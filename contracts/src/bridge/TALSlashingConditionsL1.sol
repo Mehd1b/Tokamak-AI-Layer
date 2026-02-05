@@ -4,15 +4,26 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "../interfaces/IStakingV3.sol";
 
 /**
  * @title TALSlashingConditionsL1
- * @notice Executes slashing against Staking V3 DepositManagerV3
- * @dev Registered with Staking V3 as an authorized slashing entity
+ * @notice Executes slashing against Staking V3 via the RAT coinage transfer mechanism
+ * @dev In Staking V3, slashing is NOT done via a direct DepositManagerV3.slash() call.
+ *      Instead, it uses SeigManagerV3's transferCoinageToRat() to transfer the validator's
+ *      coinage (staked tokens) to the RAT contract, effectively reducing their stake.
  *
- * Only accepts slash calls from TALStakingBridgeL1.
- * The L2->L1 message finalization period (~7 days on Optimism)
- * serves as a natural appeal window before slashing executes.
+ * Slashing Mechanism (Staking V3):
+ * - transferCoinageToRat(layer2, validator, amount): Burns validator coinage, mints to RAT
+ * - transferCoinageFromRatTo(layer2, to, amount): Restores coinage from RAT (if challenge succeeds)
+ * - Only the authorized RAT contract can call these functions on SeigManagerV3
+ *
+ * TAL Integration:
+ * - TALSlashingConditionsL1 must be registered as the RAT contract in SeigManagerV3,
+ *   OR work through the existing RAT contract for slashing authorization
+ * - Only accepts slash calls from TALStakingBridgeL1 (via SLASHER_ROLE)
+ * - The L2->L1 message finalization period (~7 days on Optimism)
+ *   serves as a natural appeal window before slashing executes
  */
 contract TALSlashingConditionsL1 is
     AccessControlUpgradeable,
@@ -26,10 +37,10 @@ contract TALSlashingConditionsL1 is
 
     // ============ State Variables ============
 
-    /// @notice Staking V3 DepositManagerV3 address
-    address public depositManagerV3;
+    /// @notice Staking V3 SeigManagerV3_1 address (for transferCoinageToRat)
+    address public seigManager;
 
-    /// @notice Layer2 address for stake queries
+    /// @notice Layer2 address for stake queries and slashing
     address public talLayer2Address;
 
     /// @notice Total slashed per operator
@@ -56,12 +67,13 @@ contract TALSlashingConditionsL1 is
     error UnauthorizedSlasher(address caller);
     error SlashAmountExceedsStake(address operator, uint256 amount, uint256 stake);
     error SlashingIsDisabled();
+    error SlashingTransferFailed(address operator, uint256 amount);
 
     // ============ Initializer ============
 
     function initialize(
         address admin_,
-        address depositManagerV3_,
+        address seigManager_,
         address talLayer2Address_,
         address bridgeL1_
     ) external initializer {
@@ -73,7 +85,7 @@ contract TALSlashingConditionsL1 is
         _grantRole(PAUSER_ROLE, admin_);
         _grantRole(SLASHER_ROLE, bridgeL1_);
 
-        depositManagerV3 = depositManagerV3_;
+        seigManager = seigManager_;
         talLayer2Address = talLayer2Address_;
         slashingEnabled = true;
     }
@@ -81,8 +93,11 @@ contract TALSlashingConditionsL1 is
     // ============ Slashing Functions ============
 
     /// @notice Execute a slash against an operator's L1 stake
+    /// @dev Uses SeigManagerV3's transferCoinageToRat to transfer stake to RAT contract
+    ///      This requires TALSlashingConditionsL1 to be authorized as the RAT contract
+    ///      in SeigManagerV3, or to route through the existing RAT contract.
     /// @param operator The operator to slash
-    /// @param amount The amount of TON to slash
+    /// @param amount The amount of TON to slash (in coinage units)
     /// @return slashedAmount The actual amount slashed
     function slash(
         address operator,
@@ -90,12 +105,22 @@ contract TALSlashingConditionsL1 is
     ) external onlyRole(SLASHER_ROLE) whenNotPaused returns (uint256 slashedAmount) {
         if (!slashingEnabled) revert SlashingIsDisabled();
 
-        // In production: call DepositManagerV3 to execute slash
-        // (bool success, bytes memory data) = depositManagerV3.call(
-        //     abi.encodeWithSignature("slash(address,address,uint256)", talLayer2Address, operator, amount)
-        // );
+        // Query current stake to validate slash amount
+        uint256 currentStake = IStakingV3(seigManager).stakeOf(talLayer2Address, operator);
+        if (amount > currentStake) {
+            revert SlashAmountExceedsStake(operator, amount, currentStake);
+        }
 
-        slashedAmount = amount; // Placeholder
+        // Execute slash via Staking V3 RAT coinage transfer mechanism
+        // transferCoinageToRat burns the validator's coinage and mints it to RAT
+        bool success = IStakingV3(seigManager).transferCoinageToRat(
+            talLayer2Address,
+            operator,
+            amount
+        );
+        if (!success) revert SlashingTransferFailed(operator, amount);
+
+        slashedAmount = amount;
         totalSlashedAmount[operator] += slashedAmount;
         slashCount[operator]++;
         lastSlashTime[operator] = block.timestamp;
@@ -104,7 +129,31 @@ contract TALSlashingConditionsL1 is
         emit SlashExecuted(operator, slashedAmount, reason);
     }
 
+    /// @notice Restore slashed funds to an operator (e.g., after successful dispute)
+    /// @dev Uses SeigManagerV3's transferCoinageFromRatTo to return coinage
+    /// @param operator The operator to restore funds to
+    /// @param amount The amount to restore
+    /// @return True if restoration succeeded
+    function restoreSlashedFunds(
+        address operator,
+        uint256 amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) whenNotPaused returns (bool) {
+        bool success = IStakingV3(seigManager).transferCoinageFromRatTo(
+            talLayer2Address,
+            operator,
+            amount
+        );
+        return success;
+    }
+
     // ============ View Functions ============
+
+    /// @notice Get current stake of an operator from SeigManagerV3
+    /// @param operator The operator address
+    /// @return The current staked amount (coinage-based, includes seigniorage)
+    function getOperatorStake(address operator) external view returns (uint256) {
+        return IStakingV3(seigManager).stakeOf(talLayer2Address, operator);
+    }
 
     /// @notice Check if a caller is authorized to execute slashing
     function isAuthorizedSlasher(address caller) external view returns (bool) {
@@ -126,6 +175,10 @@ contract TALSlashingConditionsL1 is
     }
 
     // ============ Admin Functions ============
+
+    function setSeigManager(address seigManager_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        seigManager = seigManager_;
+    }
 
     function enableSlashing() external onlyRole(DEFAULT_ADMIN_ROLE) {
         slashingEnabled = true;

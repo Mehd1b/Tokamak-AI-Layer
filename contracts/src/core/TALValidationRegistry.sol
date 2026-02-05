@@ -423,35 +423,42 @@ contract TALValidationRegistry is
         require(candidates.length > 0, "No candidates provided");
 
         // Sprint 2: Integrate with DRB module for fair validator selection
+        // DRB uses a callback model (Commit-Reveal²):
+        // 1. requestValidatorSelection() sends request to CommitReveal2 (async)
+        // 2. CommitReveal2 delivers randomness via rawFulfillRandomNumber callback
+        // 3. finalizeValidatorSelection() uses delivered randomness for weighted selection
         uint256 randomSeed;
 
-        // Try DRB module first for stake-weighted selection
+        // Try DRB module first for stake-weighted selection (async path)
         if (drbModule != address(0)) {
-            // Use DRB for fair selection with stake weights
-            (bool success, bytes memory data) = drbModule.call(
+            // Estimate the DRB fee and request randomness via callback pattern
+            uint256[] memory stakes = _getCandidateStakes(candidates);
+            (bool feeSuccess, bytes memory feeData) = drbModule.staticcall(
+                abi.encodeWithSignature("estimateRequestFee(uint32)", uint32(100000))
+            );
+            uint256 estimatedFee = 0;
+            if (feeSuccess && feeData.length >= 32) {
+                estimatedFee = abi.decode(feeData, (uint256));
+            }
+
+            // Request DRB randomness (payable call to DRB module)
+            (bool success, bytes memory data) = drbModule.call{value: estimatedFee}(
                 abi.encodeWithSignature(
                     "requestValidatorSelection(bytes32,address[],uint256[])",
-                    requestHash, candidates, _getCandidateStakes(candidates)
+                    requestHash, candidates, stakes
                 )
             );
             if (success && data.length >= 32) {
-                uint256 drbRequestId = abi.decode(data, (uint256));
-                _drbRequestIds[requestHash] = drbRequestId;
+                uint256 drbRound = abi.decode(data, (uint256));
+                _drbRequestIds[requestHash] = drbRound;
             }
-            // Fallback to blockhash for immediate selection
+            // For immediate selection, use blockhash as fallback
+            // The DRB-based selection can be finalized via finalizeValidatorSelection()
+            // once the CommitReveal2 callback delivers the random number
             randomSeed = uint256(keccak256(abi.encodePacked(blockhash(block.number - 1), requestHash)));
-        } else if (drbContract != address(0)) {
-            // Legacy DRB contract integration
-            (bool success, bytes memory result) = drbContract.staticcall(
-                abi.encodeWithSignature("getRandomness(bytes32)", requestHash)
-            );
-            if (success && result.length >= 32) {
-                randomSeed = abi.decode(result, (uint256));
-            } else {
-                randomSeed = uint256(keccak256(abi.encodePacked(blockhash(block.number - 1), requestHash)));
-            }
         } else {
             // Fallback: blockhash-based randomness (not secure for production)
+            // In production, DRB module MUST be configured for fair selection
             randomSeed = uint256(keccak256(abi.encodePacked(blockhash(block.number - 1), requestHash)));
         }
 
@@ -476,10 +483,15 @@ contract TALValidationRegistry is
     }
 
     /**
-     * @notice Finalize DRB-based validator selection
-     * @dev Sprint 2: Called after DRB randomness is available to finalize selection
+     * @notice Finalize DRB-based validator selection after CommitReveal2 callback
+     * @dev Sprint 2: Called after the DRB's rawFulfillRandomNumber callback has delivered
+     *      the random number to the DRBIntegrationModule. The module stores the randomness
+     *      and this function uses it for stake-weighted validator selection.
+     *
+     *      Flow: requestValidatorSelection() → CommitReveal2 callback → finalizeValidatorSelection()
+     *
      * @param requestHash The validation request hash
-     * @param candidates The candidate validators
+     * @param candidates The candidate validators (must match original request)
      * @param stakes The candidate stake amounts
      */
     function finalizeValidatorSelection(
@@ -490,9 +502,18 @@ contract TALValidationRegistry is
         require(_requests[requestHash].status == ValidationStatus.Pending, "Not pending");
         require(drbModule != address(0), "DRB module not set");
 
-        uint256 drbRequestId = _drbRequestIds[requestHash];
-        require(drbRequestId > 0, "No DRB request");
+        uint256 drbRound = _drbRequestIds[requestHash];
+        require(drbRound > 0, "No DRB request");
 
+        // Check if randomness has been delivered via DRB callback
+        (bool checkSuccess, bytes memory checkData) = drbModule.staticcall(
+            abi.encodeWithSignature("isRandomnessReceived(uint256)", drbRound)
+        );
+        require(checkSuccess && checkData.length >= 32, "Check failed");
+        bool isReady = abi.decode(checkData, (bool));
+        require(isReady, "DRB randomness not yet delivered via callback");
+
+        // Finalize selection using the delivered randomness
         (bool success, bytes memory data) = drbModule.call(
             abi.encodeWithSignature(
                 "finalizeValidatorSelection(bytes32,address[],uint256[])",
@@ -503,7 +524,7 @@ contract TALValidationRegistry is
         address selected = abi.decode(data, (address));
         _selectedValidators[requestHash] = selected;
 
-        emit ValidatorSelected(requestHash, selected, drbRequestId);
+        emit ValidatorSelected(requestHash, selected, drbRound);
     }
 
     // ============ TEE Attestation Management ============
@@ -606,7 +627,22 @@ contract TALValidationRegistry is
             }
         }
 
-        // TODO: Sprint 2 - Check if caller is registered validator
+        // Sprint 2: Check if caller is a registered validator (has submitted validations)
+        if (!isAuthorized) {
+            // Check if caller has any validation history (registered as validator)
+            bytes32[] storage validatorHistory = _validatorValidations[msg.sender];
+            if (validatorHistory.length > 0) {
+                isAuthorized = true;
+            }
+        }
+
+        // Also check if caller was the selected validator for this specific request
+        if (!isAuthorized) {
+            address selectedValidator = _selectedValidators[requestHash];
+            if (selectedValidator == msg.sender) {
+                isAuthorized = true;
+            }
+        }
 
         if (!isAuthorized) {
             revert NotAuthorizedToDispute(requestHash, msg.sender);

@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "../interfaces/IStakingV3.sol";
 
 /**
  * @title TALStakingBridgeL1
@@ -11,11 +12,16 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
  * @dev Queries Staking V3 on Ethereum L1 and relays data to Tokamak L2
  *
  * Key Responsibilities:
- * - Query DepositManagerV3.balanceOf() for operator stakes
+ * - Query SeigManagerV3_1.stakeOf() for operator stakes (NOT DepositManagerV3.balanceOf)
  * - Relay stake snapshots to TALStakingBridgeL2 via L1CrossDomainMessenger
  * - Execute slashing received from L2 via TALSlashingConditionsL1
- * - Claim seigniorage from SeigManagerV3_1 and bridge TON to L2
+ * - Trigger seigniorage updates via SeigManagerV3_1 and notify L2
  * - Manage registered TAL operators for batch operations
+ *
+ * Integration with Staking V3:
+ * - Uses IStakingV3.stakeOf(layer2, operator) for stake queries
+ * - Uses IStakingV3.updateSeigniorageLayer(layer2) for seigniorage updates
+ * - Slashing is delegated to TALSlashingConditionsL1 which uses RAT-based mechanism
  */
 contract TALStakingBridgeL1 is
     AccessControlUpgradeable,
@@ -37,13 +43,16 @@ contract TALStakingBridgeL1 is
     /// @notice TALStakingBridgeL2 address on L2
     address public l2BridgeAddress;
 
-    /// @notice Staking V3 DepositManagerV3 address
-    address public depositManagerV3;
+    /// @notice Staking V3 SeigManagerV3_1 address (for stakeOf queries and seigniorage)
+    /// @dev This is the SeigManager, NOT the DepositManager. Stake balances are
+    ///      queried via SeigManagerV3_1.stakeOf(), not DepositManagerV3.balanceOf()
+    address public seigManager;
 
     /// @notice TALSlashingConditionsL1 address
     address public slashingConditions;
 
-    /// @notice Layer2 address (for DepositManagerV3.balanceOf queries)
+    /// @notice Layer2 address (for SeigManagerV3_1.stakeOf queries)
+    /// @dev The Tokamak Layer2 contract that TAL operators stake on
     address public talLayer2Address;
 
     /// @notice Registered TAL operators
@@ -61,6 +70,7 @@ contract TALStakingBridgeL1 is
     event StakeRelayed(address indexed operator, uint256 amount, uint256 l1Block);
     event BatchStakeRelayed(uint256 operatorCount, uint256 l1Block);
     event SlashingExecuted(address indexed operator, uint256 amount, bytes32 evidenceHash);
+    event SeigniorageUpdated(address indexed layer2, bool success);
     event SeigniorageBridged(address indexed operator, uint256 amount);
     event OperatorRegistered(address indexed operator);
     event OperatorRemoved(address indexed operator);
@@ -88,7 +98,7 @@ contract TALStakingBridgeL1 is
         address admin_,
         address l1CrossDomainMessenger_,
         address l2BridgeAddress_,
-        address depositManagerV3_,
+        address seigManager_,
         address slashingConditions_,
         address talLayer2Address_
     ) external initializer {
@@ -102,7 +112,7 @@ contract TALStakingBridgeL1 is
 
         l1CrossDomainMessenger = l1CrossDomainMessenger_;
         l2BridgeAddress = l2BridgeAddress_;
-        depositManagerV3 = depositManagerV3_;
+        seigManager = seigManager_;
         slashingConditions = slashingConditions_;
         talLayer2Address = talLayer2Address_;
         l2MessageGasLimit = 200_000;
@@ -162,7 +172,7 @@ contract TALStakingBridgeL1 is
     ) external onlyFromL2Bridge whenNotPaused {
         bytes32 evidenceHash = keccak256(evidence);
 
-        // Call TALSlashingConditionsL1 to execute the slash
+        // Call TALSlashingConditionsL1 to execute the slash via RAT mechanism
         (bool success, ) = slashingConditions.call(
             abi.encodeWithSignature("slash(address,uint256)", operator, amount)
         );
@@ -178,24 +188,32 @@ contract TALStakingBridgeL1 is
 
     // ============ Seigniorage Functions ============
 
-    /// @notice Claim seigniorage from V3 and bridge to L2
-    /// @param operator The operator to claim for
+    /// @notice Trigger seigniorage update for the TAL layer2 on Staking V3
+    /// @dev Calls SeigManagerV3_1.updateSeigniorageLayer(talLayer2Address)
+    ///      This triggers seigniorage distribution for all stakers on this layer2
+    function triggerSeigniorageUpdate() external whenNotPaused {
+        bool success = IStakingV3(seigManager).updateSeigniorageLayer(talLayer2Address);
+        emit SeigniorageUpdated(talLayer2Address, success);
+    }
+
+    /// @notice Claim seigniorage for an operator and notify L2
+    /// @dev In Staking V3, seigniorage accrues automatically via coinage tokens.
+    ///      The operator's stakeOf() amount includes seigniorage accrual.
+    ///      This function refreshes the stake snapshot on L2 to reflect seigniorage growth.
+    /// @param operator The operator whose seigniorage-inclusive stake to relay
     function claimAndBridgeSeigniorage(address operator) external whenNotPaused {
-        // In production:
-        // 1. Claim from SeigManagerV3_1
-        // 2. Bridge TON to L2 via StandardBridge
-        // 3. Notify TALStakingBridgeL2
+        // Step 1: Trigger seigniorage update to ensure latest distribution
+        IStakingV3(seigManager).updateSeigniorageLayer(talLayer2Address);
 
-        // Placeholder: emit event for now
-        // uint256 claimed = ISeigManagerV3_1(seigManager).claim(operator);
-        // IStandardBridge(bridge).bridgeERC20(ton, l2Ton, claimed, gasLimit, data);
-        // ICrossDomainMessenger(l1CrossDomainMessenger).sendMessage(
-        //     l2BridgeAddress,
-        //     abi.encodeCall(ITALStakingBridgeL2.receiveSeigniorage, (operator, claimed)),
-        //     l2MessageGasLimit
-        // );
+        // Step 2: Query updated stake (now includes latest seigniorage)
+        uint256 currentStake = _queryStake(operator);
 
-        emit SeigniorageBridged(operator, 0);
+        // Step 3: Relay updated stake snapshot to L2
+        // In Staking V3, seigniorage is reflected in the coinage balance,
+        // so the stakeOf() value already includes accrued seigniorage.
+        _relayStakeToL2(operator, currentStake);
+
+        emit SeigniorageBridged(operator, currentStake);
     }
 
     // ============ Operator Management ============
@@ -245,6 +263,10 @@ contract TALStakingBridgeL1 is
 
     // ============ Admin Functions ============
 
+    function setSeigManager(address seigManager_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        seigManager = seigManager_;
+    }
+
     function setL2MessageGasLimit(uint32 gasLimit_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         l2MessageGasLimit = gasLimit_;
     }
@@ -259,11 +281,12 @@ contract TALStakingBridgeL1 is
 
     // ============ Internal Functions ============
 
+    /// @notice Query an operator's stake from SeigManagerV3_1
+    /// @dev Calls IStakingV3(seigManager).stakeOf(talLayer2Address, operator)
+    ///      This returns the coinage-based stake which includes seigniorage accrual
     function _queryStake(address operator) internal view returns (uint256) {
-        // In production: call DepositManagerV3.balanceOf(talLayer2Address, operator)
-        // For now, return 0 as placeholder (will be tested with mocks)
-        (bool success, bytes memory data) = depositManagerV3.staticcall(
-            abi.encodeWithSignature("balanceOf(address,address)", talLayer2Address, operator)
+        (bool success, bytes memory data) = seigManager.staticcall(
+            abi.encodeWithSignature("stakeOf(address,address)", talLayer2Address, operator)
         );
         if (success && data.length >= 32) {
             return abi.decode(data, (uint256));

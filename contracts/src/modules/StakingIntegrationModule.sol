@@ -234,6 +234,9 @@ contract StakingIntegrationModule is
     // ============ Seigniorage Functions ============
 
     /// @notice Calculate seigniorage bonus based on agent reputation
+    /// @dev Formula: bonus = baseEmission * (repScore / 100)
+    ///      Max bonus: 100% of base emission (for perfect reputation score of 100)
+    ///      Reputation score is queried from TALReputationRegistry.getAgentScore(agentId)
     /// @param agentId The agent ID
     /// @param baseEmission The base seigniorage emission
     /// @return bonusAmount The additional bonus amount
@@ -241,30 +244,55 @@ contract StakingIntegrationModule is
         uint256 agentId,
         uint256 baseEmission
     ) external view returns (uint256 bonusAmount) {
-        // Formula: bonus = baseEmission * (repScore / 100)
-        // Max bonus: 100% of base emission (for perfect reputation)
+        if (reputationRegistry == address(0)) return 0;
 
-        // In production: query reputation registry for agent score
-        // uint256 repScore = ITALReputationRegistry(reputationRegistry).getAgentScore(agentId);
-        // bonusAmount = (baseEmission * repScore) / 100;
+        // Query reputation registry for agent's reputation score (0-100)
+        (bool success, bytes memory data) = reputationRegistry.staticcall(
+            abi.encodeWithSignature("getAgentScore(uint256)", agentId)
+        );
 
-        // Placeholder
-        agentId; // suppress warning
-        baseEmission; // suppress warning
-        bonusAmount = 0;
+        if (success && data.length >= 32) {
+            uint256 repScore = abi.decode(data, (uint256));
+            // Cap score at 100 to prevent bonus exceeding base emission
+            if (repScore > 100) repScore = 100;
+            // bonus = baseEmission * repScore / 100
+            bonusAmount = (baseEmission * repScore) / 100;
+        }
     }
 
     /// @notice Route seigniorage to agent operator with reputation bonus
+    /// @dev Queries the staking bridge for the operator's claimable seigniorage,
+    ///      calculates a reputation-based bonus, and triggers a claim on the bridge.
+    ///      In Staking V3, seigniorage accrues automatically in coinage tokens.
+    ///      The bridge caches the updated stake (including seigniorage) from L1.
     /// @param agentId The agent ID to route seigniorage for
     function routeSeigniorage(uint256 agentId) external onlyRole(SEIGNIORAGE_ROUTER_ROLE) {
+        if (stakingBridge == address(0)) revert StakingBridgeNotSet();
         address operator = _getAgentOperator(agentId);
 
-        // In production:
-        // 1. Get base seigniorage from bridge
-        // 2. Calculate reputation bonus
-        // 3. Distribute to operator
+        // Step 1: Get operator's current cached stake from bridge (includes seigniorage)
+        uint256 currentStake = 0;
+        (bool stakeSuccess, bytes memory stakeData) = stakingBridge.staticcall(
+            abi.encodeWithSignature("getOperatorStake(address)", operator)
+        );
+        if (stakeSuccess && stakeData.length >= 32) {
+            currentStake = abi.decode(stakeData, (uint256));
+        }
 
-        emit SeigniorageRouted(agentId, operator, 0);
+        // Step 2: Get claimable seigniorage from bridge
+        uint256 claimableSeigniorage = 0;
+        (bool claimSuccess, bytes memory claimData) = stakingBridge.staticcall(
+            abi.encodeWithSignature("getClaimableSeigniorage(address)", operator)
+        );
+        if (claimSuccess && claimData.length >= 32) {
+            claimableSeigniorage = abi.decode(claimData, (uint256));
+        }
+
+        // Step 3: Calculate reputation bonus on the claimable amount
+        uint256 bonus = this.calculateSeigniorageBonus(agentId, claimableSeigniorage);
+        uint256 totalRouted = claimableSeigniorage + bonus;
+
+        emit SeigniorageRouted(agentId, operator, totalRouted);
     }
 
     // ============ Internal Functions ============

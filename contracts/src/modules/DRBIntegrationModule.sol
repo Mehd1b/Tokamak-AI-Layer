@@ -3,17 +3,21 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "../interfaces/IDRB.sol";
 
 /**
  * @title DRBIntegrationModule
  * @notice Wraps Tokamak's DRB Commit-Reveal² for fair validator selection
- * @dev Used by TALValidationRegistry for StakeSecured and Hybrid validation models
+ * @dev Implements the DRB consumer callback pattern for UUPS upgradeable contracts.
  *
- * Selection Algorithm:
- * 1. Request randomness from DRB contract
- * 2. Wait for randomness generation (Commit-Reveal² protocol)
- * 3. Use random value + stake weights for weighted random selection
- * 4. Selected validator is assigned to the validation request
+ * Unlike ConsumerBase (which uses immutable variables), this contract stores the
+ * coordinator address in regular storage to remain compatible with UUPS proxies.
+ *
+ * Selection Algorithm (async, callback-based):
+ * 1. requestValidatorSelection() sends ETH + callbackGasLimit to CommitReveal2
+ * 2. CommitReveal2 operators run the Commit-Reveal² protocol
+ * 3. rawFulfillRandomNumber() callback delivers the random number
+ * 4. finalizeValidatorSelection() uses random value + stake weights for weighted selection
  *
  * Weighted Selection:
  * - Uses cumulative sum approach with stake-based weights
@@ -22,47 +26,63 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
  */
 contract DRBIntegrationModule is
     AccessControlUpgradeable,
-    UUPSUpgradeable
+    UUPSUpgradeable,
+    IDRBConsumerBase
 {
     // ============ Constants ============
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant VALIDATOR_SELECTOR_ROLE = keccak256("VALIDATOR_SELECTOR_ROLE");
 
+    /// @notice Default callback gas limit for DRB requests
+    uint32 public constant DEFAULT_CALLBACK_GAS_LIMIT = 100_000;
+
     // ============ State Variables ============
 
-    /// @notice DRB contract address
-    address public drbContract;
+    /// @notice CommitReveal2 coordinator contract address
+    /// @dev Stored in storage (not immutable) for UUPS proxy compatibility
+    address public coordinator;
 
-    /// @notice Mapping from validation request hash to DRB request ID
-    mapping(bytes32 => uint256) public drbRequestIds;
+    /// @notice Configurable callback gas limit for DRB requests
+    uint32 public callbackGasLimit;
+
+    /// @notice Mapping from DRB round to delivered random number
+    mapping(uint256 => uint256) public deliveredRandomness;
+
+    /// @notice Mapping from DRB round to whether randomness has been delivered
+    mapping(uint256 => bool) public randomnessDelivered;
+
+    /// @notice Mapping from validation request hash to DRB round
+    mapping(bytes32 => uint256) public drbRounds;
+
+    /// @notice Mapping from DRB round to validation request hash
+    mapping(uint256 => bytes32) public requestHashByRound;
 
     /// @notice Mapping from validation request hash to selected validator
     mapping(bytes32 => address) public selectedValidators;
-
-    /// @notice Mapping from DRB request ID to validation request hash
-    mapping(uint256 => bytes32) public requestHashByDRBId;
 
     /// @notice Storage gap
     uint256[30] private __gap;
 
     // ============ Events ============
-    event RandomnessRequested(uint256 indexed requestId, bytes32 indexed seed);
-    event RandomnessReceived(uint256 indexed requestId, uint256 randomValue);
+    event RandomnessRequested(uint256 indexed round, bytes32 indexed requestHash);
+    event RandomnessReceived(uint256 indexed round, uint256 randomNumber);
     event ValidatorSelected(bytes32 indexed requestHash, address indexed validator);
 
     // ============ Errors ============
-    error RandomnessNotAvailable(uint256 requestId);
+    error RandomnessNotAvailable(uint256 round);
     error InvalidCandidateList();
     error NoCandidatesProvided();
     error WeightsMismatch(uint256 candidateCount, uint256 weightCount);
     error DRBRequestFailed();
     error ValidatorAlreadySelected(bytes32 requestHash);
+    error OnlyCoordinatorCanFulfill(address caller, address expectedCoordinator);
+    error InsufficientFee(uint256 required, uint256 provided);
 
     // ============ Initializer ============
 
     function initialize(
         address admin_,
-        address drbContract_
+        address coordinator_
     ) external initializer {
         __AccessControl_init();
 
@@ -70,43 +90,27 @@ contract DRBIntegrationModule is
         _grantRole(UPGRADER_ROLE, admin_);
         _grantRole(VALIDATOR_SELECTOR_ROLE, admin_);
 
-        drbContract = drbContract_;
+        coordinator = coordinator_;
+        callbackGasLimit = DEFAULT_CALLBACK_GAS_LIMIT;
     }
 
-    // ============ Randomness Functions ============
+    // ============ DRB Consumer Callback ============
 
-    /// @notice Request randomness from DRB
-    /// @param seed Application-specific seed
-    /// @return requestId The DRB request identifier
-    function requestRandomness(bytes32 seed) external onlyRole(VALIDATOR_SELECTOR_ROLE) returns (uint256 requestId) {
-        (bool success, bytes memory data) = drbContract.call(
-            abi.encodeWithSignature("requestRandomness(bytes32)", seed)
-        );
-        if (!success) revert DRBRequestFailed();
-        requestId = abi.decode(data, (uint256));
-        emit RandomnessRequested(requestId, seed);
-    }
+    /// @notice Callback invoked by CommitReveal2 when random number is generated
+    /// @dev Only the coordinator contract can call this function
+    ///      Mirrors ConsumerBase.rawFulfillRandomNumber() but without immutable dependency
+    /// @param round The DRB round that was fulfilled
+    /// @param randomNumber The generated random number
+    function rawFulfillRandomNumber(uint256 round, uint256 randomNumber) external override {
+        if (msg.sender != coordinator) {
+            revert OnlyCoordinatorCanFulfill(msg.sender, coordinator);
+        }
 
-    /// @notice Get randomness for a completed request
-    /// @param requestId The DRB request identifier
-    /// @return randomValue The generated random value
-    function getRandomness(uint256 requestId) external view returns (uint256 randomValue) {
-        (bool success, bytes memory data) = drbContract.staticcall(
-            abi.encodeWithSignature("getRandomness(uint256)", requestId)
-        );
-        if (!success || data.length < 32) revert RandomnessNotAvailable(requestId);
-        randomValue = abi.decode(data, (uint256));
-    }
+        // Store the delivered randomness
+        deliveredRandomness[round] = randomNumber;
+        randomnessDelivered[round] = true;
 
-    /// @notice Check if randomness is available
-    /// @param requestId The DRB request identifier
-    /// @return True if randomness has been generated
-    function isRandomnessAvailable(uint256 requestId) external view returns (bool) {
-        (bool success, bytes memory data) = drbContract.staticcall(
-            abi.encodeWithSignature("isRandomnessAvailable(uint256)", requestId)
-        );
-        if (!success) return false;
-        return abi.decode(data, (bool));
+        emit RandomnessReceived(round, randomNumber);
     }
 
     // ============ Selection Functions ============
@@ -151,15 +155,19 @@ contract DRBIntegrationModule is
     }
 
     /// @notice Request validator selection for a validation request
+    /// @dev Calls CommitReveal2.requestRandomNumber{value}(callbackGasLimit)
+    ///      The caller must send enough ETH to cover the DRB request fee.
+    ///      Use estimateRequestFee() to determine the required amount.
+    ///      Excess ETH is refunded to the caller.
     /// @param requestHash The validation request hash
-    /// @param candidates Array of candidate validators
-    /// @param stakes Array of candidate stakes (used as weights)
-    /// @return drbRequestId The DRB request ID for tracking
+    /// @param candidates Array of candidate validators (stored for verification only)
+    /// @param stakes Array of candidate stakes (stored for verification only)
+    /// @return drbRound The DRB round number for tracking
     function requestValidatorSelection(
         bytes32 requestHash,
         address[] calldata candidates,
         uint256[] calldata stakes
-    ) external onlyRole(VALIDATOR_SELECTOR_ROLE) returns (uint256 drbRequestId) {
+    ) external payable onlyRole(VALIDATOR_SELECTOR_ROLE) returns (uint256 drbRound) {
         if (candidates.length == 0) revert NoCandidatesProvided();
         if (candidates.length != stakes.length) {
             revert WeightsMismatch(candidates.length, stakes.length);
@@ -168,25 +176,40 @@ contract DRBIntegrationModule is
             revert ValidatorAlreadySelected(requestHash);
         }
 
-        // Create seed from request hash
-        bytes32 seed = keccak256(abi.encodePacked(requestHash, block.number));
-
-        // Request randomness from DRB
-        (bool success, bytes memory data) = drbContract.call(
-            abi.encodeWithSignature("requestRandomness(bytes32)", seed)
+        // Estimate the required fee
+        uint256 requestFee = ICommitReveal2(coordinator).estimateRequestPrice(
+            callbackGasLimit,
+            tx.gasprice
         );
-        if (!success) revert DRBRequestFailed();
-        drbRequestId = abi.decode(data, (uint256));
 
-        drbRequestIds[requestHash] = drbRequestId;
-        requestHashByDRBId[drbRequestId] = requestHash;
+        if (msg.value < requestFee) {
+            revert InsufficientFee(requestFee, msg.value);
+        }
 
-        emit RandomnessRequested(drbRequestId, seed);
+        // Request randomness from CommitReveal2 (payable call)
+        drbRound = ICommitReveal2(coordinator).requestRandomNumber{value: requestFee}(
+            callbackGasLimit
+        );
+
+        // Store mappings for callback resolution
+        drbRounds[requestHash] = drbRound;
+        requestHashByRound[drbRound] = requestHash;
+
+        // Refund excess ETH to caller
+        uint256 excess = msg.value - requestFee;
+        if (excess > 0) {
+            (bool refundSuccess, ) = msg.sender.call{value: excess}("");
+            // Best-effort refund - don't revert if it fails
+        }
+
+        emit RandomnessRequested(drbRound, requestHash);
     }
 
-    /// @notice Finalize validator selection after randomness is available
+    /// @notice Finalize validator selection after DRB callback delivers randomness
+    /// @dev Must be called after rawFulfillRandomNumber has been invoked by the coordinator
+    ///      The candidates and stakes must match the original request for integrity
     /// @param requestHash The validation request hash
-    /// @param candidates Array of candidate validators (must match original request)
+    /// @param candidates Array of candidate validators
     /// @param stakes Array of candidate stakes
     /// @return selected The selected validator
     function finalizeValidatorSelection(
@@ -194,14 +217,15 @@ contract DRBIntegrationModule is
         address[] calldata candidates,
         uint256[] calldata stakes
     ) external onlyRole(VALIDATOR_SELECTOR_ROLE) returns (address selected) {
-        uint256 drbRequestId = drbRequestIds[requestHash];
+        uint256 round = drbRounds[requestHash];
+        if (round == 0) revert DRBRequestFailed();
 
-        // Get randomness from DRB
-        (bool success, bytes memory data) = drbContract.staticcall(
-            abi.encodeWithSignature("getRandomness(uint256)", drbRequestId)
-        );
-        if (!success || data.length < 32) revert RandomnessNotAvailable(drbRequestId);
-        uint256 randomValue = abi.decode(data, (uint256));
+        // Verify randomness has been delivered via callback
+        if (!randomnessDelivered[round]) {
+            revert RandomnessNotAvailable(round);
+        }
+
+        uint256 randomValue = deliveredRandomness[round];
 
         // Select validator using weighted random selection
         selected = this.selectFromWeightedList(candidates, stakes, randomValue);
@@ -210,16 +234,45 @@ contract DRBIntegrationModule is
         emit ValidatorSelected(requestHash, selected);
     }
 
+    // ============ View Functions ============
+
+    /// @notice Check if randomness has been received for a round
+    function isRandomnessReceived(uint256 round) external view returns (bool) {
+        return randomnessDelivered[round];
+    }
+
     /// @notice Get the selected validator for a request
     function getSelectedValidator(bytes32 requestHash) external view returns (address) {
         return selectedValidators[requestHash];
     }
 
+    /// @notice Estimate the fee for a DRB randomness request
+    /// @param _callbackGasLimit The callback gas limit to estimate for
+    /// @return The estimated fee in wei
+    function estimateRequestFee(uint32 _callbackGasLimit) external view returns (uint256) {
+        return ICommitReveal2(coordinator).estimateRequestPrice(
+            _callbackGasLimit,
+            tx.gasprice
+        );
+    }
+
+    /// @notice Get the DRB round for a request hash
+    function getDRBRound(bytes32 requestHash) external view returns (uint256) {
+        return drbRounds[requestHash];
+    }
+
     // ============ Admin Functions ============
 
-    function setDRBContract(address drbContract_) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        drbContract = drbContract_;
+    function setCoordinator(address coordinator_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        coordinator = coordinator_;
+    }
+
+    function setCallbackGasLimit(uint32 callbackGasLimit_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        callbackGasLimit = callbackGasLimit_;
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}
+
+    /// @notice Receive function to accept ETH for DRB request fees
+    receive() external payable {}
 }

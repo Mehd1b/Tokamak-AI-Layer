@@ -9,7 +9,13 @@ import {MockDRB} from "../mocks/MockDRB.sol";
 /**
  * @title DRBIntegrationModuleTest
  * @notice Unit tests for DRBIntegrationModule
- * @dev Tests DRB randomness integration and weighted validator selection
+ * @dev Tests DRB callback-based randomness integration and weighted validator selection
+ *
+ * DRB Flow (callback model):
+ * 1. requestValidatorSelection() calls MockDRB.requestRandomNumber{value}(callbackGasLimit)
+ * 2. MockDRB.fulfillRandomNumber(round) simulates operator callback delivery
+ * 3. rawFulfillRandomNumber() stores randomness in the module
+ * 4. finalizeValidatorSelection() uses stored randomness for weighted selection
  */
 contract DRBIntegrationModuleTest is Test {
     // ============ Contracts ============
@@ -29,7 +35,7 @@ contract DRBIntegrationModuleTest is Test {
     // ============ Setup ============
 
     function setUp() public {
-        // Deploy mock DRB
+        // Deploy mock DRB coordinator
         mockDRB = new MockDRB();
 
         // Deploy implementation
@@ -42,7 +48,7 @@ contract DRBIntegrationModuleTest is Test {
             address(mockDRB)
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
-        drbModule = DRBIntegrationModule(address(proxy));
+        drbModule = DRBIntegrationModule(payable(address(proxy)));
 
         // Grant selector role
         vm.startPrank(admin);
@@ -57,58 +63,57 @@ contract DRBIntegrationModuleTest is Test {
         stakes.push(1000 ether);
         stakes.push(2000 ether);
         stakes.push(3000 ether);
+
+        // Fund accounts for DRB fees
+        vm.deal(selector, 10 ether);
+        vm.deal(admin, 10 ether);
+        vm.deal(address(drbModule), 10 ether);
     }
 
     // ============ Initialization Tests ============
 
     function test_Initialize() public view {
-        assertEq(drbModule.drbContract(), address(mockDRB));
+        assertEq(drbModule.coordinator(), address(mockDRB));
         assertTrue(drbModule.hasRole(drbModule.DEFAULT_ADMIN_ROLE(), admin));
         assertTrue(drbModule.hasRole(drbModule.UPGRADER_ROLE(), admin));
         assertTrue(drbModule.hasRole(drbModule.VALIDATOR_SELECTOR_ROLE(), admin));
         assertTrue(drbModule.hasRole(drbModule.VALIDATOR_SELECTOR_ROLE(), selector));
+        assertEq(drbModule.callbackGasLimit(), drbModule.DEFAULT_CALLBACK_GAS_LIMIT());
     }
 
-    // ============ Randomness Request Tests ============
+    // ============ Callback Tests ============
 
-    function test_RequestRandomness() public {
+    function test_RawFulfillRandomNumber() public {
+        // First, make a request so there's a round to fulfill
+        bytes32 requestHash = keccak256("request_1");
         vm.prank(selector);
-        uint256 requestId = drbModule.requestRandomness(keccak256("test_seed"));
-        assertGe(requestId, 0);
+        uint256 round = drbModule.requestValidatorSelection{value: 1 ether}(
+            requestHash, candidates, stakes
+        );
+
+        // Simulate DRB callback
+        mockDRB.fulfillRandomNumberWith(round, 42);
+
+        // Verify randomness was stored
+        assertTrue(drbModule.isRandomnessReceived(round));
+        assertEq(drbModule.deliveredRandomness(round), 42);
     }
 
-    function test_RequestRandomness_EmitsEvent() public {
-        vm.prank(selector);
-        vm.expectEmit(true, true, false, false);
-        emit DRBIntegrationModule.RandomnessRequested(0, keccak256("test_seed"));
-        drbModule.requestRandomness(keccak256("test_seed"));
-    }
-
-    function test_GetRandomness() public {
-        vm.prank(selector);
-        uint256 requestId = drbModule.requestRandomness(keccak256("test_seed"));
-
-        uint256 randomValue = drbModule.getRandomness(requestId);
-        assertGt(randomValue, 0);
-    }
-
-    function test_IsRandomnessAvailable() public {
-        vm.prank(selector);
-        uint256 requestId = drbModule.requestRandomness(keccak256("test_seed"));
-
-        assertTrue(drbModule.isRandomnessAvailable(requestId));
-    }
-
-    function test_IsRandomnessAvailable_FalseForUnavailable() public {
-        // Set unavailable in mock
-        mockDRB.setUnavailable(999);
-        assertFalse(drbModule.isRandomnessAvailable(999));
-    }
-
-    function test_RevertOnUnauthorizedRandomnessRequest() public {
+    function test_RawFulfillRandomNumber_RevertOnNonCoordinator() public {
+        // Try to call rawFulfillRandomNumber directly (not from coordinator)
         vm.prank(unauthorized);
-        vm.expectRevert();
-        drbModule.requestRandomness(keccak256("test"));
+        vm.expectRevert(
+            abi.encodeWithSignature(
+                "OnlyCoordinatorCanFulfill(address,address)",
+                unauthorized,
+                address(mockDRB)
+            )
+        );
+        drbModule.rawFulfillRandomNumber(1, 42);
+    }
+
+    function test_IsRandomnessReceived_FalseBeforeCallback() public {
+        assertFalse(drbModule.isRandomnessReceived(999));
     }
 
     // ============ Weighted Selection Tests ============
@@ -147,7 +152,6 @@ contract DRBIntegrationModuleTest is Test {
         }
 
         // Verify all selections are valid candidates
-        // Note: The distribution should ideally be weighted by stake
         assertEq(counts[0] + counts[1] + counts[2], 100, "All selections should be counted");
     }
 
@@ -188,40 +192,70 @@ contract DRBIntegrationModuleTest is Test {
         drbModule.selectFromWeightedList(candidates, zeroStakes, 123);
     }
 
-    // ============ Validator Selection Tests ============
+    // ============ Validator Selection Tests (Async Flow) ============
 
     function test_RequestValidatorSelection() public {
         bytes32 requestHash = keccak256("request_1");
 
         vm.prank(selector);
-        uint256 drbRequestId = drbModule.requestValidatorSelection(
+        uint256 drbRound = drbModule.requestValidatorSelection{value: 1 ether}(
             requestHash, candidates, stakes
         );
 
-        assertGe(drbRequestId, 0);
-        assertEq(drbModule.drbRequestIds(requestHash), drbRequestId);
-        assertEq(drbModule.requestHashByDRBId(drbRequestId), requestHash);
+        assertGt(drbRound, 0);
+        assertEq(drbModule.drbRounds(requestHash), drbRound);
+        assertEq(drbModule.requestHashByRound(drbRound), requestHash);
     }
 
     function test_RequestValidatorSelection_EmitsEvent() public {
         bytes32 requestHash = keccak256("request_1");
 
         vm.prank(selector);
-        vm.expectEmit(true, false, false, false);
-        emit DRBIntegrationModule.RandomnessRequested(0, bytes32(0));
-        drbModule.requestValidatorSelection(requestHash, candidates, stakes);
+        vm.expectEmit(true, true, false, false);
+        emit DRBIntegrationModule.RandomnessRequested(1, requestHash);
+        drbModule.requestValidatorSelection{value: 1 ether}(requestHash, candidates, stakes);
+    }
+
+    function test_RequestValidatorSelection_RefundsExcessETH() public {
+        bytes32 requestHash = keccak256("request_1");
+        uint256 balanceBefore = selector.balance;
+
+        vm.prank(selector);
+        drbModule.requestValidatorSelection{value: 1 ether}(requestHash, candidates, stakes);
+
+        // Should have been refunded most of the 1 ether (fee is only 0.001 ether)
+        uint256 spent = balanceBefore - selector.balance;
+        assertEq(spent, mockDRB.s_flatFee(), "Should only spend the DRB fee");
+    }
+
+    function test_RequestValidatorSelection_RevertOnInsufficientFee() public {
+        bytes32 requestHash = keccak256("request_1");
+
+        // Set a high fee
+        mockDRB.setFlatFee(5 ether);
+
+        vm.prank(selector);
+        vm.expectRevert(); // InsufficientFee
+        drbModule.requestValidatorSelection{value: 0.001 ether}(requestHash, candidates, stakes);
     }
 
     function test_FinalizeValidatorSelection() public {
         bytes32 requestHash = keccak256("request_1");
 
-        vm.startPrank(selector);
-        drbModule.requestValidatorSelection(requestHash, candidates, stakes);
+        // Step 1: Request selection
+        vm.prank(selector);
+        uint256 round = drbModule.requestValidatorSelection{value: 1 ether}(
+            requestHash, candidates, stakes
+        );
 
+        // Step 2: Simulate DRB callback (async delivery)
+        mockDRB.fulfillRandomNumberWith(round, 4500 ether); // Known value for deterministic test
+
+        // Step 3: Finalize selection
+        vm.prank(selector);
         address selected = drbModule.finalizeValidatorSelection(
             requestHash, candidates, stakes
         );
-        vm.stopPrank();
 
         assertTrue(
             selected == candidates[0] ||
@@ -234,51 +268,106 @@ contract DRBIntegrationModuleTest is Test {
     function test_FinalizeValidatorSelection_EmitsEvent() public {
         bytes32 requestHash = keccak256("request_1");
 
-        vm.startPrank(selector);
-        drbModule.requestValidatorSelection(requestHash, candidates, stakes);
+        vm.prank(selector);
+        uint256 round = drbModule.requestValidatorSelection{value: 1 ether}(
+            requestHash, candidates, stakes
+        );
 
+        mockDRB.fulfillRandomNumberWith(round, 42);
+
+        vm.prank(selector);
         vm.expectEmit(true, false, false, false);
         emit DRBIntegrationModule.ValidatorSelected(requestHash, address(0));
         drbModule.finalizeValidatorSelection(requestHash, candidates, stakes);
-        vm.stopPrank();
+    }
+
+    function test_FinalizeValidatorSelection_RevertBeforeCallback() public {
+        bytes32 requestHash = keccak256("request_1");
+
+        // Request but DON'T fulfill (no callback yet)
+        vm.prank(selector);
+        drbModule.requestValidatorSelection{value: 1 ether}(
+            requestHash, candidates, stakes
+        );
+
+        // Query round outside of prank so prank isn't consumed by view call
+        uint256 round = drbModule.drbRounds(requestHash);
+
+        // Try to finalize before randomness is delivered
+        vm.prank(selector);
+        vm.expectRevert(abi.encodeWithSignature("RandomnessNotAvailable(uint256)", round));
+        drbModule.finalizeValidatorSelection(requestHash, candidates, stakes);
     }
 
     function test_RevertOnDuplicateValidatorSelection() public {
         bytes32 requestHash = keccak256("request_1");
 
         vm.startPrank(selector);
-        drbModule.requestValidatorSelection(requestHash, candidates, stakes);
+        uint256 round = drbModule.requestValidatorSelection{value: 1 ether}(
+            requestHash, candidates, stakes
+        );
+        vm.stopPrank();
+
+        mockDRB.fulfillRandomNumberWith(round, 42);
+
+        vm.startPrank(selector);
         drbModule.finalizeValidatorSelection(requestHash, candidates, stakes);
 
         // Try to request again for same hash
         vm.expectRevert(abi.encodeWithSignature("ValidatorAlreadySelected(bytes32)", requestHash));
-        drbModule.requestValidatorSelection(requestHash, candidates, stakes);
+        drbModule.requestValidatorSelection{value: 1 ether}(requestHash, candidates, stakes);
         vm.stopPrank();
     }
 
     function test_RevertOnUnauthorizedValidatorSelection() public {
         bytes32 requestHash = keccak256("request_1");
 
+        vm.deal(unauthorized, 1 ether);
         vm.prank(unauthorized);
         vm.expectRevert();
-        drbModule.requestValidatorSelection(requestHash, candidates, stakes);
+        drbModule.requestValidatorSelection{value: 1 ether}(requestHash, candidates, stakes);
     }
 
     // ============ Admin Functions Tests ============
 
-    function test_SetDRBContract() public {
-        address newDRB = address(0x999);
+    function test_SetCoordinator() public {
+        address newCoordinator = address(0x999);
 
         vm.prank(admin);
-        drbModule.setDRBContract(newDRB);
+        drbModule.setCoordinator(newCoordinator);
 
-        assertEq(drbModule.drbContract(), newDRB);
+        assertEq(drbModule.coordinator(), newCoordinator);
     }
 
-    function test_RevertOnUnauthorizedSetDRBContract() public {
+    function test_SetCallbackGasLimit() public {
+        vm.prank(admin);
+        drbModule.setCallbackGasLimit(200_000);
+
+        assertEq(drbModule.callbackGasLimit(), 200_000);
+    }
+
+    function test_RevertOnUnauthorizedSetCoordinator() public {
         vm.prank(unauthorized);
         vm.expectRevert();
-        drbModule.setDRBContract(address(0x999));
+        drbModule.setCoordinator(address(0x999));
+    }
+
+    // ============ View Functions Tests ============
+
+    function test_EstimateRequestFee() public view {
+        uint256 fee = drbModule.estimateRequestFee(100_000);
+        assertEq(fee, mockDRB.s_flatFee());
+    }
+
+    function test_GetDRBRound() public {
+        bytes32 requestHash = keccak256("request_1");
+
+        vm.prank(selector);
+        uint256 round = drbModule.requestValidatorSelection{value: 1 ether}(
+            requestHash, candidates, stakes
+        );
+
+        assertEq(drbModule.getDRBRound(requestHash), round);
     }
 
     // ============ Fuzz Tests ============
