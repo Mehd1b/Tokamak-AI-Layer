@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+
+# Local configuration
+.omc/
+.claude/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Deployment artifacts
+contracts/deployments/local.json
+
+# Coverage
+coverage/
+lcov.info

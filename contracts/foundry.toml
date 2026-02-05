@@ -1,0 +1,42 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc = "0.8.24"
+optimizer = true
+optimizer_runs = 200
+via_ir = true
+evm_version = "cancun"
+
+# Remappings
+remappings = [
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+    "forge-std/=lib/forge-std/src/"
+]
+
+# Testing
+[fuzz]
+runs = 256
+max_test_rejects = 65536
+
+[invariant]
+runs = 256
+depth = 15
+fail_on_revert = false
+
+# Formatting
+[fmt]
+line_length = 120
+tab_width = 4
+bracket_spacing = true
+int_types = "long"
+multiline_func_header = "attributes_first"
+quote_style = "double"
+number_underscore = "thousands"
+wrap_comments = true
+
+# CI profile with more fuzz runs
+[profile.ci]
+fuzz = { runs = 1000 }
+invariant = { runs = 500 }
