@@ -30,9 +30,10 @@ TAL implements **ERC-8004** (the emerging Ethereum standard for trustless agents
 
 | Component | What It Does |
 |-----------|--------------|
-| **Identity Registry** | Discover agents with verifiable credentials |
-| **Reputation Registry** | Track agent performance with Sybil-resistant feedback |
-| **Validation Registry** | Prove agents executed tasks correctly |
+| **Identity Registry** (L2) | Discover agents with verifiable credentials |
+| **Reputation Registry** (L2) | Track agent performance with Sybil-resistant feedback |
+| **Validation Registry** (L2) | Prove agents executed tasks correctly |
+| **Cross-Layer Staking Bridge** (L1↔L2) | Bring L1 economic security to L2 agent operations |
 
 ---
 
@@ -44,21 +45,63 @@ Tokamak has **four unique capabilities** that make TAL possible:
 ┌─────────────────────────────────────────────────────────────────────┐
 │                                                                     │
 │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────┐  │
-│  │    TEE      │   │             │   │             │   │         │  │
-│  │ Integration │   │    DRB      │   │ Staking V2  │   │   L2    │  │
+│  │    TEE      │   │             │   │ Staking V3  │   │   L2    │  │
+│  │ Integration │   │    DRB      │   │   (L1)      │   │         │  │
 │  │             │   │             │   │             │   │         │  │
 │  └──────┬──────┘   └──────┬──────┘   └──────┬──────┘   └────┬────┘  │
 │         │                 │                 │               │       │
 │         ▼                 ▼                 ▼               ▼       │
 │                                                                     │
-│   TEE oracle        Fair random       Economic          Low-cost    │
-│   settlement on     selection         security          on-chain    │
-│   Tokamak L2        (no manipulation) (TON stake)       operations  │
+│   TEE oracle        Fair random       L1-grade          Low-cost    │
+│   settlement on     selection         economic          on-chain    │
+│   Tokamak L2        (no manipulation) security          operations  │
+│                                       (TON stake        on L2       │
+│                                        bridged to L2)               │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 **Tokamak provides the complete coordination stack for trustless agents.**
+
+---
+
+## The Cross-Layer Advantage
+
+**Key insight:** Economic security lives on L1. Agent operations live on L2. TAL bridges both.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                                                                     │
+│   ETHEREUM L1                        TOKAMAK L2                     │
+│   ══════════                         ═══════════                    │
+│                                                                     │
+│   ┌───────────────────┐              ┌───────────────────┐          │
+│   │  Staking V3       │   Stake      │  TAL Agent        │          │
+│   │  DepositManagerV3 │──snapshots──►│  Registries       │          │
+│   │  SeigManagerV3_1  │   (L1→L2)    │                   │          │
+│   │                   │              │  Identity +        │          │
+│   │  TON staked =     │              │  Reputation +      │          │
+│   │  economic trust   │   Slash      │  Validation        │          │
+│   │                   │◄──requests───│                   │          │
+│   │  TALSlashing      │   (L2→L1)    │  TALStaking       │          │
+│   │  ConditionsL1     │   7d appeal  │  BridgeL2         │          │
+│   │                   │              │  (cached mirror)   │          │
+│   │  TALStaking       │  Seigniorage │                   │          │
+│   │  BridgeL1         │──(bridged)──►│  Distributed to   │          │
+│   │                   │   TON/WTON   │  high-rep agents  │          │
+│   └───────────────────┘              └───────────────────┘          │
+│                                                                     │
+│   Native Optimism CrossDomainMessenger                              │
+│   ═══════════════════════════════════                               │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Why this matters:**
+- L1 stake = Ethereum-grade economic security (not just L2 assumptions)
+- L2 registries = low-cost, fast agent operations
+- 7-day L2→L1 finalization = built-in appeal window for slashing disputes
+- No new trust assumptions beyond Optimism's native bridge
 
 ---
 
@@ -72,54 +115,60 @@ Tokamak has **four unique capabilities** that make TAL possible:
              ▼                                              ▼
     ┌────────────────┐    ┌────────────────┐    ┌────────────────┐
     │                │    │                │    │                │
-    │   REPUTATION   │───►│ STAKE-SECURED  │───►│ TEE ATTESTED   │
-    │                │    │                │    │   + STAKE      │
-    │  "Pizza order" │    │  "Trade $1K"   │    │  "Trade $100K" │
-    │                │    │                │    │                │
-    │  Free          │    │  Bounty-based  │    │ Attestation-   │
-    │  Instant       │    │  Minutes       │    │ based          │
-    │                │    │                │    │                │
+    │   REPUTATION   │───►│ L1 STAKE-      │───►│ TEE ATTESTED   │
+    │   (L2 only)    │    │ SECURED        │    │ + L1 STAKE     │
+    │                │    │ (L1↔L2 bridge) │    │ (Fresh L1      │
+    │  "Pizza order" │    │  "Trade $1K"   │    │  check)        │
+    │                │    │                │    │  "Trade $100K" │
+    │  Free          │    │  Bounty-based  │    │                │
+    │  Instant       │    │  L2 cache OK   │    │ Forced L1      │
+    │                │    │                │    │ refresh         │
     └────────────────┘    └────────────────┘    └────────────────┘
 ```
 
 ### The Flow
 
 ```
-    USER                    AGENT                     TAL
+    USER                    AGENT                     TAL (L2 + L1)
       │                       │                        │
       │  1. Find agent        │                        │
-      │───────────────────────────────────────────────►│
+      │───────────────────────────────────────────────►│ (L2)
       │                       │                        │
       │  2. Check reputation  │                        │
-      │◄───────────────────────────────────────────────│
+      │◄───────────────────────────────────────────────│ (L2)
       │     Score: 94/100     │                        │
+      │     L1 Stake: 5,000 TON (verified via bridge)  │
       │     TEE Attestations: 1,247                    │
       │                       │                        │
       │  3. Request task      │                        │
       │──────────────────────►│                        │
       │                       │                        │
       │                       │  4. Execute + Prove    │
-      │                       │───────────────────────►│
+      │                       │───────────────────────►│ (L2)
       │                       │                        │
       │  5. Verified result   │                        │
-      │◄───────────────────────────────────────────────│
+      │◄───────────────────────────────────────────────│ (L2)
       │                       │                        │
+      │  (If misbehavior detected)                     │
+      │                       │  6. Slash request ─────│──►(L1)
+      │                       │     7-day appeal       │
+      │                       │     L1 stake reduced   │
 ```
 
 ---
 
-## Key Innovation: Trustless Coordination Infrastructure
+## Key Innovation: L1 Security for L2 Agents
 
-**The breakthrough:** Tokamak provides the complete stack for fair, accountable agent coordination.
+**The breakthrough:** TAL brings Ethereum L1 economic guarantees to lightweight L2 agent operations.
 
-| Component | What TAL Provides |
-|-----------|-------------------|
-| **Fair Selection** | DRB Commit-Reveal² ensures manipulation-resistant validator/agent selection |
-| **Economic Security** | TON staking creates skin-in-the-game with slashing for misbehavior |
-| **TEE Settlement** | Integrate with existing TEE oracles (Intel SGX, AWS Nitro, ARM TrustZone), settle attestations on-chain |
-| **Targeted ZK** | Efficient on-chain proofs for reputation merkle trees and identity commitments only |
-
-**This creates the trust foundation for high-value agent operations.**
+| Component | What TAL Provides | Layer |
+|-----------|-------------------|-------|
+| **Fair Selection** | DRB Commit-Reveal² ensures manipulation-resistant selection | L2 |
+| **Economic Security** | TON staking on L1 creates skin-in-the-game | L1 (bridged to L2) |
+| **Cross-Layer Bridge** | Native Optimism messaging relays stake, slashing, seigniorage | L1 ↔ L2 |
+| **TEE Settlement** | Hardware attestations (SGX, Nitro, TrustZone) settled on L2 | L2 |
+| **Targeted ZK** | Poseidon-based identity commitments and reputation proofs | L2 |
+| **Natural Appeal** | 7-day L2→L1 finalization = built-in dispute window | Optimism |
 
 ---
 
@@ -130,7 +179,7 @@ Agents can prove capabilities without revealing identity using ZK identity proof
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                                                                 │
-│   ON-CHAIN                          AGENT PROVES                │
+│   ON-CHAIN (L2)                     AGENT PROVES                │
 │   (Public)                          (Private)                   │
 │                                                                 │
 │   ┌─────────────────┐               ┌─────────────────┐         │
@@ -142,8 +191,8 @@ Agents can prove capabilities without revealing identity using ZK identity proof
 │   │                 │               │  revealing:     │         │
 │   └─────────────────┘               │  • Identity     │         │
 │                                     │  • Other skills │         │
-│                                     │  • Methods      │         │
-│                                     └─────────────────┘         │
+│   L1 STAKE: 5,000 TON              │  • Methods      │         │
+│   (verified via bridge)             └─────────────────┘         │
 │                                                                 │
 │   Note: ZK used ONLY for identity/reputation proofs (Poseidon-  │
 │   based), NOT for agent execution verification.                 │
@@ -155,25 +204,25 @@ Agents can prove capabilities without revealing identity using ZK identity proof
 
 ## TON Utility
 
-TAL creates **new demand** for TON:
+TAL creates **new demand** for TON across both layers:
 
-| Use | Mechanism |
-|-----|-----------|
-| **Verified Operator** | Stake 1,000+ TON for trust badge |
-| **Validation Bounties** | Pay TON for proof verification |
-| **Slashing** | Lose stake for misbehavior |
-| **Seigniorage Bonus** | High-reputation agents earn more |
+| Use | Mechanism | Layer |
+|-----|-----------|-------|
+| **Verified Operator** | Stake 1,000+ TON on L1 DepositManagerV3 | L1 |
+| **Validation Bounties** | Pay TON for proof verification | L2 |
+| **Slashing** | Lose L1 stake for L2 misbehavior (7d appeal) | L1 (via bridge) |
+| **Seigniorage Bonus** | High-reputation agents earn more (bridged to L2) | L1→L2 |
 
 ---
 
 ## Target Use Cases
 
-| Use Case | Trust Model | Example |
-|----------|-------------|---------|
-| **DeFi Agents** | TEE Attested + Stake | Yield optimization with hardware-attested execution |
-| **Trading Bots** | TEE + Stake | Algorithmic trading with economic accountability |
-| **Research Assistants** | Reputation | Literature review, content generation |
-| **Multi-Agent Systems** | Hybrid | Complex workflows with verified handoffs |
+| Use Case | Trust Model | Cross-Layer Involvement |
+|----------|-------------|------------------------|
+| **DeFi Agents** | TEE + L1 Stake | Fresh L1 check for high-value; slash via bridge |
+| **Trading Bots** | TEE + L1 Stake | L1 stake = economic accountability |
+| **Research Assistants** | Reputation | L2 only; L1 stake optional credibility signal |
+| **Multi-Agent Systems** | Hybrid | DRB selection; composite L1 stake verification |
 
 ---
 
@@ -183,9 +232,9 @@ TAL creates **new demand** for TON:
                            ECONOMIC SECURITY
                                  │
                          High    │    ┌───────────┐
-                                 │    │    TAL    │ ◄── Us
-                                 │    │ (Tokamak) │
-                                 │    └───────────┘
+                         (L1)    │    │    TAL    │ ◄── Us
+                                 │    │ (Tokamak) │     L1 stake +
+                                 │    └───────────┘     L2 agents
                                  │
                                  │
   CENTRALIZED ───────────────────┼──────────────────── DECENTRALIZED
@@ -197,9 +246,10 @@ TAL creates **new demand** for TON:
        └──────────┘              │         └──────────┘
                                  │
                          Low     │
+                         (L2)    │
 ```
 
-**TAL is the only solution combining DRB fairness + economic security + TEE settlement.**
+**TAL is the only solution combining DRB fairness + L1 economic security + TEE settlement + cross-layer bridge.**
 
 ---
 
@@ -216,23 +266,26 @@ Q1          Q2          Q3          Q4          Q1+
 ┌───────┐   ┌───────┐   ┌───────┐   ┌───────┐   ┌───────┐
 │ FOUND-│   │ TRUST │   │MAINNET│   │ SCALE │   │ CROSS-│
 │ ATION │──►│INTEGR-│──►│LAUNCH │──►│   &   │──►│ CHAIN │
-│       │   │ ATION │   │       │   │EXPAND │   │       │
+│   +   │   │ ATION │   │(L1+L2)│   │EXPAND │   │       │
+│BRIDGE │   │       │   │       │   │       │   │       │
 └───────┘   └───────┘   └───────┘   └───────┘   └───────┘
 
-• Contracts  • TEE oracles • Go live    • 1K agents  • L1 bridge
-• Testnet    • DRB link    • 50 agents  • Partners   • Multi-L2
-• Basic UI   • Stake mods  • Audits     • Mobile     • DAO
+• L2 Regs    • TEE oracles • Go live    • 1K agents  • L1 bridge
+• L1 Bridge  • DRB link    • Both layers• Partners   • Multi-L2
+• L1 Slash   • Slash E2E   • 50 agents  • Mobile     • DAO
+• Stake      • Seigniorage • Audits     • Indexer    
+  cache        bridge        (L1+L2)     (L1+L2)
 ```
 
 ---
-
 
 ## Why Now?
 
 1. **ERC-8004 is emerging** — First-mover advantage in implementation
 2. **Agent adoption accelerating** — MCP, A2A gaining traction
-3. **TEE ecosystem maturing** — Hardware attestation becoming standard (Intel SGX, AWS Nitro, ARM TrustZone)
-4. **Market gap** — No trustless agent coordination infrastructure exists
+3. **TEE ecosystem maturing** — Hardware attestation becoming standard
+4. **Staking V3 deployed** — L1 economic infrastructure ready; cross-layer bridge is the missing piece
+5. **Market gap** — No trustless agent coordination with L1-grade economic security exists
 
 ---
 
@@ -247,18 +300,20 @@ Q1          Q2          Q3          Q4          Q1+
 │   │                                                          │  │
 │   │  PROBLEM     AI agents need trust infrastructure         │  │
 │   │                                                          │  │
-│   │  SOLUTION    ERC-8004 + DRB fairness + TON economic      │  │
-│   │              security + TEE integration                  │  │
+│   │  SOLUTION    ERC-8004 + DRB fairness + L1 TON economic   │  │
+│   │              security + TEE integration + cross-layer    │  │
+│   │              staking bridge (L1↔L2)                      │  │
 │   │                                                          │  │
-│   │  ADVANTAGE   Complete coordination stack: fairness,      │  │
-│   │              accountability, settlement                  │  │
+│   │  ADVANTAGE   L1 economic security for L2 agent ops:      │  │
+│   │              fairness, accountability, settlement         │  │
+│   │              + 7-day natural appeal window                │  │
 │   │                                                          │  │
 │   │  OUTCOME     Tokamak becomes THE agent trust layer       │  │
 │   │                                                          │  │
 │   └──────────────────────────────────────────────────────────┘  │
 │                                                                 │
 │   "Where AI agents earn trust through economics, attestation,   │
-│    and accountability"                                          │
+│    and accountability — secured by L1, executed on L2"          │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```

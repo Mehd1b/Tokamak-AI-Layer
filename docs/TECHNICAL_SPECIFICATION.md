@@ -1,8 +1,11 @@
 # Tokamak Agent Layer (TAL) - Technical Specification
 
-**Version:** 1.0
+**Version:** 1.1
 **Date:** February 2026
 **Status:** Draft
+
+**Changelog:**
+- v1.1 (Feb 2026): Updated Staking V2 → V3 references; Added Cross-Layer Staking Bridge (TALStakingBridgeL1, TALStakingBridgeL2, TALSlashingConditionsL1); Updated external dependencies to reflect L1 staking via DepositManagerV3
 
 ---
 
@@ -101,9 +104,9 @@
 │  ┌───────────────────────────────────────────────────────────────────────────────┐  │
 │  │                      EXTERNAL DEPENDENCIES                                    │  │
 │  │  ┌───────────────────┐ ┌───────────────────┐ ┌───────────────────────────┐   │  │
-│  │  │   Staking V2      │ │   DRB Contract    │ │   TEE Attestation         │   │  │
-│  │  │   (TON Staking)   │ │ (Commit-Reveal²)  │ │   Providers               │   │  │
-│  │  │                   │ │                   │ │ (SGX, Nitro, TrustZone)   │   │  │
+│  │  │   Staking V3 (L1) │ │   DRB Contract    │ │   TEE Attestation         │   │  │
+│  │  │   + Cross-Layer   │ │ (Commit-Reveal²)  │ │   Providers               │   │  │
+│  │  │     Bridge        │ │                   │ │ (SGX, Nitro, TrustZone)   │   │  │
 │  │  └───────────────────┘ └───────────────────┘ └───────────────────────────┘   │  │
 │  └───────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                     │
@@ -198,7 +201,7 @@
 │                              │ │TAL Contracts│ │                                    │
 │                              │ └─────────────┘ │                                    │
 │                              │ ┌─────────────┐ │                                    │
-│                              │ │ Staking V2  │ │                                    │
+│                              │ │ Staking V3  │ │                                    │
 │                              │ └─────────────┘ │                                    │
 │                              │ ┌─────────────┐ │                                    │
 │                              │ │    DRB      │ │                                    │
@@ -232,7 +235,7 @@
 
 | Dependency | Type | Interface | Purpose |
 |------------|------|-----------|---------|
-| Staking V2 | Contract | `IStakingV2` | TON staking, operator verification, slashing |
+| Staking V3 (L1) | Contract | `IStakingV3` | L1 TON staking via DepositManagerV3, operator verification via cross-layer bridge, slashing via TALSlashingConditionsL1 |
 | DRB | Contract | `IDRB` | Commit-Reveal² randomness for validator selection |
 | TON Token | Contract | `IERC20` | Native economic unit for bounties/staking |
 | The Graph | Service | GraphQL | Event indexing and query API |
@@ -424,7 +427,7 @@ contract TALIdentityRegistry is
     uint256 private _nextTokenId;
 
     // External contracts
-    address public stakingV2;
+    address public stakingBridgeL2; // TALStakingBridgeL2
     address public zkVerifierModule;
 
     // Core mappings
@@ -452,7 +455,7 @@ contract TALIdentityRegistry is
 
 | Function | Visibility | Modifiers | Gas Target |
 |----------|------------|-----------|------------|
-| `initialize(address stakingV2_, address zkVerifier_)` | external | initializer | N/A |
+| `initialize(address stakingBridgeL2_, address zkVerifier_)` | external | initializer | N/A |
 | `register(string calldata agentURI)` | external | whenNotPaused | <200k |
 | `registerWithZKIdentity(string calldata agentURI, bytes32 zkCommitment)` | external | whenNotPaused | <250k |
 | `updateAgentURI(uint256 agentId, string calldata newURI)` | external | onlyOwnerOrOperator | <80k |
@@ -624,7 +627,7 @@ contract TALReputationRegistry is
     // External contracts
     address public identityRegistry;
     address public validationRegistry;
-    address public stakingV2;
+    address public stakingBridgeL2; // TALStakingBridgeL2
 
     // Core feedback storage
     mapping(uint256 => mapping(address => Feedback[])) private _feedbacks;
@@ -821,7 +824,7 @@ contract TALValidationRegistry is
     address public identityRegistry;
     address public reputationRegistry;
     address public drbContract;
-    address public stakingV2;
+    address public stakingBridgeL2; // TALStakingBridgeL2
     address public treasury;
 
     // Core storage
@@ -999,6 +1002,8 @@ interface IDRBIntegrationModule {
 
 #### 2.5.3 StakingIntegrationModule
 
+The StakingIntegrationModule provides an abstraction layer for staking operations on L2. It delegates to `TALStakingBridgeL2` for cross-layer stake queries and slashing requests to the L1 Staking V3 contracts.
+
 ```solidity
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
@@ -1055,9 +1060,314 @@ interface IStakingIntegrationModule {
 
 ---
 
-### 2.6 Governance Contracts
+### 2.6 Cross-Layer Staking Bridge
 
-#### 2.6.1 TALGovernor
+The Cross-Layer Staking Bridge enables TAL contracts on Tokamak L2 to verify operator stake status from the L1 Staking V3 contracts (DepositManagerV3, SeigManagerV3_1) and execute slashing/seigniorage operations across layers.
+
+#### 2.6.1 TALStakingBridgeL2 (Tokamak L2)
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+interface ITALStakingBridgeL2 {
+    enum OperatorTier { UNVERIFIED, VERIFIED, PREMIUM }
+
+    struct StakeSnapshot {
+        uint256 amount;
+        uint256 lastUpdatedL1Block;
+        uint256 timestamp;
+    }
+
+    // Events
+    event StakeUpdated(address indexed operator, uint256 amount, uint256 l1Block);
+    event SlashRequested(address indexed operator, uint256 amount, bytes32 evidenceHash);
+    event SeigniorageReceived(address indexed operator, uint256 amount);
+    event SeigniorageClaimed(address indexed operator, uint256 amount);
+
+    // Errors
+    error StaleStakeData(address operator, uint256 age);
+    error InsufficientStakeForTier(address operator, uint256 required, uint256 actual);
+    error UnauthorizedBridgeCall();
+    error SlashRequestPending(address operator);
+
+    // Stake Query Functions (from L1 via bridge)
+    function receiveStakeUpdate(address operator, uint256 amount, uint256 l1Block) external;
+    function isVerifiedOperator(address operator) external view returns (bool);
+    function getOperatorStake(address operator) external view returns (uint256);
+    function getOperatorTier(address operator) external view returns (OperatorTier);
+    function requestStakeRefresh(address operator) external;
+
+    // Slashing Functions (L2 → L1)
+    function requestSlashing(address operator, uint256 amount, bytes calldata evidence) external;
+
+    // Seigniorage Functions (L1 → L2)
+    function receiveSeigniorage(address operator, uint256 amount) external;
+    function claimSeigniorage() external;
+    function getPendingSeigniorage(address operator) external view returns (uint256);
+}
+```
+
+**State Variables:**
+
+```solidity
+contract TALStakingBridgeL2 is UUPSUpgradeable, AccessControlUpgradeable, PausableUpgradeable {
+    bytes32 public constant BRIDGE_ROLE = keccak256("BRIDGE_ROLE");
+    bytes32 public constant SLASHER_ROLE = keccak256("SLASHER_ROLE");
+
+    // Tier thresholds
+    uint256 public constant VERIFIED_THRESHOLD = 1000 ether;  // 1000 TON
+    uint256 public constant PREMIUM_THRESHOLD = 10000 ether;   // 10000 TON
+
+    // Cache validity
+    uint256 public constant MAX_CACHE_AGE = 4 hours;
+    uint256 public constant HIGH_VALUE_CACHE_AGE = 0; // Force fresh check for high-value operations
+
+    // Cross-domain messaging
+    address public l2CrossDomainMessenger;
+    address public l1BridgeAddress; // TALStakingBridgeL1
+    address public validationRegistry;
+
+    // Operator stake snapshots (cached from L1)
+    mapping(address => StakeSnapshot) public operatorStakes;
+    mapping(address => OperatorTier) public operatorStatus;
+
+    // Pending slash requests
+    struct SlashRequest {
+        uint256 amount;
+        bytes32 evidenceHash;
+        uint256 requestTime;
+        bool executed;
+    }
+    mapping(bytes32 => SlashRequest) public pendingSlashRequests;
+
+    // Bridged seigniorage balances
+    mapping(address => uint256) public bridgedSeigniorage;
+
+    // Storage gap for upgrades
+    uint256[30] private __gap;
+}
+```
+
+**Function Signatures:**
+
+| Function | Visibility | Modifiers | Gas Target |
+|----------|------------|-----------|------------|
+| `initialize(address messenger_, address l1Bridge_, address validationReg_)` | external | initializer | N/A |
+| `receiveStakeUpdate(address operator, uint256 amount, uint256 l1Block)` | external | onlyRole(BRIDGE_ROLE) | <80k |
+| `isVerifiedOperator(address operator)` | external view | - | <30k |
+| `getOperatorStake(address operator)` | external view | - | <30k |
+| `getOperatorTier(address operator)` | external view | - | <30k |
+| `requestStakeRefresh(address operator)` | external | whenNotPaused | <100k |
+| `requestSlashing(address operator, uint256 amount, bytes calldata evidence)` | external | onlyRole(SLASHER_ROLE) | <150k |
+| `receiveSeigniorage(address operator, uint256 amount)` | external | onlyRole(BRIDGE_ROLE) | <80k |
+| `claimSeigniorage()` | external | nonReentrant | <100k |
+
+#### 2.6.2 TALStakingBridgeL1 (Ethereum L1)
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+interface ITALStakingBridgeL1 {
+    // Events
+    event StakeRelayed(address indexed operator, uint256 amount, uint256 l1Block);
+    event SlashExecuted(address indexed operator, uint256 amount, bytes32 evidenceHash);
+    event SeigniorageBridged(address indexed operator, uint256 amount);
+    event OperatorRefreshRequested(address indexed operator);
+
+    // Errors
+    error OperatorNotRegistered(address operator);
+    error InsufficientStakeToSlash(address operator, uint256 requested, uint256 available);
+    error SlashingNotAuthorized(bytes32 evidenceHash);
+    error NoSeigniorageAvailable(address operator);
+
+    // Stake Query and Relay (L1 → L2)
+    function queryAndRelayStake(address operator) external;
+    function batchQueryStakes(address[] calldata operators) external;
+    function refreshAllOperators() external;
+
+    // Slashing Execution (from L2 request)
+    function executeSlashing(address operator, uint256 amount, bytes calldata evidence) external;
+
+    // Seigniorage Bridging (L1 → L2)
+    function claimAndBridgeSeigniorage(address operator) external;
+    function batchClaimSeigniorage(address[] calldata operators) external;
+}
+```
+
+**State Variables:**
+
+```solidity
+contract TALStakingBridgeL1 is UUPSUpgradeable, AccessControlUpgradeable, PausableUpgradeable {
+    bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
+
+    // Staking V3 contracts (L1)
+    address public depositManagerV3;
+    address public seigManagerV3_1;
+    address public layer2ManagerV3;
+
+    // Cross-domain messaging
+    address public l1CrossDomainMessenger;
+    address public l2BridgeAddress; // TALStakingBridgeL2
+
+    // Slashing conditions contract
+    address public slashingConditions; // TALSlashingConditionsL1
+
+    // Registered TAL operators (subset of all stakers)
+    mapping(address => bool) public registeredOperators;
+    address[] public operatorList;
+
+    // Last relay timestamps
+    mapping(address => uint256) public lastRelayTime;
+
+    // Storage gap for upgrades
+    uint256[30] private __gap;
+}
+```
+
+**Function Signatures:**
+
+| Function | Visibility | Modifiers | Gas Target |
+|----------|------------|-----------|------------|
+| `initialize(address depositMgr_, address seigMgr_, address messenger_, address l2Bridge_)` | external | initializer | N/A |
+| `queryAndRelayStake(address operator)` | external | whenNotPaused | <200k |
+| `batchQueryStakes(address[] calldata operators)` | external | whenNotPaused | <500k |
+| `executeSlashing(address operator, uint256 amount, bytes calldata evidence)` | external | onlyFromL2Bridge | <300k |
+| `claimAndBridgeSeigniorage(address operator)` | external | whenNotPaused | <250k |
+| `refreshAllOperators()` | external | onlyRole(RELAYER_ROLE) | <1M |
+
+#### 2.6.3 TALSlashingConditionsL1 (Ethereum L1)
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+interface ITALSlashingConditionsL1 {
+    // Events
+    event SlashExecuted(address indexed operator, uint256 amount, bytes32 reason);
+    event SlasherAuthorized(address indexed slasher);
+    event SlasherRevoked(address indexed slasher);
+
+    // Errors
+    error UnauthorizedSlasher(address caller);
+    error InvalidSlashAmount(uint256 amount);
+    error SlashingFailed(address operator, string reason);
+
+    // Slashing execution
+    function slash(address operator, uint256 amount) external;
+    function slashWithReason(address operator, uint256 amount, bytes32 reason) external;
+
+    // Authorization
+    function isAuthorizedSlasher(address caller) external view returns (bool);
+    function authorizeSlasher(address slasher) external;
+    function revokeSlasher(address slasher) external;
+
+    // Slashing parameters
+    function getSlashingPercentage(bytes32 violationType) external view returns (uint256);
+    function setSlashingPercentage(bytes32 violationType, uint256 percentage) external;
+}
+```
+
+**State Variables:**
+
+```solidity
+contract TALSlashingConditionsL1 is UUPSUpgradeable, AccessControlUpgradeable {
+    bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
+
+    // Staking V3 reference
+    address public depositManagerV3;
+
+    // TAL Bridge reference
+    address public talStakingBridgeL1;
+
+    // Authorized slashers (TALStakingBridgeL1 is primary)
+    mapping(address => bool) public authorizedSlashers;
+
+    // Slashing percentages by violation type
+    bytes32 public constant VIOLATION_FAILED_TEE = keccak256("FAILED_TEE");
+    bytes32 public constant VIOLATION_PROVEN_FRAUD = keccak256("PROVEN_FRAUD");
+    bytes32 public constant VIOLATION_LOW_REPUTATION = keccak256("LOW_REPUTATION");
+    bytes32 public constant VIOLATION_MISSED_VALIDATION = keccak256("MISSED_VALIDATION");
+
+    mapping(bytes32 => uint256) public slashingPercentages;
+    // Default: FAILED_TEE=50%, PROVEN_FRAUD=100%, LOW_REPUTATION=25%, MISSED_VALIDATION=10%
+
+    // Slashing history
+    mapping(address => uint256) public totalSlashed;
+    mapping(address => uint256) public slashCount;
+
+    // Storage gap for upgrades
+    uint256[30] private __gap;
+}
+```
+
+**Cross-Layer Message Flows:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                         CROSS-LAYER MESSAGE FLOWS                                    │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                     │
+│  FLOW 1: Stake Query (L2 → L1 → L2)                                                │
+│  ─────────────────────────────────                                                  │
+│                                                                                     │
+│  [TAL Contract on L2] ──► [TALStakingBridgeL2.requestStakeRefresh()]               │
+│           │                                                                         │
+│           ▼                                                                         │
+│  [L2CrossDomainMessenger] ──────────────────────────────► [L1CrossDomainMessenger] │
+│                                                                    │                │
+│                                                                    ▼                │
+│                                            [TALStakingBridgeL1.queryAndRelayStake()]│
+│                                                                    │                │
+│                                                                    ▼                │
+│                                            [DepositManagerV3.getStake(operator)]    │
+│                                                                    │                │
+│                                                                    ▼                │
+│  [TALStakingBridgeL2.receiveStakeUpdate()] ◄─────────────────────────────────────  │
+│                                                                                     │
+│  FLOW 2: Slashing (L2 → L1)                                                        │
+│  ─────────────────────────                                                          │
+│                                                                                     │
+│  [TALValidationRegistry] ──► [TALStakingBridgeL2.requestSlashing()]                │
+│           │                                                                         │
+│           ▼                                                                         │
+│  [L2CrossDomainMessenger] ──────────────────────────────► [L1CrossDomainMessenger] │
+│                                                                    │                │
+│                                                                    ▼                │
+│                                            [TALStakingBridgeL1.executeSlashing()]   │
+│                                                                    │                │
+│                                                                    ▼                │
+│                                            [TALSlashingConditionsL1.slash()]        │
+│                                                                    │                │
+│                                                                    ▼                │
+│                                            [DepositManagerV3 stake reduced]         │
+│                                                                                     │
+│  FLOW 3: Seigniorage (L1 → L2)                                                     │
+│  ────────────────────────────                                                       │
+│                                                                                     │
+│  [Keeper/Operator] ──► [TALStakingBridgeL1.claimAndBridgeSeigniorage()]            │
+│           │                                                                         │
+│           ▼                                                                         │
+│  [SeigManagerV3_1.claimSeigniorage()]                                              │
+│           │                                                                         │
+│           ▼                                                                         │
+│  [L1CrossDomainMessenger] ──────────────────────────────► [L2CrossDomainMessenger] │
+│                                                                    │                │
+│                                                                    ▼                │
+│                                            [TALStakingBridgeL2.receiveSeigniorage()]│
+│                                                                    │                │
+│                                                                    ▼                │
+│                                            [Operator claims on L2]                  │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 2.7 Governance Contracts
+
+#### 2.7.1 TALGovernor
 
 ```solidity
 // SPDX-License-Identifier: MIT
@@ -1097,7 +1407,7 @@ contract TALGovernor is
 }
 ```
 
-#### 2.6.2 TALTimelock
+#### 2.7.2 TALTimelock
 
 ```solidity
 // SPDX-License-Identifier: MIT
@@ -2838,7 +3148,10 @@ contracts/
 contracts/
 ├── src/
 │   ├── interfaces/
-│   │   ├── IStakingV2.sol
+│   │   ├── IStakingV3.sol
+│   │   ├── ITALStakingBridgeL2.sol
+│   │   ├── ITALStakingBridgeL1.sol
+│   │   ├── ITALSlashingConditionsL1.sol
 │   │   ├── IDRB.sol
 │   │   ├── ITEEAttestation.sol
 │   │   ├── IZKVerifierModule.sol
@@ -2847,19 +3160,27 @@ contracts/
 │   ├── modules/
 │   │   ├── DRBIntegrationModule.sol
 │   │   └── StakingIntegrationModule.sol
+│   ├── bridge/
+│   │   ├── TALStakingBridgeL2.sol
+│   │   ├── TALStakingBridgeL1.sol
+│   │   └── TALSlashingConditionsL1.sol
 │   ├── libraries/
 │   │   └── SlashingCalculator.sol
 │   └── mocks/
-│       ├── MockStakingV2.sol
+│       ├── MockStakingV3.sol
 │       ├── MockDRB.sol
-│       └── MockTEEProvider.sol
+│       ├── MockTEEProvider.sol
+│       └── MockCrossDomainMessenger.sol
 ├── test/
 │   ├── unit/
 │   │   ├── DRBIntegrationModule.t.sol
-│   │   └── StakingIntegrationModule.t.sol
+│   │   ├── StakingIntegrationModule.t.sol
+│   │   ├── TALStakingBridgeL2.t.sol
+│   │   └── TALStakingBridgeL1.t.sol
 │   └── integration/
 │       ├── StakeSecuredValidation.t.sol
-│       └── TEEAttestedValidation.t.sol
+│       ├── TEEAttestedValidation.t.sol
+│       └── CrossLayerBridge.t.sol
 ```
 
 **Dependencies:** Sprint 1 contracts
@@ -2878,6 +3199,11 @@ contracts/
 - [ ] Mock contracts for testing without external dependencies
 - [ ] Integration tests for full validation flows
 - [ ] Statistical fairness verified for DRB selection
+- [ ] TALStakingBridgeL2: receiveStakeUpdate, isVerifiedOperator, requestSlashing, receiveSeigniorage
+- [ ] TALStakingBridgeL1: queryAndRelayStake, executeSlashing, claimAndBridgeSeigniorage
+- [ ] TALSlashingConditionsL1: slash execution against DepositManagerV3
+- [ ] MockCrossDomainMessenger for testing cross-layer flows
+- [ ] Cross-layer integration tests for all three message flows
 
 ---
 
@@ -3119,7 +3445,11 @@ docs/
 | StakingIntegrationModule | TBD | TBD |
 | TALGovernor | TBD | TBD |
 | TALTimelock | TBD | TBD |
-| Staking V2 (external) | TBD | TBD |
+| Staking V3 - DepositManagerV3 (L1) | TBD | TBD |
+| Staking V3 - SeigManagerV3_1 (L1) | TBD | TBD |
+| TALStakingBridgeL1 (L1) | TBD | TBD |
+| TALStakingBridgeL2 (L2) | TBD | TBD |
+| TALSlashingConditionsL1 (L1) | TBD | TBD |
 | DRB (external) | TBD | TBD |
 
 ---

@@ -5,9 +5,10 @@
 ---
 
 **Document Type:** Technical Proposal  
-**Version:** 1.0  
+**Version:** 1.1  
 **Date:** February 2026  
 **Classification:** Public  
+**Change Notes:** Updated to reflect Staking V3 L1 deployment; added cross-layer interoperability architecture.
 
 ---
 
@@ -20,17 +21,18 @@
 5. [Tokamak Network Ecosystem Overview](#5-tokamak-network-ecosystem-overview)
 6. [Proposed Solution: Tokamak Agent Layer](#6-proposed-solution-tokamak-agent-layer)
 7. [Technical Architecture](#7-technical-architecture)
-8. [Core Components](#8-core-components)
-9. [Trust Models and Validation Mechanisms](#9-trust-models-and-validation-mechanisms)
-10. [Economic Model and TON Integration](#10-economic-model-and-ton-integration)
-11. [Privacy and Security Framework](#11-privacy-and-security-framework)
-12. [Use Cases](#12-use-cases)
-13. [Implementation Roadmap](#13-implementation-roadmap)
-14. [Risk Analysis and Mitigation](#14-risk-analysis-and-mitigation)
-15. [Competitive Analysis](#15-competitive-analysis)
-16. [Success Metrics](#16-success-metrics)
-17. [Conclusion](#17-conclusion)
-18. [Appendices](#18-appendices)
+8. [L1 ↔ L2 Cross-Layer Interoperability](#8-l1--l2-cross-layer-interoperability)
+9. [Core Components](#9-core-components)
+10. [Trust Models and Validation Mechanisms](#10-trust-models-and-validation-mechanisms)
+11. [Economic Model and TON Integration](#11-economic-model-and-ton-integration)
+12. [Privacy and Security Framework](#12-privacy-and-security-framework)
+13. [Use Cases](#13-use-cases)
+14. [Implementation Roadmap](#14-implementation-roadmap)
+15. [Risk Analysis and Mitigation](#15-risk-analysis-and-mitigation)
+16. [Competitive Analysis](#16-competitive-analysis)
+17. [Success Metrics](#17-success-metrics)
+18. [Conclusion](#18-conclusion)
+19. [Appendices](#19-appendices)
 
 ---
 
@@ -45,10 +47,15 @@ The emergence of autonomous AI agents represents a paradigm shift in how digital
 | Dimension | TAL Advantage |
 |-----------|---------------|
 | **Coordination** | DRB-powered fair validator/agent selection prevents manipulation |
-| **Economic Security** | TON staking provides skin-in-the-game with slashing for misbehavior |
+| **Economic Security** | TON staking (via L1 Staking V3) provides skin-in-the-game with slashing for misbehavior |
+| **Cross-Layer Bridge** | Native L1↔L2 messaging enables TAL on L2 to leverage L1 staking security seamlessly |
 | **Verification** | TEE oracle integration for off-chain execution attestation (Intel SGX, AWS Nitro, ARM TrustZone) |
 | **Privacy** | ZK-identity commitments for selective capability disclosure (Poseidon-based) |
 | **Interoperability** | Full ERC-8004 compliance ensures cross-ecosystem agent discovery |
+
+### Architectural Note: Cross-Layer Design
+
+A critical design consideration of TAL is the separation of concerns across layers. **Staking V3** (SeigManagerV3, DepositManagerV3, Layer2ManagerV3, L1BridgeRegistry, RAT, ValidatorReward) is deployed on **Ethereum L1**, while **TAL core registries** (Identity, Reputation, Validation) are deployed on **Tokamak L2**. TAL introduces a dedicated **Cross-Layer Staking Bridge** that leverages the native Optimism CrossDomainMessenger to relay stake verification, slashing, and seigniorage routing between layers. This design inherits L1 economic security guarantees while maintaining L2 cost efficiency for day-to-day agent operations.
 
 ### Strategic Positioning
 
@@ -90,8 +97,8 @@ Tokamak Network sits at a unique intersection of technologies that directly addr
            │                           │                           │
            ▼                           ▼                           ▼
     ┌─────────────┐            ┌─────────────┐            ┌─────────────┐
-    │ Consumer-   │            │ Low-cost    │            │ Stake-      │
-    │ grade proof │            │ on-chain    │            │ secured     │
+    │ Consumer-   │            │ Low-cost    │            │ L1 Staking  │
+    │ grade proof │            │ on-chain    │            │ V3 secured  │
     │ generation  │            │ settlement  │            │ validation  │
     └─────────────┘            └─────────────┘            └─────────────┘
            │                           │                           │
@@ -102,7 +109,9 @@ Tokamak Network sits at a unique intersection of technologies that directly addr
                     │       TOKAMAK AGENT LAYER (TAL)         │
                     │                                         │
                     │   Trustless Agent Discovery, Trust,     │
-                    │        and Execution Verification       │
+                    │   and Execution Verification            │
+                    │                                         │
+                    │   L2 Registries ←→ L1 Staking Bridge    │
                     └─────────────────────────────────────────┘
 ```
 
@@ -112,6 +121,7 @@ This proposal presents a comprehensive technical and strategic framework for imp
 
 - Detailed analysis of ERC-8004 and its applicability to Tokamak
 - Technical architecture leveraging Tokamak's unique capabilities
+- **Cross-layer interoperability design** between L1 Staking V3 and L2 TAL registries
 - Economic model integrating TON tokenomics
 - Implementation roadmap with concrete milestones
 - Risk analysis and mitigation strategies
@@ -189,7 +199,7 @@ Tokamak Network's technology stack directly addresses these gaps:
 | Expensive verification | TEE attestation integration (SGX, Nitro, TrustZone) |
 | Privacy vs. verification tradeoff | ZK identity proofs verify capabilities without revealing |
 | Validator selection manipulation | DRB Commit-Reveal² fairness |
-| No economic accountability | TON staking with slashing |
+| No economic accountability | TON staking with slashing (via L1 cross-layer bridge) |
 | High on-chain costs | L2 scaling with L1 security |
 
 ---
@@ -282,97 +292,30 @@ The registration file provides comprehensive agent metadata:
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.3 Feedback Signal Schema
-
-The reputation registry supports flexible feedback signals:
-
-| Tag Example | Measurement | Value | Decimals |
-|-------------|-------------|-------|----------|
-| `starred` | Quality rating (0-100) | 87 | 0 |
-| `reachable` | Endpoint availability | 1 (true) | 0 |
-| `uptime` | Service uptime percentage | 9977 | 2 (99.77%) |
-| `successRate` | Task completion rate | 89 | 0 (89%) |
-| `responseTime` | Latency in milliseconds | 560 | 0 |
-| `revenues` | Cumulative earnings (USD) | 56000 | 2 ($560.00) |
-| `tradingYield` | Period return | -32 | 1 (-3.2%) |
-
-### 4.4 Validation Workflow
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    ERC-8004 VALIDATION FLOW                             │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│   AGENT                    REGISTRY                    VALIDATOR        │
-│     │                         │                            │            │
-│     │  1. Execute task        │                            │            │
-│     │─────────────────────────┤                            │            │
-│     │                         │                            │            │
-│     │  2. Request validation  │                            │            │
-│     │  (taskHash, outputHash) │                            │            │
-│     │────────────────────────►│                            │            │
-│     │                         │                            │            │
-│     │                         │  3. Emit ValidationRequest │            │
-│     │                         │───────────────────────────►│            │
-│     │                         │                            │            │
-│     │                         │                            │  4. Verify │
-│     │                         │                            │  (re-exec, │
-│     │                         │                            │   zkML,    │
-│     │                         │                            │   TEE)     │
-│     │                         │                            │            │
-│     │                         │  5. Submit response        │            │
-│     │                         │  (0-100 score, proof)      │            │
-│     │                         │◄───────────────────────────│            │
-│     │                         │                            │            │
-│     │  6. Validation recorded │                            │            │
-│     │◄────────────────────────│                            │            │
-│     │                         │                            │            │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### 4.5 ERC-8004 Design Rationale
-
-Key design decisions relevant to Tokamak integration:
-
-| Decision | Rationale | TAL Implication |
-|----------|-----------|-----------------|
-| ERC-721 identity | NFT compatibility, transferability | Seamless marketplace integration |
-| Pluggable trust | Different tasks need different security | ZK validation as premium tier |
-| On-chain feedback | Composability, transparency | Subgraph indexing for analytics |
-| Off-chain extended data | Gas efficiency | IPFS for detailed execution traces |
-| Per-chain singletons | Local deployment, cross-chain reference | Deploy on Tokamak L2, reference from L1 |
-
 ---
 
 ## 5. Tokamak Network Ecosystem Overview
 
-### 5.1 Core Infrastructure Components
+### 5.1 Ecosystem Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    TOKAMAK NETWORK STACK                                │
+│                    TOKAMAK NETWORK ECOSYSTEM                            │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │                     APPLICATION LAYER                            │   │
-│  │                                                                  │   │
-│  │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────────┐    │   │
-│  │   │  DApps   │  │  DAOs    │  │ Bridges  │  │ TAL (Proposed)│    │   │
-│  │   └──────────┘  └──────────┘  └──────────┘  └───────────────┘    │   │
-│  │                                                                  │   │
-│  └──────────────────────────────────────────────────────────────────┘   │
-│                                   │                                     │
-│  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │                     PROTOCOL LAYER                               │   │
+│  │                 APPLICATION & COORDINATION LAYER                  │   │
 │  │                                                                  │   │
 │  │   ┌──────────────────┐  ┌──────────────────┐  ┌──────────────┐   │   │
-│  │   │   Staking V2     │  │       DRB        │  │  Cross-Trade │   │   │
-│  │   │                  │  │  (Commit-Reveal²)│  │              │   │   │
-│  │   │ • TON staking    │  │                  │  │ • Fast       │   │   │
-│  │   │ • Seigniorage    │  │ • Fair random    │  │   withdrawals│   │   │
-│  │   │ • DAO governance │  │ • No last-       │  │ • Trustless  │   │   │
-│  │   │                  │  │   revealer attack│  │              │   │   │
+│  │   │   TON Staking    │  │   Decentralized  │  │  Tokamak     │   │   │
+│  │   │     V3 (L1)      │  │  Random Beacon   │  │  Rollup Hub  │   │   │
+│  │   │                  │  │    (DRB)         │  │              │   │   │
+│  │   │ • SeigManagerV3  │  │                  │  │ • Fast       │   │   │
+│  │   │ • DepositManager │  │ • Fair random    │  │   withdrawals│   │   │
+│  │   │ • Layer2Manager  │  │ • No last-       │  │ • Trustless  │   │   │
+│  │   │ • L1BridgeReg.   │  │   revealer attack│  │              │   │   │
+│  │   │ • RAT            │  │                  │  │              │   │   │
+│  │   │ • ValidatorReward│  │                  │  │              │   │   │
 │  │   └──────────────────┘  └──────────────────┘  └──────────────┘   │   │
 │  │                                                                  │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
@@ -396,7 +339,7 @@ Key design decisions relevant to Tokamak integration:
 │  │                     SETTLEMENT LAYER                             │   │
 │  │                                                                  │   │
 │  │                        ETHEREUM L1                               │   │
-│  │              (State Roots, Fraud Proofs, Finality)               │   │
+│  │     (State Roots, Fraud Proofs, Finality, Staking V3)            │   │
 │  │                                                                  │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
@@ -462,16 +405,61 @@ For TAL, DRB enables:
 - Unbiased agent selection when multiple agents compete for tasks
 - Randomized audit sampling for reputation verification
 
-### 5.4 Staking V2 and Economic Security
+### 5.4 Staking V3 and Economic Security (Ethereum L1)
 
-Tokamak's Staking V2 provides the economic foundation for trust:
+Tokamak's **Staking V3** is deployed on **Ethereum L1** and provides the economic foundation for trust. Unlike V2 where general stakers received seigniorage, V3 concentrates rewards on L2 ecosystem participants to incentivize network security and growth.
 
-| Feature | Description | TAL Application |
-|---------|-------------|-----------------|
-| TON Staking | Users stake TON tokens | Minimum stake for "Verified Operator" status |
-| Seigniorage | Stakers earn emissions | Reward high-reputation agent operators |
-| DAO Candidate | L2 chains become candidates | Registered agents become DAO participants |
-| Slashing | Penalties for misbehavior | Punish malicious agent operators |
+**V3 Core Architecture (all on Ethereum L1):**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    STAKING V3 SYSTEM (ETHEREUM L1)                      │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌──────────────────────┐  ┌──────────────────────┐                    │
+│  │  SeigManagerV3_1     │  │  DepositManagerV3    │                    │
+│  │                      │  │                      │                    │
+│  │  Seigniorage dist.   │  │  TON/WTON staking    │                    │
+│  │  Hyperbolic:         │  │  Deposit/withdrawal  │                    │
+│  │  y(x) = L·(x/(k+x)) │  │  Balance tracking    │                    │
+│  └──────────┬───────────┘  └──────────┬───────────┘                    │
+│             │                         │                                │
+│  ┌──────────┴──────────┐  ┌──────────┴───────────┐                    │
+│  │  Layer2ManagerV3    │  │  L1BridgeRegistryV1_2│                    │
+│  │                      │  │                      │                    │
+│  │  L2 registration    │  │  Bridge/Portal TVL   │                    │
+│  │  Bridged TON queries│  │  tracking            │                    │
+│  └─────────────────────┘  └──────────────────────┘                    │
+│                                                                         │
+│  ┌──────────────────────┐  ┌──────────────────────┐                    │
+│  │  RAT                 │  │  ValidatorRewardV1   │                    │
+│  │                      │  │                      │                    │
+│  │  Randomized          │  │  Validator reward    │                    │
+│  │  Attention Tests     │  │  pool distribution   │                    │
+│  │  & slashing          │  │                      │                    │
+│  └──────────────────────┘  └──────────────────────┘                    │
+│                                                                         │
+│  KEY V3 CHANGES:                                                        │
+│  • Distribution based on Bridged TON (performance), not TVL             │
+│  • Hyperbolic reward function: y(x) = L·(x/(k+x))                      │
+│  • Staking ratio eligibility: S_i ≥ θ·B_i                              │
+│  • Validator rewards via RAT (α·y(x)/n)                                 │
+│  • General staker seigniorage DEPRECATED                                │
+│                                                                         │
+│  ⚠ CRITICAL: All Staking V3 contracts are on Ethereum L1               │
+│  TAL registries are on Tokamak L2 → Cross-layer bridge required         │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+| Feature | V3 Specification | TAL Application |
+|---------|------------------|-----------------|
+| TON Staking | Users stake TON/WTON via DepositManagerV3 on L1 | Minimum stake for "Verified Operator" status, checked via cross-layer bridge |
+| Seigniorage | Hyperbolic distribution to L2 sequencers/validators | Route bonus emissions to high-reputation agent operators via bridge |
+| L2 Registration | Layer2ManagerV3 tracks registered L2 chains | TAL L2 registers as a Tokamak L2 chain for staking eligibility |
+| Bridged TON | L1BridgeRegistry tracks TVL bridged to L2 | TAL operator stake serves as economic collateral visible across layers |
+| Slashing | RAT-triggered attention tests | TAL extends with agent-specific slashing via cross-layer message relay |
+| Validator Rewards | ValidatorRewardV1 pool | TAL validators can earn from both validation bounties and V3 rewards |
 
 Current statistics (as of late 2025):
 - Total staked: ~25M TON
@@ -509,7 +497,7 @@ The Rollup Hub provides infrastructure for modular L2 deployment:
 │   SUPPORTING INFRASTRUCTURE                                             │
 │   ┌──────────┐ ┌──────────┐ ┌───────────┐ ┌──────────┐                  │
 │   │Monitoring│ │  Block   │ │  Bridge   │ │ Staking  │                  │
-│   │ Plugin   │ │ Explorer │ │Integration│ │   V2     │                  │
+│   │ Plugin   │ │ Explorer │ │Integration│ │ V3 (L1)  │                  │
 │   └──────────┘ └──────────┘ └───────────┘ └──────────┘                  │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -521,7 +509,7 @@ The Rollup Hub provides infrastructure for modular L2 deployment:
 
 ### 6.1 Vision Statement
 
-**Tokamak Agent Layer (TAL) transforms the Tokamak ecosystem into the canonical coordination and settlement layer for the autonomous agent economy by implementing ERC-8004 with DRB-powered fair coordination, TEE-integrated verification, privacy-preserving identity, and TON-secured economic accountability.**
+**Tokamak Agent Layer (TAL) transforms the Tokamak ecosystem into the canonical coordination and settlement layer for the autonomous agent economy by implementing ERC-8004 with DRB-powered fair coordination, TEE-integrated verification, privacy-preserving identity, and TON-secured economic accountability—bridged seamlessly between L1 staking infrastructure and L2 agent registries.**
 
 ### 6.2 Design Principles
 
@@ -529,8 +517,9 @@ The Rollup Hub provides infrastructure for modular L2 deployment:
 |-----------|----------------|
 | **Proportional Security** | Trust models scale with value at risk—reputation for low-stakes, TEE attestation for high-stakes |
 | **Privacy by Default** | ZK identity commitments allow capability proofs without revealing agent details |
-| **Economic Alignment** | TON staking creates skin-in-the-game for agent operators with slashing |
+| **Economic Alignment** | TON staking on L1 creates skin-in-the-game for agent operators, bridged to L2 via cross-layer messaging |
 | **Fair Coordination** | DRB Commit-Reveal² ensures manipulation-resistant validator/agent selection |
+| **Cross-Layer Composability** | TAL bridges L1 economic security to L2 operational efficiency via native Optimism messaging |
 | **Standards Compliance** | Full ERC-8004 compatibility for cross-ecosystem interoperability |
 | **Progressive Decentralization** | Start with core registries, evolve to fully permissionless validation |
 
@@ -539,16 +528,16 @@ The Rollup Hub provides infrastructure for modular L2 deployment:
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                    TOKAMAK AGENT LAYER (TAL)                            │
-│                         COMPLETE STACK                                  │
+│                    CROSS-LAYER COMPLETE STACK                           │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │  ╔════════════════════════════════════════════════════════════════════╗ │
 │  ║                     USER INTERFACE LAYER                           ║ │
 │  ║                                                                    ║ │
 │  ║  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────┐ ║ │
-│  ║  │   Agent     │  │ Reputation  │  │ Validation  │  │  Stakin    │ ║ │
+│  ║  │   Agent     │  │ Reputation  │  │ Validation  │  │  Staking   │ ║ │
 │  ║  │  Discovery  │  │  Dashboard  │  │  Monitor    │  │  Portal    │ ║ │
-│  ║  │   Portal    │  │             │  │             │  │            │ ║ │
+│  ║  │   Portal    │  │             │  │             │  │  (L1/L2)   │ ║ │
 │  ║  └─────────────┘  └─────────────┘  └─────────────┘  └────────────┘ ║ │
 │  ║                                                                    ║ │
 │  ╚════════════════════════════════════════════════════════════════════╝ │
@@ -574,28 +563,39 @@ The Rollup Hub provides infrastructure for modular L2 deployment:
 │  ║                  TOKAMAK ENHANCEMENT LAYER                         ║ │
 │  ║                                                                    ║ │
 │  ║  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐     ║ │
-│  ║  │  ZK Verifier    │  │  DRB Fairness   │  │  TON Economics  │     ║ │
-│  ║  │  Module         │  │  Module         │  │  Module         │     ║ │
-│  ║  │                 │  │                 │  │                 │     ║ │
-│  ║  │ • Execution     │  │ • Commit-Reveal²│  │ • Stake verify  │     ║ │
-│  ║  │   proofs        │  │ • Fair validator│  │ • Seigniorage   │     ║ │
-│  ║  │ • Capability    │  │   selection     │  │   distribution  │     ║ │
-│  ║  │   proofs        │  │ • Agent lottery │  │ • Slashing      │     ║ │
-│  ║  │ • Identity      │  │                 │  │   conditions    │     ║ │
-│  ║  │   commitments   │  │                 │  │                 │     ║ │
+│  ║  │  ZK Verifier    │  │  DRB Fairness   │  │  Cross-Layer    │     ║ │
+│  ║  │  Module         │  │  Module         │  │  Staking Bridge │     ║ │
+│  ║  │                 │  │                 │  │  (L2 Side)      │     ║ │
+│  ║  │ • Execution     │  │ • Commit-Reveal²│  │ • Stake mirror  │     ║ │
+│  ║  │   proofs        │  │ • Fair validator│  │ • Slash relay    │     ║ │
+│  ║  │ • Capability    │  │   selection     │  │ • Seigniorage   │     ║ │
+│  ║  │   proofs        │  │ • Agent lottery │  │   routing       │     ║ │
+│  ║  │ • Identity      │  │                 │  │ • Operator      │     ║ │
+│  ║  │   commitments   │  │                 │  │   verification  │     ║ │
 │  ║  │                 │  │                 │  │                 │     ║ │
 │  ║  └─────────────────┘  └─────────────────┘  └─────────────────┘     ║ │
 │  ║                                                                    ║ │
 │  ╚════════════════════════════════════════════════════════════════════╝ │
 │                                   │                                     │
+│                    ┌──────────────┴──────────────┐                      │
+│                    │  L1 ↔ L2 MESSAGING LAYER    │                      │
+│                    │  (CrossDomainMessenger)      │                      │
+│                    └──────────────┬──────────────┘                      │
+│                                   │                                     │
 │  ╔════════════════════════════════════════════════════════════════════╗ │
-│  ║                  INFRASTRUCTURE LAYER                              ║ │
+│  ║               L1 INFRASTRUCTURE LAYER (Ethereum)                   ║ │
 │  ║                                                                    ║ │
-│  ║  ┌───────────────────────────────────────────────────────────────┐ ║ │
-│  ║  │                    Tokamak zk-EVM L2                          │ ║ │
-│  ║  │          (Settlement, identity proofs, attestations)          │ ║ │
-│  ║  └───────────────────────────────────────────────────────────────┘ ║ │
-│  ║                              │                                     ║ │
+│  ║  ┌────────────────────┐  ┌─────────────────────────────────────┐   ║ │
+│  ║  │  TAL Staking       │  │       Staking V3 Contracts          │   ║ │
+│  ║  │  Bridge L1         │  │                                     │   ║ │
+│  ║  │                    │  │  SeigManagerV3_1 │ DepositManagerV3  │   ║ │
+│  ║  │  • Stake queries   │──│  Layer2ManagerV3 │ L1BridgeRegistry  │   ║ │
+│  ║  │  • Slash execution │  │  RAT             │ ValidatorReward   │   ║ │
+│  ║  │  • Seigniorage     │  │                                     │   ║ │
+│  ║  │    claims          │  └─────────────────────────────────────┘   ║ │
+│  ║  │                    │                                            ║ │
+│  ║  └────────────────────┘                                            ║ │
+│  ║                                                                    ║ │
 │  ║  ┌───────────────────────────────────────────────────────────────┐ ║ │
 │  ║  │                    Ethereum L1 Settlement                     │ ║ │
 │  ║  │          (State roots, finality, security)                    │ ║ │
@@ -630,14 +630,15 @@ The Rollup Hub provides infrastructure for modular L2 deployment:
 │                                                                         │
 │  ┌──────────────────────────────────────────────────────────────────┐   │
 │  │                                                                  │   │
-│  │   DIFFERENTIATOR 2: INTEGRATED ECONOMIC SECURITY                 │   │
+│  │   DIFFERENTIATOR 2: CROSS-LAYER ECONOMIC SECURITY                │   │
 │  │   ───────────────────────────────────────────────────────────    │   │
 │  │                                                                  │   │
-│  │   Standalone Registry                TAL with Staking V2         │   │
+│  │   Standalone L2 Registry               TAL with L1 Staking V3   │   │
 │  │   ┌────────────────────┐            ┌────────────────────┐       │   │
-│  │   │  No economic       │            │  TON stake = trust │       │   │
-│  │   │  accountability    │     vs     │  Slashing for bad  │       │   │
-│  │   │  No penalties      │            │  behavior          │       │   │
+│  │   │  No economic       │            │  L1 TON stake =    │       │   │
+│  │   │  accountability    │     vs     │  L2 trust signal   │       │   │
+│  │   │  No penalties      │            │  Cross-layer slash │       │   │
+│  │   │  Weak guarantees   │            │  L1-grade security │       │   │
 │  │   └────────────────────┘            └────────────────────┘       │   │
 │  │                                                                  │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
@@ -701,7 +702,7 @@ The Rollup Hub provides infrastructure for modular L2 deployment:
 │  │                        API GATEWAY                              │    │
 │  │    ┌────────────────────────────────────────────────────────┐   │    │
 │  │    │  GraphQL API  │  REST API  │  WebSocket  │  RPC Node   │   │    │
-│  │    └────────────────────────────────────────────────────────┘   │    │ 
+│  │    └────────────────────────────────────────────────────────┘   │    │
 │  └─────────────────────────────────────────────────────────────────┘    │
 │                                   │                                     │
 │  ┌────────────────────────────────▼─────────────────────────────────┐   │
@@ -714,220 +715,390 @@ The Rollup Hub provides infrastructure for modular L2 deployment:
 │  │   │ • Agent index  │  │ • Real-time    │  │ • Registration │     │   │
 │  │   │ • Reputation   │  │   updates      │  │   files        │     │   │
 │  │   │   aggregation  │  │ • Validation   │  │ • Feedback     │     │   │
-│  │   │                │  │   events       │  │   details      │     │   │
+│  │   │ • Stake mirror │  │   events       │  │   details      │     │   │
+│  │   │   sync events  │  │ • L1↔L2 relay  │  │                │     │   │
 │  │   └────────────────┘  └────────────────┘  └────────────────┘     │   │
 │  │                                                                  │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
 │                                   │                                     │
-│  ┌────────────────────────────────▼─────────────────────────────────┐   │
-│  │                   SMART CONTRACT LAYER                           │   │
-│  │                      (Tokamak L2)                                │   │
-│  │                                                                  │   │
-│  │   ┌───────────────────────────────────────────────────────────┐  │   │
-│  │   │                   CORE REGISTRIES                         │  │   │
-│  │   │                                                           │  │   │
-│  │   │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐    │  │   │
-│  │   │  │TALIdentity  │  │TALReputation│  │ TALValidation   │    │  │   │
-│  │   │  │Registry     │──│Registry     │──│ Registry        │    │  │   │
-│  │   │  └─────────────┘  └─────────────┘  └─────────────────┘    │  │   │
-│  │   │                                                           │  │   │
-│  │   └───────────────────────────────────────────────────────────┘  │   │
-│  │                              │                                   │   │
-│  │   ┌──────────────────────────▼────────────────────────────────┐  │   │
-│  │   │                 ENHANCEMENT MODULES                       │  │   │
-│  │   │                                                           │  │   │
-│  │   │  ┌─────────────┐  ┌─────────────┐  ┌──────────────────┐   │  │   │
-│  │   │  │ZKVerifier   │  │DRBIntegration│ │StakingIntegration│   │  │   │
-│  │   │  │Module       │  │Module       │  │Module            │   │  │   │
-│  │   │  │             │  │             │  │                  │   │  │   │
-│  │   │  │• Plonk      │  │• Commit-    │  │• Stake check     │   │  │   │
-│  │   │  │  verifier   │  │  Reveal²    │  │• Slashing        │   │  │   │
-│  │   │  │• Poseidon   │  │• Random     │  │• Seigniorage     │   │  │   │
-│  │   │  │  hasher     │  │  beacon     │  │  routing         │   │  │   │
-│  │   │  └─────────────┘  └─────────────┘  └──────────────────┘   │  │   │
-│  │   │                                                           │  │   │
-│  │   └───────────────────────────────────────────────────────────┘  │   │
-│  │                                                                  │   │
-│  └──────────────────────────────────────────────────────────────────┘   │
-│                                   │                                     │
-│  ┌────────────────────────────────▼─────────────────────────────────┐   │
-│  │                   EXTERNAL INTEGRATIONS                          │   │
-│  │                                                                  │   │
-│  │   ┌─────────────┐  ┌─────────────┐  ┌──────────────────────────┐ │   │
-│  │   │Staking V2   │  │    DRB      │  │  Tokamak zk-EVM          │ │   │
-│  │   │Contract     │  │  Contract   │  │  Prover Network          │ │   │
-│  │   └─────────────┘  └─────────────┘  └──────────────────────────┘ │   │
-│  │                                                                  │   │
-│  └──────────────────────────────────────────────────────────────────┘   │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### 7.2 Data Flow Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    TAL DATA FLOW DIAGRAM                                │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  AGENT REGISTRATION FLOW                                                │
-│  ════════════════════════                                               │
-│                                                                         │
-│   Agent Owner                                                           │
-│       │                                                                 │
-│       │ 1. Prepare registration file (JSON)                             │
-│       │    - name, description, capabilities                            │
-│       │    - service endpoints (MCP, A2A, etc.)                         │
-│       │    - trust model preferences                                    │
-│       ▼                                                                 │
-│   ┌─────────────────┐                                                   │
-│   │  IPFS Upload    │                                                   │
-│   │  (or on-chain)  │                                                   │
-│   └────────┬────────┘                                                   │
-│            │ 2. Get content URI                                         │
-│            ▼                                                            │
-│   ┌─────────────────┐     ┌─────────────────┐                           │
-│   │ TAL Identity    │     │ Optional:       │                           │
-│   │ Registry        │◄────│ ZK Identity     │                           │
-│   │                 │     │ Commitment      │                           │
-│   │ register(       │     │                 │                           │
-│   │   agentURI,     │     │ Poseidon(       │                           │
-│   │   zkCommitment  │     │   name,         │                           │
-│   │ )               │     │   capabilities, │                           │
-│   └────────┬────────┘     │   nonce         │                           │
-│            │              │ )               │                           │
-│            │              └─────────────────┘                           │
-│            │ 3. Mint ERC-721 (agentId)                                  │
-│            │    Set metadata                                            │
-│            │    Emit Registered event                                   │
-│            ▼                                                            │
-│   ┌─────────────────┐                                                   │
-│   │   Subgraph      │                                                   │
-│   │   Indexes       │                                                   │
-│   │   new agent     │                                                   │
-│   └─────────────────┘                                                   │
-│                                                                         │
-│  ═══════════════════════════════════════════════════════════════════    │
-│                                                                         │
-│  TASK EXECUTION AND VALIDATION FLOW                                     │
-│  ════════════════════════════════════                                   │
-│                                                                         │
-│   User                          Agent                    Validator      │
-│     │                             │                          │          │
-│     │ 1. Discover agent           │                          │          │
-│     │    (via TAL registry)       │                          │          │
-│     │─────────────────────────────►                          │          │
-│     │                             │                          │          │
-│     │ 2. Request task execution   │                          │          │
-│     │─────────────────────────────►                          │          │
-│     │                             │                          │          │
-│     │                             │ 3. Execute task          │          │
-│     │                             │    Generate execution    │          │
-│     │                             │    trace                 │          │
-│     │                             │                          │          │
-│     │                             │ 4. Request validation    │          │
-│     │                             │    (taskHash, outputHash)│          │
-│     │                             │─────────────────────────►│          │
-│     │                             │                          │          │
-│     │                             │                          │ 5. Select│
-│     │                             │                          │ validation│
-│     │                             │                          │ method:  │
-│     │                             │                          │          │
-│     │   ┌─────────────────────────┴──────────────────────────┤          │
-│     │   │                                                    │          │
-│     │   ▼                                                    ▼          │
-│   ┌───────────────┐    ┌───────────────┐    ┌───────────────────────┐   │
-│   │ REPUTATION    │    │ STAKE-SECURED │    │   TEE ATTESTATION     │   │
-│   │ ONLY          │    │               │    │                       │   │
-│   │               │    │ • Re-execute  │    │ • Execute in TEE      │   │
-│   │ • Feedback    │    │   task        │    │   enclave             │   │
-│   │   signals     │    │ • Compare     │    │ • Generate hardware   │   │
-│   │ • Historical  │    │   outputs     │    │   attestation         │   │
-│   │   track record│    │ • Stake-      │    │ • Verify on-chain     │   │
-│   │               │    │   weighted    │    │                       │   │
-│   │               │    │   consensus   │    │ (SGX, Nitro, TrustZ)  │   │
-│   └───────────────┘    └───────────────┘    └───────────────────────┘   │
-│          │                    │                        │                │
-│          └────────────────────┴────────────────────────┘                │
-│                               │                                         │
-│                               ▼                                         │
-│                    ┌─────────────────────┐                              │
-│                    │  TAL Validation     │                              │
-│                    │  Registry           │                              │
-│                    │                     │                              │
-│                    │  Record response    │                              │
-│                    │  (0-100 score)      │                              │
-│                    │  Update reputation  │                              │
-│                    └─────────────────────┘                              │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### 7.3 State Management
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    TAL STATE ARCHITECTURE                               │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  ON-CHAIN STATE (Tokamak L2)                                            │
-│  ══════════════════════════                                             │
-│                                                                         │
-│  TALIdentityRegistry                                                    │
-│  ├── _owners: mapping(tokenId => address)                               │
-│  ├── _tokenURIs: mapping(tokenId => string)                             │
-│  ├── _metadata: mapping(tokenId => mapping(key => bytes))               │
-│  ├── zkIdentities: mapping(tokenId => bytes32)         ◄── TAL Extension│
-│  ├── zkCapabilities: mapping(tokenId => mapping(hash => bool))          │
-│  └── _nextTokenId: uint256                                              │
-│                                                                         │
-│  TALReputationRegistry                                                  │
-│  ├── _identityRegistry: address                                         │
-│  ├── _feedbacks: mapping(agentId => mapping(client => Feedback[]))      │
-│  │   └── Feedback: {value, decimals, tag1, tag2, isRevoked}             │
-│  ├── _clientLists: mapping(agentId => address[])                        │
-│  └── _responses: mapping(feedbackKey => Response[])                     │
-│                                                                         │
-│  TALValidationRegistry                                                  │
-│  ├── _identityRegistry: address                                         │
-│  ├── _requests: mapping(requestHash => ValidationRequest)               │
-│  │   └── ValidationRequest: {agentId, requester, taskHash, ...}         │
-│  ├── _responses: mapping(requestHash => ValidationResponse)             │
-│  │   └── ValidationResponse: {validator, response, proof, ...}          │
-│  ├── _agentValidations: mapping(agentId => bytes32[])                   │
-│  └── _validatorRequests: mapping(validator => bytes32[])                │
-│                                                                         │
-│  ═══════════════════════════════════════════════════════════════════    │
-│                                                                         │
-│  OFF-CHAIN STATE (IPFS / Indexer)                                       │
-│  ═════════════════════════════════                                      │
-│                                                                         │
-│  Agent Registration Files (IPFS)                                        │
-│  ├── Core metadata (name, description, image)                           │
-│  ├── Service endpoints (MCP, A2A, ENS, etc.)                            │
-│  ├── Trust model preferences                                            │
-│  └── Multi-chain registrations                                          │
-│                                                                         │
-│  Extended Feedback Data (IPFS)                                          │
-│  ├── Detailed task descriptions                                         │
-│  ├── Execution traces (for validation)                                  │
-│  ├── Payment proofs (x402)                                              │
-│  └── MCP/A2A specific context                                           │
-│                                                                         │
-│  Aggregated Indices (Subgraph)                                          │
-│  ├── Agent search index                                                 │
-│  ├── Reputation leaderboards                                            │
-│  ├── Validation statistics                                              │
-│  └── Historical trends                                                  │
+│  ╔════════════════════════════════▼═══════════════════════════════════╗ │
+│  ║             SMART CONTRACT LAYER (Tokamak L2)                      ║ │
+│  ║                                                                    ║ │
+│  ║   ┌───────────────────────────────────────────────────────────┐    ║ │
+│  ║   │                   CORE REGISTRIES                         │    ║ │
+│  ║   │                                                           │    ║ │
+│  ║   │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐    │    ║ │
+│  ║   │  │TALIdentity  │  │TALReputation│  │ TALValidation   │    │    ║ │
+│  ║   │  │Registry     │──│Registry     │──│ Registry        │    │    ║ │
+│  ║   │  └─────────────┘  └─────────────┘  └─────────────────┘    │    ║ │
+│  ║   │                                                           │    ║ │
+│  ║   └───────────────────────────────────────────────────────────┘    ║ │
+│  ║                              │                                     ║ │
+│  ║   ┌──────────────────────────▼────────────────────────────────┐    ║ │
+│  ║   │                 ENHANCEMENT MODULES                       │    ║ │
+│  ║   │                                                           │    ║ │
+│  ║   │  ┌─────────────┐  ┌─────────────┐  ┌──────────────────┐   │    ║ │
+│  ║   │  │ZKVerifier   │  │DRBIntegration│ │TALStakingBridge  │   │    ║ │
+│  ║   │  │Module       │  │Module       │  │L2 (Mirror)       │   │    ║ │
+│  ║   │  │             │  │             │  │                  │   │    ║ │
+│  ║   │  │• Plonk      │  │• Commit-    │  │• Cached L1 stake │   │    ║ │
+│  ║   │  │  verifier   │  │  Reveal²    │  │• Slash requests  │   │    ║ │
+│  ║   │  │• Poseidon   │  │• Random     │  │• Seigniorage     │   │    ║ │
+│  ║   │  │  hasher     │  │  beacon     │  │  routing         │   │    ║ │
+│  ║   │  └─────────────┘  └─────────────┘  └────────┬─────────┘   │    ║ │
+│  ║   │                                              │             │    ║ │
+│  ║   └──────────────────────────────────────────────┘             ║ │
+│  ║                                              │                     ║ │
+│  ╚══════════════════════════════════════════════╪═════════════════════╝ │
+│                                                  │                      │
+│                    ┌─────────────────────────────┘                      │
+│                    │  L2CrossDomainMessenger                            │
+│                    │  (Native Optimism Bridge)                          │
+│                    └─────────────────────────────┐                      │
+│                                                  │                      │
+│  ╔══════════════════════════════════════════════╪═════════════════════╗ │
+│  ║            L1 CONTRACT LAYER (Ethereum)       │                    ║ │
+│  ║                                               │                    ║ │
+│  ║   ┌───────────────────────────────────────────▼───────────────┐    ║ │
+│  ║   │                                                           │    ║ │
+│  ║   │  ┌──────────────────┐   ┌────────────────────────────┐    │    ║ │
+│  ║   │  │TALStakingBridge  │   │   Staking V3 Contracts      │    │    ║ │
+│  ║   │  │L1               │   │                              │    │    ║ │
+│  ║   │  │                  │──►│  SeigManagerV3_1             │    │    ║ │
+│  ║   │  │• Stake queries   │   │  DepositManagerV3            │    │    ║ │
+│  ║   │  │• Slash execution │   │  Layer2ManagerV3             │    │    ║ │
+│  ║   │  │• Seigniorage     │   │  L1BridgeRegistryV1_2       │    │    ║ │
+│  ║   │  │  claims          │   │  RAT / ValidatorRewardV1    │    │    ║ │
+│  ║   │  └──────────────────┘   └────────────────────────────┘    │    ║ │
+│  ║   │                                                           │    ║ │
+│  ║   │  ┌──────────────────┐                                     │    ║ │
+│  ║   │  │TALSlashConditions│                                     │    ║ │
+│  ║   │  │L1               │                                     │    ║ │
+│  ║   │  │                  │                                     │    ║ │
+│  ║   │  │• Authorized slash│                                     │    ║ │
+│  ║   │  │  executor for TAL│                                     │    ║ │
+│  ║   │  └──────────────────┘                                     │    ║ │
+│  ║   │                                                           │    ║ │
+│  ║   └───────────────────────────────────────────────────────────┘    ║ │
+│  ║                                                                    ║ │
+│  ╚════════════════════════════════════════════════════════════════════╝ │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 8. Core Components
+## 8. L1 ↔ L2 Cross-Layer Interoperability
 
-### 8.1 TAL Identity Registry
+### 8.1 The Cross-Layer Challenge
+
+TAL's economic security depends on Staking V3, but the two systems live on different layers:
+
+| System | Deployment | Purpose |
+|--------|-----------|---------|
+| TAL Registries | Tokamak L2 | Agent identity, reputation, validation (low-cost, high-throughput) |
+| Staking V3 | Ethereum L1 | TON staking, seigniorage, slashing (high-security, canonical state) |
+
+This separation is intentional: agent registries benefit from L2's low costs and fast confirmation, while economic security must be anchored to L1 for maximum trust guarantees. However, bridging these layers requires careful design.
+
+### 8.2 Cross-Layer Bridge Architecture
+
+TAL introduces three new contracts to bridge the gap:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    CROSS-LAYER STAKING BRIDGE                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  TOKAMAK L2                                                             │
+│  ═══════════                                                            │
+│                                                                         │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │  TALStakingBridgeL2                                              │   │
+│  │                                                                  │   │
+│  │  State:                                                          │   │
+│  │  ├── operatorStakes: mapping(address => StakeSnapshot)           │   │
+│  │  │   └── StakeSnapshot: {amount, lastUpdatedL1Block, timestamp}  │   │
+│  │  ├── operatorStatus: mapping(address => OperatorTier)            │   │
+│  │  │   └── OperatorTier: {UNVERIFIED, VERIFIED, PREMIUM}           │   │
+│  │  ├── pendingSlashRequests: mapping(bytes32 => SlashRequest)      │   │
+│  │  └── bridgedSeigniorage: mapping(address => uint256)             │   │
+│  │                                                                  │   │
+│  │  Functions:                                                      │   │
+│  │  ├── receiveStakeUpdate(operator, amount, l1Block)    [L1→L2]    │   │
+│  │  ├── isVerifiedOperator(operator) → bool              [view]     │   │
+│  │  ├── getOperatorStake(operator) → uint256             [view]     │   │
+│  │  ├── requestStakeRefresh(operator)                    [L2→L1]    │   │
+│  │  ├── requestSlashing(operator, amount, evidence)      [L2→L1]    │   │
+│  │  ├── receiveSeigniorage(operator, amount)             [L1→L2]    │   │
+│  │  └── claimSeigniorage(operator)                       [external] │   │
+│  │                                                                  │   │
+│  │  Access Control:                                                 │   │
+│  │  ├── receiveStakeUpdate: ONLY L2CrossDomainMessenger             │   │
+│  │  │   with xDomainMessageSender == TALStakingBridgeL1             │   │
+│  │  ├── requestSlashing: ONLY TALValidationRegistry                 │   │
+│  │  └── receiveSeigniorage: ONLY L2CrossDomainMessenger             │   │
+│  │                                                                  │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                   │                                     │
+│                    ┌──────────────┴──────────────┐                      │
+│                    │  L2CrossDomainMessenger      │                      │
+│                    │  ◄──────────────────────────►│                      │
+│                    │  L1CrossDomainMessenger      │                      │
+│                    └──────────────┬──────────────┘                      │
+│                                   │                                     │
+│  ETHEREUM L1                                                            │
+│  ═══════════                                                            │
+│                                                                         │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │  TALStakingBridgeL1                                              │   │
+│  │                                                                  │   │
+│  │  Functions:                                                      │   │
+│  │  ├── queryAndRelayStake(operator)                     [external] │   │
+│  │  │   → reads DepositManagerV3.balanceOf(layer2, operator)        │   │
+│  │  │   → sends stake data to L2 via L1CrossDomainMessenger         │   │
+│  │  │                                                               │   │
+│  │  ├── batchQueryStakes(operators[])                    [external] │   │
+│  │  │   → batch reads + batch relay for gas efficiency              │   │
+│  │  │                                                               │   │
+│  │  ├── executeSlashing(operator, amount, evidence)      [L2→L1]    │   │
+│  │  │   → receives from L1CrossDomainMessenger                      │   │
+│  │  │   → calls TALSlashingConditionsL1.slash(operator, amount)     │   │
+│  │  │                                                               │   │
+│  │  ├── claimAndBridgeSeigniorage(operator)              [external] │   │
+│  │  │   → claims from SeigManagerV3_1                               │   │
+│  │  │   → bridges TON to L2 via StandardBridge                      │   │
+│  │  │   → notifies TALStakingBridgeL2                               │   │
+│  │  │                                                               │   │
+│  │  └── refreshAllOperators()                            [keeper]   │   │
+│  │      → periodic batch refresh of all TAL operator stakes         │   │
+│  │                                                                  │   │
+│  │  Access Control:                                                 │   │
+│  │  ├── executeSlashing: ONLY L1CrossDomainMessenger                │   │
+│  │  │   with xDomainMessageSender == TALStakingBridgeL2             │   │
+│  │  └── queryAndRelayStake: permissionless (anyone can trigger)     │   │
+│  │                                                                  │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │  TALSlashingConditionsL1                                         │   │
+│  │                                                                  │   │
+│  │  • Registered with Staking V3 as authorized slashing entity     │   │
+│  │  • ONLY accepts calls from TALStakingBridgeL1                   │   │
+│  │  • Executes slashing against DepositManagerV3                   │   │
+│  │  • Emits SlashExecuted event for indexers                       │   │
+│  │                                                                  │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 8.3 Cross-Layer Message Flows
+
+**Flow A: Stake Verification (L1 → L2)**
+
+Used when an agent registers or when a user queries operator trust level.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    STAKE VERIFICATION FLOW                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  L2 (Tokamak)                              L1 (Ethereum)               │
+│                                                                         │
+│  Agent registers                                                        │
+│      │                                                                  │
+│      ▼                                                                  │
+│  TALIdentityRegistry                                                    │
+│  .register(agentURI)                                                    │
+│      │                                                                  │
+│      │ Checks TALStakingBridgeL2                                        │
+│      │ .isVerifiedOperator(msg.sender)                                  │
+│      │                                                                  │
+│      │ If cache stale or missing:                                       │
+│      ▼                                                                  │
+│  TALStakingBridgeL2                                                     │
+│  .requestStakeRefresh(operator)                                         │
+│      │                                                                  │
+│      │ L2CrossDomainMessenger                                           │
+│      │ .sendMessage(                                                    │
+│      │   TALStakingBridgeL1,                                            │
+│      │   queryAndRelayStake(operator)          TALStakingBridgeL1       │
+│      │ ) ─────────────────────────────────────►.queryAndRelayStake()    │
+│                                                     │                   │
+│                                                     │ Read:             │
+│                                                     │ DepositManagerV3  │
+│                                                     │ .balanceOf(       │
+│                                                     │   layer2,         │
+│                                                     │   operator)       │
+│                                                     │                   │
+│                                                     ▼                   │
+│                                               L1CrossDomainMessenger    │
+│                                               .sendMessage(             │
+│                                                 TALStakingBridgeL2,     │
+│  TALStakingBridgeL2                              stakeData              │
+│  .receiveStakeUpdate(  ◄──────────────────────  )                       │
+│    operator,                                                            │
+│    stakeAmount,                                                         │
+│    l1BlockNumber                                                        │
+│  )                                                                      │
+│      │                                                                  │
+│      │ Updates local cache:                                             │
+│      │ operatorStakes[operator] = StakeSnapshot{...}                    │
+│      │ operatorStatus[operator] = VERIFIED (if ≥ 1000 TON)             │
+│      │                                                                  │
+│      ▼                                                                  │
+│  Agent now has "Verified Operator" badge                                │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Flow B: Slashing (L2 → L1)**
+
+Triggered when TAL detects provable misbehavior on L2.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    SLASHING FLOW                                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  L2 (Tokamak)                              L1 (Ethereum)               │
+│                                                                         │
+│  Misbehavior detected                                                   │
+│  (failed TEE attestation,                                               │
+│   validator fraud, etc.)                                                │
+│      │                                                                  │
+│      ▼                                                                  │
+│  TALValidationRegistry                                                  │
+│  .reportMisbehavior(                                                    │
+│    operator,                                                            │
+│    evidenceHash,                                                        │
+│    slashPercentage                                                      │
+│  )                                                                      │
+│      │                                                                  │
+│      │ Validates evidence on L2                                         │
+│      │ (TEE attestation failure, consensus proof, etc.)                 │
+│      │                                                                  │
+│      ▼                                                                  │
+│  TALStakingBridgeL2                                                     │
+│  .requestSlashing(                                                      │
+│    operator, amount, evidence                                           │
+│  )                                                                      │
+│      │                                                                  │
+│      │ L2CrossDomainMessenger                                           │
+│      │ .sendMessage(                                                    │
+│      │   TALStakingBridgeL1,                                            │
+│      │   executeSlashing(operator, amount, evidence)                    │
+│      │ )                                                                │
+│      │                                                                  │
+│      │                  ┌──────────────────────────────┐                │
+│      │                  │  L2 → L1 MESSAGE FINALIZATION │                │
+│      │                  │  Inherits Optimism challenge   │                │
+│      │                  │  period (~7 days)              │                │
+│      │                  │                                │                │
+│      │                  │  This delay serves as a        │                │
+│      │                  │  NATURAL APPEAL WINDOW:        │                │
+│      │                  │  Operator can dispute slash    │                │
+│      │                  │  during challenge period       │                │
+│      │                  └──────────────────────────────┘                │
+│      │                                                                  │
+│      │ After finalization:         TALStakingBridgeL1                   │
+│      └────────────────────────────►.executeSlashing()                   │
+│                                         │                               │
+│                                         ▼                               │
+│                                    TALSlashingConditionsL1              │
+│                                    .slash(operator, amount)             │
+│                                         │                               │
+│                                         ▼                               │
+│                                    DepositManagerV3                     │
+│                                    (stake reduced)                      │
+│                                                                         │
+│                                    Emit SlashExecuted event             │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Flow C: Seigniorage Routing (L1 → L2)**
+
+Distributes bonus seigniorage to high-reputation TAL agent operators.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    SEIGNIORAGE ROUTING FLOW                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  L1 (Ethereum)                             L2 (Tokamak)                │
+│                                                                         │
+│  Keeper / TAL Operator                                                  │
+│  calls periodically                                                     │
+│      │                                                                  │
+│      ▼                                                                  │
+│  TALStakingBridgeL1                                                     │
+│  .claimAndBridgeSeigniorage(operator)                                   │
+│      │                                                                  │
+│      │ 1. Claim seigniorage from SeigManagerV3_1                        │
+│      │    for the TAL L2 chain allocation                               │
+│      │                                                                  │
+│      │ 2. Bridge TON/WTON to L2 via StandardBridge                      │
+│      │    (Optimism native token bridging)                              │
+│      │                                                                  │
+│      │ 3. Send notification to L2                                       │
+│      │    via L1CrossDomainMessenger                                    │
+│      │                                                                  │
+│      └─────────────────────────────────────►                            │
+│                                                                         │
+│                                            TALStakingBridgeL2           │
+│                                            .receiveSeigniorage(         │
+│                                              operator, amount           │
+│                                            )                            │
+│                                                 │                       │
+│                                                 │ Apply reputation      │
+│                                                 │ bonus multiplier:     │
+│                                                 │ emission × (1 +      │
+│                                                 │   repScore / 100)    │
+│                                                 │                       │
+│                                                 ▼                       │
+│                                            Operator claims              │
+│                                            via claimSeigniorage()       │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 8.4 Stake Cache Design
+
+The L2 stake mirror uses an **optimistic caching** strategy with configurable staleness thresholds:
+
+| Operation Type | Freshness Requirement | Mechanism |
+|---------------|----------------------|-----------|
+| Agent registration | Cache acceptable (≤ 1 hour) | Read from L2 cache, async refresh if stale |
+| Reputation query | Cache acceptable (≤ 4 hours) | Read from L2 cache |
+| Low-value validation | Cache acceptable (≤ 1 hour) | Read from L2 cache |
+| High-value validation (>$10K) | Fresh L1 check required | Synchronous L1 query + relay (~15 min round-trip) |
+| Slashing trigger | Fresh L1 check required | Verify current stake before submitting slash |
+
+**Cache Refresh Strategies:**
+
+1. **Periodic Keeper**: An off-chain keeper calls `TALStakingBridgeL1.refreshAllOperators()` every epoch (~4 hours), batch-refreshing all registered TAL operators' stake states.
+
+2. **On-Demand Refresh**: Any user or agent can call `requestStakeRefresh(operator)` on L2, triggering a cross-layer query. The result arrives after L1→L2 message relay (~10-15 minutes on Optimism).
+
+3. **Event-Driven Update**: L1 contract listens for `Deposited` and `WithdrawalRequested` events on DepositManagerV3, automatically relaying updates for known TAL operators.
+
+### 8.5 Security Considerations for Cross-Layer Design
+
+| Threat | Mitigation |
+|--------|-----------|
+| Stale cache exploitation | Configurable staleness thresholds; high-value operations require fresh L1 check |
+| Fake L2→L1 slash messages | L1 bridge validates xDomainMessageSender strictly; Optimism challenge period provides appeal window |
+| L1→L2 message censorship | Multiple relay paths; anyone can trigger relay; fallback to L1 direct verification |
+| Bridge contract compromise | Upgradeable proxy with timelock; multi-sig admin; circuit breaker |
+| Frontrunning stake withdrawal before slash | Staking V3's withdrawal delay (globalWithdrawalDelay) naturally prevents this; slash message sent immediately on detection |
+
+---
+
+## 9. Core Components
+
+### 9.1 TAL Identity Registry
 
 The Identity Registry extends ERC-8004 with Tokamak-specific enhancements:
 
@@ -943,60 +1114,10 @@ The Identity Registry extends ERC-8004 with Tokamak-specific enhancements:
 |-----------|---------|-----------|
 | ZK Identity Commitment | Privacy-preserving identity | Poseidon hash of identity attributes stored on-chain |
 | ZK Capability Proofs | Prove skills without revealing details | SNARK proofs verified on-chain |
-| Stake Verification | Economic trust signal | Integration with Staking V2 contract |
-| Operator Status | Verified operator badge | Minimum 1000 TON stake requirement |
+| Cross-Layer Stake Verification | Economic trust signal | Reads from TALStakingBridgeL2 cached L1 stake data |
+| Operator Status | Verified operator badge | Minimum 1000 TON stake on L1, verified via bridge |
 
-**ZK Identity Flow:**
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    ZK IDENTITY COMMITMENT FLOW                          │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│   REGISTRATION (Private → Public Commitment)                            │
-│   ═══════════════════════════════════════════                           │
-│                                                                         │
-│   Agent Owner (Private)                On-Chain (Public)                │
-│   ┌─────────────────────────┐         ┌─────────────────────────┐       │
-│   │                         │         │                         │       │
-│   │  Private Attributes:    │         │  Stored:                │       │
-│   │  ├── name: "AgentX"     │         │  ├── commitment:        │       │
-│   │  ├── capabilities: [...] │  ────► │  │   0x8a3f...          │       │
-│   │  ├── organization: "..." │         │  └── (32 bytes only)   │       │
-│   │  └── nonce: random      │         │                         │       │
-│   │                         │         │  Identity details       │       │
-│   │  commitment = Poseidon( │         │  remain private         │       │
-│   │    name,                │         │                         │       │
-│   │    capabilities,        │         │                         │       │
-│   │    organization,        │         │                         │       │
-│   │    nonce                │         │                         │       │
-│   │  )                      │         │                         │       │
-│   │                         │         │                         │       │
-│   └─────────────────────────┘         └─────────────────────────┘       │
-│                                                                         │
-│   VERIFICATION (Selective Disclosure)                                   │
-│   ═══════════════════════════════════                                   │
-│                                                                         │
-│   Client Request            Agent Response           On-Chain Verify    │
-│   ┌─────────────────┐      ┌─────────────────┐     ┌─────────────────┐  │
-│   │                 │      │                 │     │                 │  │
-│   │ "Prove you can  │      │ Generate ZK     │     │ Verify:         │  │
-│   │  execute DeFi   │ ───► │ proof that      │ ──► │                 │  │
-│   │  swaps"         │      │ capabilities    │     │ • Proof valid   │  │
-│   │                 │      │ include "swap"  │     │ • Matches       │  │
-│   │                 │      │                 │     │   commitment    │  │
-│   │                 │      │ WITHOUT         │     │                 │  │
-│   │                 │      │ revealing:      │     │ Result:         │  │
-│   │                 │      │ • Full name     │     │ ✓ Capability    │  │
-│   │                 │      │ • Other caps    │     │   verified      │  │
-│   │                 │      │ • Organization  │     │                 │  │
-│   │                 │      │                 │     │                 │  │
-│   └─────────────────┘      └─────────────────┘     └─────────────────┘  │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### 8.2 TAL Reputation Registry
+### 9.2 TAL Reputation Registry
 
 The Reputation Registry implements ERC-8004's feedback mechanism with enhanced Sybil resistance:
 
@@ -1013,231 +1134,41 @@ The Reputation Registry implements ERC-8004's feedback mechanism with enhanced S
 | feedbackURI | string | Extended feedback data (IPFS) |
 | feedbackHash | bytes32 | Content integrity commitment |
 
-**Sybil Resistance Mechanisms:**
+### 9.3 TAL Validation Registry
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    SYBIL RESISTANCE LAYERS                              │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  LAYER 1: CLIENT FILTERING                                              │
-│  ─────────────────────────────                                          │
-│  • getSummary() requires clientAddresses parameter                      │
-│  • Aggregation only across specified reviewers                          │
-│  • Prevents unbounded Sybil influence                                   │
-│                                                                         │
-│  LAYER 2: PAYMENT PROOF INTEGRATION                                     │
-│  ────────────────────────────────────                                   │
-│  • x402 payment proofs in extended feedback                             │
-│  • Economic cost to generate feedback                                   │
-│  • Verifiable transaction linkage                                       │
-│                                                                         │
-│  LAYER 3: STAKE-WEIGHTED REPUTATION                                     │
-│  ────────────────────────────────────                                   │
-│  • TAL Extension: weight feedback by reviewer's TON stake               │
-│  • High-stake reviewers have more influence                             │
-│  • Economic cost to game reputation                                     │
-│                                                                         │
-│  LAYER 4: ZK VALIDATION CORRELATION                                     │
-│  ──────────────────────────────────                                     │
-│  • Cross-reference reputation with validation results                   │
-│  • ZK-verified tasks contribute to "verified reputation"                │
-│  • Separate scores: overall vs. verified                                │
-│                                                                         │
-│  LAYER 5: REVIEWER REPUTATION                                           │
-│  ────────────────────────────────                                       │
-│  • Emergent reviewer scoring based on:                                  │
-│    - Correlation with ZK validation outcomes                            │
-│    - Historical accuracy                                                │
-│    - Stake duration                                                     │
-│  • Quality reviewers weighted higher                                    │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+The Validation Registry extends ERC-8004 with Tokamak-specific validation capabilities:
 
-### 8.3 TAL Validation Registry
-
-The Validation Registry supports multiple trust models with TEE attestation for off-chain execution:
-
-**Validation Types:**
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    TAL VALIDATION SPECTRUM                              │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  LOW VALUE                                              HIGH VALUE      │
-│  ◄─────────────────────────────────────────────────────────────────►   │
-│                                                                         │
-│  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐            │
-│  │REPUTATION│   │  STAKE   │   │   TEE    │   │  HYBRID  │            │
-│  │   ONLY   │   │ SECURED  │   │ATTESTATION│  │          │            │
-│  └────┬─────┘   └────┬─────┘   └────┬─────┘   └────┬─────┘            │
-│       │              │              │              │                    │
-│       ▼              ▼              ▼              ▼                    │
-│  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐            │
-│  │• No      │   │• Staked  │   │• Hardware│   │• Multiple│            │
-│  │  crypto- │   │  validators│  │  attested│   │  layers  │            │
-│  │  graphic │   │  re-execute│  │  execution│  │• Maximum │            │
-│  │  proof   │   │• DRB-fair │   │• Intel SGX│  │  security│            │
-│  │• Historical│  │  selection│   │  AWS Nitro│  │• High-   │            │
-│  │  feedback│   │• Slashing │   │  ARM TZ  │   │  stakes  │            │
-│  │  only    │   │  for fraud│   │          │   │  tasks   │            │
-│  └──────────┘   └──────────┘   └──────────┘   └──────────┘            │
-│                                                                         │
-│  Use Cases:     Use Cases:      Use Cases:     Use Cases:              │
-│  • Info lookup  • DeFi ops      • Financial    • Medical               │
-│  • Simple       • Trading       • Legal        • Critical              │
-│    queries      • Moderate      • Compliance   • Maximum               │
-│                   value                          liability             │
-│                                                                         │
-│  Cost: Free     Cost: Low       Cost: Medium   Cost: High              │
-│  Latency: None  Latency: Med    Latency: Low   Latency: Med            │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-**TEE Attestation Validation Flow:**
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    TEE ATTESTATION VALIDATION                           │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│   PHASE 1: TASK EXECUTION (TEE Enclave)                                 │
-│   ═════════════════════════════════════                                 │
-│                                                                         │
-│   ┌─────────────┐    ┌─────────────────────────────────────────────┐   │
-│   │    User     │    │           TEE ENCLAVE                        │   │
-│   │             │───►│  ┌─────────────┐    ┌─────────────────────┐  │   │
-│   │  Task       │    │  │    Agent    │    │   Execution Log     │  │   │
-│   │  Request    │    │  │             │───►│                     │  │   │
-│   │             │    │  │  Execute    │    │  • Input states     │  │   │
-│   │             │    │  │  Task       │    │  • Outputs          │  │   │
-│   │             │    │  │             │    │  • Code hash        │  │   │
-│   │             │    │  └─────────────┘    └─────────────────────┘  │   │
-│   └─────────────┘    │                                              │   │
-│                      │  Supported TEEs:                             │   │
-│                      │  • Intel SGX (Software Guard Extensions)     │   │
-│                      │  • AWS Nitro Enclaves                        │   │
-│                      │  • ARM TrustZone                             │   │
-│                      └─────────────────────────────────────────────┘   │
-│                                                                         │
-│   PHASE 2: TEE ATTESTATION GENERATION                                   │
-│   ═══════════════════════════════════                                   │
-│                                                                         │
-│   ┌─────────────────────────────────────────────────────────────────┐  │
-│   │                                                                  │  │
-│   │                    TEE ATTESTATION SERVICE                       │  │
-│   │                                                                  │  │
-│   │   Input:                          Output:                        │  │
-│   │   ┌─────────────────────┐        ┌─────────────────────┐        │  │
-│   │   │ • Execution log     │        │ • Hardware attestation│       │  │
-│   │   │ • Task inputs hash  │  ────► │ • Enclave measurement │       │  │
-│   │   │ • Output hash       │        │ • Signed by TEE key  │        │  │
-│   │   └─────────────────────┘        └─────────────────────┘        │  │
-│   │                                                                  │  │
-│   │   Guarantees: Code integrity, execution isolation,               │  │
-│   │               hardware-backed trust root                         │  │
-│   │                                                                  │  │
-│   └─────────────────────────────────────────────────────────────────┘  │
-│                                                                         │
-│   PHASE 3: ON-CHAIN SETTLEMENT                                          │
-│   ════════════════════════════                                          │
-│                                                                         │
-│   ┌─────────────────────────────────────────────────────────────────┐  │
-│   │                                                                  │  │
-│   │                    TAL VALIDATION REGISTRY                       │  │
-│   │                                                                  │  │
-│   │   1. Receive attestation submission                              │  │
-│   │   2. Verify TEE attestation signature                            │  │
-│   │   3. Verify:                                                     │  │
-│   │      • Attestation from known TEE provider                       │  │
-│   │      • Enclave measurement matches expected                      │  │
-│   │      • Output hash matches committed task                        │  │
-│   │   4. Record validation response (0-100)                          │  │
-│   │   5. Update agent reputation                                     │  │
-│   │   6. Distribute fees to TEE oracle                               │  │
-│   │                                                                  │  │
-│   └─────────────────────────────────────────────────────────────────┘  │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-**ZK for Identity and Reputation Only:**
-
-Note: ZK proofs in TAL are used exclusively for:
-- **Reputation merkle proofs:** Prove reputation threshold (e.g., "score > 80") without revealing exact score
+- **Reputation merkle proofs**: Verify an agent's reputation score exceeds a threshold without revealing exact score
 - **Identity commitments:** Prove capabilities without revealing full identity (Poseidon-based)
 
 ZK is NOT used for agent execution verification—most agent workloads (LLM inference, API calls, Python) cannot be practically circuitized.
 
-### 8.4 Integration Modules
+### 9.4 Integration Modules
 
 **DRB Integration Module:**
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    DRB INTEGRATION USE CASES                            │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  USE CASE 1: VALIDATOR SELECTION                                        │
-│  ═══════════════════════════════════                                    │
-│                                                                         │
-│   Problem: Select validator fairly for stake-secured validation         │
-│                                                                         │
-│   ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐   │
-│   │  Validation     │    │      DRB        │    │   Selected      │   │
-│   │  Request        │───►│  Commit-Reveal² │───►│   Validator     │   │
-│   │                 │    │                 │    │                 │   │
-│   │  taskHash       │    │  randomness =   │    │  Selection      │   │
-│   │  bounty         │    │  verifiable     │    │  weighted by    │   │
-│   │  candidates[]   │    │  unbiasable     │    │  stake amount   │   │
-│   └─────────────────┘    └─────────────────┘    └─────────────────┘   │
-│                                                                         │
-│  USE CASE 2: AGENT LOTTERY                                              │
-│  ═════════════════════════                                              │
-│                                                                         │
-│   Problem: Multiple agents compete for a task                           │
-│                                                                         │
-│   ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐   │
-│   │  Task Request   │    │      DRB        │    │   Selected      │   │
-│   │                 │───►│  Commit-Reveal² │───►│   Agent         │   │
-│   │  taskSpec       │    │                 │    │                 │   │
-│   │  qualifying     │    │  Fair lottery   │    │  Weighted by    │   │
-│   │  agents[]       │    │  no manipulation│    │  reputation     │   │
-│   └─────────────────┘    └─────────────────┘    └─────────────────┘   │
-│                                                                         │
-│  USE CASE 3: AUDIT SAMPLING                                             │
-│  ═══════════════════════════                                            │
-│                                                                         │
-│   Problem: Select which past transactions to audit                      │
-│                                                                         │
-│   ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐   │
-│   │  Audit          │    │      DRB        │    │   Selected      │   │
-│   │  Trigger        │───►│  Commit-Reveal² │───►│   Transactions  │   │
-│   │                 │    │                 │    │                 │   │
-│   │  agent          │    │  Random sample  │    │  For ZK         │   │
-│   │  time period    │    │  unpredictable  │    │  verification   │   │
-│   └─────────────────┘    └─────────────────┘    └─────────────────┘   │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+| Use Case | Description |
+|----------|-------------|
+| Validator Selection | DRB Commit-Reveal² selects validators fairly for stake-secured validation |
+| Agent Lottery | Fair, unbiased selection when multiple agents compete for a task |
+| Audit Sampling | Random, unpredictable selection of past transactions for ZK verification |
 
-**Staking Integration Module:**
+**Cross-Layer Staking Integration Module:**
 
-| Function | Description | Impact |
-|----------|-------------|--------|
-| `verifyOperatorStake(agentId)` | Check if agent owner has minimum stake | Enables "Verified Operator" badge |
-| `getStakeWeightedReputation(agentId)` | Calculate reputation weighted by stake | Higher stake = more trustworthy |
-| `registerSlashingCondition(agentId, condition)` | Define when stake can be slashed | Economic penalty for misbehavior |
-| `claimSeigniorage(agentId)` | Route emissions to high-reputation agents | Reward good actors |
+| Function | Description | Layer | Impact |
+|----------|-------------|-------|--------|
+| `isVerifiedOperator(agentId)` | Check if agent owner has ≥1000 TON staked on L1 | L2 (cached) | Enables "Verified Operator" badge |
+| `getOperatorStake(agentId)` | Return L1 stake amount from mirror cache | L2 (cached) | Stake-weighted reputation |
+| `requestStakeRefresh(operator)` | Trigger fresh L1 stake query via bridge | L2→L1→L2 | On-demand freshness |
+| `requestSlashing(agentId, amount, evidence)` | Submit slashing request to L1 via bridge | L2→L1 | Economic penalty for misbehavior |
+| `claimSeigniorage(agentId)` | Claim bridged seigniorage with reputation bonus | L2 | Reward good actors |
+| `getStakeWeightedReputation(agentId)` | Calculate reputation weighted by L1 stake | L2 (cached) | Higher stake = more trustworthy |
 
 ---
 
-## 9. Trust Models and Validation Mechanisms
+## 10. Trust Models and Validation Mechanisms
 
-### 9.1 Trust Model Selection Framework
+### 10.1 Trust Model Selection Framework
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -1261,142 +1192,37 @@ ZK is NOT used for agent execution verification—most agent workloads (LLM infe
 │  ──────────────────┼───────────────┼───────────────────┤               │
 │                    │               │                   │               │
 │  HIGH VALUE        │  TEE Attested │   Hybrid          │               │
-│  (> $10,000)       │  + Stake      │   (Multi-layer)   │               │
+│  (> $10,000)       │  + L1 Stake   │   (Multi-layer)   │               │
 │                    │               │                   │               │
 │  ──────────────────┴───────────────┴───────────────────┘               │
 │                                                                         │
-│  DECISION FLOW:                                                         │
-│                                                                         │
-│  ┌─────────────────┐                                                   │
-│  │  Task arrives   │                                                   │
-│  └────────┬────────┘                                                   │
-│           │                                                             │
-│           ▼                                                             │
-│  ┌─────────────────┐     YES    ┌─────────────────┐                    │
-│  │ Can run in TEE  │──────────►│ TEE Attestation │                    │
-│  │ enclave?        │            │ possible        │                    │
-│  └────────┬────────┘            └─────────────────┘                    │
-│           │ NO                                                          │
-│           ▼                                                             │
-│  ┌─────────────────┐     HIGH   ┌─────────────────┐                    │
-│  │ What is value   │──────────►│ Stake-secured   │                    │
-│  │ at risk?        │            │ + panel judges  │                    │
-│  └────────┬────────┘            └─────────────────┘                    │
-│           │ LOW                                                         │
-│           ▼                                                             │
-│  ┌─────────────────┐                                                   │
-│  │ Reputation-only │                                                   │
-│  │ sufficient      │                                                   │
-│  └─────────────────┘                                                   │
+│  NOTE: For high-value operations (>$10K), TAL enforces a FRESH         │
+│  L1 stake verification via the cross-layer bridge before proceeding.   │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 9.2 Detailed Trust Model Specifications
+### 10.2 Slashing Conditions (Cross-Layer)
 
-**Model 1: Reputation-Only**
+| Condition | Slash Amount | Evidence Required | Cross-Layer Flow |
+|-----------|-------------|-------------------|-----------------|
+| Failed TEE attestation | 50% | On-chain proof on L2 | L2→L1 slash message (7d finalization) |
+| Stake-secured validation fraud | 100% | Validator consensus on L2 | L2→L1 slash message (7d finalization) |
+| Repeated low reputation | 25% | Threshold breach on L2 | L2→L1 slash message (7d finalization) |
+| Malicious behavior report | Variable | DAO adjudication on L2 | L2→L1 slash after DAO vote |
 
-| Aspect | Specification |
-|--------|---------------|
-| When to use | Low-value, low-risk tasks |
-| Mechanism | Historical feedback signals |
-| Cost | Free (no on-chain validation) |
-| Latency | Instant |
-| Guarantees | Statistical confidence based on history |
-| Risks | Vulnerable to slow reputation attacks |
-
-**Model 2: Stake-Secured**
-
-| Aspect | Specification |
-|--------|---------------|
-| When to use | Medium-value tasks, non-deterministic outputs |
-| Mechanism | Validators re-execute and compare |
-| Cost | Bounty for validators |
-| Latency | Minutes (re-execution time) |
-| Guarantees | Economic security proportional to stake |
-| Risks | Collusion if stake too low |
-
-**Model 3: TEE Attestation**
-
-| Aspect | Specification |
-|--------|---------------|
-| When to use | High-value tasks requiring execution verification |
-| Mechanism | TEE enclave execution (Intel SGX, AWS Nitro, ARM TrustZone) |
-| Cost | TEE oracle fees |
-| Latency | Near real-time |
-| Guarantees | Hardware-backed execution integrity |
-| Risks | Requires TEE infrastructure |
-
-**Model 4: Hybrid**
-
-| Aspect | Specification |
-|--------|---------------|
-| When to use | Critical, high-liability tasks |
-| Mechanism | Multiple layers combined |
-| Cost | Sum of component costs |
-| Latency | Longest component latency |
-| Guarantees | Maximum available |
-| Risks | Complexity, cost |
-
-### 9.3 Validation Incentive Design
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    VALIDATION INCENTIVE STRUCTURE                       │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  BOUNTY DISTRIBUTION                                                    │
-│  ═══════════════════                                                    │
-│                                                                         │
-│   ┌─────────────────────────────────────────────────────────────────┐  │
-│   │                                                                  │  │
-│   │   Task Requester                                                 │  │
-│   │        │                                                         │  │
-│   │        │ Posts bounty (TON)                                      │  │
-│   │        ▼                                                         │  │
-│   │   ┌─────────────────┐                                           │  │
-│   │   │  Validation     │                                           │  │
-│   │   │  Escrow         │                                           │  │
-│   │   └────────┬────────┘                                           │  │
-│   │            │                                                     │  │
-│   │            │ On successful validation                            │  │
-│   │            ▼                                                     │  │
-│   │   ┌────────────────────────────────────────────────────────┐    │  │
-│   │   │                                                         │    │  │
-│   │   │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │    │  │
-│   │   │  │  Validator   │  │   Protocol   │  │    Agent     │ │    │  │
-│   │   │  │   (80%)      │  │    (10%)     │  │   (10%)      │ │    │  │
-│   │   │  │              │  │              │  │              │ │    │  │
-│   │   │  │ Proof        │  │ TAL treasury │  │ If passed    │ │    │  │
-│   │   │  │ submitter    │  │ maintenance  │  │ validation   │ │    │  │
-│   │   │  └──────────────┘  └──────────────┘  └──────────────┘ │    │  │
-│   │   │                                                         │    │  │
-│   │   └────────────────────────────────────────────────────────┘    │  │
-│   │                                                                  │  │
-│   └─────────────────────────────────────────────────────────────────┘  │
-│                                                                         │
-│  SLASHING CONDITIONS                                                    │
-│  ════════════════════                                                   │
-│                                                                         │
-│   Condition                        │ Slash Amount │ Evidence Required   │
-│   ─────────────────────────────────┼──────────────┼────────────────────│
-│   Failed TEE attestation           │     50%      │ On-chain proof     │
-│   Stake-secured validation fraud   │    100%      │ Validator consensus│
-│   Repeated low reputation          │     25%      │ Threshold breach   │
-│   Malicious behavior report        │  Variable    │ DAO adjudication   │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+The Optimism L2→L1 message finalization period (~7 days) serves as a **natural appeal window**: operators can dispute the slashing evidence during this period. If the L2 state is proven fraudulent during the challenge window, the slash message is invalidated.
 
 ---
 
-## 10. Economic Model and TON Integration
+## 11. Economic Model and TON Integration
 
-### 10.1 TON Token Utility Expansion
+### 11.1 TON Token Utility Expansion
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                    TON UTILITY IN TAL ECOSYSTEM                         │
+│                    (CROSS-LAYER ECONOMIC FLOWS)                         │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │                              ┌─────────────┐                            │
@@ -1409,6 +1235,7 @@ ZK is NOT used for agent execution verification—most agent workloads (LLM infe
 │         ▼                           ▼                           ▼      │
 │   ┌───────────┐              ┌───────────┐              ┌───────────┐  │
 │   │  STAKING  │              │  PAYMENTS │              │GOVERNANCE │  │
+│   │  (L1)     │              │  (L2)     │              │ (L2)      │  │
 │   └─────┬─────┘              └─────┬─────┘              └─────┬─────┘  │
 │         │                          │                          │        │
 │    ┌────┴────┐               ┌────┴────┐               ┌────┴────┐    │
@@ -1418,484 +1245,147 @@ ZK is NOT used for agent execution verification—most agent workloads (LLM infe
 │ │Verify│ │Earn  │       │Valid-│ │Premium│      │Params│ │Slash │   │
 │ │Opera-│ │Seign-│       │ation │ │Regis-│       │Change│ │Appeal│   │
 │ │tor   │ │iorage│       │Bounty│ │tration│      │Voting│ │Judge │   │
-│ │Status│ │      │       │      │ │      │       │      │ │      │   │
+│ │(L1→  │ │(L1→  │       │(L2)  │ │(L2)  │       │(L2)  │ │(L2→  │   │
+│ │ L2)  │ │ L2)  │       │      │ │      │       │      │ │ L1)  │   │
 │ └──────┘ └──────┘       └──────┘ └──────┘       └──────┘ └──────┘   │
 │                                                                         │
-│  ───────────────────────────────────────────────────────────────────   │
-│                                                                         │
-│  STAKING UTILITIES                                                      │
-│  ════════════════                                                       │
+│  STAKING UTILITIES (Cross-Layer)                                        │
+│  ════════════════════════════════                                       │
 │                                                                         │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                                                                  │   │
 │  │  Verified Operator Status                                        │   │
-│  │  ├── Minimum stake: 1,000 TON                                    │   │
+│  │  ├── Stake: ≥1,000 TON on L1 DepositManagerV3                   │   │
+│  │  ├── Verified via: TALStakingBridgeL1 → L2 cache                │   │
 │  │  ├── Benefit: "Verified" badge on agent profile                  │   │
 │  │  ├── Benefit: Higher visibility in discovery                     │   │
 │  │  └── Benefit: Access to high-value task pools                    │   │
 │  │                                                                  │   │
-│  │  Seigniorage Earnings                                            │   │
-│  │  ├── Base: Standard Staking V2 emissions                         │   │
-│  │  ├── Bonus: Additional emissions for high-reputation agents      │   │
+│  │  Seigniorage Earnings (Bridged)                                  │   │
+│  │  ├── Base: Staking V3 seigniorage claimed on L1                  │   │
+│  │  ├── Bridged: TON transferred to L2 via StandardBridge           │   │
+│  │  ├── Bonus: Additional share for high-reputation agents          │   │
 │  │  └── Formula: emission × (1 + reputation_score / 100)            │   │
 │  │                                                                  │   │
-│  │  Slashing Protection                                             │   │
-│  │  ├── Stake acts as collateral for good behavior                  │   │
-│  │  ├── Malicious actions result in stake loss                      │   │
-│  │  └── Creates strong incentive alignment                          │   │
-│  │                                                                  │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
-│                                                                         │
-│  PAYMENT UTILITIES                                                      │
-│  ════════════════                                                       │
-│                                                                         │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                                                                  │   │
-│  │  Validation Bounties                                             │   │
-│  │  ├── Paid in TON by task requesters                              │   │
-│  │  ├── Distributed to successful validators                        │   │
-│  │  └── Minimum bounty enforced by protocol                         │   │
-│  │                                                                  │   │
-│  │  Premium Registration                                            │   │
-│  │  ├── Basic registration: Free                                    │   │
-│  │  ├── Featured placement: TON fee (burned)                        │   │
-│  │  └── Extended metadata storage: TON fee                          │   │
-│  │                                                                  │   │
-│  │  Protocol Fees                                                   │   │
-│  │  ├── 10% of validation bounties to treasury                      │   │
-│  │  ├── Used for protocol maintenance and development               │   │
-│  │  └── DAO controls fee parameters                                 │   │
+│  │  Slashing Protection (Cross-Layer)                               │   │
+│  │  ├── L1 stake acts as collateral for L2 good behavior            │   │
+│  │  ├── L2 detects misbehavior → relays slash to L1                 │   │
+│  │  ├── 7-day appeal window (Optimism finalization period)          │   │
+│  │  └── L1 DepositManagerV3 executes slash after finalization       │   │
 │  │                                                                  │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 10.2 Economic Flow Diagram
+### 11.2 Cross-Layer Economic Flow Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    TAL ECONOMIC FLOWS                                   │
+│                    TAL CROSS-LAYER ECONOMIC FLOWS                       │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
+│  ETHEREUM L1                                  TOKAMAK L2               │
+│  ═══════════                                  ═══════════              │
 │                                                                         │
-│   USERS                    TAL ECOSYSTEM                    TOKAMAK     │
+│  ┌─────────────────┐                          ┌─────────────────┐      │
+│  │  Staking V3     │                          │  TAL Registries │      │
+│  │  DepositManager │                          │                 │      │
+│  │                 │     Stake Snapshots       │  TALStaking     │      │
+│  │  Operator stakes│─────(L1→L2 messages)────►│  BridgeL2       │      │
+│  │  TON            │                          │  (cached state) │      │
+│  │                 │                          │                 │      │
+│  │                 │     Slash Requests        │                 │      │
+│  │  TALSlashing    │◄────(L2→L1 messages)─────│  TALValidation  │      │
+│  │  ConditionsL1   │     (7d finalization)     │  Registry       │      │
+│  │                 │                          │                 │      │
+│  │                 │     Seigniorage Bridge    │                 │      │
+│  │  SeigManagerV3  │─────(StandardBridge)────►│  TALStaking     │      │
+│  │  → TON/WTON     │     + notification msg   │  BridgeL2       │      │
+│  │                 │                          │  → operators    │      │
+│  └─────────────────┘                          └─────────────────┘      │
 │                                                                         │
-│   ┌─────────┐                                              ┌─────────┐ │
-│   │  Task   │                                              │Staking  │ │
-│   │Requester│                                              │   V2    │ │
-│   └────┬────┘                                              └────┬────┘ │
-│        │                                                        │      │
-│        │ TON (bounty)                                           │      │
-│        │                                                        │      │
-│        ▼                                                        │      │
-│   ┌─────────────────────────────────────────────────────────┐  │      │
-│   │                                                          │  │      │
-│   │                    TAL CONTRACTS                         │  │      │
-│   │                                                          │  │      │
-│   │   ┌──────────────────────────────────────────────────┐  │  │      │
-│   │   │              Validation Registry                  │  │  │      │
-│   │   │                                                   │  │  │      │
-│   │   │  Bounty Pool ──────────────────────────────────► │  │  │      │
-│   │   │       │                                           │  │  │      │
-│   │   │       ├──80%──► Validator                        │  │  │      │
-│   │   │       ├──10%──► Agent (if passed)                │  │  │      │
-│   │   │       └──10%──► Protocol Treasury                │  │  │      │
-│   │   │                                                   │  │  │      │
-│   │   └──────────────────────────────────────────────────┘  │  │      │
-│   │                                                          │  │      │
-│   │   ┌──────────────────────────────────────────────────┐  │  │      │
-│   │   │              Identity Registry                    │  │  │      │
-│   │   │                                                   │◄─┤  │      │
-│   │   │  Stake Check ────────────────────────────────────┤  │  │      │
-│   │   │       │                                           │  │  │      │
-│   │   │       └──► Verified Operator Status              │  │  │      │
-│   │   │                                                   │  │  │      │
-│   │   └──────────────────────────────────────────────────┘  │  │      │
-│   │                                                          │  │      │
-│   │   ┌──────────────────────────────────────────────────┐  │  │      │
-│   │   │              Reputation Registry                  │  │  │      │
-│   │   │                                                   │  │  │      │
-│   │   │  Reputation Score ───────────────────────────────┤  │  │      │
-│   │   │       │                                           │  │  │      │
-│   │   │       └──► Seigniorage Bonus ────────────────────┼──┼──┘      │
-│   │   │                                                   │  │         │
-│   │   └──────────────────────────────────────────────────┘  │         │
-│   │                                                          │         │
-│   └─────────────────────────────────────────────────────────┘         │
-│                                                                         │
-│   ┌─────────┐          ┌─────────────┐          ┌─────────────────┐   │
-│   │  Agent  │◄─────────│  Earnings   │◄─────────│  Seigniorage    │   │
-│   │Operator │          │  (TON)      │          │  (from stake)   │   │
-│   └─────────┘          └─────────────┘          └─────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                                                                  │   │
+│  │  BOUNTY FLOW (Entirely on L2)                                    │   │
+│  │                                                                  │   │
+│  │  Task Requester → TON bounty → Validation Escrow                │   │
+│  │                                      │                           │   │
+│  │                                      ├──80%──► Validator         │   │
+│  │                                      ├──10%──► Agent (if passed) │   │
+│  │                                      └──10%──► Protocol Treasury │   │
+│  │                                                                  │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 10.3 Fee Structure
+### 11.3 Fee Structure
 
-| Action | Fee | Destination | Rationale |
-|--------|-----|-------------|-----------|
-| Agent Registration | Free | N/A | Minimize barrier to entry |
-| Featured Listing | 100 TON | Burn | Deflationary, prevents spam |
-| ZK Validation Bounty | Min 1 TON | Validator (80%), Treasury (10%), Agent (10%) | Incentivize validation |
-| Stake-Secured Bounty | Min 10 TON | Validators | Higher cost for human review |
-| Slashing (fraud) | 50-100% stake | Treasury | Punish bad actors |
-| DAO Proposal | 1000 TON | Escrow (returned if passed) | Prevent spam proposals |
+| Action | Fee | Destination | Layer | Rationale |
+|--------|-----|-------------|-------|-----------|
+| Agent Registration | Free | N/A | L2 | Minimize barrier to entry |
+| Featured Listing | 100 TON | Burn | L2 | Deflationary, prevents spam |
+| ZK Validation Bounty | Min 1 TON | Validator 80%, Treasury 10%, Agent 10% | L2 | Incentivize validation |
+| Stake-Secured Bounty | Min 10 TON | Validators | L2 | Higher cost for human review |
+| Slashing (fraud) | 50-100% stake | Treasury | L1 (via bridge) | Punish bad actors |
+| Seigniorage Claim | Gas only | Operator | L1→L2 bridge | Reward good actors |
+| DAO Proposal | 1000 TON | Escrow (returned if passed) | L2 | Prevent spam proposals |
 
 ---
 
-## 11. Privacy and Security Framework
+## 12. Privacy and Security Framework
 
-### 11.1 Privacy Architecture
+### 12.1 Privacy Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    TAL PRIVACY LAYERS                                   │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  LAYER 1: IDENTITY PRIVACY                                              │
-│  ══════════════════════════                                             │
-│                                                                         │
-│   ┌─────────────────────────────────────────────────────────────────┐  │
-│   │                                                                  │  │
-│   │   OPTION A: Public Identity (Standard ERC-8004)                  │  │
-│   │   ├── Full metadata visible on-chain                             │  │
-│   │   ├── All capabilities disclosed                                 │  │
-│   │   └── Use case: Public agents, marketing, discovery              │  │
-│   │                                                                  │  │
-│   │   OPTION B: ZK Identity (TAL Extension)                          │  │
-│   │   ├── Only commitment stored on-chain                            │  │
-│   │   ├── Selective capability disclosure via ZK proofs              │  │
-│   │   └── Use case: Competitive agents, proprietary methods          │  │
-│   │                                                                  │  │
-│   │   OPTION C: Hybrid Identity                                      │  │
-│   │   ├── Some attributes public, some private                       │  │
-│   │   ├── Granular control over disclosure                           │  │
-│   │   └── Use case: Balanced visibility needs                        │  │
-│   │                                                                  │  │
-│   └─────────────────────────────────────────────────────────────────┘  │
-│                                                                         │
-│  LAYER 2: EXECUTION PRIVACY                                             │
-│  ═══════════════════════════                                            │
-│                                                                         │
-│   ┌─────────────────────────────────────────────────────────────────┐  │
-│   │                                                                  │  │
-│   │   TEE Enclave Execution                                          │  │
-│   │   ├── Execute in isolated enclave without revealing:             │  │
-│   │   │   ├── Internal agent logic                                   │  │
-│   │   │   ├── Intermediate computation states                        │  │
-│   │   │   └── Proprietary algorithms                                 │  │
-│   │   ├── Attestation only reveals:                                  │  │
-│   │   │   ├── Input hash                                             │  │
-│   │   │   ├── Output hash                                            │  │
-│   │   │   └── Enclave measurement validity                           │  │
-│   │   └── Supported: Intel SGX, AWS Nitro, ARM TrustZone             │  │
-│   │                                                                  │  │
-│   └─────────────────────────────────────────────────────────────────┘  │
-│                                                                         │
-│  LAYER 3: REPUTATION PRIVACY                                            │
-│  ═══════════════════════════                                            │  
-│                                                                         │
-│   ┌─────────────────────────────────────────────────────────────────┐  │
-│   │                                                                  │  │
-│   │   Public Component                                               │  │
-│   │   ├── Aggregate scores visible                                   │  │
-│   │   ├── Validation counts public                                   │  │
-│   │   └── Necessary for discovery and trust                          │  │
-│   │                                                                  │  │
-│   │   Private Component                                              │  │
-│   │   ├── Individual feedback details on IPFS (access-controlled)    │  │
-│   │   ├── Client identities can be pseudonymous                      │  │
-│   │   └── Detailed execution traces encrypted                        │  │
-│   │                                                                  │  │
-│   └─────────────────────────────────────────────────────────────────┘  │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+TAL provides three layers of privacy:
 
-### 11.2 Security Threat Model
+**Layer 1: Identity Privacy** — ZK identity commitments (Poseidon-based) allow selective capability disclosure without revealing full agent identity.
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    THREAT MODEL AND MITIGATIONS                         │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  THREAT 1: SYBIL ATTACKS ON REPUTATION                                  │
-│  ═════════════════════════════════════════                              │
-│                                                                         │
-│   Attack: Create many fake identities to inflate reputation             │
-│                                                                         │
-│   Mitigations:                                                          │
-│   ├── Client filtering in aggregation queries                           │
-│   ├── Stake-weighted feedback influence                                 │
-│   ├── x402 payment proof requirements                                   │
-│   ├── ZK validation correlation                                         │
-│   └── Reviewer reputation scoring                                       │
-│                                                                         │
-│  THREAT 2: VALIDATOR COLLUSION                                          │
-│  ═══════════════════════════════                                        │
-│                                                                         │
-│   Attack: Validators collude to approve invalid executions              │
-│                                                                         │
-│   Mitigations:                                                          │
-│   ├── DRB-based random validator selection                              │
-│   ├── High stake requirements for validators                            │
-│   ├── Slashing for provably incorrect validations                       │
-│   ├── ZK validation as ultimate ground truth                            │
-│   └── Multi-validator consensus requirements                            │
-│                                                                         │
-│  THREAT 3: LAST-REVEALER MANIPULATION                                   │
-│  ═════════════════════════════════════                                  │
-│                                                                         │
-│   Attack: Last participant in reveal manipulates randomness             │
-│                                                                         │
-│   Mitigations:                                                          │
-│   └── Commit-Reveal² protocol with overlapped rounds                    │
-│                                                                         │
-│  THREAT 4: FRONT-RUNNING VALIDATION                                     │
-│  ═══════════════════════════════════                                    │
-│                                                                         │
-│   Attack: Observe pending validation, front-run with fake proof         │
-│                                                                         │
-│   Mitigations:                                                          │
-│   ├── Commit-reveal for proof submission                                │
-│   ├── Request-specific proof binding                                    │
-│   └── Time-locked proof validity                                        │
-│                                                                         │
-│  THREAT 5: SMART CONTRACT VULNERABILITIES                               │
-│  ═════════════════════════════════════════                              │
-│                                                                         │
-│   Attack: Exploit bugs in TAL contracts                                 │
-│                                                                         │
-│   Mitigations:                                                          │
-│   ├── Multiple independent audits                                       │
-│   ├── Formal verification of critical paths                             │
-│   ├── Bug bounty program                                                │
-│   ├── Upgradeable proxy pattern with timelock                           │
-│   └── Circuit breaker / pause functionality                             │
-│                                                                         │
-│  THREAT 6: TEE ATTESTATION FORGERY                                      │
-│  ═══════════════════════════════════                                    │
-│                                                                         │
-│   Attack: Create valid-looking attestations for incorrect execution     │
-│                                                                         │
-│   Mitigations:                                                          │
-│   ├── Hardware root of trust (TEE manufacturer keys)                    │
-│   ├── Multiple TEE provider support (SGX, Nitro, TrustZone)             │
-│   ├── Attestation signature verification                                │
-│   └── Fallback to stake-secured validation                              │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+**Layer 2: Execution Privacy** — TEE enclave execution (Intel SGX, AWS Nitro, ARM TrustZone) reveals only input/output hashes and enclave measurement validity.
 
-### 11.3 Audit and Compliance Plan
+**Layer 3: Reputation Privacy** — Aggregate scores public for discovery; individual feedback details access-controlled on IPFS; execution traces encrypted.
 
-| Phase | Activity | Timeline | Responsible |
-|-------|----------|----------|-------------|
-| Pre-Launch | Internal security review | Month 1-2 | Core team |
-| Pre-Launch | External audit (CertiK/OpenZeppelin) | Month 3 | External |
-| Pre-Launch | Formal verification of ZK circuits | Month 3-4 | Specialized firm |
-| Launch | Bug bounty program activation | Month 5 | Immunefi |
-| Post-Launch | Continuous monitoring | Ongoing | Security team |
-| Post-Launch | Periodic re-audits | Quarterly | Rotating auditors |
+### 12.2 Security Threat Model
+
+| Threat | Mitigation |
+|--------|-----------|
+| Sybil attacks on reputation | Client filtering, stake-weighted feedback, x402 payment proofs |
+| Validator collusion | DRB random selection, high stake requirements, slashing, multi-validator consensus |
+| Last-revealer manipulation | Commit-Reveal² overlapped rounds |
+| Front-running validation | Commit-reveal for proof submission, request-specific binding |
+| Smart contract vulnerabilities | Multiple audits, formal verification, bug bounties, upgradeable proxies |
+| TEE attestation forgery | Hardware root of trust, multi-provider support, fallback validation |
+| **Cross-layer message manipulation** | **Strict xDomainMessageSender validation, Optimism challenge period, circuit breakers** |
+| **Stale cache exploitation** | **Configurable freshness thresholds, forced refresh for high-value ops** |
+| **L1→L2 relay censorship** | **Permissionless relay triggering, multiple keeper paths, L1 fallback** |
 
 ---
 
-## 12. Use Cases
+## 13. Use Cases
 
-### 12.1 Use Case 1: DeFi Trading Agent
+### 13.1 DeFi Trading Agent (TEE + L1 Stake)
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    USE CASE: DEFI TRADING AGENT                         │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  SCENARIO                                                               │
-│  ════════                                                               │
-│  A user wants an AI agent to execute yield optimization strategies      │
-│  across multiple DeFi protocols, with verifiable execution.             │
-│                                                                         │
-│  AGENT PROFILE                                                          │
-│  ═════════════                                                          │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │  Name: YieldMaximizer-v3                                         │   │
-│  │  Capabilities: [yield-farming, rebalancing, risk-assessment]     │   │
-│  │  Supported Protocols: [Aave, Compound, Lido, Curve]              │   │
-│  │  Trust Model: TEE Attested + Stake (verified execution)          │   │
-│  │  Stake: 5,000 TON (Verified Operator)                            │   │
-│  │  Historical Return: +12.3% APY (verified)                        │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
-│                                                                         │
-│  WORKFLOW                                                               │
-│  ════════                                                               │
-│                                                                         │
-│   User                           Agent                    TAL          │
-│     │                             │                        │            │
-│     │ 1. Discover via TAL         │                        │            │
-│     │    (filter: yield, TEE)     │                        │            │
-│     │───────────────────────────────────────────────────►  │            │
-│     │                             │                        │            │
-│     │ 2. Query reputation         │                        │            │
-│     │◄───────────────────────────────────────────────────  │            │
-│     │    Score: 94/100            │                        │            │
-│     │    TEE Attestations: 1,247  │                        │            │
-│     │                             │                        │            │
-│     │ 3. Delegate funds           │                        │            │
-│     │    ($10,000 USDC)           │                        │            │
-│     │────────────────────────────►│                        │            │
-│     │                             │                        │            │
-│     │                             │ 4. Execute strategy     │            │
-│     │                             │    ├── Deposit to Aave  │            │
-│     │                             │    ├── Stake in Lido    │            │
-│     │                             │    └── LP on Curve      │            │
-│     │                             │                        │            │
-│     │                             │ 5. Generate TEE attest  │            │
-│     │                             │────────────────────────►│            │
-│     │                             │                        │            │
-│     │                             │ 6. Attestation verified │            │
-│     │                             │◄────────────────────────│            │
-│     │                             │                        │            │
-│     │ 7. Receive verified         │                        │            │
-│     │    execution report         │                        │            │
-│     │◄────────────────────────────│                        │            │
-│     │                             │                        │            │
-│                                                                         │
-│  VALUE DELIVERED                                                        │
-│  ═══════════════                                                        │
-│  • User: Hardware-attested verification that strategy was executed      │
-│  • Agent: Premium pricing for verified execution                        │
-│  • Ecosystem: Trust enables higher-value delegations                    │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+A user delegates $10,000 USDC to a yield optimization agent. TAL:
+1. Verifies agent's "Verified Operator" status via cross-layer stake bridge (≥1000 TON on L1)
+2. Because value > $10K, forces a **fresh L1 stake check** before proceeding
+3. Agent executes strategy in TEE enclave, generating hardware attestation
+4. Attestation verified on-chain; reputation updated
+5. If agent misbehaves, slashing request sent L2→L1 with 7-day appeal window
 
-### 12.2 Use Case 2: Research Assistant Agent
+### 13.2 Research Assistant Agent (Reputation-Only)
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    USE CASE: RESEARCH ASSISTANT                         │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  SCENARIO                                                               │
-│  ════════                                                               │
-│  A researcher needs an AI agent to analyze academic papers and          │
-│  generate literature reviews, with reputation-based trust.              │
-│                                                                         │
-│  AGENT PROFILE                                                          │
-│  ═════════════                                                          │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │  Name: ScholarBot                                                │   │
-│  │  Capabilities: [paper-analysis, summarization, citation-gen]     │   │
-│  │  Specializations: [CS, ML, Blockchain]                           │   │
-│  │  Trust Model: Reputation-Only (subjective quality)               │   │
-│  │  Stake: 500 TON                                                  │   │
-│  │  Feedback Score: 4.7/5.0 (823 reviews)                           │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
-│                                                                         │
-│  TRUST MODEL RATIONALE                                                  │
-│  ═════════════════════                                                  │
-│                                                                         │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                                                                  │   │
-│  │  Why Reputation-Only?                                            │   │
-│  │                                                                  │   │
-│  │  • Task is non-deterministic (creative summarization)            │   │
-│  │  • Value at risk is low (time, not money)                        │   │
-│  │  • Quality is subjective (user preference)                       │   │
-│  │  • Historical feedback provides sufficient confidence            │   │
-│  │                                                                  │   │
-│  │  Trust Signals Used:                                             │   │
-│  │  ├── Aggregate feedback score                                    │   │
-│  │  ├── Number of completed tasks                                   │   │
-│  │  ├── Tag-specific ratings ("accuracy", "thoroughness")           │   │
-│  │  └── Verified operator status (stake)                            │   │
-│  │                                                                  │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+Low-value, non-deterministic task. Reputation-only validation sufficient. No cross-layer interaction needed for basic trust; L1 stake presence serves as optional credibility signal.
 
-### 12.3 Use Case 3: Multi-Agent Coordination
+### 13.3 Multi-Agent Coordination (Hybrid)
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    USE CASE: MULTI-AGENT COORDINATION                   │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  SCENARIO                                                               │
-│  ════════                                                               │
-│  A complex task requires multiple specialized agents to collaborate,    │
-│  with fair task allocation and verified handoffs.                       │
-│                                                                         │
-│  TASK: Comprehensive Market Analysis Report                             │
-│  ├── Data Collection Agent (fetch market data)                          │
-│  ├── Analysis Agent (statistical analysis)                              │
-│  ├── Visualization Agent (create charts)                                │
-│  └── Writing Agent (compile report)                                     │
-│                                                                         │
-│  COORDINATION FLOW                                                      │
-│  ═════════════════                                                      │
-│                                                                         │
-│   ┌─────────────────────────────────────────────────────────────────┐  │
-│   │                     ORCHESTRATOR                                 │  │
-│   │                                                                  │  │
-│   │  1. Decompose task into subtasks                                 │  │
-│   │  2. Query TAL for capable agents per subtask                     │  │
-│   │  3. Use DRB for fair selection (reputation-weighted)             │  │
-│   │  4. Assign subtasks with validation requirements                 │  │
-│   │                                                                  │  │
-│   └──────────────────────────┬──────────────────────────────────────┘  │
-│                              │                                          │
-│          ┌──────────────────┼────────────────────┐                     │
-│          │                  │                    │                     │
-│          ▼                  ▼                    ▼                     │
-│   ┌────────────┐     ┌────────────┐      ┌────────────┐               │
-│   │   Data     │     │  Analysis  │      │   Viz      │               │
-│   │   Agent    │────►│   Agent    │─────►│   Agent    │──► ...        │
-│   │            │     │            │      │            │               │
-│   │ TEE Attest │     │ TEE Attest │      │ Reputation │               │
-│   │ (fetch)    │     │ (compute)  │      │ (creative) │               │
-│   └────────────┘     └────────────┘      └────────────┘               │
-│                                                                         │
-│  TRUST COMPOSITION                                                      │
-│  ═════════════════                                                      │
-│                                                                         │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                                                                  │   │
-│  │  Each handoff verified:                                          │   │
-│  │  ├── Output hash of Agent N = Input commitment for Agent N+1     │   │
-│  │  ├── Attestation chain ensures no tampering                      │   │
-│  │  └── Final report has full provenance                            │   │
-│  │                                                                  │   │
-│  │  Composite Trust Score:                                          │   │
-│  │  ├── Minimum of component agent scores                           │   │
-│  │  ├── Weighted by task criticality                                │   │
-│  │  └── Displayed to end user                                       │   │
-│  │                                                                  │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### 12.4 Additional Use Cases Summary
-
-| Use Case | Trust Model | Key TAL Features Used |
-|----------|-------------|----------------------|
-| **Automated Trading Bots** | TEE Attested + Stake | Attestation of trade execution, slashing for front-running |
-| **Content Moderation** | Stake-Secured | Multi-validator consensus, appeal mechanism |
-| **Legal Document Review** | Hybrid | TEE for analysis, human validator for judgment |
-| **Healthcare Triage** | Hybrid + TEE | Maximum security, regulatory compliance |
-| **NFT Generation** | Reputation | Creative work, subjective quality |
-| **Smart Contract Audit** | TEE + Stake | Deterministic analysis with human review |
-| **Cross-Chain Bridging** | TEE Attested | Attestation of correct relay |
-| **DAO Proposal Analysis** | Reputation | Community feedback, stake-weighted |
+Complex workflows with verified handoffs between specialized agents. DRB selects agents fairly; each handoff generates TEE attestation chain. Composite trust score weighted by L1 stake of each component agent.
 
 ---
 
-## 13. Implementation Roadmap
+## 14. Implementation Roadmap
 
-### 13.1 Phase Overview
+### 14.1 Phase Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -1912,38 +1402,26 @@ ZK is NOT used for agent execution verification—most agent workloads (LLM infe
 │  │PHASE 1│   │PHASE 2│   │PHASE 3│   │PHASE 4│                        │
 │  │       │   │       │   │       │   │       │                        │
 │  │Found- │   │ Trust │   │Mainnet│   │Scale &│                        │
-│  │ation  │   │Infra- │   │Launch │   │Expand │                        │
-│  │       │   │struct.│   │       │   │       │                        │
-│  └───────┘   └───────┘   └───────┘   └───────┘                        │
-│                                                                         │
-│  2027                                                                   │
-│  ════                                                                   │
-│                                                                         │
-│  Q1          Q2          Q3          Q4                                │
-│  │           │           │           │                                 │
-│  ▼           ▼           ▼           ▼                                 │
-│  ┌───────┐   ┌───────┐   ┌───────┐   ┌───────┐                        │
-│  │PHASE 5│   │PHASE 6│   │PHASE 7│   │PHASE 8│                        │
-│  │       │   │       │   │       │   │       │                        │
-│  │Cross- │   │Advancd│   │ DAO   │   │Mature │                        │
-│  │Chain  │   │Privacy│   │Govern-│   │Ecosys-│                        │
-│  │       │   │       │   │ance   │   │tem    │                        │
+│  │ation +│   │Infra- │   │Launch │   │Expand │                        │
+│  │Bridge │   │struct.│   │       │   │       │                        │
 │  └───────┘   └───────┘   └───────┘   └───────┘                        │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 13.2 Detailed Phase Breakdown
+### 14.2 Detailed Phase Breakdown
 
-**Phase 1: Foundation (Q1 2026)**
+**Phase 1: Foundation + Cross-Layer Bridge (Q1 2026)**
 
 | Milestone | Deliverable | Success Criteria |
 |-----------|-------------|------------------|
-| 1.1 | Core registry contracts | ERC-8004 compliant, audited |
-| 1.2 | Testnet deployment | Functional on Tokamak testnet |
-| 1.3 | Basic UI/SDK | Registration and discovery working |
-| 1.4 | Staking V2 integration | Stake verification functional |
-| 1.5 | Documentation | Complete developer docs |
+| 1.1 | Core registry contracts (L2) | ERC-8004 compliant, audited |
+| 1.2 | **TALStakingBridgeL1 + L2 contracts** | **Cross-layer stake verification working on testnet** |
+| 1.3 | **TALSlashingConditionsL1 contract** | **Integrated with Staking V3 DepositManagerV3 on testnet** |
+| 1.4 | Testnet deployment (L1 + L2) | Both layers functional, bridge messages relaying |
+| 1.5 | Basic UI/SDK | Registration and discovery working |
+| 1.6 | **Stake cache + keeper infrastructure** | **Periodic refresh operational, staleness < 4 hours** |
+| 1.7 | Documentation | Complete developer docs including bridge architecture |
 
 **Phase 2: Trust Infrastructure Integration (Q2 2026)**
 
@@ -1954,210 +1432,123 @@ ZK is NOT used for agent execution verification—most agent workloads (LLM infe
 | 2.3 | Reputation merkle proofs | ZK reputation threshold proofs working |
 | 2.4 | Stake-secured validation | Validator selection via DRB |
 | 2.5 | DRB integration | Fair validator selection |
+| 2.6 | **Cross-layer slashing end-to-end** | **L2 detection → L1 slash execution fully tested** |
+| 2.7 | **Seigniorage bridge** | **L1 claim → L2 distribution pipeline operational** |
 
 **Phase 3: Mainnet Launch (Q3 2026)**
 
 | Milestone | Deliverable | Success Criteria |
 |-----------|-------------|------------------|
-| 3.1 | Security audits complete | 2+ external audits passed |
-| 3.2 | Mainnet deployment | Live on Tokamak L2 mainnet |
-| 3.3 | Initial agents onboarded | 50+ registered agents |
+| 3.1 | Security audits complete | 2+ external audits passed (including cross-layer contracts) |
+| 3.2 | Mainnet deployment (L1 + L2) | All contracts live on both layers |
+| 3.3 | Initial agents onboarded | 50+ registered agents with verified operator status |
 | 3.4 | Validation marketplace | Active validation bounties |
-| 3.5 | Bug bounty program | Immunefi listing active |
+| 3.5 | Bug bounty program | Immunefi listing active (covering both layers) |
 
 **Phase 4: Scale & Expand (Q4 2026)**
 
 | Milestone | Deliverable | Success Criteria |
 |-----------|-------------|------------------|
-| 4.1 | Subgraph indexer | Full search and analytics |
+| 4.1 | Subgraph indexer (L1 + L2) | Full search and analytics across both layers |
 | 4.2 | A2A/MCP integration | Interoperability demonstrated |
 | 4.3 | Partner integrations | 3+ ecosystem partners |
-| 4.4 | Performance optimization | 1000+ TPS validation |
+| 4.4 | Performance optimization | 1000+ TPS validation on L2 |
 | 4.5 | Mobile SDK | iOS/Android support |
 
-**Phase 5-8: Future Development (2027)**
-
-| Phase | Focus | Key Deliverables |
-|-------|-------|------------------|
-| 5 | Cross-Chain | L1 reference contracts, bridge reputation |
-| 6 | Advanced Privacy | Full ZK identity, encrypted feedback |
-| 7 | DAO Governance | On-chain parameter control, proposals |
-| 8 | Mature Ecosystem | Insurance pools, compliance tools |
-
-### 13.3 Resource Requirements
+### 14.3 Resource Requirements
 
 | Category | Q1-Q2 2026 | Q3-Q4 2026 | 2027 |
 |----------|------------|------------|------|
 | Smart Contract Engineers | 3 | 4 | 3 |
+| **Cross-Layer / Bridge Engineers** | **1** | **1** | **1** |
 | TEE/Cryptography Engineers | 2 | 3 | 2 |
 | Frontend/SDK Engineers | 2 | 3 | 2 |
 | DevOps/Infrastructure | 1 | 2 | 2 |
 | Security Researchers | 1 | 2 | 1 |
 | Product/Project Management | 1 | 2 | 1 |
-| **Total Headcount** | **10** | **16** | **11** |
+| **Total Headcount** | **11** | **17** | **12** |
 
-### 13.4 Budget Estimate
+### 14.4 Budget Estimate
 
 | Category | Year 1 (USD) | Year 2 (USD) |
 |----------|--------------|--------------|
-| Personnel | $2,400,000 | $2,000,000 |
-| Security Audits | $400,000 | $200,000 |
-| Infrastructure | $200,000 | $300,000 |
+| Personnel | $2,640,000 | $2,160,000 |
+| Security Audits (incl. bridge) | $500,000 | $250,000 |
+| Infrastructure (L1+L2 keepers) | $250,000 | $350,000 |
 | Bug Bounties | $100,000 | $200,000 |
 | Legal/Compliance | $100,000 | $100,000 |
 | Marketing/Community | $200,000 | $300,000 |
-| Contingency (15%) | $510,000 | $465,000 |
-| **Total** | **$3,910,000** | **$3,565,000** |
+| Contingency (15%) | $568,500 | $504,000 |
+| **Total** | **$4,358,500** | **$3,864,000** |
 
 ---
 
-## 14. Risk Analysis and Mitigation
+## 15. Risk Analysis and Mitigation
 
-### 14.1 Risk Matrix
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    RISK ASSESSMENT MATRIX                               │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│                         IMPACT                                          │
-│              Low        Medium        High        Critical              │
-│            ┌──────────┬──────────┬──────────┬──────────┐               │
-│            │          │          │          │          │               │
-│   High     │    R6    │    R4    │    R2    │    R1    │               │
-│            │          │          │          │          │               │
-│            ├──────────┼──────────┼──────────┼──────────┤               │
-│            │          │          │          │          │               │
-│   Medium   │    R8    │    R5    │    R3    │          │               │
-│ L          │          │          │          │          │               │
-│ I          ├──────────┼──────────┼──────────┼──────────┤               │
-│ K          │          │          │          │          │               │
-│ E Low      │          │    R7    │          │          │               │
-│ L          │          │          │          │          │               │
-│ I          ├──────────┼──────────┼──────────┼──────────┤               │
-│ H          │          │          │          │          │               │
-│ O Very Low │          │          │          │          │               │
-│ O          │          │          │          │          │               │
-│ D          └──────────┴──────────┴──────────┴──────────┘               │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### 14.2 Risk Register
+### 15.1 Risk Register
 
 | ID | Risk | Likelihood | Impact | Mitigation Strategy |
 |----|------|------------|--------|---------------------|
 | R1 | Smart contract vulnerability | High | Critical | Multiple audits, formal verification, bug bounties, upgradeable contracts |
-| R2 | TEE attestation system flaw | Medium | Critical | Multiple TEE providers (SGX, Nitro, TrustZone), fallback to stake-secured validation |
-| R3 | Low adoption / cold start | High | High | Incentive programs, partnership with existing agent platforms, grants for early agents |
-| R4 | Regulatory uncertainty | Medium | High | Legal review, compliance-ready architecture, jurisdiction flexibility |
-| R5 | Competition from established L2s | High | Medium | Differentiation through DRB fairness + economic security, first-mover in agent space |
-| R6 | Key personnel departure | Medium | Low | Knowledge documentation, competitive compensation, team redundancy |
-| R7 | Tokamak ecosystem risks | Low | Medium | Diversified dependencies, cross-chain readiness |
-| R8 | Economic attack on TON | Medium | Low | Conservative stake requirements, circuit breakers |
-| R9 | TEE provider centralization | Medium | Medium | Multi-provider support, fallback validation modes |
+| R2 | TEE attestation system flaw | Medium | Critical | Multiple TEE providers (SGX, Nitro, TrustZone), fallback to stake-secured |
+| R3 | Low adoption / cold start | High | High | Incentive programs, partnerships, grants for early agents |
+| R4 | Regulatory uncertainty | Medium | High | Legal review, compliance-ready architecture |
+| R5 | Competition from established L2s | High | Medium | DRB fairness + economic security differentiation |
+| R6 | **Cross-layer bridge failure** | **Medium** | **High** | **Circuit breakers on both layers, graceful degradation to reputation-only, multiple keeper paths** |
+| R7 | **L1↔L2 message latency** | **Medium** | **Medium** | **Optimistic caching for low-value ops, clear UX for async verification, keeper-driven prefetch** |
+| R8 | **Stale cache exploitation** | **Medium** | **Medium** | **Configurable freshness thresholds, forced L1 check for high-value operations, event-driven updates** |
+| R9 | Key personnel departure | Medium | Low | Knowledge documentation, competitive compensation |
+| R10 | Tokamak ecosystem risks | Low | Medium | Diversified dependencies, cross-chain readiness |
+| R11 | Economic attack on TON | Medium | Low | Conservative stake requirements, circuit breakers |
 
-### 14.3 Contingency Plans
+### 15.2 Cross-Layer Contingency Plans
 
-**Scenario: Critical Smart Contract Bug Post-Launch**
+**Scenario: Cross-Layer Bridge Downtime**
 
-1. Activate circuit breaker (pause contracts)
-2. Assess scope and impact
-3. Deploy fix to testnet
-4. Emergency audit of fix
-5. DAO vote for upgrade (expedited)
-6. Deploy fix with timelock bypass (if approved)
-7. Compensate affected users from treasury
-8. Post-mortem and process improvement
+1. TALStakingBridgeL2 enters **degraded mode**: continues serving cached stake data with warning flags
+2. New registrations accept without verified operator badge (reputation-only temporarily)
+3. Slashing requests queued locally on L2, relayed when bridge recovers
+4. High-value validation paused until bridge restored
+5. Post-recovery: batch refresh all operator stakes, process queued slashing
 
-**Scenario: TEE Attestation System Compromise**
+**Scenario: L1 Staking V3 Upgrade Breaking Changes**
 
-1. Disable compromised TEE provider
-2. Fall back to stake-secured validation or alternate TEE providers
-3. Communicate to users
-4. Investigate and remediate
-5. Third-party security review
-6. Phased re-enablement with monitoring
-
-**Scenario: Low Adoption After 6 Months**
-
-1. Analyze user feedback and barriers
-2. Increase incentives (TON grants for agents)
-3. Pivot to specific vertical (DeFi-only focus)
-4. Partnership acceleration
-5. Consider cross-chain deployment
+1. TALStakingBridgeL1 is upgradeable (proxy pattern)
+2. Monitor Staking V3 governance proposals for interface changes
+3. Deploy updated bridge logic behind timelock
+4. Testnet validation before mainnet upgrade
+5. Maintain backward-compatible interface on L2 side
 
 ---
 
-## 15. Competitive Analysis
+## 16. Competitive Analysis
 
-### 15.1 Competitive Landscape
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    COMPETITIVE POSITIONING                              │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│                        ECONOMIC SECURITY                                │
-│                               │                                         │
-│                       High    │                                         │
-│                               │                                         │
-│                               │    ┌─────────────────┐                 │
-│                               │    │                 │                 │
-│                               │    │   TAL           │◄── Target       │
-│                               │    │   (Tokamak)     │    Position     │
-│                               │    │                 │                 │
-│                               │    └─────────────────┘                 │
-│                               │                                         │
-│                               │                                         │
-│  CENTRALIZED ─────────────────┼─────────────────────── DECENTRALIZED   │
-│  COORDINATION                 │                        COORDINATION    │
-│                               │                                         │
-│     ┌─────────────┐           │         ┌─────────────┐                │
-│     │             │           │         │             │                │
-│     │ OpenAI      │           │         │ Chainlink   │                │
-│     │ Plugins     │           │         │ Functions   │                │
-│     │             │           │         │             │                │
-│     └─────────────┘           │         └─────────────┘                │
-│                               │                                         │
-│            ┌─────────────┐    │                                         │
-│            │             │    │                                         │
-│            │ Generic     │    │                                         │
-│            │ ERC-8004    │    │                                         │
-│            │             │    │                                         │
-│            └─────────────┘    │                                         │
-│                               │                                         │
-│                       Low     │                                         │
-│                               │                                         │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### 15.2 Competitive Comparison
+### 16.1 Competitive Positioning
 
 | Dimension | TAL (Tokamak) | Generic ERC-8004 | Chainlink Functions | Centralized Platforms |
 |-----------|---------------|------------------|---------------------|----------------------|
-| **Trust Model** | TEE + Stake + DRB + Reputation | Reputation + Stake | Oracle network | Platform reputation |
+| **Trust Model** | TEE + L1 Stake + DRB + Reputation | Reputation + Stake | Oracle network | Platform reputation |
+| **Economic Security** | L1-grade (TON on Ethereum) | L2-only | LINK staking | None |
+| **Cross-Layer Security** | Native Optimism bridge | None | N/A | None |
 | **Verification** | TEE attestation + stake-secured | Re-execution | DON consensus | Trust platform |
-| **Privacy** | ZK identity commitments, selective disclosure | Public only | Limited | Platform controls |
+| **Privacy** | ZK identity commitments | Public only | Limited | Platform controls |
 | **Fairness** | DRB Commit-Reveal² | None | Partial | None |
 | **Decentralization** | Full | Full | Partial | None |
-| **Interoperability** | ERC-8004 compliant | ERC-8004 native | Proprietary | Siloed |
-| **Economic Security** | TON staking | Generic stake | LINK staking | None |
 
-### 15.3 TAL Competitive Advantages
+### 16.2 TAL Competitive Advantages
 
-1. **Complete Coordination Stack**: TAL uniquely combines DRB fairness + economic security + TEE settlement
-2. **Integrated Economics**: Deep TON integration provides aligned incentives unavailable elsewhere
-3. **Privacy-First**: ZK identity commitments enable selective disclosure vs. all competitors
-4. **Fair Selection**: DRB Commit-Reveal² prevents manipulation in validator/agent selection
-5. **Ecosystem Synergy**: Leverages full Tokamak stack (Rollup Hub, Staking V2, DRB)
+1. **Complete Coordination Stack**: TAL uniquely combines DRB fairness + L1 economic security + TEE settlement
+2. **L1-Grade Economic Security on L2**: Cross-layer bridge brings Ethereum L1 staking guarantees to L2 agent operations
+3. **Integrated Economics**: Deep TON integration with Staking V3 provides aligned incentives unavailable elsewhere
+4. **Natural Appeal Window**: Optimism's 7-day finalization provides built-in slashing dispute mechanism
+5. **Privacy-First**: ZK identity commitments enable selective disclosure vs. all competitors
+6. **Fair Selection**: DRB Commit-Reveal² prevents manipulation in validator/agent selection
 
 ---
 
-## 16. Success Metrics
+## 17. Success Metrics
 
-### 16.1 Key Performance Indicators
+### 17.1 Key Performance Indicators
 
 **Adoption Metrics**
 
@@ -2172,9 +1563,10 @@ ZK is NOT used for agent execution verification—most agent workloads (LLM infe
 
 | KPI | 6 Months | 12 Months | 24 Months |
 |-----|----------|-----------|-----------|
-| TON Staked in TAL | 500,000 | 2,000,000 | 10,000,000 |
-| Validation Bounties (TON) | 10,000 | 100,000 | 1,000,000 |
+| TON Staked for TAL Operators (L1) | 500,000 | 2,000,000 | 10,000,000 |
+| Validation Bounties (TON, L2) | 10,000 | 100,000 | 1,000,000 |
 | Verified Operators | 20 | 100 | 500 |
+| Cross-Layer Messages / Month | 1,000 | 10,000 | 50,000 |
 
 **Technical Metrics**
 
@@ -2182,83 +1574,47 @@ ZK is NOT used for agent execution verification—most agent workloads (LLM infe
 |-----|----------|-----------|-----------|
 | ZK Validations | 1,000 | 50,000 | 500,000 |
 | Avg Proof Time | < 60s | < 30s | < 10s |
-| Contract Uptime | 99.9% | 99.95% | 99.99% |
-
-**Ecosystem Metrics**
-
-| KPI | 6 Months | 12 Months | 24 Months |
-|-----|----------|-----------|-----------|
-| Partner Integrations | 3 | 10 | 30 |
-| SDK Downloads | 500 | 5,000 | 50,000 |
-| Developer Documentation Views | 10,000 | 100,000 | 500,000 |
-
-### 16.2 Success Criteria by Phase
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    PHASE SUCCESS CRITERIA                               │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  PHASE 1 (Foundation) - SUCCESS IF:                                     │
-│  ├── All core contracts deployed and functional                         │
-│  ├── 2 external audits completed with no critical issues                │
-│  ├── 10+ agents registered in testnet                                   │
-│  └── SDK documentation complete                                         │
-│                                                                         │
-│  PHASE 2 (ZK Integration) - SUCCESS IF:                                 │
-│  ├── ZK identity registration working                                   │
-│  ├── Execution proofs verified on-chain                                 │
-│  ├── Proof generation < 60 seconds on consumer hardware                 │
-│  └── DRB integration tested                                             │
-│                                                                         │
-│  PHASE 3 (Mainnet Launch) - SUCCESS IF:                                 │
-│  ├── Zero critical incidents in first 30 days                           │
-│  ├── 50+ agents registered                                              │
-│  ├── 500+ tasks executed                                                │
-│  └── Bug bounty program active with no critical findings                │
-│                                                                         │
-│  PHASE 4 (Scale) - SUCCESS IF:                                          │
-│  ├── 1,000+ registered agents                                           │
-│  ├── 3+ partner integrations                                            │
-│  ├── 25,000+ unique users                                               │
-│  └── 500,000+ TON staked in TAL                                         │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+| Stake Cache Staleness (avg) | < 2 hours | < 1 hour | < 30 min |
+| Bridge Uptime | 99.9% | 99.95% | 99.99% |
+| Contract Uptime (both layers) | 99.9% | 99.95% | 99.99% |
 
 ---
 
-## 17. Conclusion
+## 18. Conclusion
 
-### 17.1 Summary
+### 18.1 Summary
 
-The Tokamak Agent Layer represents a strategic opportunity to establish Tokamak Network as the foundational infrastructure for the emerging autonomous agent economy. By implementing ERC-8004 with unique enhancements leveraging Tokamak's DRB fairness protocol, TEE integration, ZK identity proofs, and TON economic security, TAL addresses critical gaps in agent coordination, trust, and verification.
+The Tokamak Agent Layer represents a strategic opportunity to establish Tokamak Network as the foundational infrastructure for the emerging autonomous agent economy. By implementing ERC-8004 with unique enhancements leveraging Tokamak's DRB fairness protocol, TEE integration, ZK identity proofs, and **L1-anchored TON economic security bridged to L2 via native Optimism messaging**, TAL addresses critical gaps in agent coordination, trust, and verification.
 
-### 17.2 Key Takeaways
+The cross-layer architecture is a key innovation: rather than compromising on economic security by deploying staking on L2, or compromising on cost efficiency by deploying registries on L1, TAL bridges both layers to achieve the best of both worlds.
+
+### 18.2 Key Takeaways
 
 1. **Market Timing**: The agent economy is nascent but rapidly growing; early infrastructure wins
-2. **Technical Differentiation**: Complete coordination stack (DRB + TEE + economic security) is a moat no competitor can easily replicate
-3. **Ecosystem Synergy**: TAL creates new utility for TON and drives value to existing Tokamak infrastructure
-4. **Standards Alignment**: ERC-8004 compliance ensures interoperability and future-proofing
-5. **Progressive Trust**: Tiered validation models enable broad adoption across value spectrums
+2. **Technical Differentiation**: Complete coordination stack (DRB + TEE + L1 economic security + cross-layer bridge) is a moat no competitor can easily replicate
+3. **Cross-Layer Innovation**: L1 staking security for L2 agent operations via native Optimism messaging is a novel architectural pattern
+4. **Ecosystem Synergy**: TAL creates new utility for TON and drives value to existing Tokamak infrastructure including Staking V3
+5. **Standards Alignment**: ERC-8004 compliance ensures interoperability and future-proofing
+6. **Progressive Trust**: Tiered validation models enable broad adoption across value spectrums
 
-### 17.3 Call to Action
+### 18.3 Call to Action
 
 We recommend the Tokamak Network community and foundation:
 
 1. **Approve** this proposal for further development
-2. **Allocate** initial resources for Phase 1 development
-3. **Engage** the ERC-8004 working group for collaboration
-4. **Establish** partnerships with leading agent platforms
-5. **Communicate** the TAL vision to attract developer interest
+2. **Allocate** initial resources for Phase 1 development (including cross-layer bridge)
+3. **Coordinate** with the Staking V3 team for TALSlashingConditionsL1 integration
+4. **Engage** the ERC-8004 working group for collaboration
+5. **Establish** partnerships with leading agent platforms
+6. **Communicate** the TAL vision to attract developer interest
 
-### 17.4 Vision Statement
+### 18.4 Vision Statement
 
-**Tokamak Agent Layer: Where AI agents earn trust through mathematics, not faith.**
+**Tokamak Agent Layer: Where AI agents earn trust through economics, attestation, and accountability—secured by L1, executed on L2.**
 
 ---
 
-## 18. Appendices
+## 19. Appendices
 
 ### Appendix A: Glossary
 
@@ -2267,13 +1623,16 @@ We recommend the Tokamak Network community and foundation:
 | **Agent** | An autonomous AI system that performs tasks on behalf of users |
 | **A2A** | Agent-to-Agent protocol for inter-agent communication |
 | **Commit-Reveal²** | Tokamak's enhanced commit-reveal protocol preventing last-revealer attacks |
+| **CrossDomainMessenger** | Optimism's native L1↔L2 message passing system |
 | **DRB** | Decentralized Random Beacon |
 | **ERC-8004** | Ethereum standard for trustless agent discovery and trust |
 | **MCP** | Model Context Protocol for AI agent capabilities |
 | **Poseidon** | ZK-friendly hash function used for identity commitments |
 | **Seigniorage** | Token emissions distributed to stakers |
 | **SNARK** | Succinct Non-interactive Argument of Knowledge (ZK proof type) |
+| **Staking V3** | Tokamak's L1 staking system (SeigManagerV3, DepositManagerV3, etc.) |
 | **TAL** | Tokamak Agent Layer (this proposal) |
+| **TALStakingBridge** | Cross-layer contracts (L1 + L2) bridging staking state for TAL |
 | **TON** | Tokamak Network's native token |
 | **ZK** | Zero-Knowledge (cryptographic proofs) |
 
@@ -2281,24 +1640,53 @@ We recommend the Tokamak Network community and foundation:
 
 1. ERC-8004 Specification: https://eips.ethereum.org/EIPS/eip-8004
 2. Tokamak zk-EVM Documentation: https://docs.tokamak.network/zk-evm
-3. Staking V2 Contracts: https://github.com/tokamak-network/ton-staking-v2
-4. DRB Protocol: https://github.com/tokamak-network/DRB-node
-5. Plonk Paper: https://eprint.iacr.org/2019/953
-6. Poseidon Hash: https://eprint.iacr.org/2019/458
+3. Staking V3 Contracts: https://github.com/tokamak-network/ton-staking-v2/tree/ton-staking-v3/dev
+4. Staking V3 Documentation: https://tokamak-network.github.io/ton-staking-v2/
+5. DRB Protocol: https://github.com/tokamak-network/DRB-node
+6. Optimism CrossDomainMessenger: https://docs.optimism.io/builders/app-developers/bridging/messaging
+7. Plonk Paper: https://eprint.iacr.org/2019/953
+8. Poseidon Hash: https://eprint.iacr.org/2019/458
 
-### Appendix C: Related Work
+### Appendix C: Cross-Layer Contract Interface Summary
 
-- Model Context Protocol (MCP) - Anthropic
-- Agent-to-Agent Protocol (A2A) - Google
-- Open Agent Service Format (OASF)
-- Chainlink Functions
-- EigenLayer AVS
+**TALStakingBridgeL1 (Ethereum L1)**
+```
+interface ITALStakingBridgeL1 {
+    function queryAndRelayStake(address operator) external;
+    function batchQueryStakes(address[] calldata operators) external;
+    function executeSlashing(address operator, uint256 amount, bytes calldata evidence) external;
+    function claimAndBridgeSeigniorage(address operator) external;
+    function refreshAllOperators() external;
+}
+```
+
+**TALStakingBridgeL2 (Tokamak L2)**
+```
+interface ITALStakingBridgeL2 {
+    function receiveStakeUpdate(address operator, uint256 amount, uint256 l1Block) external;
+    function isVerifiedOperator(address operator) external view returns (bool);
+    function getOperatorStake(address operator) external view returns (uint256);
+    function requestStakeRefresh(address operator) external;
+    function requestSlashing(address operator, uint256 amount, bytes calldata evidence) external;
+    function receiveSeigniorage(address operator, uint256 amount) external;
+    function claimSeigniorage(address operator) external;
+}
+```
+
+**TALSlashingConditionsL1 (Ethereum L1)**
+```
+interface ITALSlashingConditionsL1 {
+    function slash(address operator, uint256 amount) external;
+    function isRegistered() external view returns (bool);
+}
+```
 
 ### Appendix D: Revision History
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | February 2026 | TAL Working Group | Initial proposal |
+| 1.1 | February 2026 | TAL Working Group | Updated for Staking V3 L1 deployment; added cross-layer interoperability architecture (Section 8); updated economic flows for L1↔L2 bridge; added bridge contracts to roadmap and risk analysis |
 
 ---
 
