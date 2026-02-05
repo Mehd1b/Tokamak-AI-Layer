@@ -16,7 +16,7 @@ TAL enables trustworthy interactions between AI agents and users by providing:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                      Tokamak AI Layer                            │
+│                      Tokamak AI Layer                           │
 ├─────────────────┬─────────────────┬─────────────────────────────┤
 │   Identity      │   Reputation    │        Validation           │
 │   Registry      │   Registry      │        Registry             │
