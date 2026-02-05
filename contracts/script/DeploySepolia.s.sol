@@ -8,16 +8,17 @@ import "../src/core/TALValidationRegistry.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
- * @title DeployLocal
- * @notice Deployment script for TAL contracts on local/testnet
+ * @title DeploySepolia
+ * @notice Deployment script for TAL contracts on Sepolia testnet
  * @dev Usage:
- *      1. Copy .env.example to .env and set your PRIVATE_KEY
+ *      1. Copy .env.example to .env and set required variables
  *      2. Run: source .env
- *      3. Deploy: forge script script/DeployLocal.s.sol --broadcast --rpc-url $RPC_URL
+ *      3. Deploy: forge script script/DeploySepolia.s.sol --broadcast --rpc-url $RPC_URL --verify
  *
  *      Required environment variables:
  *      - PRIVATE_KEY: Deployer private key (required)
- *      - RPC_URL: Network RPC endpoint (required for broadcast)
+ *      - RPC_URL: Sepolia RPC endpoint (required for broadcast)
+ *      - ETHERSCAN_API_KEY: For contract verification (required for --verify)
  *
  *      Optional environment variables:
  *      - STAKING_BRIDGE: Staking bridge contract address (L2 cache of L1 Staking V3)
@@ -25,7 +26,7 @@ import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
  *      - DRB_COORDINATOR: DRB coordinator address
  *      - TEE_ORACLE: TEE oracle address
  */
-contract DeployLocal is Script {
+contract DeploySepolia is Script {
     // Deployed contract addresses
     TALIdentityRegistry public identityRegistry;
     TALReputationRegistry public reputationRegistry;
@@ -47,8 +48,9 @@ contract DeployLocal is Script {
         address drbCoordinator = vm.envOr("DRB_COORDINATOR", address(0));
         address teeOracle = vm.envOr("TEE_ORACLE", address(0));
 
-        console.log("=== TAL Deployment Script ===");
+        console.log("=== TAL Sepolia Deployment Script ===");
         console.log("");
+        console.log("Network: Sepolia Testnet");
         console.log("Deployer:", deployer);
         console.log("Staking Bridge:", stakingBridge);
         console.log("ZK Verifier:", zkVerifier);
@@ -100,7 +102,7 @@ contract DeployLocal is Script {
             deployer,                    // admin
             address(identityRegistry),   // identity registry
             address(reputationRegistry), // reputation registry
-            deployer                     // treasury (use deployer for local)
+            deployer                     // treasury (use deployer for testnet)
         );
         ERC1967Proxy validationProxy = new ERC1967Proxy(validationImpl, validationData);
         validationRegistry = TALValidationRegistry(payable(address(validationProxy)));
@@ -132,11 +134,23 @@ contract DeployLocal is Script {
         console.log("");
         console.log("=== Deployment Complete ===");
 
-        // Write deployment addresses to file for easy import
+        // Write deployment addresses to JSON file
+        _writeDeploymentFile(deployer);
+    }
+
+    /**
+     * @notice Write deployment addresses to JSON file
+     * @dev Creates deployments directory if needed and writes sepolia.json
+     * @param deployer The deployer address
+     */
+    function _writeDeploymentFile(address deployer) internal {
         string memory deploymentJson = string(abi.encodePacked(
             '{\n',
-            '  "network": "local",\n',
+            '  "network": "sepolia",\n',
+            '  "chainId": 11155111,\n',
             '  "deployer": "', vm.toString(deployer), '",\n',
+            '  "timestamp": ', vm.toString(block.timestamp), ',\n',
+            '  "blockNumber": ', vm.toString(block.number), ',\n',
             '  "contracts": {\n',
             '    "TALIdentityRegistry": {\n',
             '      "proxy": "', vm.toString(address(identityRegistry)), '",\n',
@@ -154,8 +168,18 @@ contract DeployLocal is Script {
             '}'
         ));
 
-        vm.writeFile("deployments/local.json", deploymentJson);
+        // Create deployments directory if it doesn't exist
+        try vm.createDir("deployments", false) {
+            console.log("Created deployments directory");
+        } catch {
+            // Directory already exists
+        }
+
+        vm.writeFile("deployments/sepolia.json", deploymentJson);
         console.log("");
-        console.log("Deployment addresses written to: deployments/local.json");
+        console.log("Deployment addresses written to: deployments/sepolia.json");
+        console.log("");
+        console.log("To verify contracts on Etherscan, ensure ETHERSCAN_API_KEY is set in .env");
+        console.log("Run with --verify flag to automatically verify all contracts");
     }
 }

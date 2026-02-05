@@ -6,7 +6,7 @@ import "../../src/core/TALReputationRegistry.sol";
 import "../../src/interfaces/ITALReputationRegistry.sol";
 import "../../src/interfaces/IERC8004ReputationRegistry.sol";
 import "../../src/libraries/ReputationMath.sol";
-import "../mocks/MockStakingV2.sol";
+import "../mocks/MockStakingV3.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
@@ -45,7 +45,7 @@ contract TALReputationRegistryTest is Test {
     TALReputationRegistry public registry;
     TALReputationRegistry public registryImpl;
     MockIdentityRegistry public identityRegistry;
-    MockStakingV2 public stakingV2;
+    MockStakingV3 public stakingBridge;
 
     address public admin = address(0x1);
     address public agentOwner = address(0x2);
@@ -103,7 +103,7 @@ contract TALReputationRegistryTest is Test {
     function setUp() public {
         // Deploy mocks
         identityRegistry = new MockIdentityRegistry();
-        stakingV2 = new MockStakingV2();
+        stakingBridge = new MockStakingV3();
 
         // Deploy implementation
         registryImpl = new TALReputationRegistry();
@@ -113,7 +113,7 @@ contract TALReputationRegistryTest is Test {
             TALReputationRegistry.initialize.selector,
             admin,
             address(identityRegistry),
-            address(stakingV2)
+            address(stakingBridge)
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(registryImpl), initData);
         registry = TALReputationRegistry(address(proxy));
@@ -123,9 +123,9 @@ contract TALReputationRegistryTest is Test {
         identityRegistry.setAgent(AGENT_ID_2, agentOwner);
 
         // Setup stakes for clients
-        stakingV2.setStake(client1, 100 ether);
-        stakingV2.setStake(client2, 400 ether);
-        stakingV2.setStake(client3, 900 ether);
+        stakingBridge.setStake(client1, 100 ether);
+        stakingBridge.setStake(client2, 400 ether);
+        stakingBridge.setStake(client3, 900 ether);
     }
 
     // ============ Helper Functions ============
@@ -421,8 +421,8 @@ contract TALReputationRegistryTest is Test {
 
     function test_getStakeWeightedSummary_equalStakes() public {
         // Set equal stakes for all clients
-        stakingV2.setStake(client1, 100 ether);
-        stakingV2.setStake(client2, 100 ether);
+        stakingBridge.setStake(client1, 100 ether);
+        stakingBridge.setStake(client2, 100 ether);
 
         _submitFeedbackWithValue(client1, AGENT_ID, 60);
         _submitFeedbackWithValue(client2, AGENT_ID, 100);
@@ -445,8 +445,8 @@ contract TALReputationRegistryTest is Test {
     function test_getStakeWeightedSummary_differentStakes() public {
         // client1: 100 ether stake -> sqrt weight = 10e9
         // client2: 400 ether stake -> sqrt weight = 20e9
-        stakingV2.setStake(client1, 100 ether);
-        stakingV2.setStake(client2, 400 ether);
+        stakingBridge.setStake(client1, 100 ether);
+        stakingBridge.setStake(client2, 400 ether);
 
         _submitFeedbackWithValue(client1, AGENT_ID, 100);
         _submitFeedbackWithValue(client2, AGENT_ID, 0);
@@ -469,8 +469,8 @@ contract TALReputationRegistryTest is Test {
 
     function test_getStakeWeightedSummary_sqrtWeighting() public {
         // Verify sqrt weighting: 4x stake should only give 2x weight
-        stakingV2.setStake(client1, 100 ether);  // weight = sqrt(100e18) = 10e9
-        stakingV2.setStake(client2, 400 ether);  // weight = sqrt(400e18) = 20e9
+        stakingBridge.setStake(client1, 100 ether);  // weight = sqrt(100e18) = 10e9
+        stakingBridge.setStake(client2, 400 ether);  // weight = sqrt(400e18) = 20e9
 
         _submitFeedbackWithValue(client1, AGENT_ID, 100);
         _submitFeedbackWithValue(client2, AGENT_ID, 100);
@@ -770,8 +770,8 @@ contract TALReputationRegistryTest is Test {
 
     function test_getStakeWeightedSummary_zeroStakes() public {
         // Set zero stakes
-        stakingV2.setStake(client1, 0);
-        stakingV2.setStake(client2, 0);
+        stakingBridge.setStake(client1, 0);
+        stakingBridge.setStake(client2, 0);
 
         _submitFeedbackWithValue(client1, AGENT_ID, 80);
         _submitFeedbackWithValue(client2, AGENT_ID, 60);
@@ -869,13 +869,13 @@ contract TALReputationRegistryTest is Test {
         assertEq(registry.identityRegistry(), newRegistry);
     }
 
-    function test_setStakingV2() public {
+    function test_setStakingBridge() public {
         address newStaking = address(0x888);
 
         vm.prank(admin);
-        registry.setStakingV2(newStaking);
+        registry.setStakingBridge(newStaking);
 
-        assertEq(registry.stakingV2(), newStaking);
+        assertEq(registry.stakingBridge(), newStaking);
     }
 
     function test_setValidationRegistry() public {
@@ -901,7 +901,7 @@ contract TALReputationRegistryTest is Test {
             TALReputationRegistry.initialize.selector,
             admin,
             address(0), // No identity registry
-            address(stakingV2)
+            address(stakingBridge)
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(registryImpl), initData);
         TALReputationRegistry noIdRegistry = TALReputationRegistry(address(proxy));
@@ -922,13 +922,13 @@ contract TALReputationRegistryTest is Test {
         assertEq(feedbacks.length, 1);
     }
 
-    function test_getStakeWeightedSummary_defaultWeightWithoutStakingContract() public {
-        // Deploy a new registry without staking contract
+    function test_getStakeWeightedSummary_defaultWeightWithoutStakingBridge() public {
+        // Deploy a new registry without staking bridge
         bytes memory initData = abi.encodeWithSelector(
             TALReputationRegistry.initialize.selector,
             admin,
             address(0),
-            address(0) // No staking contract
+            address(0) // No staking bridge
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(registryImpl), initData);
         TALReputationRegistry noStakeRegistry = TALReputationRegistry(address(proxy));
@@ -1021,8 +1021,8 @@ contract TALReputationRegistryTest is Test {
         stake1 = bound(stake1, 1, 1e30);
         stake2 = bound(stake2, 1, 1e30);
 
-        stakingV2.setStake(client1, stake1);
-        stakingV2.setStake(client2, stake2);
+        stakingBridge.setStake(client1, stake1);
+        stakingBridge.setStake(client2, stake2);
 
         _submitFeedbackWithValue(client1, AGENT_ID, 50);
         _submitFeedbackWithValue(client2, AGENT_ID, 75);

@@ -70,8 +70,8 @@ contract TALReputationRegistry is
     /// @notice Identity registry address for agent validation
     address public identityRegistry;
 
-    /// @notice Staking V2 contract address for stake-weighted calculations
-    address public stakingV2;
+    /// @notice Staking bridge contract address for stake-weighted calculations (L2 cache of L1 Staking V3)
+    address public stakingBridge;
 
     /// @notice Validation registry address for verified summaries
     address public validationRegistry;
@@ -117,12 +117,12 @@ contract TALReputationRegistry is
      * @dev Sets up roles and external contract references
      * @param admin The admin address that receives all initial roles
      * @param _identityRegistry The identity registry address for agent validation
-     * @param _stakingV2 The Staking V2 contract address for stake queries
+     * @param _stakingBridge The staking bridge contract address (L2 cache of L1 Staking V3)
      */
     function initialize(
         address admin,
         address _identityRegistry,
-        address _stakingV2
+        address _stakingBridge
     ) public initializer {
         __AccessControl_init();
         __Pausable_init();
@@ -134,7 +134,7 @@ contract TALReputationRegistry is
         _grantRole(REPUTATION_MANAGER_ROLE, admin);
 
         identityRegistry = _identityRegistry;
-        stakingV2 = _stakingV2;
+        stakingBridge = _stakingBridge;
     }
 
     // ============ ERC-8004 Reputation Functions ============
@@ -400,12 +400,12 @@ contract TALReputationRegistry is
     }
 
     /**
-     * @notice Set the staking V2 contract address
+     * @notice Set the staking bridge contract address
      * @dev Only callable by DEFAULT_ADMIN_ROLE
-     * @param _stakingV2 The new staking V2 address
+     * @param _stakingBridge The new staking bridge address (L2 cache of L1 Staking V3)
      */
-    function setStakingV2(address _stakingV2) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        stakingV2 = _stakingV2;
+    function setStakingBridge(address _stakingBridge) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        stakingBridge = _stakingBridge;
     }
 
     /**
@@ -663,15 +663,15 @@ contract TALReputationRegistry is
     }
 
     /**
-     * @notice Get the stake amount for an account from the staking contract
-     * @dev Returns a default weight if staking contract is not set
+     * @notice Get the stake amount for an account from the staking bridge
+     * @dev Returns a default weight if staking bridge is not set
      * @param account The account to query stake for
      * @return The stake amount (or default 1 ether if not available)
      */
     function _getStake(address account) internal view returns (uint256) {
-        if (stakingV2 == address(0)) return 1 ether; // Default weight if no staking
+        if (stakingBridge == address(0)) return 1 ether; // Default weight if no staking bridge
 
-        (bool success, bytes memory result) = stakingV2.staticcall(
+        (bool success, bytes memory result) = stakingBridge.staticcall(
             abi.encodeWithSignature("getStake(address)", account)
         );
         if (!success || result.length < 32) return 1 ether;

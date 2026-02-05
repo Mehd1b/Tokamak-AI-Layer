@@ -92,11 +92,14 @@ contract TALValidationRegistry is
     /// @notice Reputation registry address for reputation updates
     address public reputationRegistry;
 
-    /// @notice Staking V2 contract address for stake verification
-    address public stakingV2;
+    /// @notice Staking bridge contract address for stake verification (L2 cache of L1 Staking V3)
+    address public stakingBridge;
 
     /// @notice DRB (Decentralized Random Beacon) contract address
     address public drbContract;
+
+    /// @notice DRB Integration Module address (Sprint 2)
+    address public drbModule;
 
     /// @notice Protocol treasury address for fee collection
     address public treasury;
@@ -120,7 +123,13 @@ contract TALValidationRegistry is
     mapping(bytes32 => bytes) private _disputeEvidence;
 
     /// @notice Trusted TEE providers mapping (provider => isTrusted)
-    mapping(address => bool) private _trustedTEEProviders;
+    mapping(address => bool) public trustedTEEProviders;
+
+    /// @notice TEE enclave hashes mapping (provider => enclaveHash) - Sprint 2
+    mapping(address => bytes32) public teeEnclaveHashes;
+
+    /// @notice DRB request IDs mapping (requestHash => drbRequestId) - Sprint 2
+    mapping(bytes32 => uint256) private _drbRequestIds;
 
     /// @notice Array of trusted TEE providers for enumeration
     address[] private _trustedTEEProviderList;
@@ -299,22 +308,41 @@ contract TALValidationRegistry is
             // ReputationOnly: Any address can submit validation
             // No additional validation required for Sprint 1
         } else if (request.model == ValidationModel.StakeSecured) {
-            // StakeSecured: Only selected validator can submit (Sprint 2)
+            // StakeSecured: Only selected validator can submit
             address selectedValidator = _selectedValidators[requestHash];
             if (selectedValidator != address(0) && selectedValidator != msg.sender) {
                 revert NotSelectedValidator(requestHash, msg.sender);
             }
-            // TODO: Sprint 2 - Verify validator stake
+            // Sprint 2: Verify validator has sufficient stake via bridge
+            if (stakingBridge != address(0)) {
+                (bool success, bytes memory data) = stakingBridge.staticcall(
+                    abi.encodeWithSignature("isVerifiedOperator(address)", msg.sender)
+                );
+                if (success && data.length >= 32) {
+                    bool isVerified = abi.decode(data, (bool));
+                    require(isVerified, "Validator not verified: insufficient L1 stake");
+                }
+            }
         } else if (request.model == ValidationModel.TEEAttested) {
-            // TEEAttested: Verify TEE attestation (Sprint 2)
-            _verifyTEEAttestation(proof);
+            // TEEAttested: Verify TEE attestation
+            _verifyTEEAttestation(proof, requestHash);
         } else if (request.model == ValidationModel.Hybrid) {
-            // Hybrid: Both validator selection and TEE attestation required (Sprint 2)
+            // Hybrid: Both validator selection and TEE attestation required
             address selectedValidator = _selectedValidators[requestHash];
             if (selectedValidator != address(0) && selectedValidator != msg.sender) {
                 revert NotSelectedValidator(requestHash, msg.sender);
             }
-            _verifyTEEAttestation(proof);
+            // Sprint 2: Verify validator has sufficient stake via bridge
+            if (stakingBridge != address(0)) {
+                (bool success, bytes memory data) = stakingBridge.staticcall(
+                    abi.encodeWithSignature("isVerifiedOperator(address)", msg.sender)
+                );
+                if (success && data.length >= 32) {
+                    bool isVerified = abi.decode(data, (bool));
+                    require(isVerified, "Validator not verified: insufficient L1 stake");
+                }
+            }
+            _verifyTEEAttestation(proof, requestHash);
         }
 
         // Store response
@@ -394,16 +422,34 @@ contract TALValidationRegistry is
         // Validate candidates array
         require(candidates.length > 0, "No candidates provided");
 
-        // Sprint 1: Use blockhash-based randomness (placeholder)
-        // Sprint 2: Integrate with DRB contract for Commit-Reveal² randomness
+        // Sprint 2: Integrate with DRB module for fair validator selection
         uint256 randomSeed;
-        if (drbContract != address(0)) {
-            // TODO: Sprint 2 - Call DRB contract for secure randomness
-            // (bool success, bytes memory result) = drbContract.staticcall(
-            //     abi.encodeWithSignature("getRandomness(bytes32)", requestHash)
-            // );
-            // randomSeed = abi.decode(result, (uint256));
+
+        // Try DRB module first for stake-weighted selection
+        if (drbModule != address(0)) {
+            // Use DRB for fair selection with stake weights
+            (bool success, bytes memory data) = drbModule.call(
+                abi.encodeWithSignature(
+                    "requestValidatorSelection(bytes32,address[],uint256[])",
+                    requestHash, candidates, _getCandidateStakes(candidates)
+                )
+            );
+            if (success && data.length >= 32) {
+                uint256 drbRequestId = abi.decode(data, (uint256));
+                _drbRequestIds[requestHash] = drbRequestId;
+            }
+            // Fallback to blockhash for immediate selection
             randomSeed = uint256(keccak256(abi.encodePacked(blockhash(block.number - 1), requestHash)));
+        } else if (drbContract != address(0)) {
+            // Legacy DRB contract integration
+            (bool success, bytes memory result) = drbContract.staticcall(
+                abi.encodeWithSignature("getRandomness(bytes32)", requestHash)
+            );
+            if (success && result.length >= 32) {
+                randomSeed = abi.decode(result, (uint256));
+            } else {
+                randomSeed = uint256(keccak256(abi.encodePacked(blockhash(block.number - 1), requestHash)));
+            }
         } else {
             // Fallback: blockhash-based randomness (not secure for production)
             randomSeed = uint256(keccak256(abi.encodePacked(blockhash(block.number - 1), requestHash)));
@@ -429,6 +475,37 @@ contract TALValidationRegistry is
         return _selectedValidators[requestHash];
     }
 
+    /**
+     * @notice Finalize DRB-based validator selection
+     * @dev Sprint 2: Called after DRB randomness is available to finalize selection
+     * @param requestHash The validation request hash
+     * @param candidates The candidate validators
+     * @param stakes The candidate stake amounts
+     */
+    function finalizeValidatorSelection(
+        bytes32 requestHash,
+        address[] calldata candidates,
+        uint256[] calldata stakes
+    ) external whenNotPaused {
+        require(_requests[requestHash].status == ValidationStatus.Pending, "Not pending");
+        require(drbModule != address(0), "DRB module not set");
+
+        uint256 drbRequestId = _drbRequestIds[requestHash];
+        require(drbRequestId > 0, "No DRB request");
+
+        (bool success, bytes memory data) = drbModule.call(
+            abi.encodeWithSignature(
+                "finalizeValidatorSelection(bytes32,address[],uint256[])",
+                requestHash, candidates, stakes
+            )
+        );
+        require(success && data.length >= 32, "Finalization failed");
+        address selected = abi.decode(data, (address));
+        _selectedValidators[requestHash] = selected;
+
+        emit ValidatorSelected(requestHash, selected, drbRequestId);
+    }
+
     // ============ TEE Attestation Management ============
 
     /**
@@ -437,9 +514,9 @@ contract TALValidationRegistry is
      */
     function setTrustedTEEProvider(address provider) external override onlyRole(TEE_MANAGER_ROLE) {
         require(provider != address(0), "Invalid provider address");
-        require(!_trustedTEEProviders[provider], "Provider already trusted");
+        require(!trustedTEEProviders[provider], "Provider already trusted");
 
-        _trustedTEEProviders[provider] = true;
+        trustedTEEProviders[provider] = true;
         _trustedTEEProviderList.push(provider);
         _trustedTEEProviderIndex[provider] = _trustedTEEProviderList.length; // 1-indexed
 
@@ -451,9 +528,9 @@ contract TALValidationRegistry is
      * @dev Removes a trusted TEE attestation provider from the whitelist
      */
     function removeTrustedTEEProvider(address provider) external override onlyRole(TEE_MANAGER_ROLE) {
-        require(_trustedTEEProviders[provider], "Provider not trusted");
+        require(trustedTEEProviders[provider], "Provider not trusted");
 
-        _trustedTEEProviders[provider] = false;
+        trustedTEEProviders[provider] = false;
 
         // Remove from list using swap-and-pop
         uint256 indexPlusOne = _trustedTEEProviderIndex[provider];
@@ -479,7 +556,7 @@ contract TALValidationRegistry is
      * @dev Checks if a TEE attestation provider is trusted
      */
     function isTrustedTEEProvider(address provider) external view override returns (bool) {
-        return _trustedTEEProviders[provider];
+        return trustedTEEProviders[provider];
     }
 
     /**
@@ -564,12 +641,34 @@ contract TALValidationRegistry is
         if (upholdOriginal) {
             // Original validation upheld
             request.status = ValidationStatus.Completed;
-            // TODO: Sprint 2 - Slash disputer if applicable
+            // Sprint 2: Could slash disputer if frivolous disputes become an issue
         } else {
-            // Validation overturned
-            // TODO: Sprint 2 - Slash validator, refund bounty, update reputation
-            // For now, mark as expired (invalid)
+            // Validation overturned - slash the validator
+            address validator = _responses[requestHash].validator;
+
+            // Request slashing via bridge (cross-layer slashing)
+            if (stakingBridge != address(0) && validator != address(0)) {
+                bytes memory evidence = abi.encodePacked(requestHash, "DISPUTE_UPHELD");
+                (bool success, ) = stakingBridge.call(
+                    abi.encodeWithSignature(
+                        "requestSlashing(address,uint256,bytes)",
+                        validator,
+                        request.bounty, // Slash amount = bounty value
+                        evidence
+                    )
+                );
+                // Note: We don't revert if slashing fails - the dispute resolution still succeeds
+                // The slashing request is best-effort
+            }
+
+            // Mark as expired (invalid validation)
             request.status = ValidationStatus.Expired;
+
+            // Refund bounty to requester if validation was paid
+            if (request.bounty > 0) {
+                (bool refundSuccess, ) = request.requester.call{value: request.bounty}("");
+                // Best-effort refund - don't revert if it fails
+            }
         }
     }
 
@@ -679,12 +778,12 @@ contract TALValidationRegistry is
     }
 
     /**
-     * @notice Set the staking V2 contract address
+     * @notice Set the staking bridge contract address
      * @dev Only callable by DEFAULT_ADMIN_ROLE
-     * @param _stakingV2 The new staking V2 address
+     * @param _stakingBridge The new staking bridge address (L2 cache of L1 Staking V3)
      */
-    function setStakingV2(address _stakingV2) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        stakingV2 = _stakingV2;
+    function setStakingBridge(address _stakingBridge) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        stakingBridge = _stakingBridge;
     }
 
     /**
@@ -694,6 +793,26 @@ contract TALValidationRegistry is
      */
     function setDRBContract(address _drbContract) external onlyRole(DEFAULT_ADMIN_ROLE) {
         drbContract = _drbContract;
+    }
+
+    /**
+     * @notice Set the DRB module address (Sprint 2)
+     * @dev Only callable by DEFAULT_ADMIN_ROLE
+     * @param _drbModule The new DRB module address for validator selection
+     */
+    function setDRBModule(address _drbModule) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        drbModule = _drbModule;
+    }
+
+    /**
+     * @notice Set the TEE enclave hash for a trusted provider (Sprint 2)
+     * @dev Only callable by TEE_MANAGER_ROLE
+     * @param provider The TEE provider address
+     * @param enclaveHash The expected enclave hash for attestation verification
+     */
+    function setTEEEnclaveHash(address provider, bytes32 enclaveHash) external onlyRole(TEE_MANAGER_ROLE) {
+        require(trustedTEEProviders[provider], "Provider not trusted");
+        teeEnclaveHashes[provider] = enclaveHash;
     }
 
     // ============ Internal Functions ============
@@ -742,38 +861,81 @@ contract TALValidationRegistry is
     }
 
     /**
-     * @notice Verify TEE attestation proof
-     * @dev Sprint 1: Basic structure. Sprint 2: Full verification.
-     * @param proof The TEE attestation proof bytes
+     * @notice Get stake amounts for candidate validators
+     * @dev Sprint 2: Queries staking bridge for each candidate's stake
+     * @param candidates Array of candidate validator addresses
+     * @return stakes Array of stake amounts for each candidate
      */
-    function _verifyTEEAttestation(bytes calldata proof) internal view {
-        if (proof.length == 0) {
+    function _getCandidateStakes(address[] memory candidates) internal view returns (uint256[] memory stakes) {
+        stakes = new uint256[](candidates.length);
+        for (uint256 i = 0; i < candidates.length; i++) {
+            if (stakingBridge != address(0)) {
+                (bool success, bytes memory data) = stakingBridge.staticcall(
+                    abi.encodeWithSignature("getOperatorStake(address)", candidates[i])
+                );
+                if (success && data.length >= 32) {
+                    stakes[i] = abi.decode(data, (uint256));
+                }
+            }
+            // Default weight of 1 for candidates without stake data
+            if (stakes[i] == 0) stakes[i] = 1;
+        }
+    }
+
+    /**
+     * @notice Verify TEE attestation proof
+     * @dev Sprint 2: Full TEE attestation verification with signature recovery
+     * @param proof The TEE attestation proof bytes
+     * @param requestHash The validation request hash for context
+     */
+    function _verifyTEEAttestation(bytes calldata proof, bytes32 requestHash) internal view {
+        if (proof.length < 128) {
             revert InvalidTEEAttestation();
         }
 
-        // Sprint 2: Decode proof and verify against trusted providers
-        // Expected proof format: abi.encode(providerAddress, signature, attestationData)
-        if (proof.length >= 20) {
-            // Extract provider address from proof (first 20 bytes after decoding)
-            // For Sprint 1, we do basic length validation
-            // Sprint 2 will implement full signature verification
+        // Decode attestation: (bytes32 enclaveHash, address teeSigner, uint256 timestamp, bytes signature)
+        (bytes32 enclaveHash, address teeSigner, uint256 timestamp, bytes memory sig) =
+            abi.decode(proof, (bytes32, address, uint256, bytes));
 
-            // TODO: Sprint 2 - Full TEE attestation verification
-            // address provider;
-            // bytes memory signature;
-            // bytes memory attestationData;
-            // (provider, signature, attestationData) = abi.decode(proof, (address, bytes, bytes));
-            //
-            // if (!_trustedTEEProviders[provider]) {
-            //     revert TEEProviderNotTrusted(provider);
-            // }
-            //
-            // // Verify signature
-            // bytes32 messageHash = keccak256(attestationData);
-            // address recovered = ECDSA.recover(messageHash, signature);
-            // if (recovered != provider) {
-            //     revert InvalidTEEAttestation();
-            // }
+        // Check TEE provider is whitelisted
+        if (!trustedTEEProviders[teeSigner]) {
+            revert TEEProviderNotTrusted(teeSigner);
+        }
+
+        // Check enclave hash matches registered hash for this provider
+        if (teeEnclaveHashes[teeSigner] != enclaveHash) {
+            revert InvalidTEEAttestation();
+        }
+
+        // Check freshness (within 1 hour)
+        if (block.timestamp - timestamp > 1 hours) {
+            revert InvalidTEEAttestation();
+        }
+
+        // Verify signature
+        ValidationRequest storage req = _requests[requestHash];
+        bytes32 messageHash = keccak256(abi.encodePacked(
+            enclaveHash, req.taskHash, req.outputHash, requestHash, timestamp
+        ));
+        bytes32 ethSignedHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash));
+
+        // Recover signer from signature
+        if (sig.length != 65) {
+            revert InvalidTEEAttestation();
+        }
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+        assembly {
+            r := mload(add(sig, 32))
+            s := mload(add(sig, 64))
+            v := byte(0, mload(add(sig, 96)))
+        }
+        if (v < 27) v += 27;
+        address recovered = ecrecover(ethSignedHash, v, r, s);
+
+        if (recovered != teeSigner) {
+            revert InvalidTEEAttestation();
         }
     }
 

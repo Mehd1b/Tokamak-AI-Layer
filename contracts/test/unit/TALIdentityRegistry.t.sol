@@ -6,22 +6,7 @@ import {TALIdentityRegistry} from "../../src/core/TALIdentityRegistry.sol";
 import {ITALIdentityRegistry} from "../../src/interfaces/ITALIdentityRegistry.sol";
 import {IERC8004IdentityRegistry} from "../../src/interfaces/IERC8004IdentityRegistry.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-
-/**
- * @title MockStakingV2
- * @notice Mock Staking V2 contract for testing operator stake verification
- */
-contract MockStakingV2 {
-    mapping(address => uint256) public stakes;
-
-    function setStake(address operator, uint256 amount) external {
-        stakes[operator] = amount;
-    }
-
-    function getStake(address operator) external view returns (uint256) {
-        return stakes[operator];
-    }
-}
+import {MockStakingV3} from "../mocks/MockStakingV3.sol";
 
 /**
  * @title MockZKVerifier
@@ -58,7 +43,7 @@ contract TALIdentityRegistryTest is Test {
     // ============ Contracts ============
     TALIdentityRegistry public registry;
     TALIdentityRegistry public implementation;
-    MockStakingV2 public stakingV2;
+    MockStakingV3 public stakingBridge;
     MockZKVerifier public zkVerifier;
 
     // ============ Test Accounts ============
@@ -88,7 +73,7 @@ contract TALIdentityRegistryTest is Test {
 
     function setUp() public {
         // Deploy mocks
-        stakingV2 = new MockStakingV2();
+        stakingBridge = new MockStakingV3();
         zkVerifier = new MockZKVerifier();
 
         // Deploy implementation
@@ -98,7 +83,7 @@ contract TALIdentityRegistryTest is Test {
         bytes memory initData = abi.encodeWithSelector(
             TALIdentityRegistry.initialize.selector,
             admin,
-            address(stakingV2),
+            address(stakingBridge),
             address(zkVerifier)
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
@@ -482,7 +467,7 @@ contract TALIdentityRegistryTest is Test {
 
     function test_setOperator_success() public {
         uint256 agentId = _registerAgent(user1, AGENT_URI);
-        stakingV2.setStake(operator1, MIN_OPERATOR_STAKE);
+        stakingBridge.setStake(operator1, MIN_OPERATOR_STAKE);
 
         vm.prank(user1);
         registry.setOperator(agentId, operator1);
@@ -525,7 +510,7 @@ contract TALIdentityRegistryTest is Test {
 
     function test_checkOperatorStatus_withSufficientStake() public {
         uint256 agentId = _registerAgent(user1, AGENT_URI);
-        stakingV2.setStake(operator1, MIN_OPERATOR_STAKE);
+        stakingBridge.setStake(operator1, MIN_OPERATOR_STAKE);
 
         vm.prank(user1);
         registry.setOperator(agentId, operator1);
@@ -535,7 +520,7 @@ contract TALIdentityRegistryTest is Test {
 
     function test_checkOperatorStatus_withInsufficientStake() public {
         uint256 agentId = _registerAgent(user1, AGENT_URI);
-        stakingV2.setStake(operator1, MIN_OPERATOR_STAKE - 1);
+        stakingBridge.setStake(operator1, MIN_OPERATOR_STAKE - 1);
 
         vm.prank(user1);
         registry.setOperator(agentId, operator1);
@@ -556,13 +541,13 @@ contract TALIdentityRegistryTest is Test {
         uint256 agentId = _registerAgent(user1, AGENT_URI);
 
         // Set operator with insufficient stake
-        stakingV2.setStake(operator1, MIN_OPERATOR_STAKE - 1);
+        stakingBridge.setStake(operator1, MIN_OPERATOR_STAKE - 1);
         vm.prank(user1);
         registry.setOperator(agentId, operator1);
         assertFalse(registry.checkOperatorStatus(agentId), "Should not be verified initially");
 
         // Update stake to sufficient
-        stakingV2.setStake(operator1, MIN_OPERATOR_STAKE);
+        stakingBridge.setStake(operator1, MIN_OPERATOR_STAKE);
 
         // Refresh status
         registry.refreshOperatorStatus(agentId);
@@ -571,7 +556,7 @@ contract TALIdentityRegistryTest is Test {
 
     function test_refreshOperatorStatus_emitsEvent() public {
         uint256 agentId = _registerAgent(user1, AGENT_URI);
-        stakingV2.setStake(operator1, MIN_OPERATOR_STAKE);
+        stakingBridge.setStake(operator1, MIN_OPERATOR_STAKE);
 
         vm.prank(user1);
         registry.setOperator(agentId, operator1);
@@ -584,7 +569,7 @@ contract TALIdentityRegistryTest is Test {
 
     function test_isVerifiedOperator_returnsTrue() public {
         uint256 agentId = _registerAgent(user1, AGENT_URI);
-        stakingV2.setStake(operator1, MIN_OPERATOR_STAKE);
+        stakingBridge.setStake(operator1, MIN_OPERATOR_STAKE);
 
         vm.prank(user1);
         registry.setOperator(agentId, operator1);
@@ -601,7 +586,7 @@ contract TALIdentityRegistryTest is Test {
     function testFuzz_operatorStake_thresholdBehavior(uint256 stake) public {
         vm.assume(stake < type(uint256).max);
         uint256 agentId = _registerAgent(user1, AGENT_URI);
-        stakingV2.setStake(operator1, stake);
+        stakingBridge.setStake(operator1, stake);
 
         vm.prank(user1);
         registry.setOperator(agentId, operator1);
@@ -775,21 +760,21 @@ contract TALIdentityRegistryTest is Test {
         registry.unpause();
     }
 
-    function test_setStakingV2_onlyAdmin() public {
-        address newStakingV2 = makeAddr("newStakingV2");
+    function test_setStakingBridge_onlyAdmin() public {
+        address newStakingBridge = makeAddr("newStakingBridge");
 
         vm.prank(admin);
-        registry.setStakingV2(newStakingV2);
+        registry.setStakingBridge(newStakingBridge);
 
-        assertEq(registry.stakingV2(), newStakingV2, "StakingV2 should be updated");
+        assertEq(registry.stakingBridge(), newStakingBridge, "StakingBridge should be updated");
     }
 
-    function test_setStakingV2_revertIfNotAdmin() public {
-        address newStakingV2 = makeAddr("newStakingV2");
+    function test_setStakingBridge_revertIfNotAdmin() public {
+        address newStakingBridge = makeAddr("newStakingBridge");
 
         vm.prank(user1);
         vm.expectRevert();
-        registry.setStakingV2(newStakingV2);
+        registry.setStakingBridge(newStakingBridge);
     }
 
     function test_setZKVerifier_onlyAdmin() public {
@@ -930,7 +915,7 @@ contract TALIdentityRegistryTest is Test {
         bytes memory initData = abi.encodeWithSelector(
             TALIdentityRegistry.initialize.selector,
             admin,
-            address(stakingV2),
+            address(stakingBridge),
             address(0) // No ZK verifier
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
@@ -945,12 +930,12 @@ contract TALIdentityRegistryTest is Test {
         assertTrue(success, "Should auto-verify when no verifier set");
     }
 
-    function test_stakingV2_notSet_operatorNotVerified() public {
-        // Deploy new registry without staking
+    function test_stakingBridge_notSet_operatorNotVerified() public {
+        // Deploy new registry without staking bridge
         bytes memory initData = abi.encodeWithSelector(
             TALIdentityRegistry.initialize.selector,
             admin,
-            address(0), // No staking
+            address(0), // No staking bridge
             address(zkVerifier)
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
@@ -964,7 +949,7 @@ contract TALIdentityRegistryTest is Test {
         vm.prank(user1);
         registryNoStaking.setOperator(agentId, operator1);
 
-        // Operator should not be verified without staking contract
-        assertFalse(registryNoStaking.checkOperatorStatus(agentId), "Operator should not be verified without staking");
+        // Operator should not be verified without staking bridge
+        assertFalse(registryNoStaking.checkOperatorStatus(agentId), "Operator should not be verified without staking bridge");
     }
 }

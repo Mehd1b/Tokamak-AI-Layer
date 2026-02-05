@@ -37,7 +37,7 @@ contract GasBenchmarks is Test {
         bytes memory identityData = abi.encodeWithSelector(
             TALIdentityRegistry.initialize.selector,
             admin,
-            address(0), // No staking
+            address(0), // No staking bridge
             address(0)  // No ZK verifier
         );
         ERC1967Proxy identityProxy = new ERC1967Proxy(address(identityImpl), identityData);
@@ -49,7 +49,7 @@ contract GasBenchmarks is Test {
             TALReputationRegistry.initialize.selector,
             admin,
             address(identityRegistry),
-            address(0) // No staking
+            address(0) // No staking bridge
         );
         ERC1967Proxy reputationProxy = new ERC1967Proxy(address(reputationImpl), reputationData);
         reputationRegistry = TALReputationRegistry(address(reputationProxy));
@@ -61,9 +61,7 @@ contract GasBenchmarks is Test {
             admin,
             address(identityRegistry),
             address(reputationRegistry),
-            address(0), // No staking
-            address(0), // No DRB
-            address(0)  // No TEE oracle
+            address(0)  // No treasury
         );
         ERC1967Proxy validationProxy = new ERC1967Proxy(address(validationImpl), validationData);
         validationRegistry = TALValidationRegistry(payable(address(validationProxy)));

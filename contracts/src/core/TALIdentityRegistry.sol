@@ -22,7 +22,7 @@ import "../interfaces/ITALIdentityRegistry.sol";
  * - ERC-721 based identity tokens for AI agents
  * - ZK identity commitments using Poseidon hashes for privacy-preserving verification
  * - Capability verification through SNARK proofs
- * - Operator management with stake-based verification via Staking V2
+ * - Operator management with stake-based verification via Staking V3 (cross-layer bridge)
  * - EIP-712 signature-based wallet verification
  * - UUPS upgradeable proxy pattern for future improvements
  *
@@ -49,6 +49,7 @@ contract TALIdentityRegistry is
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
     /// @notice Minimum stake required for an operator to be verified (1000 TON)
+    /// @dev Enforced via cross-layer bridge from Staking V3 on L1
     uint256 public constant MIN_OPERATOR_STAKE = 1000 ether;
 
     /// @notice EIP-712 typehash for wallet verification signatures
@@ -90,8 +91,8 @@ contract TALIdentityRegistry is
     /// @notice Wallet verification nonces to prevent replay attacks
     mapping(address => uint256) public walletNonces;
 
-    /// @notice Staking V2 contract address for operator stake verification
-    address public stakingV2;
+    /// @notice Staking bridge contract address for operator stake verification (L2 cache of L1 Staking V3)
+    address public stakingBridge;
 
     /// @notice ZK Verifier module address for capability proof verification
     address public zkVerifier;
@@ -114,7 +115,7 @@ contract TALIdentityRegistry is
     /**
      * @notice Initialize the contract
      * @param admin The admin address that will receive all admin roles
-     * @param _stakingV2 The Staking V2 contract address for stake verification
+     * @param _stakingBridge The Staking bridge contract address (L2 cache of L1 Staking V3)
      * @param _zkVerifier The ZK Verifier module address for proof verification
      *
      * @dev This function can only be called once due to the initializer modifier.
@@ -122,7 +123,7 @@ contract TALIdentityRegistry is
      */
     function initialize(
         address admin,
-        address _stakingV2,
+        address _stakingBridge,
         address _zkVerifier
     ) public initializer {
         __ERC721_init("TAL Agent Identity", "TALID");
@@ -133,7 +134,7 @@ contract TALIdentityRegistry is
         _grantRole(UPGRADER_ROLE, admin);
         _grantRole(PAUSER_ROLE, admin);
 
-        stakingV2 = _stakingV2;
+        stakingBridge = _stakingBridge;
         zkVerifier = _zkVerifier;
         _nextTokenId = 1; // Start from 1, 0 is reserved as invalid
 
@@ -353,7 +354,7 @@ contract TALIdentityRegistry is
     /**
      * @inheritdoc ITALIdentityRegistry
      * @dev Sets the operator address for an agent and automatically refreshes
-     * the operator's verification status by checking their stake in Staking V2.
+     * the operator's verification status by checking their stake via the cross-layer bridge.
      */
     function setOperator(uint256 agentId, address operator) external {
         if (!_exists(agentId)) revert AgentNotFound(agentId);
@@ -385,7 +386,7 @@ contract TALIdentityRegistry is
 
     /**
      * @inheritdoc ITALIdentityRegistry
-     * @dev Queries the Staking V2 contract for the operator's current stake
+     * @dev Queries the staking bridge for the operator's current stake (cached from L1 Staking V3)
      * and updates the verification status accordingly. Should be called
      * periodically to keep the status in sync.
      */
@@ -447,12 +448,12 @@ contract TALIdentityRegistry is
     }
 
     /**
-     * @notice Update the Staking V2 contract address
-     * @param _stakingV2 The new Staking V2 contract address
+     * @notice Update the staking bridge contract address
+     * @param _stakingBridge The new staking bridge contract address
      * @dev Can only be called by accounts with DEFAULT_ADMIN_ROLE
      */
-    function setStakingV2(address _stakingV2) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        stakingV2 = _stakingV2;
+    function setStakingBridge(address _stakingBridge) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        stakingBridge = _stakingBridge;
     }
 
     /**
@@ -469,7 +470,7 @@ contract TALIdentityRegistry is
     /**
      * @notice Internal function to refresh operator verification status
      * @param agentId The agent ID to refresh
-     * @dev Queries the Staking V2 contract for the operator's stake and
+     * @dev Queries the staking bridge (L2 cache of L1 Staking V3) for the operator's stake and
      * updates the verification status based on MIN_OPERATOR_STAKE threshold.
      */
     function _refreshOperatorStatus(uint256 agentId) internal {
@@ -481,9 +482,9 @@ contract TALIdentityRegistry is
         }
 
         uint256 stake = 0;
-        if (stakingV2 != address(0)) {
-            // Query stake from Staking V2 contract
-            (bool success, bytes memory result) = stakingV2.staticcall(
+        if (stakingBridge != address(0)) {
+            // Query stake from staking bridge (cached L1 Staking V3 data)
+            (bool success, bytes memory result) = stakingBridge.staticcall(
                 abi.encodeWithSignature("getStake(address)", operator)
             );
             if (success && result.length >= 32) {
