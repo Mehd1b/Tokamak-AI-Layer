@@ -1,0 +1,36 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployer": "0x3ec2c9fb15C222Aa273F3f2F20a740FA86b4F618",
+  "treasury": "0x3ec2c9fb15C222Aa273F3f2F20a740FA86b4F618",
+  "timestamp": 1770367020,
+  "blockNumber": 39282240,
+  "externals": {
+    "drbCoordinator": "0x0000000000000000000000000000000000000000",
+    "stakingBridge": "0x0000000000000000000000000000000000000000",
+    "zkVerifier": "0x0000000000000000000000000000000000000000",
+    "teeOracle": "0x0000000000000000000000000000000000000000"
+  },
+  "contracts": {
+    "TALIdentityRegistry": {
+      "proxy": "0x3f89CD27fD877827E7665A9883b3c0180E22A525",
+      "implementation": "0x9f8d4D1f7AAf06aab1640abd565A731399862Bc8"
+    },
+    "TALReputationRegistry": {
+      "proxy": "0x0052258E517835081c94c0B685409f2EfC4D502b",
+      "implementation": "0xb05D73E931bf329bd995c64696E7D833C08650b1"
+    },
+    "TALValidationRegistry": {
+      "proxy": "0x09447147C6E75a60A449f38532F06E19F5F632F3",
+      "implementation": "0xFa0AAEe4482C7901653855F591B832E7E8a20727"
+    },
+    "DRBIntegrationModule": {
+      "proxy": "0x0000000000000000000000000000000000000000",
+      "implementation": "0x0000000000000000000000000000000000000000"
+    },
+    "StakingIntegrationModule": {
+      "proxy": "0x41FF86643f6d550725177af1ABBF4db9715A74b8",
+      "implementation": "0xAf58D2191772bcFFB3260F5140E995ec79e4d88B"
+    }
+  }
+}
