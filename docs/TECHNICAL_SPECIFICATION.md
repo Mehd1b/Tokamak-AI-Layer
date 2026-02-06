@@ -3433,24 +3433,37 @@ docs/
 
 ---
 
-## Appendix B: Contract Addresses (TBD)
+## Appendix B: Contract Addresses
+
+### L2 Contracts (Optimism Sepolia - Chain 11155420)
+
+| Contract | Proxy | Implementation |
+|----------|-------|----------------|
+| TALIdentityRegistry | `0x3f89CD27fD877827E7665A9883b3c0180E22A525` | `0x9f8d4D1f7AAf06aab1640abd565A731399862Bc8` |
+| TALReputationRegistry | `0x0052258E517835081c94c0B685409f2EfC4D502b` | `0xb05D73E931bf329bd995c64696E7D833C08650b1` |
+| TALValidationRegistry | `0x09447147C6E75a60A449f38532F06E19F5F632F3` | `0xFa0AAEe4482C7901653855F591B832E7E8a20727` |
+| StakingIntegrationModule | `0x41FF86643f6d550725177af1ABBF4db9715A74b8` | `0xAf58D2191772bcFFB3260F5140E995ec79e4d88B` |
+| DRBIntegrationModule | Not deployed (awaiting DRB coordinator) | — |
+| ZKVerifierModule | TBD | TBD |
+| TALStakingBridgeL2 | TBD | TBD |
+
+Deployer / Treasury: `0x3ec2c9fb15C222Aa273F3f2F20a740FA86b4F618`
+
+### L1 Contracts (Ethereum Sepolia)
 
 | Contract | Testnet | Mainnet |
 |----------|---------|---------|
-| TALIdentityRegistry | TBD | TBD |
-| TALReputationRegistry | TBD | TBD |
-| TALValidationRegistry | TBD | TBD |
-| ZKVerifierModule | TBD | TBD |
-| DRBIntegrationModule | TBD | TBD |
-| StakingIntegrationModule | TBD | TBD |
+| TALStakingBridgeL1 | TBD | TBD |
+| TALSlashingConditionsL1 | TBD | TBD |
+| Staking V3 - SeigManagerV3_1 | TBD | TBD |
+| DRB CommitReveal2 (external) | TBD | TBD |
+
+### Governance (Future)
+
+| Contract | Testnet | Mainnet |
+|----------|---------|---------|
 | TALGovernor | TBD | TBD |
 | TALTimelock | TBD | TBD |
-| Staking V3 - DepositManagerV3 (L1) | TBD | TBD |
-| Staking V3 - SeigManagerV3_1 (L1) | TBD | TBD |
-| TALStakingBridgeL1 (L1) | TBD | TBD |
-| TALStakingBridgeL2 (L2) | TBD | TBD |
-| TALSlashingConditionsL1 (L1) | TBD | TBD |
-| DRB (external) | TBD | TBD |
 
 ---
 

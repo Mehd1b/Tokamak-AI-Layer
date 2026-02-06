@@ -1,0 +1,276 @@
+import { type PublicClient, type WalletClient } from 'viem';
+import { TALValidationRegistryABI } from '../abi/TALValidationRegistry';
+import type {
+  Address,
+  Bytes32,
+  ValidationRequestParams,
+  ValidationRequest,
+  ValidationResponse,
+  ValidationDetails,
+  ValidationModel,
+  ValidationStatus,
+  TransactionResult,
+} from '../types';
+
+export class ValidationClient {
+  private readonly publicClient: PublicClient;
+  private readonly walletClient: WalletClient | undefined;
+  private readonly contractAddress: Address;
+
+  constructor(
+    publicClient: PublicClient,
+    contractAddress: Address,
+    walletClient?: WalletClient,
+  ) {
+    this.publicClient = publicClient;
+    this.walletClient = walletClient;
+    this.contractAddress = contractAddress;
+  }
+
+  /**
+   * Request validation for an agent's output
+   */
+  async requestValidation(
+    params: ValidationRequestParams,
+  ): Promise<{ requestHash: Bytes32; tx: TransactionResult }> {
+    this.requireWallet();
+
+    const deadlineTimestamp = BigInt(
+      Math.floor(params.deadline.getTime() / 1000),
+    );
+
+    const hash = await this.walletClient!.writeContract({
+      address: this.contractAddress,
+      abi: TALValidationRegistryABI,
+      functionName: 'requestValidation',
+      args: [
+        params.agentId,
+        params.taskHash,
+        params.outputHash,
+        params.model,
+        deadlineTimestamp,
+      ],
+      value: params.bounty,
+      chain: this.walletClient!.chain,
+      account: this.walletClient!.account!,
+    });
+
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+
+    // Parse ValidationRequested event to get requestHash
+    const requestHash = this.parseRequestHashFromReceipt(receipt);
+
+    return {
+      requestHash,
+      tx: {
+        hash,
+        blockNumber: receipt.blockNumber,
+        status: receipt.status === 'success' ? 'success' : 'reverted',
+      },
+    };
+  }
+
+  /**
+   * Submit validation response
+   */
+  async submitValidation(
+    requestHash: Bytes32,
+    score: number,
+    proof: `0x${string}`,
+    detailsURI: string,
+  ): Promise<TransactionResult> {
+    this.requireWallet();
+    const hash = await this.walletClient!.writeContract({
+      address: this.contractAddress,
+      abi: TALValidationRegistryABI,
+      functionName: 'submitValidation',
+      args: [requestHash, score, proof, detailsURI],
+      chain: this.walletClient!.chain,
+      account: this.walletClient!.account!,
+    });
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+    return {
+      hash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 'success' ? 'success' : 'reverted',
+    };
+  }
+
+  /**
+   * Get validation details
+   */
+  async getValidation(requestHash: Bytes32): Promise<ValidationDetails> {
+    const [reqData, respData] = (await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALValidationRegistryABI,
+      functionName: 'getValidation',
+      args: [requestHash],
+    })) as [any, any];
+
+    const isDisputed = (await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALValidationRegistryABI,
+      functionName: 'isDisputed',
+      args: [requestHash],
+    })) as boolean;
+
+    const request: ValidationRequest = {
+      requestHash,
+      agentId: BigInt(reqData.agentId),
+      requester: reqData.requester as Address,
+      taskHash: reqData.taskHash as Bytes32,
+      outputHash: reqData.outputHash as Bytes32,
+      model: Number(reqData.model) as ValidationModel,
+      bounty: BigInt(reqData.bounty),
+      deadline: new Date(Number(reqData.deadline) * 1000),
+      status: Number(reqData.status) as ValidationStatus,
+    };
+
+    const zeroAddress = '0x0000000000000000000000000000000000000000';
+    const hasResponse =
+      respData.validator && respData.validator !== zeroAddress;
+
+    const response: ValidationResponse | null = hasResponse
+      ? {
+          validator: respData.validator as Address,
+          score: Number(respData.score),
+          proof: respData.proof,
+          detailsURI: respData.detailsURI,
+          timestamp: new Date(Number(respData.timestamp) * 1000),
+        }
+      : null;
+
+    return {
+      request,
+      response,
+      isDisputed,
+      disputeDeadline: null, // Would need additional contract call
+    };
+  }
+
+  /**
+   * Get all validation hashes for an agent
+   */
+  async getAgentValidations(agentId: bigint): Promise<Bytes32[]> {
+    const hashes = await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALValidationRegistryABI,
+      functionName: 'getAgentValidations',
+      args: [agentId],
+    });
+    return hashes as Bytes32[];
+  }
+
+  /**
+   * Get validations by requester
+   */
+  async getValidationsByRequester(requester: Address): Promise<Bytes32[]> {
+    const hashes = await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALValidationRegistryABI,
+      functionName: 'getValidationsByRequester',
+      args: [requester],
+    });
+    return hashes as Bytes32[];
+  }
+
+  /**
+   * Get validations by validator
+   */
+  async getValidationsByValidator(validator: Address): Promise<Bytes32[]> {
+    const hashes = await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALValidationRegistryABI,
+      functionName: 'getValidationsByValidator',
+      args: [validator],
+    });
+    return hashes as Bytes32[];
+  }
+
+  /**
+   * Dispute a validation
+   */
+  async disputeValidation(
+    requestHash: Bytes32,
+    evidence: `0x${string}`,
+  ): Promise<TransactionResult> {
+    this.requireWallet();
+    const hash = await this.walletClient!.writeContract({
+      address: this.contractAddress,
+      abi: TALValidationRegistryABI,
+      functionName: 'disputeValidation',
+      args: [requestHash, evidence],
+      chain: this.walletClient!.chain,
+      account: this.walletClient!.account!,
+    });
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+    return {
+      hash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 'success' ? 'success' : 'reverted',
+    };
+  }
+
+  /**
+   * Get pending validation count for an agent
+   */
+  async getPendingValidationCount(agentId: bigint): Promise<number> {
+    const count = await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALValidationRegistryABI,
+      functionName: 'getPendingValidationCount',
+      args: [agentId],
+    });
+    return Number(count);
+  }
+
+  /**
+   * Check if a TEE provider is trusted
+   */
+  async isTrustedTEEProvider(provider: Address): Promise<boolean> {
+    const result = await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALValidationRegistryABI,
+      functionName: 'isTrustedTEEProvider',
+      args: [provider],
+    });
+    return result as boolean;
+  }
+
+  /**
+   * Get the selected validator for a request
+   */
+  async getSelectedValidator(requestHash: Bytes32): Promise<Address> {
+    const validator = await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALValidationRegistryABI,
+      functionName: 'getSelectedValidator',
+      args: [requestHash],
+    });
+    return validator as Address;
+  }
+
+  private requireWallet(): void {
+    if (!this.walletClient) {
+      throw new Error(
+        'WalletClient required for write operations. Pass a walletClient to TALClient config.',
+      );
+    }
+    if (!this.walletClient.account) {
+      throw new Error('WalletClient must have an account connected.');
+    }
+  }
+
+  private parseRequestHashFromReceipt(receipt: any): Bytes32 {
+    // Look for ValidationRequested event
+    for (const log of receipt.logs) {
+      if (log.topics.length >= 2 && log.address.toLowerCase() === this.contractAddress.toLowerCase()) {
+        // First indexed topic after event sig is requestHash
+        return log.topics[1] as Bytes32;
+      }
+    }
+    throw new Error(
+      'Could not parse requestHash from transaction receipt',
+    );
+  }
+}

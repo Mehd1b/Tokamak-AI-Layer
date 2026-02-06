@@ -115,16 +115,17 @@ forge script script/DeployLocal.s.sol --broadcast --rpc-url http://localhost:854
 
 ## Contract Addresses
 
-### Testnet (Coming Soon)
+### Optimism Sepolia (Live)
 | Contract | Address |
 |----------|---------|
-| TALIdentityRegistry | TBD |
-| TALReputationRegistry | TBD |
-| TALValidationRegistry | TBD |
+| TALIdentityRegistry | `0x3f89CD27fD877827E7665A9883b3c0180E22A525` |
+| TALReputationRegistry | `0x0052258E517835081c94c0B685409f2EfC4D502b` |
+| TALValidationRegistry | `0x09447147C6E75a60A449f38532F06E19F5F632F3` |
+| StakingIntegrationModule | `0x41FF86643f6d550725177af1ABBF4db9715A74b8` |
 
 ## Test Suite
 
-**346 tests total - All passing**
+**381 tests total - All passing**
 
 ### Test Coverage by Suite
 
@@ -139,6 +140,11 @@ forge script script/DeployLocal.s.sol --broadcast --rpc-url http://localhost:854
 | TEEAttestedValidation | 20 | ✓ |
 | StakeSecuredValidation | 12 | ✓ |
 | GasBenchmarks | 11 | ✓ |
+| **SDK** | | |
+| types.test.ts | 5 | ✓ |
+| RegistrationBuilder.test.ts | 13 | ✓ |
+| ProofGenerator.test.ts | 11 | ✓ |
+| SubgraphClient.test.ts | 6 | ✓ |
 
 ### Test Categories
 
@@ -153,6 +159,46 @@ forge script script/DeployLocal.s.sol --broadcast --rpc-url http://localhost:854
 | `register()` | ~143k | 200k |
 | `submitFeedback()` | ~318k | 350k |
 | `requestValidation()` | ~277k | 300k |
+
+## SDK
+
+TypeScript SDK for interacting with TAL smart contracts. See [`sdk/README.md`](sdk/README.md) for full documentation.
+
+```bash
+cd sdk
+npm install
+npm test        # 35 tests, all passing
+npm run build
+```
+
+**Key features:**
+- `TALClient` facade wrapping Identity, Reputation, and Validation clients
+- `RegistrationBuilder` for ERC-8004 compliant agent registration files with IPFS upload
+- `ProofGenerator` interface for ZK proofs (Sprint 3)
+- `SubgraphClient` for indexed data queries (gracefully stubbed)
+- Full TypeScript types for all contract interactions
+
+```typescript
+import { TALClient, RegistrationBuilder } from '@tokamak/tal-sdk';
+
+const client = new TALClient({ rpcUrl: 'https://sepolia.optimism.io' });
+const agent = await client.getAgent(1n);
+```
+
+## Frontend
+
+Next.js 14 web interface for the TAL protocol. See [`frontend/README.md`](frontend/README.md) for full documentation.
+
+```bash
+cd frontend
+npm install --legacy-peer-deps
+npm run dev     # http://localhost:3000
+npm run build   # 8 routes, all passing
+```
+
+**Pages:** Landing, Agent Discovery, Agent Detail, Agent Registration, Reputation Dashboard, Validation Registry, Validation Detail, Staking
+
+**Stack:** Next.js 14 (App Router), Tailwind CSS, wagmi + viem, RainbowKit, TanStack React Query
 
 ## Project Structure
 
@@ -210,6 +256,27 @@ Tokamak-AI-Layer/
 │   └── script/
 │       ├── DeployLocal.s.sol
 │       └── DeploySepolia.s.sol
+├── sdk/
+│   ├── src/
+│   │   ├── TALClient.ts              # Main facade client
+│   │   ├── identity/                  # Agent identity operations
+│   │   ├── reputation/                # Feedback & reputation
+│   │   ├── validation/                # Validation request/submit
+│   │   ├── zk/                        # ZK proof interface (Sprint 3)
+│   │   ├── subgraph/                  # GraphQL subgraph client
+│   │   ├── abi/                       # Contract ABIs
+│   │   ├── types/                     # TypeScript types & constants
+│   │   └── __tests__/                 # 35 unit tests
+│   ├── package.json
+│   └── tsconfig.json
+├── frontend/
+│   ├── src/
+│   │   ├── app/                       # Next.js App Router (8 pages)
+│   │   ├── components/                # Reusable UI components
+│   │   ├── hooks/                     # wagmi contract hooks
+│   │   └── lib/                       # Utils & contract config
+│   ├── package.json
+│   └── tsconfig.json
 ├── docs/
 │   └── TECHNICAL_SPECIFICATION.md
 ├── PROPOSAL.md
@@ -259,9 +326,29 @@ Complete TEE provider management for hardware-backed validation:
 - **Enclave Hash Registration**: Secure enclave code validation
 - **Signature Verification**: Cryptographic proof of TEE execution
 
+## Sprint 4: SDK + Frontend
+
+### TypeScript SDK (`sdk/`)
+- **TALClient** facade with Identity, Reputation, and Validation sub-clients
+- **RegistrationBuilder** — fluent builder for ERC-8004 agent registration files with IPFS upload (Pinata/Infura)
+- **ProofGenerator** — ZK proof interface (stubbed until Sprint 3 circuits)
+- **SubgraphClient** — GraphQL client for indexed data (gracefully stubbed until deployment)
+- **35 unit tests** covering types, registration builder, proof encoding, subgraph client
+
+### Next.js Frontend (`frontend/`)
+- **Agent Discovery** — Browse and search registered agents
+- **Agent Registration** — Multi-step form with service endpoints and capabilities
+- **Agent Detail** — Identity, stats, operator status, feedback count, validations
+- **Reputation Dashboard** — Standard, stake-weighted, and verified reputation views
+- **Validation Registry** — Trust model overview, validation list and detail with timeline
+- **Staking Interface** — Stake/unstake forms with cross-layer bridge information
+- **Wallet Integration** — RainbowKit + wagmi on Optimism Sepolia
+
 ## Documentation
 
 - [Technical Specification](docs/TECHNICAL_SPECIFICATION.md)
+- [SDK Documentation](sdk/README.md)
+- [Frontend Documentation](frontend/README.md)
 - [Proposal](PROPOSAL.md)
 - [Pitch Deck](DECK_PITCH.md)
 
@@ -305,4 +392,4 @@ MIT License - see [LICENSE](LICENSE)
 
 ---
 
-Built with Foundry on Tokamak L2
+Built with Foundry, TypeScript, and Next.js on Tokamak L2

@@ -5,6 +5,9 @@ node_modules/
 contracts/out/
 contracts/cache/
 contracts/broadcast/
+sdk/dist/
+frontend/.next/
+frontend/out/
 
 # Local configuration
 .omc/
