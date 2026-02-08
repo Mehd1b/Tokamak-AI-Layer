@@ -1,0 +1,32 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "agentId", "type": "uint256" },
+      { "indexed": true, "name": "sender", "type": "address" },
+      { "indexed": false, "name": "scores", "type": "uint8[]" }
+    ],
+    "name": "FeedbackSubmitted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "agentId", "type": "uint256" },
+      { "indexed": true, "name": "client", "type": "address" },
+      { "indexed": false, "name": "txHash", "type": "bytes32" },
+      { "indexed": false, "name": "amount", "type": "uint256" }
+    ],
+    "name": "PaymentProofSubmitted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "agentId", "type": "uint256" },
+      { "indexed": false, "name": "merkleRoot", "type": "bytes32" }
+    ],
+    "name": "MerkleRootUpdated",
+    "type": "event"
+  }
+]

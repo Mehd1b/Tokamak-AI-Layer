@@ -1,0 +1,67 @@
+type Agent @entity {
+  id: ID!
+  owner: Bytes!
+  agentURI: String!
+  zkIdentity: Bytes
+  registeredAt: BigInt!
+  isActive: Boolean!
+  feedbackCount: Int!
+  averageScore: BigDecimal!
+  totalScoreSum: BigInt!
+  validationCount: Int!
+  successfulValidations: Int!
+  operator: Bytes
+  verifiedOperator: Boolean!
+  stakedAmount: BigInt!
+  feedbacks: [Feedback!]! @derivedFrom(field: "agent")
+  validations: [ValidationRequest!]! @derivedFrom(field: "agent")
+}
+
+type Feedback @entity {
+  id: ID!
+  agent: Agent!
+  sender: Bytes!
+  scores: [Int!]!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
+}
+
+type PaymentProof @entity {
+  id: ID!
+  agent: Agent!
+  client: Bytes!
+  paymentTxHash: Bytes!
+  amount: BigInt!
+  timestamp: BigInt!
+}
+
+type ValidationRequest @entity {
+  id: ID!
+  agent: Agent!
+  requester: Bytes!
+  model: Int!
+  bounty: BigInt!
+  status: Int!
+  validator: Bytes
+  validatorStake: BigInt
+  score: Int
+  disputed: Boolean!
+  validatorBounty: BigInt
+  agentBounty: BigInt
+  treasuryBounty: BigInt
+  timestamp: BigInt!
+  completedAt: BigInt
+  blockNumber: BigInt!
+  txHash: Bytes!
+}
+
+type ProtocolStats @entity {
+  id: ID!
+  totalAgents: Int!
+  totalFeedbacks: Int!
+  totalValidations: Int!
+  completedValidations: Int!
+  disputedValidations: Int!
+  totalBountiesPaid: BigInt!
+}

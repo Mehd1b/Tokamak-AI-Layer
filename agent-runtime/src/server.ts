@@ -3,8 +3,10 @@ import cors from 'cors';
 import { config } from './config.js';
 import { SummarizerAgent } from './agents/SummarizerAgent.js';
 import { AuditorAgent } from './agents/AuditorAgent.js';
+import { ValidatorAgent } from './agents/ValidatorAgent.js';
 import { createAgentRoutes } from './routes/agents.js';
 import { createTaskRoutes } from './routes/tasks.js';
+import { createValidationRoutes } from './routes/validation.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import type { BaseAgent } from './agents/BaseAgent.js';
 
@@ -12,6 +14,7 @@ import type { BaseAgent } from './agents/BaseAgent.js';
 const agents = new Map<string, BaseAgent>();
 agents.set('summarizer', new SummarizerAgent());
 agents.set('auditor', new AuditorAgent());
+agents.set('validator', new ValidatorAgent());
 
 // Create Express app
 const app = express();
@@ -43,6 +46,10 @@ app.get('/api', (_req, res) => {
       submitTask: 'POST /api/tasks',
       listTasks: 'GET /api/tasks',
       getTask: 'GET /api/tasks/:id',
+      requestValidation: 'POST /api/validations/request',
+      executeValidation: 'POST /api/validations/execute',
+      getValidation: 'GET /api/validations/:requestHash',
+      getAgentValidations: 'GET /api/validations/agent/:agentId',
     },
   });
 });
@@ -50,6 +57,7 @@ app.get('/api', (_req, res) => {
 // Routes
 app.use('/api/agents', createAgentRoutes(agents));
 app.use('/api/tasks', createTaskRoutes(agents));
+app.use('/api/validations', createValidationRoutes(agents));
 
 // Error handler
 app.use(errorHandler);

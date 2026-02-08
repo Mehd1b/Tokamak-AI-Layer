@@ -1,0 +1,16 @@
+{
+  "name": "tal-subgraph",
+  "version": "0.1.0",
+  "description": "Tokamak AI Layer Subgraph - Indexes TAL registry events on Optimism Sepolia",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy:studio": "graph deploy --studio tal-optimism-sepolia",
+    "create:local": "graph create --node http://localhost:8020/ tokamak/tal",
+    "deploy:local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 tokamak/tal"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-cli": "^0.71.0",
+    "@graphprotocol/graph-ts": "^0.35.1"
+  }
+}

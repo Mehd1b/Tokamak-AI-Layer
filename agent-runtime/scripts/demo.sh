@@ -6,7 +6,10 @@
 #   1. Start the agent runtime
 #   2. Submit a summarization task
 #   3. Submit a Solidity audit task
-#   4. Show results with on-chain hashes
+#   4. Request StakeSecured validation
+#   5. Execute validator re-execution
+#   6. Query validation status
+#   7. Show results with on-chain hashes
 #
 # Prerequisites:
 #   - cd agent-runtime && cp .env.example .env  (fill in OPENAI_API_KEY)
@@ -55,7 +58,6 @@ ok "Found agents"
 # 3. Summarization task
 header "Step 2: Submit Summarization Task"
 
-# Write task payload to temp file to avoid shell escaping issues
 TMPFILE=$(mktemp)
 cat > "$TMPFILE" << 'PAYLOAD'
 {
@@ -124,16 +126,78 @@ elif [ "$AUDIT_STATUS" = "failed" ]; then
   echo "$AUDIT_RESULT" | parse_json error
 fi
 
+# 5. Request validation
+header "Step 4: Request StakeSecured Validation"
+
+cat > "$TMPFILE" << PAYLOAD
+{
+  "taskId": "$SUMMARY_ID",
+  "model": "StakeSecured"
+}
+PAYLOAD
+
+info "POST /api/validations/request (taskId: $SUMMARY_ID, model: StakeSecured)"
+VALIDATION_REQUEST=$(curl -sf -X POST "$RUNTIME_URL/api/validations/request" \
+  -H "Content-Type: application/json" \
+  -d @"$TMPFILE")
+
+echo ""
+VALIDATION_TASK_ID=$(echo "$VALIDATION_REQUEST" | parse_json taskId)
+VALIDATION_MODEL=$(echo "$VALIDATION_REQUEST" | parse_json model)
+VALIDATION_AGENT=$(echo "$VALIDATION_REQUEST" | parse_json agentId)
+VALIDATION_INPUT_HASH=$(echo "$VALIDATION_REQUEST" | parse_json inputHash)
+
+ok "Validation Task ID: $VALIDATION_TASK_ID"
+ok "Model:              $VALIDATION_MODEL"
+ok "Agent ID:           $VALIDATION_AGENT"
+ok "Input Hash:         $VALIDATION_INPUT_HASH"
+echo ""
+
+# 6. Execute validation
+header "Step 5: Execute Validator Re-Execution"
+
+cat > "$TMPFILE" << PAYLOAD
+{
+  "taskId": "$SUMMARY_ID"
+}
+PAYLOAD
+
+info "POST /api/validations/execute (taskId: $SUMMARY_ID)"
+VALIDATION_RESULT=$(curl -sf -X POST "$RUNTIME_URL/api/validations/execute" \
+  -H "Content-Type: application/json" \
+  -d @"$TMPFILE")
+
+echo ""
+VALIDATION_SCORE=$(echo "$VALIDATION_RESULT" | parse_json score)
+VALIDATION_MATCH=$(echo "$VALIDATION_RESULT" | parse_json matchType)
+VALIDATION_REEXEC_HASH=$(echo "$VALIDATION_RESULT" | parse_json reExecutionHash)
+
+ok "Validation Score:       $VALIDATION_SCORE"
+ok "Match Type:             $VALIDATION_MATCH"
+ok "Re-Execution Hash:      $VALIDATION_REEXEC_HASH"
+echo ""
+
+# 7. Query validation status
+header "Step 6: Query Validation Status"
+
+info "GET /api/validations/agent/1"
+AGENT_VALIDATIONS=$(curl -sf "$RUNTIME_URL/api/validations/agent/1")
+echo "$AGENT_VALIDATIONS" | python3 -m json.tool 2>/dev/null || echo "$AGENT_VALIDATIONS"
+ok "Retrieved agent validations"
+
 # Cleanup
 rm -f "$TMPFILE"
 
-# 5. Summary
+# Summary
 header "Demo Complete"
 echo "Lifecycle demonstrated:"
 echo "  1. Agent discovery via REST API"
 echo "  2. Task submission to Summarizer agent"
 echo "  3. Task submission to Solidity Auditor agent"
-echo "  4. Output hashes generated for on-chain validation"
+echo "  4. Validation request via /api/validations/request"
+echo "  5. Validator re-execution via /api/validations/execute"
+echo "  6. Validation status query via /api/validations/agent/:id"
+echo "  7. Output hashes generated for on-chain validation"
 echo ""
 echo "Next steps for full on-chain demo:"
 echo "  - Register agents: npm run register"

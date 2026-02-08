@@ -1,0 +1,48 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "agentId", "type": "uint256" },
+      { "indexed": true, "name": "owner", "type": "address" },
+      { "indexed": false, "name": "agentURI", "type": "string" }
+    ],
+    "name": "AgentRegistered",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "agentId", "type": "uint256" },
+      { "indexed": false, "name": "newURI", "type": "string" }
+    ],
+    "name": "AgentURIUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "agentId", "type": "uint256" },
+      { "indexed": true, "name": "operator", "type": "address" }
+    ],
+    "name": "OperatorUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "agentId", "type": "uint256" },
+      { "indexed": true, "name": "operator", "type": "address" }
+    ],
+    "name": "OperatorVerified",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "agentId", "type": "uint256" },
+      { "indexed": false, "name": "commitment", "type": "bytes32" }
+    ],
+    "name": "ZKIdentityCommitted",
+    "type": "event"
+  }
+]

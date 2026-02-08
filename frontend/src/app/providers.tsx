@@ -2,7 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WagmiProvider, http } from 'wagmi';
-import { optimismSepolia } from 'wagmi/chains';
+import { optimismSepolia, sepolia } from 'wagmi/chains';
 import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit';
 import '@rainbow-me/rainbowkit/styles.css';
 import { useState, type ReactNode } from 'react';
@@ -10,9 +10,10 @@ import { useState, type ReactNode } from 'react';
 const config = getDefaultConfig({
   appName: 'Tokamak Agent Layer',
   projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_ID || 'placeholder',
-  chains: [optimismSepolia],
+  chains: [optimismSepolia, sepolia],
   transports: {
     [optimismSepolia.id]: http(),
+    [sepolia.id]: http(),
   },
   ssr: true,
 });

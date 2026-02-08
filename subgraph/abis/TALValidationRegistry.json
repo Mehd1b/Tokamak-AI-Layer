@@ -1,0 +1,53 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "requestHash", "type": "bytes32" },
+      { "indexed": true, "name": "agentId", "type": "uint256" },
+      { "indexed": false, "name": "model", "type": "uint8" }
+    ],
+    "name": "ValidationRequested",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "requestHash", "type": "bytes32" },
+      { "indexed": true, "name": "validator", "type": "address" },
+      { "indexed": false, "name": "stake", "type": "uint256" }
+    ],
+    "name": "ValidatorSelected",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "requestHash", "type": "bytes32" },
+      { "indexed": true, "name": "validator", "type": "address" },
+      { "indexed": false, "name": "score", "type": "uint8" }
+    ],
+    "name": "ValidationCompleted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "requestHash", "type": "bytes32" },
+      { "indexed": true, "name": "disputer", "type": "address" }
+    ],
+    "name": "ValidationDisputed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "requestHash", "type": "bytes32" },
+      { "indexed": true, "name": "validator", "type": "address" },
+      { "indexed": false, "name": "validatorAmount", "type": "uint256" },
+      { "indexed": false, "name": "agentAmount", "type": "uint256" },
+      { "indexed": false, "name": "treasuryAmount", "type": "uint256" }
+    ],
+    "name": "BountyDistributed",
+    "type": "event"
+  }
+]

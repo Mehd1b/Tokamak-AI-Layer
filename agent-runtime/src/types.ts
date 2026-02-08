@@ -40,3 +40,26 @@ export interface TaskSubmission {
   agentId: string;
   input: TaskInput;
 }
+
+export interface ValidationRequest {
+  requestHash: string;
+  agentId: bigint;
+  requester: string;
+  taskHash: string;
+  outputHash: string;
+  model: number; // 0=ReputationOnly, 1=StakeSecured, 2=TEEAttested, 3=Hybrid
+  bounty: bigint;
+  deadline: bigint;
+  status: number; // 0=Pending, 1=Completed, 2=Expired, 3=Disputed
+  validator: string;
+  score: number;
+  proof: string;
+  detailsURI: string;
+}
+
+export interface ValidationResult {
+  score: number;
+  matchType: 'exact' | 'semantic' | 'partial' | 'mismatch';
+  reExecutionHash: string;
+  details: string;
+}

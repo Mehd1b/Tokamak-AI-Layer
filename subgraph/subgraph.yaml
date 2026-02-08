@@ -1,0 +1,91 @@
+specVersion: 1.0.0
+indexerHints:
+  prune: auto
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: TALIdentityRegistry
+    network: optimism-sepolia
+    source:
+      address: "0x3f89CD27fD877827E7665A9883b3c0180E22A525"
+      abi: TALIdentityRegistry
+      startBlock: 21000000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Agent
+        - ProtocolStats
+      abis:
+        - name: TALIdentityRegistry
+          file: ./abis/TALIdentityRegistry.json
+      eventHandlers:
+        - event: AgentRegistered(indexed uint256,indexed address,string)
+          handler: handleAgentRegistered
+        - event: AgentURIUpdated(indexed uint256,string)
+          handler: handleAgentURIUpdated
+        - event: OperatorUpdated(indexed uint256,indexed address)
+          handler: handleOperatorUpdated
+        - event: OperatorVerified(indexed uint256,indexed address)
+          handler: handleOperatorVerified
+        - event: ZKIdentityCommitted(indexed uint256,bytes32)
+          handler: handleZKIdentityCommitted
+      file: ./src/identity.ts
+  - kind: ethereum
+    name: TALReputationRegistry
+    network: optimism-sepolia
+    source:
+      address: "0x0052258E517835081c94c0B685409f2EfC4D502b"
+      abi: TALReputationRegistry
+      startBlock: 21000000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Agent
+        - Feedback
+        - ProtocolStats
+      abis:
+        - name: TALReputationRegistry
+          file: ./abis/TALReputationRegistry.json
+      eventHandlers:
+        - event: FeedbackSubmitted(indexed uint256,indexed address,uint8[])
+          handler: handleFeedbackSubmitted
+        - event: PaymentProofSubmitted(indexed uint256,indexed address,bytes32,uint256)
+          handler: handlePaymentProofSubmitted
+        - event: MerkleRootUpdated(indexed uint256,bytes32)
+          handler: handleMerkleRootUpdated
+      file: ./src/reputation.ts
+  - kind: ethereum
+    name: TALValidationRegistry
+    network: optimism-sepolia
+    source:
+      address: "0x09447147C6E75a60A449f38532F06E19F5F632F3"
+      abi: TALValidationRegistry
+      startBlock: 21000000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Agent
+        - ValidationRequest
+        - ProtocolStats
+      abis:
+        - name: TALValidationRegistry
+          file: ./abis/TALValidationRegistry.json
+      eventHandlers:
+        - event: ValidationRequested(indexed bytes32,indexed uint256,uint8)
+          handler: handleValidationRequested
+        - event: ValidatorSelected(indexed bytes32,indexed address,uint256)
+          handler: handleValidatorSelected
+        - event: ValidationCompleted(indexed bytes32,indexed address,uint8)
+          handler: handleValidationCompleted
+        - event: ValidationDisputed(indexed bytes32,indexed address)
+          handler: handleValidationDisputed
+        - event: BountyDistributed(indexed bytes32,indexed address,uint256,uint256,uint256)
+          handler: handleBountyDistributed
+      file: ./src/validation.ts
