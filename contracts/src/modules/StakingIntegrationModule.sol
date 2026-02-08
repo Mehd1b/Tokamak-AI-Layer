@@ -263,7 +263,7 @@ contract StakingIntegrationModule is
     /// @notice Route seigniorage to agent operator with reputation bonus
     /// @dev Queries the staking bridge for the operator's claimable seigniorage,
     ///      calculates a reputation-based bonus, and triggers a claim on the bridge.
-    ///      In Staking V3, seigniorage accrues automatically in coinage tokens.
+    ///      In Staking V2, seigniorage accrues automatically in coinage tokens.
     ///      The bridge caches the updated stake (including seigniorage) from L1.
     /// @param agentId The agent ID to route seigniorage for
     function routeSeigniorage(uint256 agentId) external onlyRole(SEIGNIORAGE_ROUTER_ROLE) {

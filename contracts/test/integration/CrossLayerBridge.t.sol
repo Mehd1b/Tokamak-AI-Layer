@@ -7,7 +7,7 @@ import {TALStakingBridgeL1} from "../../src/bridge/TALStakingBridgeL1.sol";
 import {TALSlashingConditionsL1} from "../../src/bridge/TALSlashingConditionsL1.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MockCrossDomainMessenger} from "../mocks/MockCrossDomainMessenger.sol";
-import {MockDepositManagerV3} from "../mocks/MockDepositManagerV3.sol";
+import {MockDepositManagerV2} from "../mocks/MockDepositManagerV2.sol";
 
 /**
  * @title CrossLayerBridgeTest
@@ -20,7 +20,7 @@ contract CrossLayerBridgeTest is Test {
     TALStakingBridgeL1 public bridgeL1;
     TALSlashingConditionsL1 public slashingConditions;
     MockCrossDomainMessenger public mockMessenger;
-    MockDepositManagerV3 public mockDeposit;
+    MockDepositManagerV2 public mockDeposit;
 
     // ============ Test Accounts ============
     address public admin = address(0x1);
@@ -37,7 +37,7 @@ contract CrossLayerBridgeTest is Test {
     function setUp() public {
         // Deploy mocks
         mockMessenger = new MockCrossDomainMessenger();
-        mockDeposit = new MockDepositManagerV3();
+        mockDeposit = new MockDepositManagerV2();
 
         // Deploy L2 Bridge
         TALStakingBridgeL2 bridgeL2Impl = new TALStakingBridgeL2();
@@ -59,9 +59,11 @@ contract CrossLayerBridgeTest is Test {
         bytes memory slashingData = abi.encodeWithSelector(
             TALSlashingConditionsL1.initialize.selector,
             admin,
-            address(mockDeposit),
+            address(mockDeposit),   // seigManager (for stakeOf queries)
             talLayer2,
-            address(0) // Bridge L1 (set after deploy)
+            address(0),             // Bridge L1 (set after deploy)
+            address(mockDeposit),   // depositManager (for slash execution)
+            admin                   // slashRecipient (treasury - use admin for tests)
         );
         ERC1967Proxy slashingProxy = new ERC1967Proxy(address(slashingImpl), slashingData);
         slashingConditions = TALSlashingConditionsL1(address(slashingProxy));

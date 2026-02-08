@@ -1,0 +1,372 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" width="1200" height="750">
+  <defs>
+    <linearGradient id="hybridGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#f5f3ff"/>
+      <stop offset="100%" style="stop-color:#eff6ff"/>
+    </linearGradient>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1e3a5f"/>
+      <stop offset="100%" style="stop-color:#1e4a6f"/>
+    </linearGradient>
+    <filter id="shadow" x="-2%" y="-2%" width="104%" height="104%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.1"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="750" fill="#f9fafb"/>
+
+  <!-- Main Title -->
+  <text x="600" y="35" font-family="'Segoe UI', system-ui, sans-serif" font-size="22" font-weight="600" fill="#1e3a5f" text-anchor="middle">Tokamak AI Layer — Trust Tiers &amp; Reference</text>
+
+  <!-- ===== SECTION 1: Trust Tiers Grid (top-left) ===== -->
+  <g transform="translate(20, 55)">
+    <!-- Section container -->
+    <rect x="0" y="0" width="590" height="290" rx="12" fill="white" filter="url(#shadow)"/>
+
+    <!-- Section header -->
+    <rect x="0" y="0" width="590" height="36" rx="12" fill="url(#headerGrad)"/>
+    <rect x="0" y="24" width="590" height="12" fill="#1e3a5f"/>
+    <text x="20" y="24" font-family="'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="white">Trust Tiers Grid</text>
+
+    <!-- Table Header Row -->
+    <rect x="10" y="46" width="570" height="32" rx="4" fill="#1e3a5f"/>
+    <text x="70" y="67" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="white">Tier</text>
+    <text x="200" y="67" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="white">Min Bounty</text>
+    <text x="320" y="67" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="white">Validator Selection</text>
+    <text x="490" y="67" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="white">Proof Required</text>
+
+    <!-- Row 1: ReputationOnly -->
+    <rect x="10" y="82" width="570" height="48" rx="4" fill="#eff6ff"/>
+    <circle cx="25" cy="106" r="6" fill="#3b82f6"/>
+    <text x="40" y="100" font-family="'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="600" fill="#1e3a5f">ReputationOnly</text>
+    <text x="40" y="116" font-family="'Courier New', monospace" font-size="10" fill="#6b7280">enum: 0</text>
+    <text x="200" y="110" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" fill="#374151">0</text>
+    <text x="320" y="110" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" fill="#374151">Any address</text>
+    <text x="490" y="110" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" fill="#374151">None</text>
+
+    <!-- Row 2: StakeSecured -->
+    <rect x="10" y="134" width="570" height="48" rx="4" fill="#f5f3ff"/>
+    <circle cx="25" cy="158" r="6" fill="#7c3aed"/>
+    <text x="40" y="152" font-family="'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="600" fill="#1e3a5f">StakeSecured</text>
+    <text x="40" y="168" font-family="'Courier New', monospace" font-size="10" fill="#6b7280">enum: 1</text>
+    <text x="200" y="162" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" fill="#374151">10 TON</text>
+    <text x="320" y="162" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" fill="#374151">DRB weighted random</text>
+    <text x="490" y="162" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" fill="#374151">Stake ≥ 1000 TON</text>
+
+    <!-- Row 3: TEEAttested -->
+    <rect x="10" y="186" width="570" height="48" rx="4" fill="#eff6ff"/>
+    <circle cx="25" cy="210" r="6" fill="#059669"/>
+    <text x="40" y="204" font-family="'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="600" fill="#1e3a5f">TEEAttested</text>
+    <text x="40" y="220" font-family="'Courier New', monospace" font-size="10" fill="#6b7280">enum: 2</text>
+    <text x="200" y="214" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" fill="#374151">1 TON</text>
+    <text x="320" y="214" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" fill="#374151">Any address</text>
+    <text x="490" y="200" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" fill="#374151">TEE attestation</text>
+    <text x="490" y="216" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#6b7280">(SGX / Nitro / TrustZone)</text>
+
+    <!-- Row 4: Hybrid -->
+    <rect x="10" y="238" width="570" height="48" rx="4" fill="url(#hybridGrad)"/>
+    <circle cx="25" cy="262" r="6" fill="#2563eb"/>
+    <text x="40" y="256" font-family="'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="600" fill="#1e3a5f">Hybrid</text>
+    <text x="40" y="272" font-family="'Courier New', monospace" font-size="10" fill="#6b7280">enum: 3</text>
+    <text x="200" y="266" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" fill="#374151">10 TON</text>
+    <text x="320" y="266" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" fill="#374151">DRB weighted random</text>
+    <text x="490" y="266" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" fill="#374151">Stake + TEE attestation</text>
+  </g>
+
+  <!-- ===== SECTION 2: Operator Tiers (top-right) ===== -->
+  <g transform="translate(630, 55)">
+    <!-- Section container -->
+    <rect x="0" y="0" width="550" height="130" rx="12" fill="white" filter="url(#shadow)"/>
+
+    <!-- Section header -->
+    <rect x="0" y="0" width="550" height="36" rx="12" fill="url(#headerGrad)"/>
+    <rect x="0" y="24" width="550" height="12" fill="#1e3a5f"/>
+    <text x="20" y="24" font-family="'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="white">Operator Tiers</text>
+
+    <!-- Tier bar background -->
+    <rect x="20" y="52" width="510" height="40" rx="6" fill="#e5e7eb"/>
+
+    <!-- UNVERIFIED segment -->
+    <rect x="20" y="52" width="150" height="40" rx="6" fill="#9ca3af"/>
+    <text x="95" y="68" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="white" text-anchor="middle">UNVERIFIED</text>
+    <text x="95" y="82" font-family="'Courier New', monospace" font-size="9" fill="white" text-anchor="middle">&lt; 1,000 TON</text>
+
+    <!-- VERIFIED segment -->
+    <rect x="170" y="52" width="180" height="40" fill="#2563eb"/>
+    <text x="260" y="68" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="white" text-anchor="middle">VERIFIED</text>
+    <text x="260" y="82" font-family="'Courier New', monospace" font-size="9" fill="white" text-anchor="middle">1,000 – 9,999 TON</text>
+
+    <!-- PREMIUM segment -->
+    <rect x="350" y="52" width="180" height="40" rx="6" fill="#7c3aed"/>
+    <rect x="350" y="52" width="6" height="40" fill="#7c3aed"/>
+    <text x="440" y="68" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="white" text-anchor="middle">PREMIUM</text>
+    <text x="440" y="82" font-family="'Courier New', monospace" font-size="9" fill="white" text-anchor="middle">≥ 10,000 TON</text>
+
+    <!-- Threshold markers -->
+    <line x1="170" y1="46" x2="170" y2="98" stroke="#374151" stroke-width="2"/>
+    <text x="170" y="42" font-family="'Courier New', monospace" font-size="9" fill="#374151" text-anchor="middle">1,000</text>
+
+    <line x1="350" y1="46" x2="350" y2="98" stroke="#374151" stroke-width="2"/>
+    <text x="350" y="42" font-family="'Courier New', monospace" font-size="9" fill="#374151" text-anchor="middle">10,000</text>
+
+    <!-- Label -->
+    <text x="275" y="118" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#6b7280" text-anchor="middle">Stake thresholds determine operator tier and validation eligibility</text>
+  </g>
+
+  <!-- ===== SECTION 3: Bounty Distribution (middle-right) ===== -->
+  <g transform="translate(630, 195)">
+    <!-- Section container -->
+    <rect x="0" y="0" width="550" height="205" rx="12" fill="white" filter="url(#shadow)"/>
+
+    <!-- Section header -->
+    <rect x="0" y="0" width="550" height="36" rx="12" fill="url(#headerGrad)"/>
+    <rect x="0" y="24" width="550" height="12" fill="#1e3a5f"/>
+    <text x="20" y="24" font-family="'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="white">Bounty Distribution</text>
+
+    <!-- Donut chart -->
+    <g transform="translate(100, 120)">
+      <!-- Validator 81% (blue) - starts at top, goes clockwise -->
+      <circle cx="0" cy="0" r="55" fill="none" stroke="#2563eb" stroke-width="30" stroke-dasharray="277.46 61.26" stroke-dashoffset="84.82" transform="rotate(-90)"/>
+      <!-- Treasury 10% (orange) -->
+      <circle cx="0" cy="0" r="55" fill="none" stroke="#f59e0b" stroke-width="30" stroke-dasharray="34.56 304.16" stroke-dashoffset="119.38" transform="rotate(-90)"/>
+      <!-- Agent 9% (green) -->
+      <circle cx="0" cy="0" r="55" fill="none" stroke="#059669" stroke-width="30" stroke-dasharray="31.1 307.62" stroke-dashoffset="84.82" transform="rotate(-90)"/>
+
+      <!-- Center text -->
+      <text x="0" y="-5" font-family="'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="#1e3a5f" text-anchor="middle">Bounty</text>
+      <text x="0" y="12" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" fill="#6b7280" text-anchor="middle">Split</text>
+    </g>
+
+    <!-- Legend -->
+    <g transform="translate(20, 175)">
+      <rect x="0" y="0" width="12" height="12" rx="2" fill="#2563eb"/>
+      <text x="18" y="10" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#374151">81% Validator</text>
+
+      <rect x="90" y="0" width="12" height="12" rx="2" fill="#f59e0b"/>
+      <text x="108" y="10" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#374151">10% Treasury</text>
+
+      <rect x="180" y="0" width="12" height="12" rx="2" fill="#059669"/>
+      <text x="198" y="10" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#374151">9% Agent</text>
+    </g>
+
+    <!-- Formulas -->
+    <g transform="translate(270, 50)">
+      <rect x="0" y="0" width="260" height="100" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+      <text x="10" y="20" font-family="'Courier New', monospace" font-size="9" fill="#374151">treasuryAmt  = bounty × 1000 / 10000</text>
+      <text x="220" y="20" font-family="'Segoe UI', system-ui, sans-serif" font-size="9" fill="#6b7280">// 10%</text>
+
+      <text x="10" y="40" font-family="'Courier New', monospace" font-size="9" fill="#374151">remaining    = bounty - treasuryAmt</text>
+
+      <text x="10" y="60" font-family="'Courier New', monospace" font-size="9" fill="#374151">agentAmt     = remaining × 1000 / 10000</text>
+      <text x="220" y="60" font-family="'Segoe UI', system-ui, sans-serif" font-size="9" fill="#6b7280">// 9%</text>
+
+      <text x="10" y="80" font-family="'Courier New', monospace" font-size="9" fill="#374151">validatorAmt = remaining - agentAmt</text>
+      <text x="220" y="80" font-family="'Segoe UI', system-ui, sans-serif" font-size="9" fill="#6b7280">// 81%</text>
+    </g>
+  </g>
+
+  <!-- ===== SECTION 4: RBAC Role Matrix (bottom-left) ===== -->
+  <g transform="translate(20, 360)">
+    <!-- Section container -->
+    <rect x="0" y="0" width="590" height="375" rx="12" fill="white" filter="url(#shadow)"/>
+
+    <!-- Section header -->
+    <rect x="0" y="0" width="590" height="36" rx="12" fill="url(#headerGrad)"/>
+    <rect x="0" y="24" width="590" height="12" fill="#1e3a5f"/>
+    <text x="20" y="24" font-family="'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="white">RBAC Role Matrix</text>
+
+    <!-- Table Header -->
+    <rect x="10" y="46" width="570" height="26" rx="4" fill="#1e3a5f"/>
+    <text x="25" y="64" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="white">Contract</text>
+    <text x="200" y="64" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="white">Roles</text>
+
+    <!-- Row 1: TALIdentityRegistry -->
+    <rect x="10" y="76" width="570" height="36" rx="4" fill="#f9fafb"/>
+    <text x="25" y="98" font-family="'Courier New', monospace" font-size="10" fill="#1e3a5f">TALIdentityRegistry</text>
+    <g transform="translate(200, 86)">
+      <rect x="0" y="0" width="70" height="18" rx="9" fill="#dc2626"/>
+      <text x="35" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">DEFAULT_ADMIN</text>
+      <rect x="76" y="0" width="55" height="18" rx="9" fill="#2563eb"/>
+      <text x="103.5" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">UPGRADER</text>
+      <rect x="137" y="0" width="45" height="18" rx="9" fill="#f59e0b"/>
+      <text x="159.5" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">PAUSER</text>
+    </g>
+
+    <!-- Row 2: TALReputationRegistry -->
+    <rect x="10" y="116" width="570" height="36" rx="4" fill="white"/>
+    <text x="25" y="138" font-family="'Courier New', monospace" font-size="10" fill="#1e3a5f">TALReputationRegistry</text>
+    <g transform="translate(200, 126)">
+      <rect x="0" y="0" width="70" height="18" rx="9" fill="#dc2626"/>
+      <text x="35" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">DEFAULT_ADMIN</text>
+      <rect x="76" y="0" width="55" height="18" rx="9" fill="#2563eb"/>
+      <text x="103.5" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">UPGRADER</text>
+      <rect x="137" y="0" width="45" height="18" rx="9" fill="#f59e0b"/>
+      <text x="159.5" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">PAUSER</text>
+    </g>
+
+    <!-- Row 3: TALValidationRegistry -->
+    <rect x="10" y="156" width="570" height="36" rx="4" fill="#f9fafb"/>
+    <text x="25" y="178" font-family="'Courier New', monospace" font-size="10" fill="#1e3a5f">TALValidationRegistry</text>
+    <g transform="translate(200, 166)">
+      <rect x="0" y="0" width="70" height="18" rx="9" fill="#dc2626"/>
+      <text x="35" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">DEFAULT_ADMIN</text>
+      <rect x="76" y="0" width="55" height="18" rx="9" fill="#2563eb"/>
+      <text x="103.5" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">UPGRADER</text>
+      <rect x="137" y="0" width="45" height="18" rx="9" fill="#f59e0b"/>
+      <text x="159.5" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">PAUSER</text>
+      <rect x="188" y="0" width="65" height="18" rx="9" fill="#059669"/>
+      <text x="220.5" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">TEE_MANAGER</text>
+      <rect x="259" y="0" width="35" height="18" rx="9" fill="#7c3aed"/>
+      <text x="276.5" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">DRB</text>
+    </g>
+
+    <!-- Row 4: TALStakingBridgeL2 -->
+    <rect x="10" y="196" width="570" height="36" rx="4" fill="white"/>
+    <text x="25" y="218" font-family="'Courier New', monospace" font-size="10" fill="#1e3a5f">TALStakingBridgeL2</text>
+    <g transform="translate(200, 206)">
+      <rect x="0" y="0" width="70" height="18" rx="9" fill="#dc2626"/>
+      <text x="35" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">DEFAULT_ADMIN</text>
+      <rect x="76" y="0" width="55" height="18" rx="9" fill="#2563eb"/>
+      <text x="103.5" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">UPGRADER</text>
+      <rect x="137" y="0" width="45" height="18" rx="9" fill="#6b7280"/>
+      <text x="159.5" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">BRIDGE</text>
+      <rect x="188" y="0" width="45" height="18" rx="9" fill="#6b7280"/>
+      <text x="210.5" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">KEEPER</text>
+    </g>
+
+    <!-- Row 5: TALStakingBridgeL1 -->
+    <rect x="10" y="236" width="570" height="36" rx="4" fill="#f9fafb"/>
+    <text x="25" y="258" font-family="'Courier New', monospace" font-size="10" fill="#1e3a5f">TALStakingBridgeL1</text>
+    <g transform="translate(200, 246)">
+      <rect x="0" y="0" width="70" height="18" rx="9" fill="#dc2626"/>
+      <text x="35" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">DEFAULT_ADMIN</text>
+      <rect x="76" y="0" width="55" height="18" rx="9" fill="#2563eb"/>
+      <text x="103.5" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">UPGRADER</text>
+      <rect x="137" y="0" width="55" height="18" rx="9" fill="#6b7280"/>
+      <text x="164.5" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">OPERATOR</text>
+    </g>
+
+    <!-- Row 6: TALSlashingConditionsL1 -->
+    <rect x="10" y="276" width="570" height="36" rx="4" fill="white"/>
+    <text x="25" y="298" font-family="'Courier New', monospace" font-size="10" fill="#1e3a5f">TALSlashingConditionsL1</text>
+    <g transform="translate(200, 286)">
+      <rect x="0" y="0" width="70" height="18" rx="9" fill="#dc2626"/>
+      <text x="35" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">DEFAULT_ADMIN</text>
+      <rect x="76" y="0" width="50" height="18" rx="9" fill="#6b7280"/>
+      <text x="101" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">SLASHER</text>
+    </g>
+
+    <!-- Row 7: DRBIntegrationModule -->
+    <rect x="10" y="316" width="570" height="36" rx="4" fill="#f9fafb"/>
+    <text x="25" y="338" font-family="'Courier New', monospace" font-size="10" fill="#1e3a5f">DRBIntegrationModule</text>
+    <g transform="translate(200, 326)">
+      <rect x="0" y="0" width="70" height="18" rx="9" fill="#dc2626"/>
+      <text x="35" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">DEFAULT_ADMIN</text>
+      <rect x="76" y="0" width="55" height="18" rx="9" fill="#2563eb"/>
+      <text x="103.5" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">UPGRADER</text>
+    </g>
+
+    <!-- Row 8: StakingIntegrationModule -->
+    <rect x="10" y="356" width="570" height="34" rx="4" fill="white"/>
+    <text x="25" y="377" font-family="'Courier New', monospace" font-size="10" fill="#1e3a5f">StakingIntegrationModule</text>
+    <g transform="translate(200, 365)">
+      <rect x="0" y="0" width="70" height="18" rx="9" fill="#dc2626"/>
+      <text x="35" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">DEFAULT_ADMIN</text>
+      <rect x="76" y="0" width="55" height="18" rx="9" fill="#2563eb"/>
+      <text x="103.5" y="13" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">UPGRADER</text>
+    </g>
+  </g>
+
+  <!-- ===== SECTION 5: Reputation Weighting Formula (bottom-right) ===== -->
+  <g transform="translate(630, 415)">
+    <!-- Section container -->
+    <rect x="0" y="0" width="550" height="320" rx="12" fill="white" filter="url(#shadow)"/>
+
+    <!-- Section header -->
+    <rect x="0" y="0" width="550" height="36" rx="12" fill="url(#headerGrad)"/>
+    <rect x="0" y="24" width="550" height="12" fill="#1e3a5f"/>
+    <text x="20" y="24" font-family="'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="white">Stake-Weighted Reputation Aggregation</text>
+
+    <!-- Formulas box -->
+    <rect x="20" y="50" width="510" height="80" rx="8" fill="#f9fafb" stroke="#e5e7eb"/>
+
+    <!-- Formula 1: weight -->
+    <text x="40" y="80" font-family="'Segoe UI', system-ui, sans-serif" font-size="14" fill="#374151">weight</text>
+    <text x="90" y="82" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#6b7280">i</text>
+    <text x="105" y="80" font-family="'Segoe UI', system-ui, sans-serif" font-size="14" fill="#374151">=</text>
+    <text x="125" y="80" font-family="'Segoe UI', system-ui, sans-serif" font-size="16" fill="#374151">√</text>
+    <text x="140" y="80" font-family="'Segoe UI', system-ui, sans-serif" font-size="14" fill="#374151">(stake</text>
+    <text x="185" y="82" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#6b7280">i</text>
+    <text x="195" y="80" font-family="'Segoe UI', system-ui, sans-serif" font-size="14" fill="#374151">)</text>
+
+    <!-- Formula 2: weightedAvg -->
+    <text x="40" y="115" font-family="'Segoe UI', system-ui, sans-serif" font-size="14" fill="#374151">weightedAvg =</text>
+    <text x="165" y="105" font-family="'Segoe UI', system-ui, sans-serif" font-size="12" fill="#374151">Σ(value</text>
+    <text x="218" y="107" font-family="'Segoe UI', system-ui, sans-serif" font-size="9" fill="#6b7280">i</text>
+    <text x="228" y="105" font-family="'Segoe UI', system-ui, sans-serif" font-size="12" fill="#374151">× √stake</text>
+    <text x="290" y="107" font-family="'Segoe UI', system-ui, sans-serif" font-size="9" fill="#6b7280">i</text>
+    <text x="298" y="105" font-family="'Segoe UI', system-ui, sans-serif" font-size="12" fill="#374151">)</text>
+    <line x1="165" y1="112" x2="310" y2="112" stroke="#374151" stroke-width="1"/>
+    <text x="200" y="125" font-family="'Segoe UI', system-ui, sans-serif" font-size="12" fill="#374151">Σ(√stake</text>
+    <text x="262" y="127" font-family="'Segoe UI', system-ui, sans-serif" font-size="9" fill="#6b7280">i</text>
+    <text x="270" y="125" font-family="'Segoe UI', system-ui, sans-serif" font-size="12" fill="#374151">)</text>
+
+    <!-- Example visualization title -->
+    <text x="30" y="155" font-family="'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="600" fill="#1e3a5f">Example: Stake vs Weight Influence</text>
+
+    <!-- Validator A -->
+    <g transform="translate(30, 170)">
+      <text x="0" y="12" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#374151">Validator A:</text>
+      <text x="65" y="12" font-family="'Courier New', monospace" font-size="9" fill="#6b7280">100 TON</text>
+      <rect x="130" y="2" width="10" height="14" rx="2" fill="#3b82f6"/>
+      <text x="150" y="12" font-family="'Segoe UI', system-ui, sans-serif" font-size="9" fill="#6b7280">weight = 10</text>
+    </g>
+
+    <!-- Validator B -->
+    <g transform="translate(30, 195)">
+      <text x="0" y="12" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#374151">Validator B:</text>
+      <text x="65" y="12" font-family="'Courier New', monospace" font-size="9" fill="#6b7280">2,500 TON</text>
+      <rect x="130" y="2" width="50" height="14" rx="2" fill="#2563eb"/>
+      <text x="190" y="12" font-family="'Segoe UI', system-ui, sans-serif" font-size="9" fill="#6b7280">weight = 50</text>
+    </g>
+
+    <!-- Validator C -->
+    <g transform="translate(30, 220)">
+      <text x="0" y="12" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#374151">Validator C:</text>
+      <text x="65" y="12" font-family="'Courier New', monospace" font-size="9" fill="#6b7280">10,000 TON</text>
+      <rect x="130" y="2" width="100" height="14" rx="2" fill="#1e3a5f"/>
+      <text x="240" y="12" font-family="'Segoe UI', system-ui, sans-serif" font-size="9" fill="#6b7280">weight = 100</text>
+    </g>
+
+    <!-- Comparison note -->
+    <rect x="30" y="250" width="490" height="55" rx="6" fill="#eff6ff" stroke="#3b82f6" stroke-width="1"/>
+    <text x="45" y="270" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#1e3a5f" font-weight="600">Why Square Root?</text>
+    <text x="45" y="288" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#374151">Validator C has 100x more stake than A, but only 10x more voting weight.</text>
+    <text x="45" y="300" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#6b7280">This prevents whale domination while still rewarding larger stakes.</text>
+  </g>
+
+  <!-- Role Legend -->
+  <g transform="translate(630, 350)">
+    <rect x="0" y="0" width="550" height="55" rx="8" fill="white" filter="url(#shadow)"/>
+    <text x="15" y="18" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" font-weight="600" fill="#1e3a5f">Role Legend:</text>
+
+    <rect x="15" y="28" width="70" height="16" rx="8" fill="#dc2626"/>
+    <text x="50" y="40" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">DEFAULT_ADMIN</text>
+
+    <rect x="95" y="28" width="55" height="16" rx="8" fill="#2563eb"/>
+    <text x="122.5" y="40" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">UPGRADER</text>
+
+    <rect x="160" y="28" width="45" height="16" rx="8" fill="#f59e0b"/>
+    <text x="182.5" y="40" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">PAUSER</text>
+
+    <rect x="215" y="28" width="65" height="16" rx="8" fill="#059669"/>
+    <text x="247.5" y="40" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">TEE_MANAGER</text>
+
+    <rect x="290" y="28" width="35" height="16" rx="8" fill="#7c3aed"/>
+    <text x="307.5" y="40" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">DRB</text>
+
+    <rect x="335" y="28" width="85" height="16" rx="8" fill="#6b7280"/>
+    <text x="377.5" y="40" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">BRIDGE/KEEPER/etc</text>
+  </g>
+</svg>

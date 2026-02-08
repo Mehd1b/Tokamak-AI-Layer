@@ -1,0 +1,426 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 1000" width="1400" height="1000">
+  <defs>
+    <style>
+      .title { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 24px; font-weight: 700; fill: #1e3a5f; }
+      .lane-header { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 16px; font-weight: 600; fill: #1e3a5f; }
+      .box-label { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 11px; font-weight: 600; fill: #1e3a5f; }
+      .box-sublabel { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 9px; fill: #64748b; }
+      .address { font-family: 'Courier New', monospace; font-size: 8px; fill: #6b7280; }
+      .stub-label { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 8px; font-weight: 600; fill: #dc2626; }
+      .arrow-label { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 9px; fill: #64748b; }
+      .legend-text { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 10px; fill: #374151; }
+      .hook-label { font-family: 'Courier New', monospace; font-size: 10px; fill: #7c3aed; }
+    </style>
+    <!-- Arrow markers -->
+    <marker id="arrow-blue" markerWidth="14" markerHeight="10" refX="13" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0 0, 13 5, 0 10" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="14" markerHeight="10" refX="13" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0 0, 13 5, 0 10" fill="#f59e0b"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="14" markerHeight="10" refX="13" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0 0, 13 5, 0 10" fill="#dc2626"/>
+    </marker>
+    <marker id="arrow-gray" markerWidth="14" markerHeight="10" refX="13" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0 0, 13 5, 0 10" fill="#6b7280"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="14" markerHeight="10" refX="13" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0 0, 13 5, 0 10" fill="#059669"/>
+    </marker>
+    <marker id="arrow-purple" markerWidth="14" markerHeight="10" refX="13" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0 0, 13 5, 0 10" fill="#7c3aed"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1400" height="1000" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="700" y="35" text-anchor="middle" class="title">Tokamak AI Layer — System Architecture</text>
+
+  <!-- ==================== LANE 1: Frontend ==================== -->
+  <g id="lane-frontend">
+    <!-- Lane background -->
+    <rect x="20" y="55" width="1360" height="200" rx="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>
+    <text x="40" y="80" class="lane-header">Frontend (Next.js 14)</text>
+
+    <!-- Page boxes row -->
+    <g id="frontend-pages" transform="translate(40, 95)">
+      <!-- Landing -->
+      <g transform="translate(0, 0)">
+        <rect width="85" height="50" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="42.5" y="22" text-anchor="middle" class="box-label">/</text>
+        <text x="42.5" y="36" text-anchor="middle" class="box-sublabel">Landing</text>
+      </g>
+      <!-- Discovery -->
+      <g transform="translate(95, 0)">
+        <rect width="85" height="50" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="42.5" y="22" text-anchor="middle" class="box-label">/agents</text>
+        <text x="42.5" y="36" text-anchor="middle" class="box-sublabel">Discovery</text>
+      </g>
+      <!-- Agent Detail -->
+      <g transform="translate(190, 0)">
+        <rect width="95" height="50" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="47.5" y="22" text-anchor="middle" class="box-label">/agents/[id]</text>
+        <text x="47.5" y="36" text-anchor="middle" class="box-sublabel">Detail</text>
+      </g>
+      <!-- Register -->
+      <g transform="translate(295, 0)">
+        <rect width="110" height="50" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="55" y="22" text-anchor="middle" class="box-label">/agents/register</text>
+        <text x="55" y="36" text-anchor="middle" class="box-sublabel">Register</text>
+      </g>
+      <!-- Reputation -->
+      <g transform="translate(415, 0)">
+        <rect width="130" height="50" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="65" y="22" text-anchor="middle" class="box-label">/reputation/[agentId]</text>
+        <text x="65" y="36" text-anchor="middle" class="box-sublabel">Reputation</text>
+      </g>
+      <!-- Validation List -->
+      <g transform="translate(555, 0)">
+        <rect width="95" height="50" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="47.5" y="22" text-anchor="middle" class="box-label">/validation</text>
+        <text x="47.5" y="36" text-anchor="middle" class="box-sublabel">Validations</text>
+      </g>
+      <!-- Validation Detail -->
+      <g transform="translate(660, 0)">
+        <rect width="115" height="50" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="57.5" y="22" text-anchor="middle" class="box-label">/validation/[hash]</text>
+        <text x="57.5" y="36" text-anchor="middle" class="box-sublabel">Detail</text>
+      </g>
+      <!-- Staking -->
+      <g transform="translate(785, 0)">
+        <rect width="85" height="50" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="42.5" y="22" text-anchor="middle" class="box-label">/staking</text>
+        <text x="42.5" y="36" text-anchor="middle" class="box-sublabel">Staking</text>
+      </g>
+    </g>
+
+    <!-- Hooks row -->
+    <g id="frontend-hooks" transform="translate(40, 165)">
+      <text x="0" y="12" class="box-sublabel">wagmi hooks:</text>
+      <g transform="translate(70, 0)">
+        <rect width="85" height="28" rx="4" fill="#f5f3ff" stroke="#a78bfa" stroke-width="1"/>
+        <text x="42.5" y="18" text-anchor="middle" class="hook-label">useAgent</text>
+      </g>
+      <g transform="translate(165, 0)">
+        <rect width="100" height="28" rx="4" fill="#f5f3ff" stroke="#a78bfa" stroke-width="1"/>
+        <text x="50" y="18" text-anchor="middle" class="hook-label">useReputation</text>
+      </g>
+      <g transform="translate(275, 0)">
+        <rect width="100" height="28" rx="4" fill="#f5f3ff" stroke="#a78bfa" stroke-width="1"/>
+        <text x="50" y="18" text-anchor="middle" class="hook-label">useValidation</text>
+      </g>
+    </g>
+
+    <!-- Side elements -->
+    <g id="frontend-side" transform="translate(1050, 95)">
+      <!-- RainbowKit -->
+      <rect width="130" height="40" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="65" y="18" text-anchor="middle" class="box-label">RainbowKit</text>
+      <text x="65" y="32" text-anchor="middle" class="box-sublabel">Wallet Connector</text>
+      <!-- RPC -->
+      <g transform="translate(0, 50)">
+        <rect width="130" height="40" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="65" y="18" text-anchor="middle" class="box-label">Optimism Sepolia</text>
+        <text x="65" y="32" text-anchor="middle" class="box-sublabel">RPC Endpoint</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- ==================== LANE 2: SDK ==================== -->
+  <g id="lane-sdk">
+    <!-- Lane background -->
+    <rect x="20" y="265" width="1360" height="180" rx="8" fill="#f5f3ff" stroke="#ddd6fe" stroke-width="1"/>
+    <text x="40" y="290" class="lane-header">SDK (TypeScript)</text>
+
+    <!-- TALClient facade (center, prominent) -->
+    <g id="sdk-talclient" transform="translate(550, 310)">
+      <rect width="180" height="70" rx="8" fill="#ffffff" stroke="#7c3aed" stroke-width="2.5"/>
+      <text x="90" y="32" text-anchor="middle" class="box-label" style="font-size: 14px;">TALClient</text>
+      <text x="90" y="50" text-anchor="middle" class="box-sublabel">Main Facade</text>
+      <text x="90" y="62" text-anchor="middle" class="address">471 lines</text>
+    </g>
+
+    <!-- Domain clients -->
+    <g id="sdk-clients" transform="translate(40, 320)">
+      <!-- IdentityClient -->
+      <g transform="translate(0, 0)">
+        <rect width="120" height="50" rx="6" fill="#ffffff" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="60" y="22" text-anchor="middle" class="box-label">IdentityClient</text>
+        <text x="60" y="38" text-anchor="middle" class="box-sublabel">Agent Registry</text>
+      </g>
+      <!-- ReputationClient -->
+      <g transform="translate(135, 0)">
+        <rect width="120" height="50" rx="6" fill="#ffffff" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="60" y="22" text-anchor="middle" class="box-label">ReputationClient</text>
+        <text x="60" y="38" text-anchor="middle" class="box-sublabel">Feedback</text>
+      </g>
+      <!-- ValidationClient -->
+      <g transform="translate(270, 0)">
+        <rect width="120" height="50" rx="6" fill="#ffffff" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="60" y="22" text-anchor="middle" class="box-label">ValidationClient</text>
+        <text x="60" y="38" text-anchor="middle" class="box-sublabel">Multi-model</text>
+      </g>
+    </g>
+
+    <!-- RegistrationBuilder -->
+    <g id="sdk-builder" transform="translate(40, 385)">
+      <rect width="120" height="40" rx="6" fill="#ffffff" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="60" y="18" text-anchor="middle" class="box-label">RegistrationBuilder</text>
+      <text x="60" y="32" text-anchor="middle" class="box-sublabel">Fluent API</text>
+      <!-- Arrow to IdentityClient -->
+      <line x1="120" y1="-25" x2="60" y2="0" stroke="#6b7280" stroke-width="1" stroke-dasharray="3,2"/>
+    </g>
+
+    <!-- Stubbed clients -->
+    <g id="sdk-stubbed" transform="translate(850, 320)">
+      <!-- SubgraphClient (stubbed) -->
+      <g transform="translate(0, 0)">
+        <rect width="120" height="50" rx="6" fill="#fef2f2" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="5,3"/>
+        <text x="60" y="22" text-anchor="middle" class="box-label">SubgraphClient</text>
+        <text x="60" y="38" text-anchor="middle" class="stub-label">STUBBED</text>
+      </g>
+      <!-- ProofGenerator (stubbed) -->
+      <g transform="translate(135, 0)">
+        <rect width="120" height="50" rx="6" fill="#fef2f2" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="5,3"/>
+        <text x="60" y="22" text-anchor="middle" class="box-label">ProofGenerator</text>
+        <text x="60" y="38" text-anchor="middle" class="stub-label">Sprint 3</text>
+      </g>
+    </g>
+
+    <!-- viem dependency -->
+    <g id="sdk-viem" transform="translate(1200, 380)">
+      <rect width="80" height="35" rx="6" fill="#e0e7ff" stroke="#6366f1" stroke-width="1"/>
+      <text x="40" y="22" text-anchor="middle" class="box-label">viem</text>
+    </g>
+
+    <!-- Connection lines from facade to clients -->
+    <line x1="550" y1="345" x2="430" y2="345" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
+    <line x1="730" y1="345" x2="850" y2="345" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="5,3"/>
+  </g>
+
+  <!-- ==================== LANE 3: L2 Contracts ==================== -->
+  <g id="lane-l2">
+    <!-- Lane background -->
+    <rect x="20" y="455" width="1360" height="280" rx="8" fill="#faf5ff" stroke="#e9d5ff" stroke-width="1"/>
+    <text x="40" y="480" class="lane-header">L2 Contracts (Optimism Sepolia)</text>
+
+    <!-- Core cluster -->
+    <g id="l2-core" transform="translate(40, 500)">
+      <!-- TALIdentityRegistry -->
+      <g transform="translate(0, 0)">
+        <rect width="160" height="75" rx="8" fill="#ffffff" stroke="#7c3aed" stroke-width="2"/>
+        <text x="80" y="22" text-anchor="middle" class="box-label">TALIdentityRegistry</text>
+        <text x="80" y="38" text-anchor="middle" class="box-sublabel">ERC-721 Agent NFTs</text>
+        <text x="80" y="52" text-anchor="middle" class="box-sublabel">602 lines</text>
+        <text x="80" y="68" text-anchor="middle" class="address">0x3f89...A525</text>
+      </g>
+      <!-- TALReputationRegistry -->
+      <g transform="translate(180, 0)">
+        <rect width="170" height="75" rx="8" fill="#ffffff" stroke="#7c3aed" stroke-width="2"/>
+        <text x="85" y="22" text-anchor="middle" class="box-label">TALReputationRegistry</text>
+        <text x="85" y="38" text-anchor="middle" class="box-sublabel">Stake-weighted Feedback</text>
+        <text x="85" y="52" text-anchor="middle" class="box-sublabel">687 lines</text>
+        <text x="85" y="68" text-anchor="middle" class="address">0x0052...502b</text>
+      </g>
+      <!-- TALValidationRegistry -->
+      <g transform="translate(370, 0)">
+        <rect width="170" height="75" rx="8" fill="#ffffff" stroke="#7c3aed" stroke-width="2"/>
+        <text x="85" y="22" text-anchor="middle" class="box-label">TALValidationRegistry</text>
+        <text x="85" y="38" text-anchor="middle" class="box-sublabel">Multi-model Validation</text>
+        <text x="85" y="52" text-anchor="middle" class="box-sublabel">1052 lines</text>
+        <text x="85" y="68" text-anchor="middle" class="address">0x0944...2F3</text>
+      </g>
+    </g>
+
+    <!-- Supporting cluster -->
+    <g id="l2-supporting" transform="translate(620, 500)">
+      <!-- TALStakingBridgeL2 -->
+      <g transform="translate(0, 0)">
+        <rect width="150" height="60" rx="6" fill="#ffffff" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="75" y="22" text-anchor="middle" class="box-label">TALStakingBridgeL2</text>
+        <text x="75" y="38" text-anchor="middle" class="box-sublabel">L1 Stake Cache</text>
+        <text x="75" y="52" text-anchor="middle" class="box-sublabel">Tier Management</text>
+      </g>
+      <!-- DRBIntegrationModule -->
+      <g transform="translate(165, 0)">
+        <rect width="155" height="60" rx="6" fill="#ffffff" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="77.5" y="22" text-anchor="middle" class="box-label">DRBIntegrationModule</text>
+        <text x="77.5" y="38" text-anchor="middle" class="box-sublabel">Commit-Reveal2</text>
+        <text x="77.5" y="52" text-anchor="middle" class="box-sublabel">Validator Selection</text>
+      </g>
+      <!-- StakingIntegrationModule -->
+      <g transform="translate(335, 0)">
+        <rect width="165" height="60" rx="6" fill="#ffffff" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="82.5" y="22" text-anchor="middle" class="box-label">StakingIntegrationModule</text>
+        <text x="82.5" y="38" text-anchor="middle" class="box-sublabel">Stake Queries</text>
+        <text x="82.5" y="52" text-anchor="middle" class="address">0x41FF...74b8</text>
+      </g>
+    </g>
+
+    <!-- Libraries -->
+    <g id="l2-libraries" transform="translate(1160, 500)">
+      <rect width="110" height="40" rx="4" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1"/>
+      <text x="55" y="18" text-anchor="middle" class="box-label">ReputationMath</text>
+      <text x="55" y="32" text-anchor="middle" class="box-sublabel">Library</text>
+      <g transform="translate(0, 50)">
+        <rect width="110" height="40" rx="4" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1"/>
+        <text x="55" y="18" text-anchor="middle" class="box-label">SlashingCalculator</text>
+        <text x="55" y="32" text-anchor="middle" class="box-sublabel">Library</text>
+      </g>
+    </g>
+
+    <!-- Dependency arrows within L2 -->
+    <g id="l2-dependencies">
+      <!-- ValidationRegistry -> IdentityRegistry (agent verification) -->
+      <path d="M 455 520 Q 330 490 180 520" fill="none" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+      <text x="300" y="498" class="arrow-label">agent verify</text>
+
+      <!-- ValidationRegistry -> ReputationRegistry (reputation updates) -->
+      <line x1="455" y1="535" x2="370" y2="535" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+      <text x="400" y="548" class="arrow-label">rep update</text>
+
+      <!-- ValidationRegistry -> DRBIntegrationModule (validator selection) -->
+      <line x1="580" y1="540" x2="620" y2="530" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+
+      <!-- ValidationRegistry -> StakingBridgeL2 (stake verification) -->
+      <path d="M 540 575 Q 620 600 695 560" fill="none" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+      <text x="595" y="595" class="arrow-label">stake verify</text>
+
+      <!-- StakingIntegrationModule -> StakingBridgeL2 -->
+      <line x1="955" y1="530" x2="770" y2="530" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+      <text x="850" y="520" class="arrow-label">stake queries</text>
+
+      <!-- IdentityRegistry -> StakingBridgeL2 -->
+      <path d="M 120 575 Q 400 630 695 560" fill="none" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+      <text x="380" y="620" class="arrow-label">operator verify</text>
+
+      <!-- ReputationRegistry -> StakingBridgeL2 -->
+      <path d="M 350 575 Q 500 610 695 560" fill="none" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+      <text x="495" y="610" class="arrow-label">stake-weighted</text>
+    </g>
+
+    <!-- UUPS/RBAC badge -->
+    <g transform="translate(40, 595)">
+      <rect width="180" height="28" rx="4" fill="#ddd6fe" stroke="#7c3aed" stroke-width="1"/>
+      <text x="90" y="18" text-anchor="middle" class="box-sublabel" style="fill: #5b21b6;">UUPS Proxy + AccessControl</text>
+    </g>
+
+    <!-- Interfaces note -->
+    <g transform="translate(240, 595)">
+      <rect width="150" height="28" rx="4" fill="#e0e7ff" stroke="#6366f1" stroke-width="1"/>
+      <text x="75" y="18" text-anchor="middle" class="box-sublabel" style="fill: #4338ca;">14 Interface Files</text>
+    </g>
+  </g>
+
+  <!-- ==================== LANE 4: L1 Contracts ==================== -->
+  <g id="lane-l1">
+    <!-- Lane background -->
+    <rect x="20" y="745" width="1360" height="130" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1"/>
+    <text x="40" y="770" class="lane-header">L1 Contracts (Ethereum)</text>
+
+    <!-- L1 Contracts -->
+    <g id="l1-contracts" transform="translate(100, 790)">
+      <!-- TALStakingBridgeL1 -->
+      <g transform="translate(0, 0)">
+        <rect width="160" height="60" rx="8" fill="#ffffff" stroke="#059669" stroke-width="2"/>
+        <text x="80" y="24" text-anchor="middle" class="box-label">TALStakingBridgeL1</text>
+        <text x="80" y="40" text-anchor="middle" class="box-sublabel">Stake Queries</text>
+        <text x="80" y="54" text-anchor="middle" class="box-sublabel">Relay to L2</text>
+      </g>
+      <!-- TALSlashingConditionsL1 -->
+      <g transform="translate(200, 0)">
+        <rect width="175" height="60" rx="8" fill="#ffffff" stroke="#059669" stroke-width="2"/>
+        <text x="87.5" y="24" text-anchor="middle" class="box-label">TALSlashingConditionsL1</text>
+        <text x="87.5" y="40" text-anchor="middle" class="box-sublabel">Slashing Execution</text>
+        <text x="87.5" y="54" text-anchor="middle" class="box-sublabel">Evidence Validation</text>
+      </g>
+      <!-- SeigManagerV3 (external) -->
+      <g transform="translate(420, 0)">
+        <rect width="140" height="60" rx="8" fill="#fef9c3" stroke="#059669" stroke-width="1.5" stroke-dasharray="5,3"/>
+        <text x="70" y="24" text-anchor="middle" class="box-label">SeigManagerV3</text>
+        <text x="70" y="40" text-anchor="middle" class="box-sublabel">TON Staking V3</text>
+        <text x="70" y="54" text-anchor="middle" class="box-sublabel" style="fill: #92400e;">(External)</text>
+      </g>
+    </g>
+
+    <!-- CrossDomainMessenger -->
+    <g id="l1-messenger" transform="translate(750, 790)">
+      <rect width="170" height="60" rx="8" fill="#dcfce7" stroke="#059669" stroke-width="1.5"/>
+      <text x="85" y="24" text-anchor="middle" class="box-label">CrossDomainMessenger</text>
+      <text x="85" y="40" text-anchor="middle" class="box-sublabel">Optimism Bridge</text>
+      <text x="85" y="54" text-anchor="middle" class="box-sublabel">L1 ↔ L2</text>
+    </g>
+  </g>
+
+  <!-- ==================== Cross-Lane Arrows ==================== -->
+  <g id="cross-lane-arrows">
+    <!-- Frontend -> SDK -->
+    <line x1="700" y1="255" x2="700" y2="305" stroke="#6b7280" stroke-width="2" marker-end="url(#arrow-gray)"/>
+    <text x="715" y="282" class="arrow-label">viem</text>
+
+    <!-- SDK -> L2 -->
+    <line x1="640" y1="380" x2="640" y2="455" stroke="#6b7280" stroke-width="2" marker-end="url(#arrow-gray)"/>
+    <text x="650" y="420" class="arrow-label">Contract Calls</text>
+
+    <!-- L2 <-> L1 Bridge arrows (thick) -->
+    <!-- L1 -> L2 (Stake Sync) -->
+    <path d="M 835 790 Q 900 720 695 640" fill="none" stroke="#059669" stroke-width="3" marker-end="url(#arrow-green)"/>
+    <text x="840" y="700" class="arrow-label" style="fill: #059669; font-weight: 600;">Stake Sync ~2min</text>
+
+    <!-- L2 -> L1 (Slashing) -->
+    <path d="M 695 660 Q 1000 720 920 790" fill="none" stroke="#dc2626" stroke-width="3" marker-end="url(#arrow-red)"/>
+    <text x="950" y="700" class="arrow-label" style="fill: #dc2626; font-weight: 600;">Slashing ~7d finality</text>
+  </g>
+
+  <!-- ==================== Legend ==================== -->
+  <g id="legend" transform="translate(1050, 800)">
+    <rect x="0" y="0" width="280" height="70" rx="6" fill="#ffffff" stroke="#e5e7eb" stroke-width="1"/>
+    <text x="140" y="18" text-anchor="middle" class="box-label">Legend</text>
+
+    <!-- Row 1 -->
+    <g transform="translate(15, 28)">
+      <rect width="30" height="12" rx="2" fill="#ffffff" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="40" y="10" class="legend-text">Deployed</text>
+
+      <g transform="translate(90, 0)">
+        <rect width="30" height="12" rx="2" fill="#fef2f2" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="3,2"/>
+        <text x="40" y="10" class="legend-text">Stubbed</text>
+      </g>
+
+      <g transform="translate(170, 0)">
+        <line x1="0" y1="6" x2="25" y2="6" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+        <text x="35" y="10" class="legend-text">Read</text>
+      </g>
+    </g>
+
+    <!-- Row 2 -->
+    <g transform="translate(15, 48)">
+      <line x1="0" y1="6" x2="25" y2="6" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrow-orange)"/>
+      <text x="35" y="10" class="legend-text">Write</text>
+
+      <g transform="translate(70, 0)">
+        <line x1="0" y1="6" x2="25" y2="6" stroke="#dc2626" stroke-width="2" marker-end="url(#arrow-red)"/>
+        <text x="35" y="10" class="legend-text">Slash</text>
+      </g>
+
+      <g transform="translate(130, 0)">
+        <line x1="0" y1="6" x2="25" y2="6" stroke="#059669" stroke-width="3"/>
+        <text x="35" y="10" class="legend-text">Cross-layer</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Chain ID badge -->
+  <g transform="translate(1200, 60)">
+    <rect width="160" height="28" rx="4" fill="#e0e7ff" stroke="#6366f1" stroke-width="1"/>
+    <text x="80" y="18" text-anchor="middle" class="box-sublabel" style="fill: #4338ca; font-weight: 600;">Chain ID: 11155420</text>
+  </g>
+
+  <!-- Test count badge -->
+  <g transform="translate(1200, 95)">
+    <rect width="160" height="28" rx="4" fill="#dcfce7" stroke="#059669" stroke-width="1"/>
+    <text x="80" y="18" text-anchor="middle" class="box-sublabel" style="fill: #059669; font-weight: 600;">384 Tests Passing</text>
+  </g>
+</svg>

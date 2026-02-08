@@ -1,0 +1,432 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="1200" height="900">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="l2Gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c3aed;stop-opacity:0.15"/>
+      <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:0.05"/>
+    </linearGradient>
+    <linearGradient id="l1Gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#059669;stop-opacity:0.05"/>
+      <stop offset="100%" style="stop-color:#059669;stop-opacity:0.15"/>
+    </linearGradient>
+    <linearGradient id="blueHeader" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1e3a5f"/>
+      <stop offset="100%" style="stop-color:#2563eb"/>
+    </linearGradient>
+    <linearGradient id="redHeader" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#991b1b"/>
+      <stop offset="100%" style="stop-color:#dc2626"/>
+    </linearGradient>
+    <linearGradient id="greenHeader" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#065f46"/>
+      <stop offset="100%" style="stop-color:#059669"/>
+    </linearGradient>
+    <!-- Arrow markers -->
+    <marker id="arrowBlue" markerWidth="16" markerHeight="12" refX="15" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0 0, 15 6, 0 12" fill="#2563eb"/>
+    </marker>
+    <marker id="arrowRed" markerWidth="16" markerHeight="12" refX="15" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0 0, 15 6, 0 12" fill="#dc2626"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="16" markerHeight="12" refX="15" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0 0, 15 6, 0 12" fill="#059669"/>
+    </marker>
+    <marker id="arrowGray" markerWidth="16" markerHeight="12" refX="15" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0 0, 15 6, 0 12" fill="#6b7280"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="900" fill="#fafafa"/>
+
+  <!-- Title -->
+  <text x="600" y="40" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="24" font-weight="600" fill="#1e3a5f">
+    Tokamak AI Layer — Cross-Layer Bridge Flows
+  </text>
+
+  <!-- L2 Zone Background -->
+  <rect x="20" y="60" width="1160" height="360" fill="url(#l2Gradient)" rx="8"/>
+  <text x="40" y="85" font-family="'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="#7c3aed">
+    TOKAMAK L2 (Optimism)
+  </text>
+
+  <!-- L1 Zone Background -->
+  <rect x="20" y="440" width="1160" height="440" fill="url(#l1Gradient)" rx="8"/>
+  <text x="40" y="465" font-family="'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="#059669">
+    ETHEREUM L1
+  </text>
+
+  <!-- Layer Divider -->
+  <line x1="20" y1="430" x2="1180" y2="430" stroke="#9ca3af" stroke-width="2" stroke-dasharray="8,4"/>
+  <rect x="540" y="418" width="120" height="24" fill="#fafafa" rx="4"/>
+  <text x="600" y="435" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="12" fill="#6b7280">
+    Cross-Layer Boundary
+  </text>
+
+  <!-- Column Dividers -->
+  <line x1="400" y1="60" x2="400" y2="880" stroke="#d1d5db" stroke-width="1" stroke-dasharray="6,3"/>
+  <line x1="800" y1="60" x2="800" y2="880" stroke="#d1d5db" stroke-width="1" stroke-dasharray="6,3"/>
+
+  <!-- ==================== COLUMN A: Stake Sync (L1→L2) ==================== -->
+  <g id="columnA">
+    <!-- Column Header -->
+    <rect x="40" y="100" width="340" height="36" fill="url(#blueHeader)" rx="6"/>
+    <text x="210" y="124" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="white">
+      Stake Sync (L1 → L2)
+    </text>
+
+    <!-- L1 Section -->
+    <!-- Step 1: Keeper Trigger -->
+    <g transform="translate(60, 490)">
+      <rect width="300" height="70" fill="white" stroke="#2563eb" stroke-width="2" rx="8"/>
+      <text x="150" y="20" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e3a5f">
+        KEEPER_ROLE trigger
+      </text>
+      <text x="150" y="38" text-anchor="middle" font-family="'Courier New', monospace" font-size="10" fill="#374151">
+        queryAndRelayStake(operator)
+      </text>
+      <text x="150" y="52" text-anchor="middle" font-family="'Courier New', monospace" font-size="10" fill="#374151">
+        batchQueryStakes() | refreshAllOperators()
+      </text>
+    </g>
+
+    <!-- Arrow 1→2 -->
+    <line x1="210" y1="560" x2="210" y2="580" stroke="#2563eb" stroke-width="2" marker-end="url(#arrowBlue)"/>
+
+    <!-- Step 2: TALStakingBridgeL1 -->
+    <g transform="translate(60, 590)">
+      <rect width="300" height="55" fill="white" stroke="#2563eb" stroke-width="2" rx="8"/>
+      <text x="150" y="18" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e3a5f">
+        TALStakingBridgeL1
+      </text>
+      <text x="150" y="35" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#374151">
+        SeigManagerV3.stakeOf(talLayer2, operator)
+      </text>
+      <text x="150" y="48" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="9" fill="#6b7280">
+        → returns stake amount
+      </text>
+    </g>
+
+    <!-- Arrow 2→3 -->
+    <line x1="210" y1="645" x2="210" y2="665" stroke="#2563eb" stroke-width="2" marker-end="url(#arrowBlue)"/>
+
+    <!-- Step 3: L1CrossDomainMessenger -->
+    <g transform="translate(60, 675)">
+      <rect width="300" height="55" fill="#eff6ff" stroke="#2563eb" stroke-width="2" rx="8"/>
+      <text x="150" y="18" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e3a5f">
+        L1CrossDomainMessenger
+      </text>
+      <text x="150" y="35" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#374151">
+        sendMessage(l2Bridge, encodedCall)
+      </text>
+      <text x="150" y="48" text-anchor="middle" font-family="'Courier New', monospace" font-size="8" fill="#6b7280">
+        receiveStakeUpdate(operator, amount, block.number)
+      </text>
+    </g>
+
+    <!-- Cross-layer Arrow L1→L2 -->
+    <line x1="210" y1="730" x2="210" y2="410" stroke="#2563eb" stroke-width="4" marker-end="url(#arrowBlue)"/>
+    <rect x="140" y="395" width="140" height="20" fill="#fafafa" rx="4"/>
+    <text x="210" y="408" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#2563eb" font-weight="500">
+      ~2 min finality
+    </text>
+
+    <!-- L2 Section -->
+    <!-- Step 4: TALStakingBridgeL2 receive -->
+    <g transform="translate(60, 150)">
+      <rect width="300" height="50" fill="white" stroke="#7c3aed" stroke-width="2" rx="8"/>
+      <text x="150" y="18" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="#5b21b6">
+        TALStakingBridgeL2
+      </text>
+      <text x="150" y="35" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#374151">
+        receiveStakeUpdate(operator, amount, blockNum)
+      </text>
+    </g>
+
+    <!-- Arrow 4→5 -->
+    <line x1="210" y1="200" x2="210" y2="220" stroke="#7c3aed" stroke-width="2" marker-end="url(#arrowGray)"/>
+
+    <!-- Step 5: StakeSnapshot update -->
+    <g transform="translate(60, 230)">
+      <rect width="300" height="45" fill="white" stroke="#7c3aed" stroke-width="2" rx="8"/>
+      <text x="150" y="18" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="#5b21b6">
+        Updates StakeSnapshot struct
+      </text>
+      <text x="150" y="35" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#374151">
+        {amount, l1Block, l2Block, timestamp}
+      </text>
+    </g>
+
+    <!-- Arrow 5→6 -->
+    <line x1="210" y1="275" x2="210" y2="295" stroke="#7c3aed" stroke-width="2" marker-end="url(#arrowGray)"/>
+
+    <!-- Step 6: Tier Calculation -->
+    <g transform="translate(60, 305)">
+      <rect width="300" height="100" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2" rx="8"/>
+      <text x="150" y="18" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="#5b21b6">
+        Tier Calculation
+      </text>
+      <line x1="20" y1="28" x2="280" y2="28" stroke="#ddd6fe" stroke-width="1"/>
+      <text x="30" y="48" font-family="'Courier New', monospace" font-size="10" fill="#dc2626">
+        UNVERIFIED: &lt; 1,000 TON
+      </text>
+      <text x="30" y="66" font-family="'Courier New', monospace" font-size="10" fill="#d97706">
+        VERIFIED: 1,000 - 9,999 TON
+      </text>
+      <text x="30" y="84" font-family="'Courier New', monospace" font-size="10" fill="#059669">
+        PREMIUM: ≥ 10,000 TON
+      </text>
+    </g>
+  </g>
+
+  <!-- ==================== COLUMN B: Slashing (L2→L1) ==================== -->
+  <g id="columnB">
+    <!-- Column Header -->
+    <rect x="420" y="100" width="360" height="36" fill="url(#redHeader)" rx="6"/>
+    <text x="600" y="124" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="white">
+      Slashing (L2 → L1)
+    </text>
+
+    <!-- L2 Section -->
+    <!-- Step 1: Dispute Resolution Trigger -->
+    <g transform="translate(435, 150)">
+      <rect width="330" height="50" fill="white" stroke="#dc2626" stroke-width="2" rx="8"/>
+      <text x="165" y="18" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="#991b1b">
+        Dispute Resolution Trigger
+      </text>
+      <text x="165" y="38" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#374151">
+        TALValidationRegistry.resolveDispute(hash, false)
+      </text>
+    </g>
+
+    <!-- Arrow 1→2 -->
+    <line x1="600" y1="200" x2="600" y2="215" stroke="#dc2626" stroke-width="2" marker-end="url(#arrowRed)"/>
+
+    <!-- Step 2: Request Slashing -->
+    <g transform="translate(435, 225)">
+      <rect width="330" height="50" fill="white" stroke="#dc2626" stroke-width="2" rx="8"/>
+      <text x="165" y="18" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="#991b1b">
+        TALStakingBridgeL2
+      </text>
+      <text x="165" y="38" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#374151">
+        requestSlashing(operator, amount, evidence)
+      </text>
+    </g>
+
+    <!-- Arrow 2→3 -->
+    <line x1="600" y1="275" x2="600" y2="290" stroke="#dc2626" stroke-width="2" marker-end="url(#arrowRed)"/>
+
+    <!-- Step 3: L2CrossDomainMessenger -->
+    <g transform="translate(435, 300)">
+      <rect width="330" height="55" fill="#fef2f2" stroke="#dc2626" stroke-width="2" rx="8"/>
+      <text x="165" y="18" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="#991b1b">
+        L2CrossDomainMessenger
+      </text>
+      <text x="165" y="35" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#374151">
+        sendMessage(l1Bridge, encodedCall)
+      </text>
+      <text x="165" y="48" text-anchor="middle" font-family="'Courier New', monospace" font-size="8" fill="#6b7280">
+        executeSlashing(operator, amount, evidence)
+      </text>
+    </g>
+
+    <!-- Cross-layer Arrow L2→L1 -->
+    <line x1="600" y1="355" x2="600" y2="480" stroke="#dc2626" stroke-width="4" marker-end="url(#arrowRed)"/>
+    <!-- Hourglass icon -->
+    <g transform="translate(575, 400)">
+      <rect x="0" y="0" width="50" height="24" fill="#fafafa" rx="4"/>
+      <text x="12" y="16" font-size="12">⏳</text>
+      <text x="28" y="14" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="#dc2626">7d</text>
+    </g>
+    <rect x="510" y="425" width="180" height="16" fill="#fafafa" rx="4"/>
+    <text x="600" y="437" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="9" fill="#dc2626" font-weight="500">
+      ~7 day finalization (appeal window)
+    </text>
+
+    <!-- L1 Section -->
+    <!-- Step 4: Execute Slashing -->
+    <g transform="translate(435, 490)">
+      <rect width="330" height="45" fill="white" stroke="#dc2626" stroke-width="2" rx="8"/>
+      <text x="165" y="18" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="#991b1b">
+        TALStakingBridgeL1
+      </text>
+      <text x="165" y="35" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#374151">
+        executeSlashing(operator, amount, evidence)
+      </text>
+    </g>
+
+    <!-- Arrow 4→5 -->
+    <line x1="600" y1="535" x2="600" y2="550" stroke="#dc2626" stroke-width="2" marker-end="url(#arrowRed)"/>
+
+    <!-- Step 5: TALSlashingConditionsL1 -->
+    <g transform="translate(435, 560)">
+      <rect width="330" height="45" fill="white" stroke="#dc2626" stroke-width="2" rx="8"/>
+      <text x="165" y="18" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="#991b1b">
+        TALSlashingConditionsL1
+      </text>
+      <text x="165" y="35" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#374151">
+        slash(operator, amount, evidence)
+      </text>
+    </g>
+
+    <!-- Arrow 5→6 -->
+    <line x1="600" y1="605" x2="600" y2="620" stroke="#dc2626" stroke-width="2" marker-end="url(#arrowRed)"/>
+
+    <!-- Step 6: SeigManagerV3 burn -->
+    <g transform="translate(435, 630)">
+      <rect width="330" height="60" fill="#fef2f2" stroke="#dc2626" stroke-width="2" rx="8"/>
+      <text x="165" y="18" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="#991b1b">
+        SeigManagerV3
+      </text>
+      <text x="165" y="35" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#374151">
+        transferCoinageToRat(talLayer2, operator, amt)
+      </text>
+      <text x="165" y="52" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="9" fill="#dc2626" font-style="italic">
+        Burns validator coinage
+      </text>
+    </g>
+
+    <!-- Return Arrow L1→L2 (dashed) -->
+    <path d="M 770 660 Q 790 660 790 580 Q 790 500 790 430 Q 790 380 750 380 L 700 380"
+          stroke="#6b7280" stroke-width="2" stroke-dasharray="6,3" fill="none" marker-end="url(#arrowGray)"/>
+    <rect x="792" y="500" width="120" height="30" fill="#fafafa" rx="4"/>
+    <text x="852" y="512" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="#6b7280">
+      Auto-relay updated
+    </text>
+    <text x="852" y="524" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="8" fill="#6b7280">
+      stake back to L2
+    </text>
+  </g>
+
+  <!-- ==================== COLUMN C: Seigniorage (L1→L2) ==================== -->
+  <g id="columnC">
+    <!-- Column Header -->
+    <rect x="820" y="100" width="340" height="36" fill="url(#greenHeader)" rx="6"/>
+    <text x="990" y="124" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="white">
+      Seigniorage (L1 → L2)
+    </text>
+
+    <!-- L1 Section -->
+    <!-- Step 1: Trigger Seigniorage -->
+    <g transform="translate(835, 490)">
+      <rect width="310" height="55" fill="white" stroke="#059669" stroke-width="2" rx="8"/>
+      <text x="155" y="18" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="#065f46">
+        Seigniorage Update Trigger
+      </text>
+      <text x="155" y="35" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#374151">
+        triggerSeigniorageUpdate()
+      </text>
+      <text x="155" y="48" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#374151">
+        SeigManagerV3.updateSeigniorageLayer(talLayer2)
+      </text>
+    </g>
+
+    <!-- Arrow 1→2 -->
+    <line x1="990" y1="545" x2="990" y2="565" stroke="#059669" stroke-width="2" marker-end="url(#arrowGreen)"/>
+
+    <!-- Step 2: Claim and Bridge -->
+    <g transform="translate(835, 575)">
+      <rect width="310" height="50" fill="white" stroke="#059669" stroke-width="2" rx="8"/>
+      <text x="155" y="18" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="#065f46">
+        TALStakingBridgeL1
+      </text>
+      <text x="155" y="38" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#374151">
+        claimAndBridgeSeigniorage(operator)
+      </text>
+    </g>
+
+    <!-- Cross-layer Arrow L1→L2 -->
+    <line x1="990" y1="625" x2="990" y2="410" stroke="#059669" stroke-width="4" marker-end="url(#arrowGreen)"/>
+    <rect x="900" y="500" width="180" height="20" fill="#fafafa" rx="4"/>
+    <text x="990" y="514" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#059669" font-weight="500">
+      Relay updated stake (incl. seigniorage)
+    </text>
+
+    <!-- L2 Section -->
+    <!-- Step 3: StakingIntegrationModule -->
+    <g transform="translate(835, 150)">
+      <rect width="310" height="50" fill="white" stroke="#059669" stroke-width="2" rx="8"/>
+      <text x="155" y="18" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="#065f46">
+        StakingIntegrationModule
+      </text>
+      <text x="155" y="38" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#374151">
+        routeSeigniorage(agentId)
+      </text>
+    </g>
+
+    <!-- Arrow 3→4 -->
+    <line x1="990" y1="200" x2="990" y2="220" stroke="#059669" stroke-width="2" marker-end="url(#arrowGreen)"/>
+
+    <!-- Step 4: Formula Box -->
+    <g transform="translate(835, 230)">
+      <rect width="310" height="70" fill="#ecfdf5" stroke="#059669" stroke-width="2" rx="8"/>
+      <text x="155" y="18" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="#065f46">
+        Reputation Bonus Calculation
+      </text>
+      <line x1="20" y1="28" x2="290" y2="28" stroke="#a7f3d0" stroke-width="1"/>
+      <text x="155" y="48" text-anchor="middle" font-family="'Courier New', monospace" font-size="11" fill="#374151">
+        bonus = baseEmission × (repScore / 100)
+      </text>
+      <text x="155" y="62" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="9" fill="#6b7280">
+        Higher reputation = higher seigniorage bonus
+      </text>
+    </g>
+
+    <!-- Arrow 4→5 -->
+    <line x1="990" y1="300" x2="990" y2="320" stroke="#059669" stroke-width="2" marker-end="url(#arrowGreen)"/>
+
+    <!-- Step 5: Claim -->
+    <g transform="translate(835, 330)">
+      <rect width="310" height="50" fill="white" stroke="#059669" stroke-width="2" rx="8"/>
+      <text x="155" y="18" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="600" fill="#065f46">
+        Operator Claims
+      </text>
+      <text x="155" y="38" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#374151">
+        claimSeigniorage() by operator
+      </text>
+    </g>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(40, 830)">
+    <rect width="1120" height="55" fill="white" stroke="#e5e7eb" stroke-width="1" rx="6"/>
+    <text x="20" y="25" font-family="'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="600" fill="#374151">
+      Legend:
+    </text>
+    <!-- Thick arrow -->
+    <line x1="90" y1="22" x2="140" y2="22" stroke="#2563eb" stroke-width="4" marker-end="url(#arrowBlue)"/>
+    <text x="155" y="26" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#6b7280">
+      Cross-layer message
+    </text>
+    <!-- Thin arrow -->
+    <line x1="290" y1="22" x2="330" y2="22" stroke="#6b7280" stroke-width="2" marker-end="url(#arrowGray)"/>
+    <text x="345" y="26" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#6b7280">
+      Internal call
+    </text>
+    <!-- Dashed arrow -->
+    <line x1="440" y1="22" x2="480" y2="22" stroke="#6b7280" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#arrowGray)"/>
+    <text x="495" y="26" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#6b7280">
+      Auto-relay
+    </text>
+    <!-- L2 box -->
+    <rect x="600" y="12" width="20" height="20" fill="white" stroke="#7c3aed" stroke-width="2" rx="3"/>
+    <text x="630" y="26" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#6b7280">
+      L2 Contract
+    </text>
+    <!-- L1 box -->
+    <rect x="720" y="12" width="20" height="20" fill="white" stroke="#059669" stroke-width="2" rx="3"/>
+    <text x="750" y="26" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#6b7280">
+      L1 Contract
+    </text>
+    <!-- Messenger box -->
+    <rect x="840" y="12" width="20" height="20" fill="#eff6ff" stroke="#2563eb" stroke-width="2" rx="3"/>
+    <text x="870" y="26" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#6b7280">
+      CrossDomainMessenger
+    </text>
+    <!-- Formula box -->
+    <rect x="1010" y="12" width="20" height="20" fill="#ecfdf5" stroke="#059669" stroke-width="2" rx="3"/>
+    <text x="1040" y="26" font-family="'Segoe UI', system-ui, sans-serif" font-size="10" fill="#6b7280">
+      Calculation
+    </text>
+  </g>
+</svg>

@@ -22,7 +22,9 @@ import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
  * Environment variables:
  *   - PRIVATE_KEY: Deployer private key (required)
  *   - L1_RPC_URL: L1 Ethereum RPC endpoint (required)
- *   - SEIG_MANAGER: SeigManagerV3_1 address on L1 (required for mainnet)
+ *   - SEIG_MANAGER: SeigManager (V2) address on L1 (required for mainnet)
+ *   - DEPOSIT_MANAGER: DepositManager address on L1 for slashing (required)
+ *   - SLASH_RECIPIENT: Treasury address to receive slashed funds (defaults to deployer)
  *   - L1_CROSS_DOMAIN_MESSENGER: L1CrossDomainMessenger address (required)
  *   - L2_BRIDGE_ADDRESS: TALStakingBridgeL2 proxy address on L2 (set after L2 deploy)
  *   - TAL_LAYER2_ADDRESS: Tokamak layer2 address for stakeOf queries (required)
@@ -49,11 +51,15 @@ contract DeployL1 is Script {
         address l1Messenger = vm.envOr("L1_CROSS_DOMAIN_MESSENGER", address(0));
         address l2BridgeAddress = vm.envOr("L2_BRIDGE_ADDRESS", address(0));
         address talLayer2Address = vm.envOr("TAL_LAYER2_ADDRESS", address(0));
+        address depositManagerAddr = vm.envOr("DEPOSIT_MANAGER", address(0));
+        address slashRecipient = vm.envOr("SLASH_RECIPIENT", deployer);
 
         console.log("=== TAL L1 Bridge Deployment ===");
         console.log("");
         console.log("Deployer:", deployer);
-        console.log("SeigManager:", seigManager);
+        console.log("SeigManager (V2):", seigManager);
+        console.log("DepositManager:", depositManagerAddr);
+        console.log("Slash Recipient:", slashRecipient);
         console.log("L1 Messenger:", l1Messenger);
         console.log("L2 Bridge:", l2BridgeAddress);
         console.log("TAL Layer2:", talLayer2Address);
@@ -71,9 +77,11 @@ contract DeployL1 is Script {
         bytes memory slashingData = abi.encodeWithSelector(
             TALSlashingConditionsL1.initialize.selector,
             deployer,           // admin
-            seigManager,        // SeigManagerV3_1
+            seigManager,        // SeigManager (V2) for stakeOf queries
             talLayer2Address,   // layer2 address for stakeOf
-            deployer            // temporary bridgeL1 (deployer gets SLASHER_ROLE)
+            deployer,           // temporary bridgeL1 (deployer gets SLASHER_ROLE)
+            depositManagerAddr, // DepositManager (V2) for slash execution
+            slashRecipient      // treasury address for slashed funds
         );
         ERC1967Proxy slashingProxy = new ERC1967Proxy(slashingConditionsImpl, slashingData);
         slashingConditions = TALSlashingConditionsL1(address(slashingProxy));
@@ -91,7 +99,7 @@ contract DeployL1 is Script {
             deployer,                       // admin
             l1Messenger,                    // L1CrossDomainMessenger
             l2BridgeAddress,                // TALStakingBridgeL2 on L2
-            seigManager,                    // SeigManagerV3_1
+            seigManager,                    // SeigManager (V2)
             address(slashingConditions),    // TALSlashingConditionsL1
             talLayer2Address                // layer2 address
         );

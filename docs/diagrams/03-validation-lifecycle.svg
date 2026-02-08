@@ -1,0 +1,353 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 1000" width="1400" height="1000">
+  <defs>
+    <style>
+      .title { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 22px; font-weight: 600; fill: #1e3a5f; }
+      .subtitle { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 12px; fill: #64748b; }
+      .participant-label { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 10px; font-weight: 600; fill: white; }
+      .participant-label-dark { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 10px; font-weight: 600; fill: #1e3a5f; }
+      .step-label { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 11px; font-weight: 600; fill: #1e3a5f; }
+      .fn-sig { font-family: 'Courier New', monospace; font-size: 8px; fill: #374151; }
+      .annotation { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 9px; fill: #6b7280; font-style: italic; }
+      .box-label { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 9px; fill: #374151; }
+      .branch-title { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 10px; font-weight: 600; }
+      .math-text { font-family: 'Courier New', monospace; font-size: 8px; fill: #92400e; }
+      .step-num { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 12px; font-weight: 700; fill: white; }
+    </style>
+    <marker id="arrowhead" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0 0, 11 4, 0 8" fill="#374151"/>
+    </marker>
+    <marker id="arrowhead-blue" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0 0, 11 4, 0 8" fill="#2563eb"/>
+    </marker>
+    <marker id="arrowhead-green" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0 0, 11 4, 0 8" fill="#059669"/>
+    </marker>
+    <marker id="arrowhead-red" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0 0, 11 4, 0 8" fill="#dc2626"/>
+    </marker>
+    <marker id="arrowhead-purple" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0 0, 11 4, 0 8" fill="#7c3aed"/>
+    </marker>
+    <marker id="arrowhead-orange" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0 0, 11 4, 0 8" fill="#f59e0b"/>
+    </marker>
+    <marker id="arrowhead-gray" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0 0, 11 4, 0 8" fill="#9ca3af"/>
+    </marker>
+    <linearGradient id="hybridGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#7c3aed;stop-opacity:0.15"/>
+      <stop offset="100%" style="stop-color:#1e3a5f;stop-opacity:0.15"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1400" height="1000" fill="#fafafa"/>
+
+  <!-- Title -->
+  <g id="title">
+    <text x="700" y="28" text-anchor="middle" class="title">Tokamak AI Layer - Validation Lifecycle</text>
+    <text x="700" y="44" text-anchor="middle" class="subtitle">Full validation flow across all 4 trust tiers (ReputationOnly, StakeSecured, TEEAttested, Hybrid)</text>
+  </g>
+
+  <!-- Participants Header Row -->
+  <g id="participants">
+    <!-- Requester (Actor) -->
+    <g id="requester">
+      <circle cx="95" cy="70" r="10" fill="#2563eb"/>
+      <line x1="95" y1="80" x2="95" y2="95" stroke="#2563eb" stroke-width="2"/>
+      <line x1="82" y1="87" x2="108" y2="87" stroke="#2563eb" stroke-width="2"/>
+      <line x1="95" y1="95" x2="87" y2="107" stroke="#2563eb" stroke-width="2"/>
+      <line x1="95" y1="95" x2="103" y2="107" stroke="#2563eb" stroke-width="2"/>
+      <text x="95" y="120" text-anchor="middle" class="participant-label-dark">Requester</text>
+      <line x1="95" y1="130" x2="95" y2="990" stroke="#2563eb" stroke-width="1" stroke-dasharray="3,2" opacity="0.4"/>
+    </g>
+
+    <!-- TALValidationRegistry -->
+    <g id="validation-registry">
+      <rect x="160" y="62" width="100" height="32" rx="3" fill="#5b21b6"/>
+      <text x="210" y="76" text-anchor="middle" class="participant-label">TALValidation</text>
+      <text x="210" y="88" text-anchor="middle" class="participant-label">Registry (L2)</text>
+      <line x1="210" y1="130" x2="210" y2="990" stroke="#5b21b6" stroke-width="1" stroke-dasharray="3,2" opacity="0.4"/>
+    </g>
+
+    <!-- DRBIntegrationModule -->
+    <g id="drb-module">
+      <rect x="320" y="62" width="95" height="32" rx="3" fill="#7c3aed"/>
+      <text x="367" y="76" text-anchor="middle" class="participant-label">DRBIntegration</text>
+      <text x="367" y="88" text-anchor="middle" class="participant-label">Module (L2)</text>
+      <line x1="367" y1="130" x2="367" y2="990" stroke="#7c3aed" stroke-width="1" stroke-dasharray="3,2" opacity="0.4"/>
+    </g>
+
+    <!-- CommitReveal2 -->
+    <g id="commit-reveal">
+      <rect x="475" y="62" width="85" height="32" rx="3" fill="none" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="3,2"/>
+      <text x="517" y="76" text-anchor="middle" class="participant-label-dark">CommitReveal2</text>
+      <text x="517" y="88" text-anchor="middle" class="annotation">(External)</text>
+      <line x1="517" y1="130" x2="517" y2="990" stroke="#9ca3af" stroke-width="1" stroke-dasharray="3,2" opacity="0.3"/>
+    </g>
+
+    <!-- Validator (Actor) -->
+    <g id="validator">
+      <circle cx="630" cy="70" r="10" fill="#059669"/>
+      <line x1="630" y1="80" x2="630" y2="95" stroke="#059669" stroke-width="2"/>
+      <line x1="617" y1="87" x2="643" y2="87" stroke="#059669" stroke-width="2"/>
+      <line x1="630" y1="95" x2="622" y2="107" stroke="#059669" stroke-width="2"/>
+      <line x1="630" y1="95" x2="638" y2="107" stroke="#059669" stroke-width="2"/>
+      <text x="630" y="120" text-anchor="middle" class="participant-label-dark">Validator</text>
+      <line x1="630" y1="130" x2="630" y2="990" stroke="#059669" stroke-width="1" stroke-dasharray="3,2" opacity="0.4"/>
+    </g>
+
+    <!-- TALStakingBridgeL2 -->
+    <g id="staking-bridge">
+      <rect x="720" y="62" width="90" height="32" rx="3" fill="#7c3aed"/>
+      <text x="765" y="76" text-anchor="middle" class="participant-label">TALStaking</text>
+      <text x="765" y="88" text-anchor="middle" class="participant-label">BridgeL2</text>
+      <line x1="765" y1="130" x2="765" y2="990" stroke="#7c3aed" stroke-width="1" stroke-dasharray="3,2" opacity="0.4"/>
+    </g>
+
+    <!-- TEE Enclave -->
+    <g id="tee-enclave">
+      <rect x="870" y="62" width="85" height="32" rx="3" fill="#1e3a5f"/>
+      <text x="912" y="76" text-anchor="middle" class="participant-label">TEE Enclave</text>
+      <text x="912" y="88" text-anchor="middle" class="participant-label">(Hardware)</text>
+      <line x1="912" y1="130" x2="912" y2="990" stroke="#1e3a5f" stroke-width="1" stroke-dasharray="3,2" opacity="0.3"/>
+    </g>
+
+    <!-- Treasury -->
+    <g id="treasury">
+      <rect x="1015" y="62" width="75" height="32" rx="3" fill="#f59e0b"/>
+      <text x="1052" y="82" text-anchor="middle" class="participant-label-dark">Treasury</text>
+      <line x1="1052" y1="130" x2="1052" y2="990" stroke="#f59e0b" stroke-width="1" stroke-dasharray="3,2" opacity="0.4"/>
+    </g>
+
+    <!-- Agent Owner -->
+    <g id="agent-owner">
+      <rect x="1150" y="62" width="80" height="32" rx="3" fill="#3b82f6"/>
+      <text x="1190" y="76" text-anchor="middle" class="participant-label">Agent</text>
+      <text x="1190" y="88" text-anchor="middle" class="participant-label">Owner</text>
+      <line x1="1190" y1="130" x2="1190" y2="990" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3,2" opacity="0.4"/>
+    </g>
+  </g>
+
+  <!-- Step 1: Validation Request -->
+  <g id="step1">
+    <circle cx="22" cy="155" r="12" fill="#2563eb"/>
+    <text x="22" y="159" text-anchor="middle" class="step-num">1</text>
+    <text x="42" y="159" class="step-label">Validation Request</text>
+
+    <!-- Requester to ValidationRegistry -->
+    <line x1="95" y1="155" x2="200" y2="155" stroke="#374151" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+    <text x="148" y="148" text-anchor="middle" class="fn-sig">requestValidation(agentId, taskHash,</text>
+    <text x="148" y="168" text-anchor="middle" class="fn-sig">outputHash, model, deadline) + ETH bounty</text>
+
+    <!-- Activation box -->
+    <rect x="202" y="162" width="16" height="28" fill="#5b21b6" opacity="0.3" stroke="#5b21b6"/>
+    <text x="225" y="175" class="box-label">Store request, lock bounty, emit ValidationRequested</text>
+    <text x="225" y="186" class="annotation">model param determines which trust tier branch below</text>
+  </g>
+
+  <!-- Step 2: Branch by Validation Model -->
+  <g id="step2">
+    <circle cx="22" cy="215" r="12" fill="#2563eb"/>
+    <text x="22" y="219" text-anchor="middle" class="step-num">2</text>
+    <text x="42" y="219" class="step-label">Branch by Validation Model</text>
+
+    <!-- Branch A: ReputationOnly -->
+    <g id="branch-a">
+      <rect x="48" y="235" width="510" height="50" rx="3" fill="#dbeafe" stroke="#3b82f6" stroke-width="1"/>
+      <text x="58" y="250" class="branch-title" fill="#1e40af">A: ReputationOnly (model=0)</text>
+      <text x="58" y="263" class="annotation">Simplest - any address can validate, no special selection</text>
+      <line x1="630" y1="272" x2="262" y2="272" stroke="#059669" stroke-width="1.5" marker-end="url(#arrowhead-green)"/>
+      <text x="440" y="265" text-anchor="middle" class="fn-sig">submitValidation(requestHash, score, proof, detailsURI)</text>
+    </g>
+
+    <!-- Branch B: StakeSecured -->
+    <g id="branch-b">
+      <rect x="48" y="295" width="780" height="155" rx="3" fill="#ede9fe" stroke="#7c3aed" stroke-width="1"/>
+      <text x="58" y="310" class="branch-title" fill="#5b21b6">B: StakeSecured (model=1)</text>
+      <text x="200" y="310" class="annotation">DRB-selected validator with stake collateral</text>
+
+      <!-- ValidationRegistry to DRB -->
+      <line x1="210" y1="325" x2="315" y2="325" stroke="#5b21b6" stroke-width="1.5" marker-end="url(#arrowhead-purple)"/>
+      <text x="263" y="318" text-anchor="middle" class="fn-sig">selectValidator(requestHash)</text>
+
+      <!-- DRB self-call -->
+      <rect x="360" y="330" width="14" height="18" fill="#7c3aed" opacity="0.3" stroke="#7c3aed"/>
+      <text x="380" y="342" class="fn-sig">requestValidatorSelection(requestHash, candidates[])</text>
+
+      <!-- DRB to CommitReveal2 -->
+      <line x1="367" y1="355" x2="465" y2="355" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#arrowhead-purple)"/>
+      <text x="416" y="348" text-anchor="middle" class="fn-sig">requestRandomNumber()</text>
+
+      <!-- Async gap wavy line -->
+      <path d="M 517 362 Q 522 368, 512 374 Q 522 380, 512 386 Q 522 392, 517 398" stroke="#9ca3af" stroke-width="1.5" fill="none"/>
+      <text x="535" y="382" class="annotation">Commit-Reveal2 (async)</text>
+
+      <!-- CommitReveal2 callback -->
+      <line x1="517" y1="405" x2="420" y2="405" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#arrowhead-gray)"/>
+      <text x="468" y="398" text-anchor="middle" class="fn-sig">rawFulfillRandomNumber(requestId, randomWord)</text>
+
+      <!-- DRB weighted selection box -->
+      <rect x="348" y="412" width="150" height="16" rx="2" fill="#f3e8ff" stroke="#7c3aed"/>
+      <text x="423" y="423" text-anchor="middle" class="box-label">Weighted selection: cumulative stake sums</text>
+
+      <!-- DRB to StakingBridge -->
+      <line x1="367" y1="435" x2="713" y2="435" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#arrowhead-purple)"/>
+      <text x="540" y="428" text-anchor="middle" class="fn-sig">verify stakeOf(validator) &gt;= 1000 TON</text>
+
+      <!-- Selected Validator submits -->
+      <line x1="630" y1="448" x2="262" y2="448" stroke="#059669" stroke-width="1.5" marker-end="url(#arrowhead-green)"/>
+      <text x="440" y="441" text-anchor="middle" class="fn-sig">submitValidation(requestHash, score, proof, detailsURI)</text>
+    </g>
+
+    <!-- Branch C: TEEAttested -->
+    <g id="branch-c">
+      <rect x="48" y="460" width="910" height="70" rx="3" fill="#dbeafe" stroke="#1e3a5f" stroke-width="1"/>
+      <text x="58" y="475" class="branch-title" fill="#1e3a5f">C: TEEAttested (model=2)</text>
+      <text x="200" y="475" class="annotation">Hardware-backed verification (SGX, Nitro, TrustZone)</text>
+
+      <!-- Validator to TEE -->
+      <line x1="630" y1="490" x2="860" y2="490" stroke="#059669" stroke-width="1.5" marker-end="url(#arrowhead-green)"/>
+      <text x="745" y="483" text-anchor="middle" class="fn-sig">Execute task in enclave</text>
+
+      <!-- TEE self-processing -->
+      <rect x="905" y="493" width="14" height="14" fill="#1e3a5f" opacity="0.3" stroke="#1e3a5f"/>
+      <text x="925" y="503" class="box-label">Generate attestation (enclaveHash, teeSigner, timestamp, sig)</text>
+
+      <!-- Validator to ValidationRegistry with TEE proof -->
+      <line x1="630" y1="515" x2="262" y2="515" stroke="#059669" stroke-width="1.5" marker-end="url(#arrowhead-green)"/>
+      <text x="440" y="508" text-anchor="middle" class="fn-sig">submitValidation(requestHash, score, teeProof, detailsURI)</text>
+      <text x="270" y="525" class="annotation">Verify TEE sig against trusted providers</text>
+    </g>
+
+    <!-- Branch D: Hybrid -->
+    <g id="branch-d">
+      <rect x="48" y="540" width="910" height="35" rx="3" fill="url(#hybridGrad)" stroke="#5b21b6" stroke-width="1"/>
+      <text x="58" y="555" class="branch-title" fill="#5b21b6">D: Hybrid (model=3)</text>
+      <text x="175" y="555" class="annotation">Maximum security: DRB validator selection + TEE attestation required</text>
+      <text x="58" y="568" class="box-label">Combines StakeSecured flow with TEEAttested - selected validator MUST provide hardware attestation</text>
+    </g>
+  </g>
+
+  <!-- Step 3: Bounty Distribution -->
+  <g id="step3">
+    <circle cx="22" cy="600" r="12" fill="#2563eb"/>
+    <text x="22" y="604" text-anchor="middle" class="step-num">3</text>
+    <text x="42" y="604" class="step-label">Bounty Distribution</text>
+
+    <!-- Activation box for completed -->
+    <rect x="202" y="615" width="16" height="16" fill="#5b21b6" opacity="0.3" stroke="#5b21b6"/>
+    <text x="225" y="627" class="box-label">Mark validation Completed</text>
+
+    <!-- Bounty math callout -->
+    <rect x="320" y="595" width="240" height="52" rx="3" fill="#fffbeb" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="330" y="608" class="math-text">treasuryAmt  = bounty x 1000 / 10000  (10%)</text>
+    <text x="330" y="620" class="math-text">remaining    = bounty - treasuryAmt</text>
+    <text x="330" y="632" class="math-text">agentAmt     = remaining x 1000 / 10000 (9%)</text>
+    <text x="330" y="644" class="math-text">validatorAmt = remaining - agentAmt   (81%)</text>
+
+    <!-- Pie chart -->
+    <g transform="translate(610, 620)">
+      <circle cx="0" cy="0" r="22" fill="#059669"/>
+      <path d="M 0 0 L 0 -22 A 22 22 0 0 1 20.9 6.8 Z" fill="#f59e0b"/>
+      <path d="M 0 0 L 20.9 6.8 A 22 22 0 0 1 9.5 19.8 Z" fill="#3b82f6"/>
+      <text x="35" y="-8" class="annotation">10% Treasury</text>
+      <text x="35" y="4" class="annotation">9% Agent Owner</text>
+      <text x="35" y="16" class="annotation">81% Validator</text>
+    </g>
+
+    <!-- Transfer arrows -->
+    <line x1="210" y1="660" x2="1000" y2="660" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrowhead-orange)"/>
+    <text x="600" y="653" text-anchor="middle" class="fn-sig">transfer treasuryAmt (10%)</text>
+
+    <line x1="210" y1="678" x2="1138" y2="678" stroke="#2563eb" stroke-width="2" marker-end="url(#arrowhead-blue)"/>
+    <text x="670" y="671" text-anchor="middle" class="fn-sig">transfer agentAmt (9%) to agent owner</text>
+
+    <line x1="210" y1="696" x2="578" y2="696" stroke="#059669" stroke-width="2" marker-end="url(#arrowhead-green)"/>
+    <text x="395" y="689" text-anchor="middle" class="fn-sig">transfer validatorAmt (81%)</text>
+  </g>
+
+  <!-- Step 4: Dispute Flow -->
+  <g id="step4">
+    <circle cx="22" cy="730" r="12" fill="#dc2626"/>
+    <text x="22" y="734" text-anchor="middle" class="step-num">4</text>
+    <text x="42" y="734" class="step-label" style="fill:#dc2626">Dispute Path (Optional)</text>
+
+    <!-- Dispute alt box -->
+    <rect x="48" y="750" width="920" height="105" rx="3" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5"/>
+    <text x="58" y="765" class="branch-title" fill="#dc2626">alt [Dispute Filed]</text>
+
+    <!-- Any party disputes -->
+    <line x1="95" y1="782" x2="200" y2="782" stroke="#dc2626" stroke-width="1.5" marker-end="url(#arrowhead-red)"/>
+    <text x="148" y="775" text-anchor="middle" class="fn-sig">disputeValidation(requestHash, evidence)</text>
+
+    <!-- Mark disputed -->
+    <rect x="202" y="788" width="16" height="12" fill="#dc2626" opacity="0.2" stroke="#dc2626"/>
+    <text x="225" y="798" class="box-label" style="fill:#dc2626">status = Disputed</text>
+
+    <!-- Governance resolves -->
+    <text x="58" y="820" class="annotation">Governance/Admin:</text>
+    <line x1="95" y1="825" x2="200" y2="825" stroke="#dc2626" stroke-width="1.5" marker-end="url(#arrowhead-red)"/>
+    <text x="148" y="838" text-anchor="middle" class="fn-sig">resolveDispute(requestHash, validatorWins=false)</text>
+
+    <!-- Slashing request -->
+    <line x1="210" y1="845" x2="713" y2="845" stroke="#dc2626" stroke-width="2.5" marker-end="url(#arrowhead-red)"/>
+    <text x="460" y="838" text-anchor="middle" class="fn-sig">requestSlashing(validator, amount, evidence)</text>
+
+    <!-- Cross-layer indicator -->
+    <rect x="780" y="832" width="130" height="24" rx="3" fill="#fecaca" stroke="#dc2626"/>
+    <text x="845" y="848" text-anchor="middle" class="box-label" style="fill:#991b1b">Cross-layer L2-&gt;L1 (~7d)</text>
+
+    <!-- Refund -->
+    <line x1="200" y1="852" x2="100" y2="852" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#arrowhead-red)"/>
+    <text x="150" y="862" text-anchor="middle" class="fn-sig">Refund bounty to requester</text>
+  </g>
+
+  <!-- Legend -->
+  <g id="legend" transform="translate(1020, 750)">
+    <rect x="0" y="0" width="165" height="105" rx="3" fill="white" stroke="#e5e7eb"/>
+    <text x="10" y="16" class="step-label">Legend</text>
+
+    <line x1="10" y1="32" x2="45" y2="32" stroke="#374151" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+    <text x="55" y="36" class="annotation">Sync call</text>
+
+    <line x1="10" y1="48" x2="45" y2="48" stroke="#374151" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#arrowhead)"/>
+    <text x="55" y="52" class="annotation">Return / async</text>
+
+    <line x1="10" y1="64" x2="45" y2="64" stroke="#dc2626" stroke-width="2.5" marker-end="url(#arrowhead-red)"/>
+    <text x="55" y="68" class="annotation">Dispute / slashing</text>
+
+    <rect x="10" y="76" width="35" height="10" fill="#7c3aed" opacity="0.3" stroke="#7c3aed"/>
+    <text x="55" y="85" class="annotation">Activation box</text>
+
+    <rect x="10" y="92" width="35" height="10" fill="#ede9fe" stroke="#7c3aed"/>
+    <text x="55" y="101" class="annotation">Branch container</text>
+  </g>
+
+  <!-- Trust Tier Color Key -->
+  <g id="tier-key" transform="translate(1020, 600)">
+    <rect x="0" y="0" width="165" height="90" rx="3" fill="white" stroke="#e5e7eb"/>
+    <text x="10" y="16" class="step-label">Trust Tiers</text>
+
+    <rect x="10" y="25" width="12" height="12" fill="#dbeafe" stroke="#3b82f6"/>
+    <text x="28" y="35" class="annotation">ReputationOnly (0)</text>
+
+    <rect x="10" y="42" width="12" height="12" fill="#ede9fe" stroke="#7c3aed"/>
+    <text x="28" y="52" class="annotation">StakeSecured (1)</text>
+
+    <rect x="10" y="59" width="12" height="12" fill="#dbeafe" stroke="#1e3a5f"/>
+    <text x="28" y="69" class="annotation">TEEAttested (2)</text>
+
+    <rect x="10" y="76" width="12" height="12" fill="url(#hybridGrad)" stroke="#5b21b6"/>
+    <text x="28" y="86" class="annotation">Hybrid (3)</text>
+  </g>
+
+  <!-- Contract References -->
+  <g id="contracts" transform="translate(1020, 700)">
+    <rect x="0" y="0" width="165" height="42" rx="3" fill="#f8fafc" stroke="#e5e7eb"/>
+    <text x="10" y="14" class="annotation" style="font-style:normal;font-weight:600">Key Contracts</text>
+    <text x="10" y="26" class="fn-sig">TALValidationRegistry.sol</text>
+    <text x="10" y="36" class="fn-sig">DRBIntegrationModule.sol</text>
+  </g>
+
+</svg>
