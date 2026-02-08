@@ -1,5 +1,9 @@
+'use client';
+
 import Link from 'next/link';
 import { Shield, Search, Star, Zap } from 'lucide-react';
+import { useAgentCount } from '@/hooks/useAgent';
+import { useRecentTasks } from '@/hooks/useAgentRuntime';
 
 const features = [
   {
@@ -33,6 +37,11 @@ const features = [
 ];
 
 export default function HomePage() {
+  const { count: agentCount } = useAgentCount();
+  const { tasks } = useRecentTasks();
+
+  const completedTasks = tasks.filter((t) => t.status === 'completed').length;
+
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
       {/* Hero */}
@@ -87,12 +96,16 @@ export default function HomePage() {
           </h2>
           <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
             <div className="text-center">
-              <p className="text-3xl font-bold text-tokamak-600">-</p>
+              <p className="text-3xl font-bold text-tokamak-600">
+                {agentCount !== undefined ? agentCount.toString() : '-'}
+              </p>
               <p className="mt-1 text-sm text-gray-600">Registered Agents</p>
             </div>
             <div className="text-center">
-              <p className="text-3xl font-bold text-tokamak-600">-</p>
-              <p className="mt-1 text-sm text-gray-600">Feedback Entries</p>
+              <p className="text-3xl font-bold text-tokamak-600">
+                {completedTasks > 0 ? completedTasks.toString() : '-'}
+              </p>
+              <p className="mt-1 text-sm text-gray-600">Tasks Completed</p>
             </div>
             <div className="text-center">
               <p className="text-3xl font-bold text-tokamak-600">-</p>
@@ -105,6 +118,65 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Recent Tasks */}
+      {tasks.length > 0 && (
+        <section className="pb-16">
+          <div className="card">
+            <h2 className="mb-6 text-xl font-bold text-gray-900">
+              Recent Agent Activity
+            </h2>
+            <div className="space-y-3">
+              {tasks.slice(0, 5).map((task) => (
+                <div
+                  key={task.taskId}
+                  className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`inline-flex h-2 w-2 rounded-full ${
+                        task.status === 'completed'
+                          ? 'bg-green-500'
+                          : task.status === 'failed'
+                            ? 'bg-red-500'
+                            : 'bg-yellow-500'
+                      }`}
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {task.agentId === 'summarizer'
+                          ? 'Text Summarization'
+                          : task.agentId === 'auditor'
+                            ? 'Solidity Audit'
+                            : task.agentId}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(task.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        task.status === 'completed'
+                          ? 'bg-green-100 text-green-700'
+                          : task.status === 'failed'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-yellow-100 text-yellow-700'
+                      }`}
+                    >
+                      {task.status}
+                    </span>
+                    <span className="text-xs font-mono text-gray-400">
+                      {task.taskId.slice(0, 8)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
