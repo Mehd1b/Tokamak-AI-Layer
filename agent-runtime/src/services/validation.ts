@@ -1,7 +1,15 @@
-import { createPublicClient, createWalletClient, http, parseAbi, type Hex, type Address } from 'viem';
+import { createPublicClient, createWalletClient, http, parseAbi, defineChain, type Hex, type Address } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { optimismSepolia } from 'viem/chains';
 import { config } from '../config.js';
+
+const thanosSepolia = defineChain({
+  id: config.CHAIN_ID,
+  name: 'Thanos Sepolia',
+  nativeCurrency: { name: 'TON', symbol: 'TON', decimals: 18 },
+  rpcUrls: {
+    default: { http: [config.RPC_URL] },
+  },
+});
 
 const VALIDATION_ABI = parseAbi([
   'function requestValidation(uint256 agentId, bytes32 taskHash, bytes32 outputHash, uint8 model, uint256 deadline) external payable returns (bytes32)',
@@ -15,7 +23,7 @@ const VALIDATION_ABI = parseAbi([
 const registryAddress = config.VALIDATION_REGISTRY as Address;
 
 const publicClient = createPublicClient({
-  chain: optimismSepolia,
+  chain: thanosSepolia,
   transport: http(config.RPC_URL),
 });
 
@@ -26,7 +34,7 @@ function getWalletClient() {
   const account = privateKeyToAccount(config.PRIVATE_KEY as Hex);
   return createWalletClient({
     account,
-    chain: optimismSepolia,
+    chain: thanosSepolia,
     transport: http(config.RPC_URL),
   });
 }

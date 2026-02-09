@@ -2,47 +2,292 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-  }
+:root {
+  --background: #0a0a0f;
+  --background-secondary: #111118;
+  --foreground: #ffffff;
+  --primary: #00d4ff;
+  --primary-rgb: 56, 189, 248;
+  --primary-glow: rgba(0, 212, 255, 0.3);
+  --text-primary: #ffffff;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+  --border: rgba(255, 255, 255, 0.1);
+  --card-bg: rgba(255, 255, 255, 0.05);
+  --card-border: rgba(255, 255, 255, 0.1);
+}
 
+@layer base {
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
+    @apply bg-[#0a0a0f] text-white antialiased;
+    font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    overflow-x: hidden;
   }
 }
 
 @layer components {
   .card {
-    @apply rounded-xl border border-gray-200 bg-white p-6 shadow-sm;
+    @apply rounded-xl border border-white/10 bg-[#1a1a24]/70 p-6 backdrop-blur-sm transition-all duration-300;
+  }
+
+  .card-hover {
+    @apply card hover:border-[#38BDF8]/30 hover:-translate-y-1;
+  }
+
+  .glass {
+    @apply bg-[rgba(26,26,36,0.7)] backdrop-blur-xl border border-white/10;
   }
 
   .btn-primary {
-    @apply rounded-lg bg-tokamak-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-tokamak-700 disabled:opacity-50;
+    @apply rounded-lg bg-[#38BDF8] px-4 py-2 text-sm font-semibold text-[#0a0a0f] transition-all duration-200 shadow-glow hover:-translate-y-0.5 hover:shadow-glow-lg disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-glow;
   }
 
   .btn-secondary {
-    @apply rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50;
+    @apply rounded-lg border border-white/10 bg-transparent px-4 py-2 text-sm font-semibold text-white transition-all duration-200 hover:border-[#38BDF8]/50 hover:bg-[#38BDF8]/10 disabled:opacity-50;
   }
 
   .badge {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider;
   }
 
   .badge-success {
-    @apply badge bg-green-100 text-green-800;
+    @apply badge bg-emerald-500/10 text-emerald-400 border border-emerald-500/20;
   }
 
   .badge-warning {
-    @apply badge bg-amber-100 text-amber-800;
+    @apply badge bg-amber-500/10 text-amber-400 border border-amber-500/20;
   }
 
   .badge-error {
-    @apply badge bg-red-100 text-red-800;
+    @apply badge bg-red-500/10 text-red-400 border border-red-500/20;
   }
 
   .badge-info {
-    @apply badge bg-blue-100 text-blue-800;
+    @apply badge bg-[#38BDF8]/10 text-[#38BDF8] border border-[#38BDF8]/20;
   }
+
+  .gradient-text {
+    background: linear-gradient(90deg, #00d4ff, #38bdf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .input-dark {
+    @apply w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50 disabled:opacity-50;
+  }
+
+  .terminal {
+    @apply rounded-xl border border-white/10 bg-[#0d0d12] p-6 font-mono text-sm shadow-card;
+  }
+
+  .section-eyebrow {
+    @apply text-sm font-semibold uppercase tracking-widest text-[#38BDF8] mb-3;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    background: linear-gradient(90deg, #ffffff, #9ca3af);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+/* Aura Grid Pattern */
+.aura-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 100px 200px;
+}
+
+/* Aura Dot Pattern */
+.aura-dots {
+  background-image: radial-gradient(white 0.5px, transparent 0.5px);
+  background-size: 18px 18px;
+  opacity: 0.2;
+}
+
+/* Sonar Wave Animation */
+@keyframes sonar-wave {
+  0% {
+    r: 15;
+    opacity: 0.8;
+    stroke-width: 1.5;
+  }
+  100% {
+    r: 150;
+    opacity: 0;
+    stroke-width: 0;
+  }
+}
+
+.sonar-wave {
+  animation: sonar-wave 3s ease-out infinite;
+}
+
+/* Pulse Glow Animation */
+@keyframes pulse-glow {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+}
+
+/* Border Spin Animation */
+@keyframes border-spin {
+  0% {
+    --gradient-angle: 0deg;
+  }
+  100% {
+    --gradient-angle: 360deg;
+  }
+}
+
+/* Shimmer Animation */
+@keyframes shimmer {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+/* Fade In Up Animation */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* CSS Custom Properties for animated gradients */
+@property --gradient-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* Shiny CTA Button */
+.shiny-cta {
+  --gradient-angle: 0deg;
+  --gradient-shine: #38BDF8;
+
+  position: relative;
+  overflow: hidden;
+  border-radius: 9999px;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  line-height: 1.2;
+  font-weight: 500;
+  color: #38BDF8;
+  background:
+    linear-gradient(#0a0a0f, #0a0a0f) padding-box,
+    conic-gradient(
+      from var(--gradient-angle),
+      transparent 0%,
+      #0ea5e9 5%,
+      var(--gradient-shine) 15%,
+      #0ea5e9 30%,
+      transparent 40%,
+      transparent 100%
+    ) border-box;
+  border: 2px solid transparent;
+  box-shadow: rgb(26, 24, 24) 0px 0px 0px 1px inset;
+  cursor: pointer;
+  isolation: isolate;
+  animation: border-spin 2.5s linear infinite;
+  text-decoration: none;
+  display: inline-block;
+  transition: box-shadow 0.3s;
+  font-family: var(--font-mono), monospace;
+}
+
+.shiny-cta:active {
+  transform: translateY(1px);
+}
+
+/* Inner grid pattern with edge fade */
+.shiny-cta::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  z-index: 0;
+  background-image:
+    linear-gradient(to right, rgba(56, 189, 248, 0.15) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(56, 189, 248, 0.15) 1px, transparent 1px);
+  background-size: 8px 8px;
+  border-radius: inherit;
+  opacity: 0.6;
+  pointer-events: none;
+  mask-image: radial-gradient(ellipse 80% 80% at center, black 20%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 80% at center, black 20%, transparent 50%);
+}
+
+/* Shimmer light effect */
+.shiny-cta::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: linear-gradient(-50deg, transparent, rgba(14, 165, 233, 0.4), transparent);
+  mask-image: radial-gradient(circle at center bottom, transparent 40%, black);
+  opacity: 0.6;
+  animation: shimmer 4s linear infinite;
+}
+
+/* Text wrapper */
+.shiny-cta-text {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Social icon glow */
+.social-glow {
+  @apply relative p-3 rounded-full transition-all duration-300;
+}
+
+.social-glow .social-bg {
+  @apply absolute inset-0 rounded-full bg-white/5 border border-white/10 transition-all duration-300;
+}
+
+.social-glow:hover .social-bg {
+  @apply bg-[#38BDF8]/10 border-[#38BDF8]/30;
+}
+
+.social-glow .social-glow-effect {
+  @apply absolute inset-0 rounded-full opacity-0 transition-opacity duration-300;
+  background: rgba(56, 189, 248, 0.2);
+  filter: blur(12px);
+}
+
+.social-glow:hover .social-glow-effect {
+  @apply opacity-100;
+}
+
+.social-glow .social-icon {
+  @apply relative z-10 text-gray-400 transition-all duration-300;
+}
+
+.social-glow:hover .social-icon {
+  @apply text-[#38BDF8] scale-110;
 }

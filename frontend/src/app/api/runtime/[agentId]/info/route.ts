@@ -13,6 +13,9 @@ export async function GET(
   } catch (err) {
     console.error('[api/runtime/info]', err);
     const msg = err instanceof Error ? err.message : 'Resolution failed';
+    if (msg.includes('No agentURI') || msg.includes('not found')) {
+      return NextResponse.json({ error: msg }, { status: 404 });
+    }
     return NextResponse.json({ error: msg }, { status: 502 });
   }
 }

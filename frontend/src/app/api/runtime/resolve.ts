@@ -28,7 +28,7 @@ const client = createPublicClient({
 // In-memory cache (per-process, resets on cold start)
 // ---------------------------------------------------------------------------
 
-interface ResolvedAgent {
+export interface ResolvedAgent {
   runtimeBaseUrl: string;
   runtimeAgentId: string;
 }
@@ -47,6 +47,10 @@ const IPFS_GATEWAYS = [
   'https://cloudflare-ipfs.com/ipfs/',
 ];
 
+/** Env-based fallback when on-chain / IPFS resolution fails */
+const AGENT_RUNTIME_URL =
+  process.env.AGENT_RUNTIME_URL || process.env.NEXT_PUBLIC_AGENT_RUNTIME_URL || '';
+
 // ---------------------------------------------------------------------------
 // Resolver
 // ---------------------------------------------------------------------------
@@ -60,6 +64,34 @@ export async function resolveAgent(
     return cached.data;
   }
 
+  // Try the full on-chain -> IPFS -> A2A resolution path first
+  try {
+    const data = await resolveViaOnChain(onChainAgentId);
+    cache.set(onChainAgentId, { data, expiresAt: Date.now() + CACHE_TTL });
+    return data;
+  } catch (onChainErr) {
+    console.warn(
+      `[resolve] On-chain resolution failed for agent ${onChainAgentId}: ${onChainErr instanceof Error ? onChainErr.message : onChainErr}`,
+    );
+
+    // Fallback: use AGENT_RUNTIME_URL env var if configured
+    if (AGENT_RUNTIME_URL) {
+      console.log(`[resolve] Falling back to AGENT_RUNTIME_URL: ${AGENT_RUNTIME_URL}`);
+      const data: ResolvedAgent = {
+        runtimeBaseUrl: AGENT_RUNTIME_URL.replace(/\/$/, ''),
+        runtimeAgentId: onChainAgentId,
+      };
+      cache.set(onChainAgentId, { data, expiresAt: Date.now() + CACHE_TTL });
+      return data;
+    }
+
+    throw onChainErr;
+  }
+}
+
+async function resolveViaOnChain(
+  onChainAgentId: string,
+): Promise<ResolvedAgent> {
   // 1. Call agentURI on IdentityRegistry
   const agentIdBigInt = BigInt(onChainAgentId);
   console.log(`[resolve] Calling agentURI(${onChainAgentId}) on ${IDENTITY_REGISTRY_ADDRESS} via ${THANOS_RPC_URL}`);
@@ -75,7 +107,7 @@ export async function resolveAgent(
     throw new Error(`No agentURI for agent ${onChainAgentId}`);
   }
 
-  // 2–3. Fetch metadata (try multiple IPFS gateways)
+  // 2-3. Fetch metadata (try multiple IPFS gateways)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let metadata: any = null;
 
@@ -140,9 +172,6 @@ export async function resolveAgent(
 
   const data: ResolvedAgent = { runtimeBaseUrl, runtimeAgentId };
   console.log(`[resolve] Resolved: base=${runtimeBaseUrl}, agentId=${runtimeAgentId}`);
-
-  // 6. Cache with TTL
-  cache.set(onChainAgentId, { data, expiresAt: Date.now() + CACHE_TTL });
 
   return data;
 }

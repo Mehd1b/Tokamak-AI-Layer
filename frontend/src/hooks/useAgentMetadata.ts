@@ -41,8 +41,11 @@ export function useAgentMetadata(agentURI: string | undefined): UseAgentMetadata
   const [error, setError] = useState<string | undefined>();
 
   useEffect(() => {
+    // Reset state immediately so stale data from a previous URI is never shown
+    setMetadata(null);
+    setError(undefined);
+
     if (!agentURI) {
-      setMetadata(null);
       setIsLoading(false);
       return;
     }
@@ -61,15 +64,17 @@ export function useAgentMetadata(agentURI: string | undefined): UseAgentMetadata
       return;
     }
 
+    let cancelled = false;
+
     const fetchMetadata = async () => {
       setIsLoading(true);
-      setError(undefined);
 
       const cid = agentURI.replace('ipfs://', '');
       let lastError: Error | null = null;
 
       // Try each gateway in order
       for (const gateway of IPFS_GATEWAYS) {
+        if (cancelled) return;
         try {
           const url = `${gateway}${cid}`;
           const response = await fetch(url, {
@@ -83,6 +88,8 @@ export function useAgentMetadata(agentURI: string | undefined): UseAgentMetadata
           }
 
           const data = await response.json();
+
+          if (cancelled) return;
 
           // Parse ERC-8004 registration file structure
           const parsed: AgentMetadata = {
@@ -104,9 +111,12 @@ export function useAgentMetadata(agentURI: string | undefined): UseAgentMetadata
         }
       }
 
+      if (cancelled) return;
+
       // All gateways failed
       const errorMessage = lastError?.message || 'Failed to fetch metadata from all gateways';
       setError(errorMessage);
+      setMetadata(null);
       if (process.env.NODE_ENV === 'development') {
         console.error('Failed to fetch IPFS metadata:', lastError);
       }
@@ -114,6 +124,8 @@ export function useAgentMetadata(agentURI: string | undefined): UseAgentMetadata
     };
 
     fetchMetadata();
+
+    return () => { cancelled = true; };
   }, [agentURI]);
 
   return {

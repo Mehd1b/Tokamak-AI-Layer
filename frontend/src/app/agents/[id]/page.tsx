@@ -62,7 +62,7 @@ export default function AgentDetailPage() {
   if (isLoading) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        <p className="text-gray-500">Loading agent details...</p>
+        <p className="text-zinc-500">Loading agent details...</p>
       </div>
     );
   }
@@ -72,12 +72,12 @@ export default function AgentDetailPage() {
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
         <Link
           href="/agents"
-          className="mb-4 inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
+          className="mb-4 inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" /> Back to Agents
         </Link>
         <div className="card text-center py-12">
-          <p className="text-gray-500">Agent not found.</p>
+          <p className="text-zinc-500">Agent not found.</p>
         </div>
       </div>
     );
@@ -98,7 +98,7 @@ export default function AgentDetailPage() {
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
       <Link
         href="/agents"
-        className="mb-6 inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
+        className="mb-6 inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-white"
       >
         <ArrowLeft className="h-4 w-4" /> Back to Agents
       </Link>
@@ -107,28 +107,28 @@ export default function AgentDetailPage() {
       <div className="card mb-6">
         <div className="flex items-start justify-between">
           <div className="flex min-w-0 flex-1 items-center gap-4">
-            <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-tokamak-100 text-tokamak-700 text-2xl font-bold">
+            <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-[#38BDF8]/20 text-[#38BDF8] text-2xl font-bold">
               #{agentId?.toString()}
             </div>
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold text-gray-900">
-                {runtimeAgent?.name || metaName || `Agent #${agentId?.toString()}`}
+              <h1 className="text-2xl font-bold text-white">
+                {metaName || runtimeAgent?.name || `Agent #${agentId?.toString()}`}
               </h1>
-              {(runtimeAgent?.description || metaDescription) && (
-                <p className="mt-0.5 text-sm text-gray-600 break-words">
-                  {runtimeAgent?.description || metaDescription}
+              {(metaDescription || runtimeAgent?.description) && (
+                <p className="mt-0.5 text-sm text-zinc-400 break-words">
+                  {metaDescription || runtimeAgent?.description}
                 </p>
               )}
               <div className="mt-1 flex items-center gap-2">
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-zinc-500">
                   Owner: {shortenAddress(agent.owner)}
                 </span>
                 <button
                   onClick={() => copyAddress(agent.owner!)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-zinc-600 hover:text-zinc-400"
                 >
                   {copied ? (
-                    <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                    <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
                   ) : (
                     <Copy className="h-3.5 w-3.5" />
                   )}
@@ -138,7 +138,7 @@ export default function AgentDetailPage() {
           </div>
           <div className="flex gap-2">
             {runtimeAgent && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400">
                 <Play className="h-3 w-3" /> Live
               </span>
             )}
@@ -158,14 +158,14 @@ export default function AgentDetailPage() {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* Info */}
         <div className="card">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">
+          <h2 className="mb-4 text-lg font-semibold text-white">
             Agent Information
           </h2>
           <dl className="space-y-3">
             <div>
-              <dt className="text-sm text-gray-500">Agent URI</dt>
+              <dt className="text-sm text-zinc-500">Agent URI</dt>
               <dd className="mt-1 flex items-center gap-2">
-                <span className="truncate text-sm font-mono text-gray-900">
+                <span className="truncate text-sm font-mono text-white">
                   {agent.agentURI || 'Not set'}
                 </span>
                 {agent.agentURI && (
@@ -173,7 +173,7 @@ export default function AgentDetailPage() {
                     href={agent.agentURI}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-tokamak-600 hover:text-tokamak-700"
+                    className="text-[#38BDF8] hover:text-[#38BDF8]"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
                   </a>
@@ -181,16 +181,16 @@ export default function AgentDetailPage() {
               </dd>
             </div>
             <div>
-              <dt className="text-sm text-gray-500">Operator</dt>
-              <dd className="mt-1 text-sm font-mono text-gray-900">
+              <dt className="text-sm text-zinc-500">Operator</dt>
+              <dd className="mt-1 text-sm font-mono text-white">
                 {agent.operator && agent.operator !== zeroAddr
                   ? shortenAddress(agent.operator)
                   : 'None'}
               </dd>
             </div>
             <div>
-              <dt className="text-sm text-gray-500">ZK Identity</dt>
-              <dd className="mt-1 text-sm text-gray-900">
+              <dt className="text-sm text-zinc-500">ZK Identity</dt>
+              <dd className="mt-1 text-sm text-white">
                 {agent.zkIdentity && agent.zkIdentity !== zeroBytes
                   ? shortenAddress(agent.zkIdentity)
                   : 'Public Identity'}
@@ -198,8 +198,8 @@ export default function AgentDetailPage() {
             </div>
             {runtimeAgent && (
               <div>
-                <dt className="text-sm text-gray-500">Version</dt>
-                <dd className="mt-1 text-sm text-gray-900">
+                <dt className="text-sm text-zinc-500">Version</dt>
+                <dd className="mt-1 text-sm text-white">
                   {runtimeAgent.version}
                 </dd>
               </div>
@@ -209,33 +209,33 @@ export default function AgentDetailPage() {
 
         {/* Stats */}
         <div className="card">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">
+          <h2 className="mb-4 text-lg font-semibold text-white">
             Statistics
           </h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-2xl font-bold text-tokamak-600">
+              <p className="text-2xl font-bold text-[#38BDF8]">
                 {feedbackCount?.toString() ?? '0'}
               </p>
-              <p className="text-sm text-gray-500">Feedback Entries</p>
+              <p className="text-sm text-zinc-500">Feedback Entries</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-tokamak-600">
+              <p className="text-2xl font-bold text-[#38BDF8]">
                 {clients?.length ?? 0}
               </p>
-              <p className="text-sm text-gray-500">Unique Clients</p>
+              <p className="text-sm text-zinc-500">Unique Clients</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-tokamak-600">
+              <p className="text-2xl font-bold text-[#38BDF8]">
                 {validationHashes?.length ?? 0}
               </p>
-              <p className="text-sm text-gray-500">Validations</p>
+              <p className="text-sm text-zinc-500">Validations</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-tokamak-600">
+              <p className="text-2xl font-bold text-[#38BDF8]">
                 {agent.isVerifiedOperator ? 'Yes' : 'No'}
               </p>
-              <p className="text-sm text-gray-500">Verified Operator</p>
+              <p className="text-sm text-zinc-500">Verified Operator</p>
             </div>
           </div>
         </div>
@@ -244,23 +244,23 @@ export default function AgentDetailPage() {
       {/* Capabilities */}
       {((runtimeAgent && runtimeAgent.capabilities.length > 0) || (metaCapabilities && metaCapabilities.length > 0)) && (
         <div className="mt-6 card">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">
+          <h2 className="mb-4 text-lg font-semibold text-white">
             Capabilities
           </h2>
           <div className="space-y-3">
             {(runtimeAgent?.capabilities || (metaCapabilities || []).map((c, i) => ({ id: `cap-${i}`, name: c, description: '' }))).map((cap) => (
               <div
                 key={cap.id}
-                className="rounded-lg border border-gray-200 bg-gray-50 p-3"
+                className="rounded-lg border border-white/10 bg-white/5 p-3"
               >
                 <div className="flex items-center gap-2">
-                  {agentConfig && <agentConfig.icon className="h-4 w-4 text-tokamak-600" />}
-                  <span className="font-medium text-gray-900">{cap.name}</span>
-                  <span className="rounded bg-tokamak-100 px-1.5 py-0.5 text-xs font-mono text-tokamak-700">
+                  {agentConfig && <agentConfig.icon className="h-4 w-4 text-[#38BDF8]" />}
+                  <span className="font-medium text-white">{cap.name}</span>
+                  <span className="rounded bg-[#38BDF8]/20 px-1.5 py-0.5 text-xs font-mono text-[#38BDF8]">
                     {cap.id}
                   </span>
                 </div>
-                <p className="mt-1 text-sm text-gray-600">{cap.description}</p>
+                <p className="mt-1 text-sm text-zinc-400">{cap.description}</p>
               </div>
             ))}
           </div>
@@ -270,17 +270,17 @@ export default function AgentDetailPage() {
       {/* Service Endpoints */}
       {metaServices && Object.keys(metaServices).length > 0 && (
         <div className="mt-6 card">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">
+          <h2 className="mb-4 text-lg font-semibold text-white">
             Service Endpoints
           </h2>
           <div className="space-y-2">
             {Object.entries(metaServices).map(([type, url]) => (
-              <div key={type} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
+              <div key={type} className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2">
                 <div className="min-w-0 flex-1">
-                  <span className="text-sm font-medium text-gray-700">{type}:</span>{' '}
-                  <span className="text-sm text-gray-600 break-all">{url}</span>
+                  <span className="text-sm font-medium text-zinc-300">{type}:</span>{' '}
+                  <span className="text-sm text-zinc-400 break-all">{url}</span>
                 </div>
-                <a href={url} target="_blank" rel="noopener noreferrer" className="ml-2 text-tokamak-600 hover:text-tokamak-700 flex-shrink-0">
+                <a href={url} target="_blank" rel="noopener noreferrer" className="ml-2 text-[#38BDF8] hover:text-[#38BDF8] flex-shrink-0">
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               </div>
@@ -291,17 +291,17 @@ export default function AgentDetailPage() {
 
       {/* Fee Info */}
       {onChainFee && onChainFee > 0n && (
-        <div className="mt-6 card border-tokamak-200 bg-tokamak-50">
+        <div className="mt-6 card border-[#38BDF8]/20 bg-[#38BDF8]/5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Task Fee</h2>
-              <p className="text-sm text-gray-600">This agent charges a fee per task execution</p>
+              <h2 className="text-lg font-semibold text-white">Task Fee</h2>
+              <p className="text-sm text-zinc-400">This agent charges a fee per task execution</p>
             </div>
             <div className="text-right">
-              <p className="text-2xl font-bold text-tokamak-600">
+              <p className="text-2xl font-bold text-[#38BDF8]">
                 {formatEther(onChainFee)} TON
               </p>
-              <p className="text-xs text-gray-500">per task</p>
+              <p className="text-xs text-zinc-500">per task</p>
             </div>
           </div>
         </div>
@@ -311,14 +311,14 @@ export default function AgentDetailPage() {
       {runtimeAgent && agentConfig && (
         <div className="mt-6 card">
           <div className="mb-4 flex items-center gap-2">
-            <Play className="h-5 w-5 text-tokamak-600" />
-            <h2 className="text-lg font-semibold text-gray-900">
-              Use {runtimeAgent.name}
+            <Play className="h-5 w-5 text-[#38BDF8]" />
+            <h2 className="text-lg font-semibold text-white">
+              Use {metaName || runtimeAgent.name}
             </h2>
           </div>
           <TaskSubmission
             agentId={agentId!.toString()}
-            agentName={runtimeAgent.name}
+            agentName={metaName || runtimeAgent.name}
             placeholder={agentConfig.placeholder}
             onChainAgentId={agentId}
             feePerTask={onChainFee}
@@ -337,6 +337,12 @@ export default function AgentDetailPage() {
         >
           Submit Feedback
         </button>
+        <Link
+          href={`/validation/request?agentId=${agentId}`}
+          className="btn-secondary"
+        >
+          Request Validation
+        </Link>
       </div>
 
       {/* Feedback Modal */}

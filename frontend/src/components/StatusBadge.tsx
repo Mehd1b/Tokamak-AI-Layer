@@ -37,7 +37,7 @@ export function ModelBadge({ model }: ModelBadgeProps) {
   const colors: Record<number, string> = {
     0: 'badge-success',
     1: 'badge-info',
-    2: 'badge bg-purple-100 text-purple-800',
+    2: 'badge bg-[#38BDF8]/10 text-[#38BDF8] border border-[#38BDF8]/20',
     3: 'badge-warning',
   };
 

@@ -35,6 +35,21 @@ export const TaskFeeEscrowABI = [
     name: 'TransferFailed',
     inputs: [],
   },
+  {
+    type: 'error',
+    name: 'TaskNotEscrowed',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'RefundTooEarly',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotAuthorized',
+    inputs: [],
+  },
 
   // ============ Events ============
   {
@@ -52,6 +67,24 @@ export const TaskFeeEscrowABI = [
       { name: 'agentId', type: 'uint256', indexed: true, internalType: 'uint256' },
       { name: 'payer', type: 'address', indexed: true, internalType: 'address' },
       { name: 'taskRef', type: 'bytes32', indexed: true, internalType: 'bytes32' },
+      { name: 'amount', type: 'uint256', indexed: false, internalType: 'uint256' },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'TaskConfirmed',
+    inputs: [
+      { name: 'taskRef', type: 'bytes32', indexed: true, internalType: 'bytes32' },
+      { name: 'agentId', type: 'uint256', indexed: true, internalType: 'uint256' },
+      { name: 'amount', type: 'uint256', indexed: false, internalType: 'uint256' },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'TaskRefunded',
+    inputs: [
+      { name: 'taskRef', type: 'bytes32', indexed: true, internalType: 'bytes32' },
+      { name: 'payer', type: 'address', indexed: true, internalType: 'address' },
       { name: 'amount', type: 'uint256', indexed: false, internalType: 'uint256' },
     ],
   },
@@ -75,16 +108,16 @@ export const TaskFeeEscrowABI = [
   },
   {
     type: 'function',
-    name: 'agentFees',
-    inputs: [{ name: 'agentId', type: 'uint256', internalType: 'uint256' }],
-    outputs: [{ name: 'fee', type: 'uint256', internalType: 'uint256' }],
+    name: 'REFUND_DEADLINE',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
-    name: 'taskPayments',
-    inputs: [{ name: 'taskRef', type: 'bytes32', internalType: 'bytes32' }],
-    outputs: [{ name: '', type: 'bool', internalType: 'bool' }],
+    name: 'agentFees',
+    inputs: [{ name: 'agentId', type: 'uint256', internalType: 'uint256' }],
+    outputs: [{ name: 'fee', type: 'uint256', internalType: 'uint256' }],
     stateMutability: 'view',
   },
   {
@@ -115,6 +148,26 @@ export const TaskFeeEscrowABI = [
     outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
     stateMutability: 'view',
   },
+  {
+    type: 'function',
+    name: 'getTaskEscrow',
+    inputs: [{ name: 'taskRef', type: 'bytes32', internalType: 'bytes32' }],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple',
+        internalType: 'struct ITaskFeeEscrow.TaskEscrow',
+        components: [
+          { name: 'payer', type: 'address', internalType: 'address' },
+          { name: 'agentId', type: 'uint256', internalType: 'uint256' },
+          { name: 'amount', type: 'uint256', internalType: 'uint256' },
+          { name: 'paidAt', type: 'uint256', internalType: 'uint256' },
+          { name: 'status', type: 'uint8', internalType: 'enum ITaskFeeEscrow.TaskStatus' },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
 
   // ============ Write Functions ============
   {
@@ -136,6 +189,20 @@ export const TaskFeeEscrowABI = [
     ],
     outputs: [],
     stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    name: 'confirmTask',
+    inputs: [{ name: 'taskRef', type: 'bytes32', internalType: 'bytes32' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'refundTask',
+    inputs: [{ name: 'taskRef', type: 'bytes32', internalType: 'bytes32' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',

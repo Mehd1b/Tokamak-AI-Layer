@@ -137,3 +137,42 @@ export function useClaimFees() {
 
   return { claim, hash, isPending, isConfirming, isSuccess, error };
 }
+
+// ============ Escrow Refund Hooks ============
+
+/**
+ * Read the escrow status for a task
+ * Returns: { payer, agentId, amount, paidAt, status }
+ * Status: 0=None, 1=Escrowed, 2=Completed, 3=Refunded
+ */
+export function useTaskEscrow(taskRef?: `0x${string}`) {
+  return useReadContract({
+    address: CONTRACTS.taskFeeEscrow,
+    abi: TaskFeeEscrowABI,
+    functionName: 'getTaskEscrow',
+    args: taskRef ? [taskRef] : undefined,
+    chainId: CHAIN_ID,
+    query: { enabled: !!taskRef },
+  });
+}
+
+/**
+ * Refund escrowed funds for a failed task.
+ * Callable by agent owner/operator at any time, or by payer after REFUND_DEADLINE (1 hour).
+ */
+export function useRefundTask() {
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  const refund = (taskRef: `0x${string}`) => {
+    writeContract({
+      address: CONTRACTS.taskFeeEscrow,
+      abi: TaskFeeEscrowABI,
+      functionName: 'refundTask',
+      args: [taskRef],
+      chainId: CHAIN_ID,
+    });
+  };
+
+  return { refund, hash, isPending, isConfirming, isSuccess, error };
+}

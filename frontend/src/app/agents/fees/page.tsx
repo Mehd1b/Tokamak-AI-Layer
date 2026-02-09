@@ -25,7 +25,7 @@ function ClaimButton({ agentId, balance }: { agentId: bigint; balance: bigint })
 
   if (claimed) {
     return (
-      <span className="inline-flex items-center gap-1 text-sm text-green-600">
+      <span className="inline-flex items-center gap-1 text-sm text-emerald-400">
         <CheckCircle className="h-4 w-4" /> Claimed
       </span>
     );
@@ -47,7 +47,7 @@ function ClaimButton({ agentId, balance }: { agentId: bigint; balance: bigint })
         )}
       </button>
       {error && (
-        <p className="mt-1 text-xs text-red-600">{error.message}</p>
+        <p className="mt-1 text-xs text-red-400">{error.message}</p>
       )}
     </div>
   );
@@ -98,34 +98,34 @@ export default function AgentFeesPage() {
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
       <Link
         href="/agents"
-        className="mb-6 inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
+        className="mb-6 inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-white"
       >
         <ArrowLeft className="h-4 w-4" /> Back to Agents
       </Link>
 
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Agent Fees</h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <h1 className="text-2xl font-bold text-white">Agent Fees</h1>
+          <p className="mt-1 text-sm text-zinc-400">
             View and claim accumulated task fees for your agents.
           </p>
         </div>
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-tokamak-100">
-          <Wallet className="h-6 w-6 text-tokamak-600" />
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#38BDF8]/20">
+          <Wallet className="h-6 w-6 text-[#38BDF8]" />
         </div>
       </div>
 
       {!isConnected && (
-        <div className="card border-amber-200 bg-amber-50">
-          <p className="text-sm text-amber-800">
+        <div className="card border-amber-500/20 bg-amber-500/10">
+          <p className="text-sm text-amber-400">
             Please connect your wallet to view your agent fees.
           </p>
         </div>
       )}
 
       {isConnected && !isL2 && (
-        <div className="card border-amber-200 bg-amber-50">
-          <p className="text-sm text-amber-800">
+        <div className="card border-amber-500/20 bg-amber-500/10">
+          <p className="text-sm text-amber-400">
             Please switch to Thanos Sepolia network.
           </p>
         </div>
@@ -134,26 +134,26 @@ export default function AgentFeesPage() {
       {isConnected && isL2 && (
         <>
           {/* Total Balance */}
-          <div className="card mb-6 border-tokamak-200 bg-tokamak-50">
+          <div className="card mb-6 border-[#38BDF8]/20 bg-[#38BDF8]/5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Unclaimed Fees</p>
-                <p className="text-3xl font-bold text-tokamak-600">
+                <p className="text-sm text-zinc-400">Total Unclaimed Fees</p>
+                <p className="text-3xl font-bold text-[#38BDF8]">
                   {feesLoading ? '...' : `${formatEther(totalBalance)} TON`}
                 </p>
               </div>
-              <Coins className="h-8 w-8 text-tokamak-400" />
+              <Coins className="h-8 w-8 text-[#38BDF8]" />
             </div>
           </div>
 
           {agentsLoading || feesLoading ? (
             <div className="card text-center py-8">
-              <Loader2 className="mx-auto h-6 w-6 animate-spin text-gray-400" />
-              <p className="mt-2 text-sm text-gray-500">Loading your agents...</p>
+              <Loader2 className="mx-auto h-6 w-6 animate-spin text-zinc-600" />
+              <p className="mt-2 text-sm text-zinc-500">Loading your agents...</p>
             </div>
           ) : !hasAgents ? (
             <div className="card text-center py-8">
-              <p className="text-gray-500">You don&apos;t own any agents yet.</p>
+              <p className="text-zinc-500">You don&apos;t own any agents yet.</p>
               <Link href="/agents/register" className="mt-3 inline-block btn-primary text-sm">
                 Register an Agent
               </Link>
@@ -165,17 +165,17 @@ export default function AgentFeesPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-tokamak-100 text-tokamak-700 font-bold">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#38BDF8]/20 text-[#38BDF8] font-bold">
                           #{agent.id.toString()}
                         </div>
                         <div>
                           <Link
                             href={`/agents/${agent.id.toString()}`}
-                            className="font-medium text-gray-900 hover:text-tokamak-600"
+                            className="font-medium text-white hover:text-[#38BDF8]"
                           >
                             Agent #{agent.id.toString()}
                           </Link>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-zinc-500">
                             Fee: {agent.feePerTask > 0n ? `${formatEther(agent.feePerTask)} TON/task` : 'Free (no fee set)'}
                           </p>
                         </div>
@@ -183,10 +183,10 @@ export default function AgentFeesPage() {
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <p className="text-lg font-bold text-tokamak-600">
+                        <p className="text-lg font-bold text-[#38BDF8]">
                           {formatEther(agent.balance)} TON
                         </p>
-                        <p className="text-xs text-gray-500">unclaimed</p>
+                        <p className="text-xs text-zinc-500">unclaimed</p>
                       </div>
                       <ClaimButton agentId={agent.id} balance={agent.balance} />
                     </div>

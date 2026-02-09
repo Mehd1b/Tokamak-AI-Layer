@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { createPublicClient, http } from 'viem';
+import { createPublicClient, createWalletClient, http } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
 import type { BaseAgent } from '../agents/BaseAgent.js';
 import type { TaskSubmission } from '../types.js';
 import { getTask, getAllTasks } from '../services/storage.js';
@@ -20,11 +21,40 @@ const ESCROW_ABI = [
     outputs: [{ name: '', type: 'uint256' }],
     stateMutability: 'view',
   },
+  {
+    type: 'function',
+    name: 'confirmTask',
+    inputs: [{ name: 'taskRef', type: 'bytes32' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'refundTask',
+    inputs: [{ name: 'taskRef', type: 'bytes32' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
 ] as const;
 
 const viemClient = createPublicClient({
   transport: http(config.RPC_URL),
 });
+
+function getWalletClient() {
+  if (!config.PRIVATE_KEY) return null;
+  const account = privateKeyToAccount(config.PRIVATE_KEY as `0x${string}`);
+  return createWalletClient({
+    account,
+    chain: {
+      id: config.CHAIN_ID,
+      name: 'Thanos Sepolia',
+      nativeCurrency: { name: 'TON', symbol: 'TON', decimals: 18 },
+      rpcUrls: { default: { http: [config.RPC_URL] } },
+    },
+    transport: http(config.RPC_URL),
+  });
+}
 
 export function createTaskRoutes(agents: Map<string, BaseAgent>): Router {
   const router = Router();
@@ -77,6 +107,36 @@ export function createTaskRoutes(agents: Map<string, BaseAgent>): Router {
       console.log(`[TASK] Executing task for agent '${agentId}' (${input.text.length} chars)`);
       const result = await agent.execute(input);
       console.log(`[TASK] Task ${result.taskId} completed with status: ${result.status}`);
+
+      // On-chain escrow settlement (confirm or refund based on task result)
+      if (taskRef && escrowAddress !== '0x0000000000000000000000000000000000000000') {
+        const walletClient = getWalletClient();
+        if (walletClient) {
+          try {
+            if (result.status === 'completed') {
+              const txHash = await walletClient.writeContract({
+                address: escrowAddress,
+                abi: ESCROW_ABI,
+                functionName: 'confirmTask',
+                args: [taskRef as `0x${string}`],
+              });
+              console.log(`[ESCROW] Task confirmed on-chain: ${txHash}`);
+            } else if (result.status === 'failed') {
+              const txHash = await walletClient.writeContract({
+                address: escrowAddress,
+                abi: ESCROW_ABI,
+                functionName: 'refundTask',
+                args: [taskRef as `0x${string}`],
+              });
+              console.log(`[ESCROW] Task refunded on-chain: ${txHash}`);
+            }
+          } catch (escrowErr) {
+            console.error('[ESCROW] Settlement failed (task result still returned):', escrowErr);
+          }
+        } else {
+          console.warn('[ESCROW] No PRIVATE_KEY configured — skipping on-chain settlement');
+        }
+      }
 
       res.status(201).json(result);
     } catch (err) {

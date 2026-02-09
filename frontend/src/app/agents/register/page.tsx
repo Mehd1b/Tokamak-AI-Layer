@@ -139,28 +139,28 @@ export default function RegisterAgentPage() {
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
       <Link
         href="/agents"
-        className="mb-6 inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
+        className="mb-6 inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-white"
       >
         <ArrowLeft className="h-4 w-4" /> Back to Agents
       </Link>
 
-      <h1 className="mb-2 text-3xl font-bold text-gray-900">Register Agent</h1>
-      <p className="mb-8 text-gray-600">
+      <h1 className="mb-2 text-3xl font-bold text-white">Register Agent</h1>
+      <p className="mb-8 text-zinc-400">
         Register your AI agent on the Tokamak Agent Layer. Your agent will
         receive an ERC-721 token representing its on-chain identity.
       </p>
 
       {!isConnected && (
-        <div className="card mb-6 border-amber-200 bg-amber-50">
-          <p className="text-sm text-amber-800">
+        <div className="card mb-6 border-amber-500/20 bg-amber-500/10">
+          <p className="text-sm text-amber-400">
             Please connect your wallet to register an agent.
           </p>
         </div>
       )}
 
       {isConnected && !isL2 && (
-        <div className="card mb-6 border-amber-200 bg-amber-50">
-          <p className="text-sm text-amber-800">
+        <div className="card mb-6 border-amber-500/20 bg-amber-500/10">
+          <p className="text-sm text-amber-400">
             Please switch to Optimism Sepolia network.
           </p>
         </div>
@@ -169,13 +169,13 @@ export default function RegisterAgentPage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Basic Info */}
         <div className="card">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">
+          <h2 className="mb-4 text-lg font-semibold text-white">
             Basic Information
           </h2>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-zinc-300">
                 Agent Name *
               </label>
               <input
@@ -185,15 +185,15 @@ export default function RegisterAgentPage() {
                 required
                 maxLength={100}
                 placeholder="My AI Agent"
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-tokamak-500 focus:outline-none focus:ring-1 focus:ring-tokamak-500"
+                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-zinc-500">
                 {name.length}/100
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-zinc-300">
                 Description *
               </label>
               <textarea
@@ -203,15 +203,15 @@ export default function RegisterAgentPage() {
                 maxLength={1000}
                 rows={3}
                 placeholder="Describe what your agent does..."
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-tokamak-500 focus:outline-none focus:ring-1 focus:ring-tokamak-500"
+                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-zinc-500">
                 {description.length}/1000
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-zinc-300">
                 Image URL
               </label>
               <input
@@ -219,7 +219,7 @@ export default function RegisterAgentPage() {
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
                 placeholder="https://example.com/agent-avatar.png"
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-tokamak-500 focus:outline-none focus:ring-1 focus:ring-tokamak-500"
+                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"
               />
             </div>
           </div>
@@ -227,11 +227,11 @@ export default function RegisterAgentPage() {
 
         {/* Fee Configuration */}
         <div className="card">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">
+          <h2 className="mb-4 text-lg font-semibold text-white">
             Fee Configuration
           </h2>
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-zinc-300">
               Fee per Task (TON)
             </label>
             <input
@@ -241,9 +241,9 @@ export default function RegisterAgentPage() {
               value={feePerTask}
               onChange={(e) => setFeePerTask(e.target.value)}
               placeholder="0.0 (free)"
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-tokamak-500 focus:outline-none focus:ring-1 focus:ring-tokamak-500"
+              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"
             />
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-zinc-500">
               Leave empty or 0 for free agents. Fee is paid in native TON on Thanos L2.
               You can set or update the fee later from the agent detail page.
             </p>
@@ -252,7 +252,7 @@ export default function RegisterAgentPage() {
 
         {/* Service Endpoints */}
         <div className="card">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">
+          <h2 className="mb-4 text-lg font-semibold text-white">
             Service Endpoints
           </h2>
 
@@ -261,18 +261,18 @@ export default function RegisterAgentPage() {
               {Object.entries(services).map(([type, url]) => (
                 <div
                   key={type}
-                  className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2"
+                  className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2"
                 >
                   <div>
-                    <span className="text-sm font-medium text-gray-700">
+                    <span className="text-sm font-medium text-zinc-300">
                       {type}:
                     </span>{' '}
-                    <span className="text-sm text-gray-600">{url}</span>
+                    <span className="text-sm text-zinc-400">{url}</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => removeService(type)}
-                    className="text-gray-400 hover:text-red-500"
+                    className="text-zinc-600 hover:text-red-500"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -285,7 +285,7 @@ export default function RegisterAgentPage() {
             <select
               value={newServiceType}
               onChange={(e) => setNewServiceType(e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
             >
               <option value="A2A">A2A</option>
               <option value="MCP">MCP</option>
@@ -299,7 +299,7 @@ export default function RegisterAgentPage() {
               value={newServiceUrl}
               onChange={(e) => setNewServiceUrl(e.target.value)}
               placeholder="https://..."
-              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600"
             />
             <button
               type="button"
@@ -314,7 +314,7 @@ export default function RegisterAgentPage() {
         {/* Capabilities */}
         <div className="card">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold text-white">
               Capabilities
             </h2>
             <button
@@ -328,12 +328,12 @@ export default function RegisterAgentPage() {
 
           <div className="space-y-4">
             {capabilities.map((cap, i) => (
-              <div key={cap.id} className="rounded-lg border border-gray-200 p-4">
+              <div key={cap.id} className="rounded-lg border border-white/10 p-4">
                 <div className="mb-2 flex justify-end">
                   <button
                     type="button"
                     onClick={() => removeCapability(i)}
-                    className="text-gray-400 hover:text-red-500"
+                    className="text-zinc-600 hover:text-red-500"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -344,7 +344,7 @@ export default function RegisterAgentPage() {
                     value={cap.name}
                     onChange={(e) => updateCapability(i, 'name', e.target.value)}
                     placeholder="Capability name"
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600"
                   />
                   <input
                     type="text"
@@ -353,14 +353,14 @@ export default function RegisterAgentPage() {
                       updateCapability(i, 'description', e.target.value)
                     }
                     placeholder="Description"
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600"
                   />
                 </div>
               </div>
             ))}
 
             {capabilities.length === 0 && (
-              <p className="text-center text-sm text-gray-500">
+              <p className="text-center text-sm text-zinc-500">
                 No capabilities added yet.
               </p>
             )}
@@ -384,62 +384,62 @@ export default function RegisterAgentPage() {
 
         {/* Status Messages */}
         {uploadError && (
-          <div className="card border-red-200 bg-red-50">
-            <p className="text-sm text-red-800">
+          <div className="card border-red-500/20 bg-red-500/10">
+            <p className="text-sm text-red-400">
               <strong>Upload Error:</strong> {uploadError}
             </p>
           </div>
         )}
 
         {txError && (
-          <div className="card border-red-200 bg-red-50">
-            <p className="text-sm text-red-800">
+          <div className="card border-red-500/20 bg-red-500/10">
+            <p className="text-sm text-red-400">
               <strong>Transaction Error:</strong> {txError.message}
             </p>
           </div>
         )}
 
         {feeError && (
-          <div className="card border-red-200 bg-red-50">
-            <p className="text-sm text-red-800">
+          <div className="card border-red-500/20 bg-red-500/10">
+            <p className="text-sm text-red-400">
               <strong>Fee Setup Error:</strong> {feeError.message}
             </p>
           </div>
         )}
 
         {ipfsUri && !isSuccess && (
-          <div className="card border-blue-200 bg-blue-50">
-            <p className="text-sm text-blue-800">
+          <div className="card border-blue-500/20 bg-blue-500/10">
+            <p className="text-sm text-blue-400">
               <strong>Uploaded to IPFS:</strong> {ipfsUri}
             </p>
           </div>
         )}
 
         {isSuccess && txHash && (
-          <div className="card border-green-200 bg-green-50">
-            <p className="text-sm text-green-800">
+          <div className="card border-emerald-500/20 bg-emerald-500/10">
+            <p className="text-sm text-emerald-400">
               <strong>Agent registered!</strong>{newAgentId ? ` (ID: ${newAgentId.toString()})` : ''} Transaction:{' '}
               <a
                 href={`https://explorer.thanos-sepolia.tokamak.network/tx/${txHash}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline hover:text-green-900"
+                className="underline hover:text-emerald-300"
               >
                 {txHash.slice(0, 10)}...{txHash.slice(-8)}
               </a>
             </p>
             {hasFeeToSet && !isFeeSuccess && !feeError && (
-              <p className="mt-1 text-sm text-green-700">
+              <p className="mt-1 text-sm text-emerald-400">
                 {isFeePending ? 'Please confirm fee transaction in wallet...' : isFeeConfirming ? 'Setting agent fee on-chain...' : 'Preparing fee transaction...'}
               </p>
             )}
             {isFeeSuccess && (
-              <p className="mt-1 text-sm text-green-800">
+              <p className="mt-1 text-sm text-emerald-400">
                 <strong>Fee set to {feePerTask} TON per task.</strong> Redirecting...
               </p>
             )}
             {!hasFeeToSet && (
-              <p className="mt-1 text-sm text-green-700">Redirecting to agents list...</p>
+              <p className="mt-1 text-sm text-emerald-400">Redirecting to agents list...</p>
             )}
           </div>
         )}

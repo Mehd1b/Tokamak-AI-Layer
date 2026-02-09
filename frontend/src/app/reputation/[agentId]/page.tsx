@@ -41,21 +41,21 @@ export default function ReputationPage() {
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
       <Link
         href={agentId ? `/agents/${agentId}` : '/agents'}
-        className="mb-6 inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
+        className="mb-6 inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-white"
       >
         <ArrowLeft className="h-4 w-4" /> Back to Agent
       </Link>
 
-      <h1 className="mb-2 text-3xl font-bold text-gray-900">
+      <h1 className="mb-2 text-3xl font-bold text-white">
         Reputation for Agent #{agentId?.toString()}
       </h1>
-      <p className="mb-8 text-gray-600">
+      <p className="mb-8 text-zinc-400">
         On-chain reputation data from verified client interactions.
       </p>
 
       {isLoading ? (
         <div className="card text-center py-12">
-          <p className="text-gray-500">Loading reputation data...</p>
+          <p className="text-zinc-500">Loading reputation data...</p>
         </div>
       ) : (
         <>
@@ -63,88 +63,88 @@ export default function ReputationPage() {
           <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
             <div className="card text-center">
               <Star className="mx-auto h-8 w-8 text-amber-500" />
-              <p className="mt-2 text-2xl font-bold text-gray-900">{formatAverage(standardSummary)}</p>
-              <p className="text-sm text-gray-500">Average Score</p>
+              <p className="mt-2 text-2xl font-bold text-white">{formatAverage(standardSummary)}</p>
+              <p className="text-sm text-zinc-500">Average Score</p>
             </div>
             <div className="card text-center">
               <TrendingUp className="mx-auto h-8 w-8 text-green-500" />
-              <p className="mt-2 text-2xl font-bold text-gray-900">
+              <p className="mt-2 text-2xl font-bold text-white">
                 {feedbackCount?.toString() ?? '0'}
               </p>
-              <p className="text-sm text-gray-500">Total Feedback</p>
+              <p className="text-sm text-zinc-500">Total Feedback</p>
             </div>
             <div className="card text-center">
               <Users className="mx-auto h-8 w-8 text-blue-500" />
-              <p className="mt-2 text-2xl font-bold text-gray-900">
+              <p className="mt-2 text-2xl font-bold text-white">
                 {clients?.length ?? 0}
               </p>
-              <p className="text-sm text-gray-500">Unique Clients</p>
+              <p className="text-sm text-zinc-500">Unique Clients</p>
             </div>
             <div className="card text-center">
               <Shield className="mx-auto h-8 w-8 text-purple-500" />
-              <p className="mt-2 text-2xl font-bold text-gray-900">{formatAverage(verifiedSummary)}</p>
-              <p className="text-sm text-gray-500">Verified Score</p>
+              <p className="mt-2 text-2xl font-bold text-white">{formatAverage(verifiedSummary)}</p>
+              <p className="text-sm text-zinc-500">Verified Score</p>
             </div>
           </div>
 
           {/* Reputation Types */}
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             <div className="card">
-              <h3 className="mb-2 font-semibold text-gray-900">
+              <h3 className="mb-2 font-semibold text-white">
                 Standard Reputation
               </h3>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-zinc-400">
                 Aggregated from all client feedback. Client filtering
                 (ERC-8004) prevents Sybil attacks.
               </p>
-              <div className="mt-4 rounded-lg bg-gray-50 p-3 text-center">
-                <p className="text-xl font-bold text-gray-900">{formatAverage(standardSummary)}</p>
-                <p className="text-xs text-gray-500">Score</p>
-                <p className="text-xs text-gray-400 mt-1">Range: {formatRange(standardSummary)}</p>
+              <div className="mt-4 rounded-lg bg-white/5 p-3 text-center">
+                <p className="text-xl font-bold text-white">{formatAverage(standardSummary)}</p>
+                <p className="text-xs text-zinc-500">Score</p>
+                <p className="text-xs text-zinc-600 mt-1">Range: {formatRange(standardSummary)}</p>
               </div>
             </div>
 
             <div className="card">
-              <h3 className="mb-2 font-semibold text-gray-900">
+              <h3 className="mb-2 font-semibold text-white">
                 Stake-Weighted
               </h3>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-zinc-400">
                 Weighted by sqrt(reviewerStake). Feedback from stakers counts
                 more.
               </p>
-              <div className="mt-4 rounded-lg bg-gray-50 p-3 text-center">
-                <p className="text-xl font-bold text-gray-900">{formatAverage(standardSummary)}</p>
-                <p className="text-xs text-gray-500">Weighted Score</p>
-                <p className="text-xs text-gray-400 mt-1">Range: {formatRange(standardSummary)}</p>
+              <div className="mt-4 rounded-lg bg-white/5 p-3 text-center">
+                <p className="text-xl font-bold text-white">{formatAverage(standardSummary)}</p>
+                <p className="text-xs text-zinc-500">Weighted Score</p>
+                <p className="text-xs text-zinc-600 mt-1">Range: {formatRange(standardSummary)}</p>
               </div>
             </div>
 
             <div className="card">
-              <h3 className="mb-2 font-semibold text-gray-900">
+              <h3 className="mb-2 font-semibold text-white">
                 Verified Only
               </h3>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-zinc-400">
                 Only feedback linked to validated tasks. Highest trust level.
               </p>
-              <div className="mt-4 rounded-lg bg-gray-50 p-3 text-center">
-                <p className="text-xl font-bold text-gray-900">{formatAverage(verifiedSummary)}</p>
-                <p className="text-xs text-gray-500">Verified Score</p>
-                <p className="text-xs text-gray-400 mt-1">Range: {formatRange(verifiedSummary)}</p>
+              <div className="mt-4 rounded-lg bg-white/5 p-3 text-center">
+                <p className="text-xl font-bold text-white">{formatAverage(verifiedSummary)}</p>
+                <p className="text-xs text-zinc-500">Verified Score</p>
+                <p className="text-xs text-zinc-600 mt-1">Range: {formatRange(verifiedSummary)}</p>
               </div>
             </div>
           </div>
 
           {/* Feedback List */}
           <div className="mt-8 card">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">
+            <h2 className="mb-4 text-lg font-semibold text-white">
               Recent Feedback
             </h2>
             {Number(feedbackCount ?? 0) === 0 ? (
-              <p className="text-center text-sm text-gray-500 py-8">
+              <p className="text-center text-sm text-zinc-500 py-8">
                 No feedback submitted yet for this agent.
               </p>
             ) : (
-              <p className="text-center text-sm text-gray-500 py-8">
+              <p className="text-center text-sm text-zinc-500 py-8">
                 Individual feedback details require the subgraph indexer.
               </p>
             )}

@@ -35,16 +35,16 @@ export function FeedbackModal({ agentId, agentOwner, onClose }: FeedbackModalPro
   // Success state
   if (isSuccess) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-        <div className="card w-full max-w-md">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#13131a] p-6 shadow-2xl">
           <div className="py-8 text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-              <CheckCircle className="h-6 w-6 text-green-600" />
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">
+              <CheckCircle className="h-6 w-6 text-emerald-400" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-lg font-semibold text-white">
               Feedback Submitted!
             </h3>
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 text-sm text-zinc-400">
               Your {rating}-star feedback has been recorded on-chain.
             </p>
             {hash && (
@@ -52,7 +52,7 @@ export function FeedbackModal({ agentId, agentOwner, onClose }: FeedbackModalPro
                 href={`https://sepolia-optimism.etherscan.io/tx/${hash}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-2 inline-block text-xs text-tokamak-600 underline"
+                className="mt-2 inline-block text-xs text-[#38BDF8] underline"
               >
                 View transaction
               </a>
@@ -67,23 +67,23 @@ export function FeedbackModal({ agentId, agentOwner, onClose }: FeedbackModalPro
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="card w-full max-w-md">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#13131a] p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900">
+          <h3 className="text-lg font-semibold text-white">
             Submit Feedback
           </h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-zinc-500 hover:text-zinc-300"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {isSelfFeedback && (
-          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
-            <p className="text-sm text-amber-800">
+          <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
+            <p className="text-sm text-amber-400">
               You cannot submit feedback for your own agent.
             </p>
           </div>
@@ -92,7 +92,7 @@ export function FeedbackModal({ agentId, agentOwner, onClose }: FeedbackModalPro
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Star Rating */}
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
+            <label className="mb-2 block text-sm font-medium text-zinc-300">
               Rating
             </label>
             <div className="flex gap-1">
@@ -109,13 +109,13 @@ export function FeedbackModal({ agentId, agentOwner, onClose }: FeedbackModalPro
                     className={`h-8 w-8 transition-colors ${
                       star <= (hoverRating || rating)
                         ? 'fill-yellow-400 text-yellow-400'
-                        : 'text-gray-300'
+                        : 'text-zinc-600'
                     }`}
                   />
                 </button>
               ))}
               {rating > 0 && (
-                <span className="ml-2 flex items-center text-sm text-gray-500">
+                <span className="ml-2 flex items-center text-sm text-zinc-500">
                   {rating}/5
                 </span>
               )}
@@ -124,13 +124,13 @@ export function FeedbackModal({ agentId, agentOwner, onClose }: FeedbackModalPro
 
           {/* Category */}
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
+            <label className="mb-2 block text-sm font-medium text-zinc-300">
               Category
             </label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-tokamak-500 focus:outline-none focus:ring-1 focus:ring-tokamak-500"
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"
             >
               {CATEGORIES.map((cat) => (
                 <option key={cat} value={cat}>
@@ -142,7 +142,7 @@ export function FeedbackModal({ agentId, agentOwner, onClose }: FeedbackModalPro
 
           {/* Comment */}
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
+            <label className="mb-2 block text-sm font-medium text-zinc-300">
               Comment (optional)
             </label>
             <textarea
@@ -151,17 +151,17 @@ export function FeedbackModal({ agentId, agentOwner, onClose }: FeedbackModalPro
               maxLength={500}
               rows={3}
               placeholder="Share your experience with this agent..."
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-tokamak-500 focus:outline-none focus:ring-1 focus:ring-tokamak-500"
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"
             />
-            <p className={`mt-1 text-xs text-right ${comment.length > 450 ? 'text-red-600' : 'text-gray-500'}`}>
+            <p className={`mt-1 text-xs text-right ${comment.length > 450 ? 'text-red-400' : 'text-zinc-500'}`}>
               {comment.length}/500
             </p>
           </div>
 
           {/* Error */}
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-              <p className="text-sm text-red-700">
+            <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3">
+              <p className="text-sm text-red-400">
                 {error.message?.includes('self-feedback')
                   ? 'You cannot submit feedback for your own agent.'
                   : error.message?.substring(0, 150) || 'Transaction failed'}

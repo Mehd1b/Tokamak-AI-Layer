@@ -38,20 +38,34 @@ export function useRuntimeAgent(onChainAgentId: string | undefined) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Reset state immediately so stale data from the previous agent is never shown
+    setAgent(null);
+    setIsLoading(true);
+
     if (!onChainAgentId) {
       setIsLoading(false);
       return;
     }
-    fetch(`/api/runtime/${onChainAgentId}/info`)
+
+    const controller = new AbortController();
+    fetch(`/api/runtime/${onChainAgentId}/info`, { signal: controller.signal })
       .then((res) => {
         if (!res.ok) return null;
         return res.json();
       })
       .then((data) => {
-        setAgent(data);
-        setIsLoading(false);
+        if (!controller.signal.aborted) {
+          setAgent(data);
+          setIsLoading(false);
+        }
       })
-      .catch(() => setIsLoading(false));
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => controller.abort();
   }, [onChainAgentId]);
 
   return { agent, isLoading };
