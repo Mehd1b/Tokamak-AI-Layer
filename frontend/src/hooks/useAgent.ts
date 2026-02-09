@@ -91,3 +91,63 @@ export function useAgentsByOwner(owner: `0x${string}` | undefined) {
     isLoading,
   };
 }
+
+interface ContractCall {
+  address: `0x${string}`;
+  abi: typeof TALIdentityRegistryABI;
+  functionName: string;
+  args: bigint[];
+}
+
+interface ContractResult {
+  status: 'success' | 'failure';
+  result?: unknown;
+}
+
+export function useAgentList(count: number) {
+  const limit = Math.min(count, 50);
+  const enabled = count > 0;
+
+  const contracts: ContractCall[] = [];
+  for (let i = 1; i <= limit; i++) {
+    contracts.push({
+      address: CONTRACTS.identityRegistry,
+      abi: TALIdentityRegistryABI,
+      functionName: 'ownerOf',
+      args: [BigInt(i)],
+    });
+    contracts.push({
+      address: CONTRACTS.identityRegistry,
+      abi: TALIdentityRegistryABI,
+      functionName: 'agentURI',
+      args: [BigInt(i)],
+    });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, isLoading } = useReadContracts({
+    contracts: contracts as any,
+    query: { enabled },
+  });
+
+  const agents: Array<{ agentId: number; owner: `0x${string}`; agentURI: string }> = [];
+  if (data && Array.isArray(data)) {
+    for (let i = 0; i < limit; i++) {
+      const ownerResult = data[i * 2] as ContractResult;
+      const uriResult = data[i * 2 + 1] as ContractResult;
+
+      if (ownerResult?.status === 'success' && uriResult?.status === 'success') {
+        agents.push({
+          agentId: i + 1,
+          owner: ownerResult.result as `0x${string}`,
+          agentURI: uriResult.result as string,
+        });
+      }
+    }
+  }
+
+  return {
+    agents,
+    isLoading,
+  };
+}

@@ -53,7 +53,27 @@ export function useReputationSummary(
   });
 
   return {
-    summary: data as any | undefined,
+    summary: data as { totalValue: bigint; count: bigint; min: bigint; max: bigint } | undefined,
+    isLoading,
+  };
+}
+
+export function useVerifiedSummary(
+  agentId: bigint | undefined,
+  clients: `0x${string}`[] = [],
+) {
+  const enabled = agentId !== undefined && clients.length > 0;
+
+  const { data, isLoading } = useReadContract({
+    address: CONTRACTS.reputationRegistry,
+    abi: TALReputationRegistryABI,
+    functionName: 'getVerifiedSummary',
+    args: enabled ? [agentId, clients] : undefined,
+    query: { enabled },
+  });
+
+  return {
+    summary: data as { totalValue: bigint; count: bigint; min: bigint; max: bigint } | undefined,
     isLoading,
   };
 }

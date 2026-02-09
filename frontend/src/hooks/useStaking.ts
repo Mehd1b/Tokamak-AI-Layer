@@ -35,6 +35,17 @@ const ERC20_ABI = [
   },
 ] as const;
 
+const WTON_ABI = [
+  ...ERC20_ABI,
+  {
+    name: 'swapFromTON',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'tonAmount', type: 'uint256' }],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+] as const;
+
 const DEPOSIT_MANAGER_ABI = [
   {
     name: 'deposit',
@@ -81,8 +92,12 @@ const SEIG_MANAGER_ABI = [
   },
 ] as const;
 
-// Tokamak L2 address on Sepolia (the layer2 parameter for staking calls)
-const TOKAMAK_LAYER2 = L1_CONTRACTS.layer2Registry;
+const TOKAMAK_LAYER2 = L1_CONTRACTS.layer2;
+
+// Convert TON amount (18 decimals) to WTON amount (27 decimals)
+export const toWTONAmount = (tonRawAmount: bigint): bigint => tonRawAmount * 10n ** 9n;
+
+// --- Read hooks ---
 
 export function useTONBalance(address?: Address) {
   return useReadContract({
@@ -95,9 +110,33 @@ export function useTONBalance(address?: Address) {
   });
 }
 
+export function useWTONBalance(address?: Address) {
+  return useReadContract({
+    address: L1_CONTRACTS.wton,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+    chainId: sepolia.id,
+    query: { enabled: !!address },
+  });
+}
+
+// TON allowance to WTON contract (for swap)
 export function useTONAllowance(owner?: Address) {
   return useReadContract({
     address: L1_CONTRACTS.ton,
+    abi: ERC20_ABI,
+    functionName: 'allowance',
+    args: owner ? [owner, L1_CONTRACTS.wton] : undefined,
+    chainId: sepolia.id,
+    query: { enabled: !!owner },
+  });
+}
+
+// WTON allowance to DepositManager (for deposit)
+export function useWTONAllowance(owner?: Address) {
+  return useReadContract({
+    address: L1_CONTRACTS.wton,
     abi: ERC20_ABI,
     functionName: 'allowance',
     args: owner ? [owner, L1_CONTRACTS.depositManager] : undefined,
@@ -117,6 +156,9 @@ export function useStakeBalance(address?: Address) {
   });
 }
 
+// --- Write hooks ---
+
+// Step 1: Approve TON to WTON contract (for swap)
 export function useApproveTON() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
@@ -126,7 +168,7 @@ export function useApproveTON() {
       address: L1_CONTRACTS.ton,
       abi: ERC20_ABI,
       functionName: 'approve',
-      args: [L1_CONTRACTS.depositManager, parseEther(amount)],
+      args: [L1_CONTRACTS.wton, parseEther(amount)],
       chainId: sepolia.id,
     });
   };
@@ -134,6 +176,43 @@ export function useApproveTON() {
   return { approve, hash, isPending, isConfirming, isSuccess, error };
 }
 
+// Step 2: Swap TON → WTON
+export function useSwapToWTON() {
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  const swap = (amount: string) => {
+    writeContract({
+      address: L1_CONTRACTS.wton,
+      abi: WTON_ABI,
+      functionName: 'swapFromTON',
+      args: [parseEther(amount)],
+      chainId: sepolia.id,
+    });
+  };
+
+  return { swap, hash, isPending, isConfirming, isSuccess, error };
+}
+
+// Step 3: Approve WTON to DepositManager (for deposit)
+export function useApproveWTON() {
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  const approve = (amount: string) => {
+    writeContract({
+      address: L1_CONTRACTS.wton,
+      abi: ERC20_ABI,
+      functionName: 'approve',
+      args: [L1_CONTRACTS.depositManager, toWTONAmount(parseEther(amount))],
+      chainId: sepolia.id,
+    });
+  };
+
+  return { approve, hash, isPending, isConfirming, isSuccess, error };
+}
+
+// Step 4: Deposit WTON to DepositManager
 export function useStakeTON() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
@@ -143,7 +222,7 @@ export function useStakeTON() {
       address: L1_CONTRACTS.depositManager,
       abi: DEPOSIT_MANAGER_ABI,
       functionName: 'deposit',
-      args: [TOKAMAK_LAYER2, parseEther(amount)],
+      args: [TOKAMAK_LAYER2, toWTONAmount(parseEther(amount))],
       chainId: sepolia.id,
     });
   };
@@ -151,6 +230,7 @@ export function useStakeTON() {
   return { stake, hash, isPending, isConfirming, isSuccess, error };
 }
 
+// Unstake: requestWithdrawal (amount in WTON 27 decimals)
 export function useUnstakeTON() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
@@ -160,7 +240,7 @@ export function useUnstakeTON() {
       address: L1_CONTRACTS.depositManager,
       abi: DEPOSIT_MANAGER_ABI,
       functionName: 'requestWithdrawal',
-      args: [TOKAMAK_LAYER2, parseEther(amount)],
+      args: [TOKAMAK_LAYER2, toWTONAmount(parseEther(amount))],
       chainId: sepolia.id,
     });
   };

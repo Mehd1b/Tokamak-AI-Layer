@@ -6,7 +6,7 @@ import { config } from '../config.js';
 const VALIDATION_ABI = parseAbi([
   'function requestValidation(uint256 agentId, bytes32 taskHash, bytes32 outputHash, uint8 model, uint256 deadline) external payable returns (bytes32)',
   'function submitValidation(bytes32 requestHash, uint8 score, bytes calldata proof, string calldata detailsURI) external',
-  'function getValidation(bytes32 requestHash) external view returns (tuple(uint256 agentId, address requester, bytes32 taskHash, bytes32 outputHash, uint8 model, uint256 bounty, uint256 deadline, uint8 status, address validator, uint8 score, bytes proof, string detailsURI))',
+  'function getValidation(bytes32 requestHash) external view returns ((uint256 agentId, address requester, bytes32 taskHash, bytes32 outputHash, uint8 model, uint256 bounty, uint256 deadline, uint8 status, address validator, uint8 score, bytes proof, string detailsURI))',
   'function selectValidator(bytes32 requestHash, address[] calldata candidates) external',
   'function getSelectedValidator(bytes32 requestHash) external view returns (address)',
   'function getAgentValidations(uint256 agentId) external view returns (bytes32[])',

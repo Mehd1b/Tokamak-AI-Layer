@@ -8,10 +8,12 @@ export const CONTRACTS = {
 } as const;
 
 export const L1_CONTRACTS = {
-  depositManager: '0x90ffcc7F168DceDBEf1Cb6c6eB00cA73F922956F' as Address,
+  depositManager: '0x90ffcc7F168DceDBEF1Cb6c6eB00cA73F922956F' as Address,
   seigManager: '0x2320542ae933FbAdf8f5B97cA348c7CeDA90fAd7' as Address,
   layer2Registry: '0xA0a9576b437E52114aDA8b0BC4149F2F5c604581' as Address,
+  layer2: '0xCBeF7Cc221c04AD2E68e623613cc5d33b0fE1599' as Address, // Registered Layer2 operator for staking
   ton: '0xa30fe40285B8f5c0457DbC3B7C8A280373c40044' as Address,
+  wton: '0x79E0d92670106c85E9067b56B8F674340dCa0Bbd' as Address,
 } as const;
 
 export const CHAIN_ID = 11155420; // Optimism Sepolia

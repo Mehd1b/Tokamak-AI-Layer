@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Send, Loader2, AlertCircle, CheckCircle, FileCode, FileText } from 'lucide-react';
+import { Send, Loader2, AlertCircle, CheckCircle, FileCode, FileText, Shield, CheckCircle2, XCircle } from 'lucide-react';
 import { useSubmitTask } from '@/hooks/useAgentRuntime';
+import { useRequestValidation } from '@/hooks/useValidation';
 
 interface TaskSubmissionProps {
   agentId: string;
@@ -13,6 +14,13 @@ interface TaskSubmissionProps {
 export function TaskSubmission({ agentId, agentName, placeholder }: TaskSubmissionProps) {
   const [input, setInput] = useState('');
   const { submitTask, result, isSubmitting, error, reset } = useSubmitTask();
+  const {
+    validate,
+    result: validationResult,
+    isValidating,
+    error: validationError,
+    reset: resetValidation,
+  } = useRequestValidation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +47,7 @@ export function TaskSubmission({ agentId, agentName, placeholder }: TaskSubmissi
             {result && (
               <button
                 type="button"
-                onClick={() => { reset(); setInput(''); }}
+                onClick={() => { reset(); resetValidation(); setInput(''); }}
                 className="btn-secondary text-sm"
               >
                 Clear
@@ -117,6 +125,80 @@ export function TaskSubmission({ agentId, agentName, placeholder }: TaskSubmissi
                 {result.output}
               </pre>
             </div>
+          </div>
+
+          {/* Validation */}
+          <div className="mt-4 border-t border-green-200 pt-4">
+            {!validationResult && !validationError && (
+              <button
+                onClick={() => validate(result.taskId)}
+                disabled={isValidating}
+                className="btn-secondary inline-flex items-center gap-2 text-sm"
+              >
+                {isValidating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Validating...
+                  </>
+                ) : (
+                  <>
+                    <Shield className="h-4 w-4" />
+                    Request Validation
+                  </>
+                )}
+              </button>
+            )}
+
+            {validationResult && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <div className="mb-2 flex items-center gap-2">
+                  {validationResult.score >= 90 ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  ) : validationResult.score < 50 ? (
+                    <XCircle className="h-4 w-4 text-red-600" />
+                  ) : (
+                    <Shield className="h-4 w-4 text-blue-600" />
+                  )}
+                  <span className="text-sm font-medium text-blue-800">
+                    Validation Complete
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-blue-600">Score:</span>{' '}
+                    <span className="font-mono font-bold text-blue-900">
+                      {validationResult.score}/100
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-blue-600">Match:</span>{' '}
+                    <span className="font-mono text-blue-900 capitalize">
+                      {validationResult.matchType}
+                    </span>
+                  </div>
+                </div>
+                {validationResult.reExecutionHash && (
+                  <div className="mt-1 text-xs">
+                    <span className="text-blue-600">Re-execution Hash:</span>{' '}
+                    <span className="font-mono text-blue-900">
+                      {validationResult.reExecutionHash.substring(0, 18)}...
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {validationError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                <p className="text-sm text-red-700">{validationError}</p>
+                <button
+                  onClick={resetValidation}
+                  className="mt-2 text-xs text-red-600 underline"
+                >
+                  Try again
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

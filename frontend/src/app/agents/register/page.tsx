@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Upload, Plus, X } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
+import { useRegisterAgent } from '@/hooks/useRegisterAgent';
 
 interface Capability {
   id: string;
@@ -12,7 +14,9 @@ interface Capability {
 }
 
 export default function RegisterAgentPage() {
-  const { isConnected, isCorrectChain } = useWallet();
+  const router = useRouter();
+  const { address, isConnected, isCorrectChain: isL2 } = useWallet();
+  const { register, hash: txHash, isPending, isConfirming, isSuccess, error: txError } = useRegisterAgent();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -21,6 +25,18 @@ export default function RegisterAgentPage() {
   const [newServiceType, setNewServiceType] = useState('A2A');
   const [newServiceUrl, setNewServiceUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [ipfsUri, setIpfsUri] = useState<string | null>(null);
+
+  // Redirect to /agents after successful registration
+  useEffect(() => {
+    if (isSuccess) {
+      const timer = setTimeout(() => {
+        router.push('/agents');
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isSuccess, router]);
 
   const addService = () => {
     if (newServiceType && newServiceUrl) {
@@ -63,23 +79,43 @@ export default function RegisterAgentPage() {
     if (!name || !description) return;
 
     setIsSubmitting(true);
+    setUploadError(null);
+
     try {
-      // Build registration file
+      // Build ERC-8004 registration JSON
       const registration = {
         type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
         name,
         description,
         image: imageUrl || undefined,
         active: true,
-        services: Object.keys(services).length > 0 ? services : undefined,
-        tal: capabilities.length > 0 ? { capabilities } : undefined,
+        services: Object.fromEntries(
+          Object.entries(services).filter(([, v]) => v.trim() !== ''),
+        ),
+        tal: {
+          capabilities: capabilities.filter((c) => c.name && c.description),
+        },
       };
 
-      // TODO: Upload to IPFS and call contract
-      console.log('Registration file:', registration);
-      alert('Registration flow requires wallet connection and IPFS upload. Registration file prepared.');
-    } catch (error) {
-      console.error('Registration failed:', error);
+      // Upload to IPFS via API route
+      const uploadRes = await fetch('/api/ipfs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(registration),
+      });
+
+      if (!uploadRes.ok) {
+        const data = await uploadRes.json();
+        throw new Error(data.error || 'IPFS upload failed');
+      }
+
+      const { ipfsUri: uri } = await uploadRes.json();
+      setIpfsUri(uri);
+
+      // Call contract to register
+      register(uri);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Registration failed');
     } finally {
       setIsSubmitting(false);
     }
@@ -108,7 +144,7 @@ export default function RegisterAgentPage() {
         </div>
       )}
 
-      {isConnected && !isCorrectChain && (
+      {isConnected && !isL2 && (
         <div className="card mb-6 border-amber-200 bg-amber-50">
           <p className="text-sm text-amber-800">
             Please switch to Optimism Sepolia network.
@@ -133,9 +169,13 @@ export default function RegisterAgentPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
+                maxLength={100}
                 placeholder="My AI Agent"
                 className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-tokamak-500 focus:outline-none focus:ring-1 focus:ring-tokamak-500"
               />
+              <p className="mt-1 text-xs text-gray-500">
+                {name.length}/100
+              </p>
             </div>
 
             <div>
@@ -146,10 +186,14 @@ export default function RegisterAgentPage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 required
+                maxLength={1000}
                 rows={3}
                 placeholder="Describe what your agent does..."
                 className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-tokamak-500 focus:outline-none focus:ring-1 focus:ring-tokamak-500"
               />
+              <p className="mt-1 text-xs text-gray-500">
+                {description.length}/1000
+              </p>
             </div>
 
             <div>
@@ -291,13 +335,56 @@ export default function RegisterAgentPage() {
           </Link>
           <button
             type="submit"
-            disabled={!isConnected || !isCorrectChain || isSubmitting || !name || !description}
+            disabled={!isConnected || !isL2 || !name || !description || isPending || isConfirming || isSubmitting}
             className="btn-primary flex items-center gap-2"
           >
             <Upload className="h-4 w-4" />
-            {isSubmitting ? 'Registering...' : 'Register Agent'}
+            {isSubmitting ? 'Uploading to IPFS...' : isPending ? 'Confirm in wallet...' : isConfirming ? 'Registering...' : 'Register Agent'}
           </button>
         </div>
+
+        {/* Status Messages */}
+        {uploadError && (
+          <div className="card border-red-200 bg-red-50">
+            <p className="text-sm text-red-800">
+              <strong>Upload Error:</strong> {uploadError}
+            </p>
+          </div>
+        )}
+
+        {txError && (
+          <div className="card border-red-200 bg-red-50">
+            <p className="text-sm text-red-800">
+              <strong>Transaction Error:</strong> {txError.message}
+            </p>
+          </div>
+        )}
+
+        {ipfsUri && !isSuccess && (
+          <div className="card border-blue-200 bg-blue-50">
+            <p className="text-sm text-blue-800">
+              <strong>Uploaded to IPFS:</strong> {ipfsUri}
+            </p>
+          </div>
+        )}
+
+        {isSuccess && txHash && (
+          <div className="card border-green-200 bg-green-50">
+            <p className="text-sm text-green-800">
+              <strong>Agent registered!</strong> Transaction:{' '}
+              <a
+                href={`https://sepolia-optimism.etherscan.io/tx/${txHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-green-900"
+              >
+                {txHash.slice(0, 10)}...{txHash.slice(-8)}
+              </a>
+              <br />
+              Redirecting to agents list...
+            </p>
+          </div>
+        )}
       </form>
     </div>
   );

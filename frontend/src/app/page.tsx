@@ -2,8 +2,14 @@
 
 import Link from 'next/link';
 import { Shield, Search, Star, Zap } from 'lucide-react';
+import { useReadContracts } from 'wagmi';
 import { useAgentCount } from '@/hooks/useAgent';
 import { useRecentTasks } from '@/hooks/useAgentRuntime';
+import { useWallet } from '@/hooks/useWallet';
+import { useStakeBalance } from '@/hooks/useStaking';
+import { CONTRACTS } from '@/lib/contracts';
+import { formatBigInt } from '@/lib/utils';
+import { TALValidationRegistryABI } from '../../../sdk/src/abi/TALValidationRegistry';
 
 const features = [
   {
@@ -39,8 +45,37 @@ const features = [
 export default function HomePage() {
   const { count: agentCount } = useAgentCount();
   const { tasks } = useRecentTasks();
+  const { address, isConnected } = useWallet();
+  const { data: stakeBalance } = useStakeBalance(address);
 
   const completedTasks = tasks.filter((t) => t.status === 'completed').length;
+
+  // Aggregate validation count across first 20 agents
+  const agentCountNum = agentCount ? Number(agentCount) : 0;
+
+  const validationContracts = Array.from(
+    { length: Math.min(agentCountNum, 20) },
+    (_, i) => ({
+      address: CONTRACTS.validationRegistry as `0x${string}`,
+      abi: TALValidationRegistryABI,
+      functionName: 'getAgentValidations' as const,
+      args: [BigInt(i + 1)],
+    })
+  );
+
+  const { data: validationData } = useReadContracts({
+    contracts: validationContracts,
+    query: { enabled: agentCountNum > 0 },
+  });
+
+  const totalValidations = validationData
+    ? validationData.reduce((sum, result) => {
+        if (result.status === 'success' && Array.isArray(result.result)) {
+          return sum + result.result.length;
+        }
+        return sum;
+      }, 0)
+    : 0;
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -108,12 +143,18 @@ export default function HomePage() {
               <p className="mt-1 text-sm text-gray-600">Tasks Completed</p>
             </div>
             <div className="text-center">
-              <p className="text-3xl font-bold text-tokamak-600">-</p>
+              <p className="text-3xl font-bold text-tokamak-600">
+                {totalValidations > 0 ? totalValidations.toString() : agentCountNum > 0 ? '0' : '-'}
+              </p>
               <p className="mt-1 text-sm text-gray-600">Validations</p>
             </div>
             <div className="text-center">
-              <p className="text-3xl font-bold text-tokamak-600">-</p>
-              <p className="mt-1 text-sm text-gray-600">TON Staked</p>
+              <p className="text-3xl font-bold text-tokamak-600">
+                {isConnected && stakeBalance ? formatBigInt(stakeBalance, 27) : '-'}
+              </p>
+              <p className="mt-1 text-sm text-gray-600">
+                {isConnected ? 'Your TON Staked' : 'TON Staked'}
+              </p>
             </div>
           </div>
         </div>

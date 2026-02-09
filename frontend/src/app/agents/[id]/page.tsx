@@ -17,6 +17,7 @@ import { useFeedbackCount, useClientList } from '@/hooks/useReputation';
 import { useAgentValidations } from '@/hooks/useValidation';
 import { useRuntimeAgents } from '@/hooks/useAgentRuntime';
 import { TaskSubmission } from '@/components/TaskSubmission';
+import { FeedbackModal } from '@/components/FeedbackModal';
 import { shortenAddress } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -45,6 +46,7 @@ export default function AgentDetailPage() {
   const { validationHashes } = useAgentValidations(agentId);
   const { agents: runtimeAgents } = useRuntimeAgents();
   const [copied, setCopied] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
   const copyAddress = (addr: string) => {
     navigator.clipboard.writeText(addr);
@@ -288,8 +290,22 @@ export default function AgentDetailPage() {
         <Link href={`/reputation/${agentId}`} className="btn-primary">
           View Reputation
         </Link>
-        <button className="btn-secondary">Submit Feedback</button>
+        <button
+          onClick={() => setShowFeedbackModal(true)}
+          className="btn-secondary"
+        >
+          Submit Feedback
+        </button>
       </div>
+
+      {/* Feedback Modal */}
+      {showFeedbackModal && (
+        <FeedbackModal
+          agentId={BigInt(params.id as string)}
+          agentOwner={agent.owner || ''}
+          onClose={() => setShowFeedbackModal(false)}
+        />
+      )}
     </div>
   );
 }

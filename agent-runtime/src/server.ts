@@ -68,7 +68,7 @@ app.listen(config.PORT, config.HOST, () => {
 ╔══════════════════════════════════════════════════════╗
 ║          TAL Agent Runtime v0.1.0                    ║
 ╠══════════════════════════════════════════════════════╣
-║  Server:  http://${config.HOST}:${config.PORT}${' '.repeat(Math.max(0, 32 - `http://${config.HOST}:${config.PORT}`.length))}║
+║  Server:  http://${config.HOST}:${config.PORT}${' '.repeat(Math.max(0, 32 - `http://${config.HOST}:${config.PORT}`.length))}     ║
 ║  Model:   ${config.LLM_MODEL}${' '.repeat(Math.max(0, 41 - config.LLM_MODEL.length))}║
 ║  Agents:  ${Array.from(agents.keys()).join(', ')}${' '.repeat(Math.max(0, 41 - Array.from(agents.keys()).join(', ').length))}║
 ╚══════════════════════════════════════════════════════╝

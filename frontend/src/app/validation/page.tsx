@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import {
   Search,
@@ -12,11 +13,36 @@ import {
 } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
 import { useAgentCount } from '@/hooks/useAgent';
-import { getValidationModelLabel } from '@/lib/utils';
+import { useAllValidationHashes, useValidationBatch } from '@/hooks/useValidation';
+import {
+  getValidationModelLabel,
+  getValidationStatusLabel,
+  getStatusColor,
+  shortenAddress,
+  formatBigInt,
+} from '@/lib/utils';
 
 export default function ValidationPage() {
   const { isConnected } = useWallet();
-  const { count: agentCount, isLoading } = useAgentCount();
+  const { count: agentCount, isLoading: isLoadingCount } = useAgentCount();
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const totalAgents = agentCount ? Number(agentCount) : 0;
+  const { validations: allHashes, isLoading: isLoadingHashes } = useAllValidationHashes(totalAgents);
+  const hashes = allHashes.map((v) => v.hash);
+  const { validations, isLoading: isLoadingDetails } = useValidationBatch(hashes);
+
+  const isLoading = isLoadingCount || isLoadingHashes || isLoadingDetails;
+
+  // Filter validations by search query
+  const filteredValidations = validations.filter((v) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      v.hash.toLowerCase().includes(query) ||
+      v.request.agentId.toString().includes(query)
+    );
+  });
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -82,6 +108,8 @@ export default function ValidationPage() {
             <input
               type="text"
               placeholder="Search validations by agent ID or request hash..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm focus:border-tokamak-500 focus:outline-none focus:ring-1 focus:ring-tokamak-500"
             />
           </div>
@@ -100,17 +128,18 @@ export default function ValidationPage() {
           </div>
         )}
 
-        {!isLoading && (
+        {!isLoading && filteredValidations.length === 0 && (
           <div className="card py-12 text-center">
             <Shield className="mx-auto h-12 w-12 text-gray-300" />
             <h3 className="mt-4 text-lg font-semibold text-gray-900">
-              No Validations Yet
+              {searchQuery ? 'No Matching Validations' : 'No Validations Yet'}
             </h3>
             <p className="mt-2 text-sm text-gray-500">
-              Validation requests will appear here once agents begin requesting
-              capability validations.
+              {searchQuery
+                ? 'Try a different search query or clear the filter.'
+                : 'Validation requests will appear here once agents begin requesting capability validations.'}
             </p>
-            {isConnected && (
+            {!searchQuery && isConnected && (
               <p className="mt-4 text-xs text-gray-400">
                 To request a validation, visit an agent&apos;s detail page and
                 select a trust model.
@@ -118,6 +147,61 @@ export default function ValidationPage() {
             )}
           </div>
         )}
+
+        {!isLoading &&
+          filteredValidations.map((v) => {
+            const statusColor = getStatusColor(v.request.status);
+            const isCompleted = v.request.status === 1;
+            const modelLabel = getValidationModelLabel(v.request.model);
+            const statusLabel = getValidationStatusLabel(v.request.status);
+
+            return (
+              <Link key={v.hash} href={`/validation/${v.hash}`}>
+                <div className="card hover:border-tokamak-500 transition-colors cursor-pointer">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="font-mono text-sm text-gray-900">
+                          {shortenAddress(v.hash, 12)}
+                        </h3>
+                        <span className={statusColor}>{statusLabel}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-500">Agent ID:</span>{' '}
+                          <Link
+                            href={`/agents/${v.request.agentId}`}
+                            className="text-tokamak-600 hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            #{v.request.agentId.toString()}
+                          </Link>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Trust Model:</span>{' '}
+                          <span className="font-medium">{modelLabel}</span>
+                        </div>
+                        {isCompleted && v.response.score > 0 && (
+                          <div>
+                            <span className="text-gray-500">Score:</span>{' '}
+                            <span className="font-medium">{v.response.score}/100</span>
+                          </div>
+                        )}
+                        {v.request.bounty > 0n && (
+                          <div>
+                            <span className="text-gray-500">Bounty:</span>{' '}
+                            <span className="font-medium">
+                              {formatBigInt(v.request.bounty)} ETH
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
       </div>
 
       {/* Status Legend */}

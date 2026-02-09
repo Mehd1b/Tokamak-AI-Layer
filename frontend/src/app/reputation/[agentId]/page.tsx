@@ -3,8 +3,25 @@
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Star, TrendingUp, Users, Shield } from 'lucide-react';
-import { useFeedbackCount, useClientList } from '@/hooks/useReputation';
+import { useFeedbackCount, useClientList, useReputationSummary, useVerifiedSummary } from '@/hooks/useReputation';
 import { useAgent } from '@/hooks/useAgent';
+
+function formatAverage(summary: { totalValue: bigint; count: bigint; min: bigint; max: bigint } | undefined): string {
+  if (!summary || summary.count === 0n) {
+    return 'N/A';
+  }
+  const average = Number(summary.totalValue) / Number(summary.count) / 10;
+  return average.toFixed(1);
+}
+
+function formatRange(summary: { totalValue: bigint; count: bigint; min: bigint; max: bigint } | undefined): string {
+  if (!summary || summary.count === 0n) {
+    return 'N/A';
+  }
+  const min = Number(summary.min) / 10;
+  const max = Number(summary.max) / 10;
+  return `${min.toFixed(1)} - ${max.toFixed(1)}`;
+}
 
 export default function ReputationPage() {
   const params = useParams();
@@ -13,8 +30,12 @@ export default function ReputationPage() {
   const { count: feedbackCount, isLoading: feedbackLoading } =
     useFeedbackCount(agentId);
   const { clients, isLoading: clientsLoading } = useClientList(agentId);
+  const { summary: standardSummary, isLoading: standardLoading } =
+    useReputationSummary(agentId, clients ?? []);
+  const { summary: verifiedSummary, isLoading: verifiedLoading } =
+    useVerifiedSummary(agentId, clients ?? []);
 
-  const isLoading = agentLoading || feedbackLoading || clientsLoading;
+  const isLoading = agentLoading || feedbackLoading || clientsLoading || standardLoading || verifiedLoading;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
@@ -42,7 +63,7 @@ export default function ReputationPage() {
           <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
             <div className="card text-center">
               <Star className="mx-auto h-8 w-8 text-amber-500" />
-              <p className="mt-2 text-2xl font-bold text-gray-900">-</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">{formatAverage(standardSummary)}</p>
               <p className="text-sm text-gray-500">Average Score</p>
             </div>
             <div className="card text-center">
@@ -61,7 +82,7 @@ export default function ReputationPage() {
             </div>
             <div className="card text-center">
               <Shield className="mx-auto h-8 w-8 text-purple-500" />
-              <p className="mt-2 text-2xl font-bold text-gray-900">-</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">{formatAverage(verifiedSummary)}</p>
               <p className="text-sm text-gray-500">Verified Score</p>
             </div>
           </div>
@@ -77,8 +98,9 @@ export default function ReputationPage() {
                 (ERC-8004) prevents Sybil attacks.
               </p>
               <div className="mt-4 rounded-lg bg-gray-50 p-3 text-center">
-                <p className="text-xl font-bold text-gray-900">-</p>
+                <p className="text-xl font-bold text-gray-900">{formatAverage(standardSummary)}</p>
                 <p className="text-xs text-gray-500">Score</p>
+                <p className="text-xs text-gray-400 mt-1">Range: {formatRange(standardSummary)}</p>
               </div>
             </div>
 
@@ -91,8 +113,9 @@ export default function ReputationPage() {
                 more.
               </p>
               <div className="mt-4 rounded-lg bg-gray-50 p-3 text-center">
-                <p className="text-xl font-bold text-gray-900">-</p>
+                <p className="text-xl font-bold text-gray-900">{formatAverage(standardSummary)}</p>
                 <p className="text-xs text-gray-500">Weighted Score</p>
+                <p className="text-xs text-gray-400 mt-1">Range: {formatRange(standardSummary)}</p>
               </div>
             </div>
 
@@ -104,8 +127,9 @@ export default function ReputationPage() {
                 Only feedback linked to validated tasks. Highest trust level.
               </p>
               <div className="mt-4 rounded-lg bg-gray-50 p-3 text-center">
-                <p className="text-xl font-bold text-gray-900">-</p>
+                <p className="text-xl font-bold text-gray-900">{formatAverage(verifiedSummary)}</p>
                 <p className="text-xs text-gray-500">Verified Score</p>
+                <p className="text-xs text-gray-400 mt-1">Range: {formatRange(verifiedSummary)}</p>
               </div>
             </div>
           </div>
@@ -121,8 +145,7 @@ export default function ReputationPage() {
               </p>
             ) : (
               <p className="text-center text-sm text-gray-500 py-8">
-                Feedback entries will appear here once the subgraph is
-                available (Sprint 3).
+                Individual feedback details require the subgraph indexer.
               </p>
             )}
           </div>
