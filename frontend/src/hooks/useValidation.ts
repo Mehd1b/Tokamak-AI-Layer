@@ -161,8 +161,6 @@ export function useValidationBatch(hashes: `0x${string}`[]) {
   return { validations, isLoading };
 }
 
-const RUNTIME_URL = process.env.NEXT_PUBLIC_AGENT_RUNTIME_URL || 'http://localhost:3001';
-
 export interface ValidationExecuteResult {
   taskId: string;
   score: number;
@@ -176,34 +174,41 @@ export function useRequestValidation() {
   const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const validate = useCallback(async (taskId: string) => {
-    setIsValidating(true);
-    setError(null);
-    setResult(null);
+  const validate = useCallback(
+    async (onChainAgentId: string, taskId: string) => {
+      setIsValidating(true);
+      setError(null);
+      setResult(null);
 
-    try {
-      const res = await fetch(`${RUNTIME_URL}/api/validations/execute`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId }),
-      });
+      try {
+        const res = await fetch(
+          `/api/runtime/${onChainAgentId}/validate`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ taskId }),
+          },
+        );
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `Validation failed (${res.status})`);
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || `Validation failed (${res.status})`);
+        }
+
+        const data: ValidationExecuteResult = await res.json();
+        setResult(data);
+        return data;
+      } catch (err) {
+        const msg =
+          err instanceof Error ? err.message : 'Validation request failed';
+        setError(msg);
+        return null;
+      } finally {
+        setIsValidating(false);
       }
-
-      const data: ValidationExecuteResult = await res.json();
-      setResult(data);
-      return data;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Validation request failed';
-      setError(msg);
-      return null;
-    } finally {
-      setIsValidating(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   const reset = useCallback(() => {
     setResult(null);

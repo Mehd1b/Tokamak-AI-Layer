@@ -2,9 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-const RUNTIME_URL =
-  process.env.NEXT_PUBLIC_AGENT_RUNTIME_URL || 'http://localhost:3001';
-
 export interface RuntimeAgent {
   id: string;
   name: string;
@@ -36,37 +33,16 @@ export interface TaskResult {
   metadata: Record<string, unknown>;
 }
 
-export function useRuntimeAgents() {
-  const [agents, setAgents] = useState<RuntimeAgent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch(`${RUNTIME_URL}/api/agents`)
-      .then((res) => res.json())
-      .then((data) => {
-        setAgents(data.agents || []);
-        setIsLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message);
-        setIsLoading(false);
-      });
-  }, []);
-
-  return { agents, isLoading, error };
-}
-
-export function useRuntimeAgent(agentId: string | undefined) {
+export function useRuntimeAgent(onChainAgentId: string | undefined) {
   const [agent, setAgent] = useState<RuntimeAgent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!agentId) {
+    if (!onChainAgentId) {
       setIsLoading(false);
       return;
     }
-    fetch(`${RUNTIME_URL}/api/agents/${agentId}`)
+    fetch(`/api/runtime/${onChainAgentId}/info`)
       .then((res) => {
         if (!res.ok) return null;
         return res.json();
@@ -76,7 +52,7 @@ export function useRuntimeAgent(agentId: string | undefined) {
         setIsLoading(false);
       })
       .catch(() => setIsLoading(false));
-  }, [agentId]);
+  }, [onChainAgentId]);
 
   return { agent, isLoading };
 }
@@ -87,16 +63,21 @@ export function useSubmitTask() {
   const [error, setError] = useState<string | null>(null);
 
   const submitTask = useCallback(
-    async (agentId: string, text: string) => {
+    async (
+      onChainAgentId: string,
+      text: string,
+      paymentTxHash?: string,
+      taskRef?: string,
+    ) => {
       setIsSubmitting(true);
       setError(null);
       setResult(null);
 
       try {
-        const res = await fetch(`${RUNTIME_URL}/api/tasks`, {
+        const res = await fetch(`/api/runtime/${onChainAgentId}/tasks`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ agentId, input: { text } }),
+          body: JSON.stringify({ input: { text }, paymentTxHash, taskRef }),
         });
 
         if (!res.ok) {
@@ -126,20 +107,24 @@ export function useSubmitTask() {
   return { submitTask, result, isSubmitting, error, reset };
 }
 
-export function useRecentTasks() {
+export function useRecentTasks(onChainAgentId?: string) {
   const [tasks, setTasks] = useState<TaskResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const refresh = useCallback(() => {
+    if (!onChainAgentId) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
-    fetch(`${RUNTIME_URL}/api/tasks`)
+    fetch(`/api/runtime/${onChainAgentId}/tasks`)
       .then((res) => res.json())
       .then((data) => {
         setTasks(data.tasks || []);
         setIsLoading(false);
       })
       .catch(() => setIsLoading(false));
-  }, []);
+  }, [onChainAgentId]);
 
   useEffect(() => {
     refresh();

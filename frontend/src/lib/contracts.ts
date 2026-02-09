@@ -1,10 +1,12 @@
 import type { Address } from 'viem';
 
+// Thanos Sepolia L2 contracts (deployed via DeployThanos.s.sol)
 export const CONTRACTS = {
   identityRegistry: '0x3f89CD27fD877827E7665A9883b3c0180E22A525' as Address,
   reputationRegistry: '0x0052258E517835081c94c0B685409f2EfC4D502b' as Address,
   validationRegistry: '0x09447147C6E75a60A449f38532F06E19F5F632F3' as Address,
-  stakingIntegrationModule: '0x41FF86643f6d550725177af1ABBF4db9715A74b8' as Address,
+  stakingIntegrationModule: '0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30' as Address,
+  taskFeeEscrow: '0xAf58D2191772bcFFB3260F5140E995ec79e4d88B' as Address,
 } as const;
 
 export const L1_CONTRACTS = {
@@ -16,5 +18,5 @@ export const L1_CONTRACTS = {
   wton: '0x79E0d92670106c85E9067b56B8F674340dCa0Bbd' as Address,
 } as const;
 
-export const CHAIN_ID = 11155420; // Optimism Sepolia
+export const CHAIN_ID = 111551119090; // Thanos Sepolia
 export const L1_CHAIN_ID = 11155111; // Sepolia

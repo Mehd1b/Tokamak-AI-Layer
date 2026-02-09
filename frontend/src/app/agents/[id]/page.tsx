@@ -15,8 +15,11 @@ import {
 import { useAgent } from '@/hooks/useAgent';
 import { useFeedbackCount, useClientList } from '@/hooks/useReputation';
 import { useAgentValidations } from '@/hooks/useValidation';
-import { useRuntimeAgents } from '@/hooks/useAgentRuntime';
+import { useRuntimeAgent } from '@/hooks/useAgentRuntime';
+import { useAgentMetadata } from '@/hooks/useAgentMetadata';
+import { useAgentFee } from '@/hooks/useTaskFee';
 import { TaskSubmission } from '@/components/TaskSubmission';
+import { formatEther } from 'viem';
 import { FeedbackModal } from '@/components/FeedbackModal';
 import { shortenAddress } from '@/lib/utils';
 import { useState } from 'react';
@@ -44,7 +47,9 @@ export default function AgentDetailPage() {
   const { count: feedbackCount } = useFeedbackCount(agentId);
   const { clients } = useClientList(agentId);
   const { validationHashes } = useAgentValidations(agentId);
-  const { agents: runtimeAgents } = useRuntimeAgents();
+  const { agent: runtimeAgent } = useRuntimeAgent(agentId?.toString());
+  const { name: metaName, description: metaDescription, capabilities: metaCapabilities, services: metaServices, active: metaActive, pricing: metaPricing } = useAgentMetadata(agent?.agentURI);
+  const { data: onChainFee } = useAgentFee(agentId);
   const [copied, setCopied] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
@@ -53,12 +58,6 @@ export default function AgentDetailPage() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-
-  // Match on-chain agent to runtime agent by checking if agentURI points to our runtime
-  const runtimeAgent = runtimeAgents.find((ra) => {
-    if (!agent?.agentURI) return false;
-    return agent.agentURI.includes(`/api/agents/${ra.id}/`);
-  });
 
   if (isLoading) {
     return (
@@ -107,17 +106,17 @@ export default function AgentDetailPage() {
       {/* Header */}
       <div className="card mb-6">
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-tokamak-100 text-tokamak-700 text-2xl font-bold">
+          <div className="flex min-w-0 flex-1 items-center gap-4">
+            <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-tokamak-100 text-tokamak-700 text-2xl font-bold">
               #{agentId?.toString()}
             </div>
-            <div>
+            <div className="min-w-0">
               <h1 className="text-2xl font-bold text-gray-900">
-                {runtimeAgent ? runtimeAgent.name : `Agent #${agentId?.toString()}`}
+                {runtimeAgent?.name || metaName || `Agent #${agentId?.toString()}`}
               </h1>
-              {runtimeAgent && (
-                <p className="mt-0.5 text-sm text-gray-600">
-                  {runtimeAgent.description}
+              {(runtimeAgent?.description || metaDescription) && (
+                <p className="mt-0.5 text-sm text-gray-600 break-words">
+                  {runtimeAgent?.description || metaDescription}
                 </p>
               )}
               <div className="mt-1 flex items-center gap-2">
@@ -243,13 +242,13 @@ export default function AgentDetailPage() {
       </div>
 
       {/* Capabilities */}
-      {runtimeAgent && runtimeAgent.capabilities.length > 0 && (
+      {((runtimeAgent && runtimeAgent.capabilities.length > 0) || (metaCapabilities && metaCapabilities.length > 0)) && (
         <div className="mt-6 card">
           <h2 className="mb-4 text-lg font-semibold text-gray-900">
             Capabilities
           </h2>
           <div className="space-y-3">
-            {runtimeAgent.capabilities.map((cap) => (
+            {(runtimeAgent?.capabilities || (metaCapabilities || []).map((c, i) => ({ id: `cap-${i}`, name: c, description: '' }))).map((cap) => (
               <div
                 key={cap.id}
                 className="rounded-lg border border-gray-200 bg-gray-50 p-3"
@@ -268,6 +267,46 @@ export default function AgentDetailPage() {
         </div>
       )}
 
+      {/* Service Endpoints */}
+      {metaServices && Object.keys(metaServices).length > 0 && (
+        <div className="mt-6 card">
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">
+            Service Endpoints
+          </h2>
+          <div className="space-y-2">
+            {Object.entries(metaServices).map(([type, url]) => (
+              <div key={type} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <span className="text-sm font-medium text-gray-700">{type}:</span>{' '}
+                  <span className="text-sm text-gray-600 break-all">{url}</span>
+                </div>
+                <a href={url} target="_blank" rel="noopener noreferrer" className="ml-2 text-tokamak-600 hover:text-tokamak-700 flex-shrink-0">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Fee Info */}
+      {onChainFee && onChainFee > 0n && (
+        <div className="mt-6 card border-tokamak-200 bg-tokamak-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Task Fee</h2>
+              <p className="text-sm text-gray-600">This agent charges a fee per task execution</p>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-bold text-tokamak-600">
+                {formatEther(onChainFee)} TON
+              </p>
+              <p className="text-xs text-gray-500">per task</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Use Agent */}
       {runtimeAgent && agentConfig && (
         <div className="mt-6 card">
@@ -278,9 +317,11 @@ export default function AgentDetailPage() {
             </h2>
           </div>
           <TaskSubmission
-            agentId={runtimeAgent.id}
+            agentId={agentId!.toString()}
             agentName={runtimeAgent.name}
             placeholder={agentConfig.placeholder}
+            onChainAgentId={agentId}
+            feePerTask={onChainFee}
           />
         </div>
       )}

@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { ArrowLeft, Upload, Plus, X } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
 import { useRegisterAgent } from '@/hooks/useRegisterAgent';
+import { useSetAgentFee } from '@/hooks/useTaskFee';
+import { parseEther } from 'viem';
 
 interface Capability {
   id: string;
@@ -16,10 +18,12 @@ interface Capability {
 export default function RegisterAgentPage() {
   const router = useRouter();
   const { address, isConnected, isCorrectChain: isL2 } = useWallet();
-  const { register, hash: txHash, isPending, isConfirming, isSuccess, error: txError } = useRegisterAgent();
+  const { register, hash: txHash, isPending, isConfirming, isSuccess, error: txError, newAgentId } = useRegisterAgent();
+  const { setFee, hash: feeHash, isPending: isFeePending, isConfirming: isFeeConfirming, isSuccess: isFeeSuccess, error: feeError } = useSetAgentFee();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [feePerTask, setFeePerTask] = useState('');
   const [services, setServices] = useState<Record<string, string>>({});
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [newServiceType, setNewServiceType] = useState('A2A');
@@ -28,15 +32,24 @@ export default function RegisterAgentPage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [ipfsUri, setIpfsUri] = useState<string | null>(null);
 
-  // Redirect to /agents after successful registration
+  // After registration success, set fee on-chain if configured
   useEffect(() => {
-    if (isSuccess) {
+    if (isSuccess && newAgentId && feePerTask && parseFloat(feePerTask) > 0 && !feeHash && !isFeePending) {
+      setFee(newAgentId, parseEther(feePerTask));
+    }
+  }, [isSuccess, newAgentId, feePerTask, feeHash, isFeePending, setFee]);
+
+  // Redirect to /agents after successful registration (and fee set if applicable)
+  const hasFeeToSet = feePerTask && parseFloat(feePerTask) > 0;
+  useEffect(() => {
+    const done = hasFeeToSet ? (isSuccess && isFeeSuccess) : isSuccess;
+    if (done) {
       const timer = setTimeout(() => {
         router.push('/agents');
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [isSuccess, router]);
+  }, [isSuccess, isFeeSuccess, hasFeeToSet, router]);
 
   const addService = () => {
     if (newServiceType && newServiceUrl) {
@@ -83,7 +96,7 @@ export default function RegisterAgentPage() {
 
     try {
       // Build ERC-8004 registration JSON
-      const registration = {
+      const registration: Record<string, unknown> = {
         type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
         name,
         description,
@@ -94,6 +107,7 @@ export default function RegisterAgentPage() {
         ),
         tal: {
           capabilities: capabilities.filter((c) => c.name && c.description),
+          ...(feePerTask ? { pricing: { currency: 'TON', perRequest: feePerTask } } : {}),
         },
       };
 
@@ -208,6 +222,31 @@ export default function RegisterAgentPage() {
                 className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-tokamak-500 focus:outline-none focus:ring-1 focus:ring-tokamak-500"
               />
             </div>
+          </div>
+        </div>
+
+        {/* Fee Configuration */}
+        <div className="card">
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">
+            Fee Configuration
+          </h2>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Fee per Task (TON)
+            </label>
+            <input
+              type="number"
+              step="0.001"
+              min="0"
+              value={feePerTask}
+              onChange={(e) => setFeePerTask(e.target.value)}
+              placeholder="0.0 (free)"
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-tokamak-500 focus:outline-none focus:ring-1 focus:ring-tokamak-500"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Leave empty or 0 for free agents. Fee is paid in native TON on Thanos L2.
+              You can set or update the fee later from the agent detail page.
+            </p>
           </div>
         </div>
 
@@ -339,7 +378,7 @@ export default function RegisterAgentPage() {
             className="btn-primary flex items-center gap-2"
           >
             <Upload className="h-4 w-4" />
-            {isSubmitting ? 'Uploading to IPFS...' : isPending ? 'Confirm in wallet...' : isConfirming ? 'Registering...' : 'Register Agent'}
+            {isSubmitting ? 'Uploading to IPFS...' : isPending ? 'Confirm in wallet...' : isConfirming ? 'Registering...' : isFeePending ? 'Confirm fee in wallet...' : isFeeConfirming ? 'Setting fee...' : 'Register Agent'}
           </button>
         </div>
 
@@ -360,6 +399,14 @@ export default function RegisterAgentPage() {
           </div>
         )}
 
+        {feeError && (
+          <div className="card border-red-200 bg-red-50">
+            <p className="text-sm text-red-800">
+              <strong>Fee Setup Error:</strong> {feeError.message}
+            </p>
+          </div>
+        )}
+
         {ipfsUri && !isSuccess && (
           <div className="card border-blue-200 bg-blue-50">
             <p className="text-sm text-blue-800">
@@ -371,18 +418,29 @@ export default function RegisterAgentPage() {
         {isSuccess && txHash && (
           <div className="card border-green-200 bg-green-50">
             <p className="text-sm text-green-800">
-              <strong>Agent registered!</strong> Transaction:{' '}
+              <strong>Agent registered!</strong>{newAgentId ? ` (ID: ${newAgentId.toString()})` : ''} Transaction:{' '}
               <a
-                href={`https://sepolia-optimism.etherscan.io/tx/${txHash}`}
+                href={`https://explorer.thanos-sepolia.tokamak.network/tx/${txHash}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline hover:text-green-900"
               >
                 {txHash.slice(0, 10)}...{txHash.slice(-8)}
               </a>
-              <br />
-              Redirecting to agents list...
             </p>
+            {hasFeeToSet && !isFeeSuccess && !feeError && (
+              <p className="mt-1 text-sm text-green-700">
+                {isFeePending ? 'Please confirm fee transaction in wallet...' : isFeeConfirming ? 'Setting agent fee on-chain...' : 'Preparing fee transaction...'}
+              </p>
+            )}
+            {isFeeSuccess && (
+              <p className="mt-1 text-sm text-green-800">
+                <strong>Fee set to {feePerTask} TON per task.</strong> Redirecting...
+              </p>
+            )}
+            {!hasFeeToSet && (
+              <p className="mt-1 text-sm text-green-700">Redirecting to agents list...</p>
+            )}
           </div>
         )}
       </form>

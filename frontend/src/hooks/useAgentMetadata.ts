@@ -2,16 +2,27 @@
 
 import { useState, useEffect } from 'react';
 
+interface AgentPricing {
+  currency?: string;
+  perRequest?: string;
+}
+
 interface AgentMetadata {
   name?: string;
   description?: string;
   capabilities?: string[];
+  active?: boolean;
+  services?: Record<string, string>;
+  pricing?: AgentPricing;
 }
 
 interface UseAgentMetadataResult {
   name?: string;
   description?: string;
   capabilities?: string[];
+  active?: boolean;
+  services?: Record<string, string>;
+  pricing?: AgentPricing;
   isLoading: boolean;
   error?: string;
 }
@@ -78,10 +89,14 @@ export function useAgentMetadata(agentURI: string | undefined): UseAgentMetadata
             name: data.name || data.metadata?.name,
             description: data.description || data.metadata?.description,
             capabilities: data.capabilities || data.metadata?.capabilities || [],
+            active: data.active !== undefined ? data.active : true,
+            services: data.services || {},
+            pricing: data.tal?.pricing || undefined,
           };
 
           metadataCache.set(agentURI, parsed);
           setMetadata(parsed);
+          setIsLoading(false);
           return; // Success, exit function
         } catch (err) {
           lastError = err instanceof Error ? err : new Error('Failed to fetch metadata');
@@ -105,6 +120,9 @@ export function useAgentMetadata(agentURI: string | undefined): UseAgentMetadata
     name: metadata?.name,
     description: metadata?.description,
     capabilities: metadata?.capabilities,
+    active: metadata?.active,
+    services: metadata?.services,
+    pricing: metadata?.pricing,
     isLoading,
     error,
   };

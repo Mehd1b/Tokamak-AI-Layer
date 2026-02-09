@@ -1,19 +1,33 @@
 'use client';
 
-import { useState } from 'react';
-import { Send, Loader2, AlertCircle, CheckCircle, FileCode, FileText, Shield, CheckCircle2, XCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Send, Loader2, AlertCircle, CheckCircle, FileCode, FileText, Shield, CheckCircle2, XCircle, Coins } from 'lucide-react';
 import { useSubmitTask } from '@/hooks/useAgentRuntime';
 import { useRequestValidation } from '@/hooks/useValidation';
+import { usePayForTask, useTONBalanceL2, generateTaskRef } from '@/hooks/useTaskFee';
+import { useAccount } from 'wagmi';
+import { formatEther } from 'viem';
 
 interface TaskSubmissionProps {
   agentId: string;
   agentName: string;
   placeholder: string;
+  onChainAgentId?: bigint;
+  feePerTask?: bigint;
 }
 
-export function TaskSubmission({ agentId, agentName, placeholder }: TaskSubmissionProps) {
+type PaymentStep = 'input' | 'paying' | 'paid' | 'submitting';
+
+export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId, feePerTask }: TaskSubmissionProps) {
   const [input, setInput] = useState('');
+  const [nonce] = useState(() => BigInt(Date.now()));
+  const [paymentStep, setPaymentStep] = useState<PaymentStep>('input');
+  const [currentTaskRef, setCurrentTaskRef] = useState<`0x${string}` | undefined>();
+
+  const { address } = useAccount();
+  const { data: balance } = useTONBalanceL2(address);
   const { submitTask, result, isSubmitting, error, reset } = useSubmitTask();
+  const { pay, hash: payHash, isPending: isPayPending, isConfirming: isPayConfirming, isSuccess: isPaySuccess, error: payError } = usePayForTask();
   const {
     validate,
     result: validationResult,
@@ -22,21 +36,93 @@ export function TaskSubmission({ agentId, agentName, placeholder }: TaskSubmissi
     reset: resetValidation,
   } = useRequestValidation();
 
+  const hasFee = feePerTask && feePerTask > 0n && onChainAgentId !== undefined;
+  const insufficientBalance = hasFee && balance && balance.value < feePerTask;
+
+  // When payment confirms, move to paid step and submit task
+  useEffect(() => {
+    if (isPaySuccess && paymentStep === 'paying') {
+      setPaymentStep('paid');
+    }
+  }, [isPaySuccess, paymentStep]);
+
+  // Auto-submit after payment success
+  useEffect(() => {
+    if (paymentStep === 'paid' && input.trim() && !isSubmitting && !result) {
+      setPaymentStep('submitting');
+      submitTask(agentId, input, payHash, currentTaskRef);
+    }
+  }, [paymentStep, input, isSubmitting, result, agentId, payHash, currentTaskRef, submitTask]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isSubmitting) return;
-    await submitTask(agentId, input);
+
+    if (hasFee && address) {
+      // Generate taskRef and start payment flow
+      const taskRef = generateTaskRef(onChainAgentId, address, nonce);
+      setCurrentTaskRef(taskRef);
+      setPaymentStep('paying');
+      pay(onChainAgentId, taskRef, feePerTask);
+    } else {
+      // Free agent - submit directly
+      setPaymentStep('submitting');
+      await submitTask(agentId, input);
+    }
   };
+
+  const handleReset = () => {
+    reset();
+    resetValidation();
+    setInput('');
+    setPaymentStep('input');
+    setCurrentTaskRef(undefined);
+  };
+
+  const isProcessing = isSubmitting || isPayPending || isPayConfirming;
 
   return (
     <div className="space-y-4">
+      {/* Fee Info Banner */}
+      {hasFee && (
+        <div className="flex items-center justify-between rounded-lg border border-tokamak-200 bg-tokamak-50 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Coins className="h-4 w-4 text-tokamak-600" />
+            <span className="text-sm font-medium text-tokamak-800">
+              Fee: {formatEther(feePerTask)} TON per task
+            </span>
+          </div>
+          {balance && (
+            <span className={`text-xs ${insufficientBalance ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
+              Balance: {parseFloat(formatEther(balance.value)).toFixed(4)} TON
+              {insufficientBalance && ' (insufficient)'}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Step Indicator (only for paid agents during payment) */}
+      {hasFee && paymentStep !== 'input' && (
+        <div className="flex items-center gap-2 text-xs">
+          <span className={`flex items-center gap-1 ${paymentStep === 'paying' ? 'text-tokamak-600 font-medium' : isPaySuccess ? 'text-green-600' : 'text-gray-400'}`}>
+            {isPaySuccess ? <CheckCircle className="h-3 w-3" /> : <span className="flex h-3 w-3 items-center justify-center rounded-full border text-[10px]">1</span>}
+            Pay Fee
+          </span>
+          <span className="text-gray-300">→</span>
+          <span className={`flex items-center gap-1 ${paymentStep === 'submitting' || paymentStep === 'paid' ? 'text-tokamak-600 font-medium' : 'text-gray-400'}`}>
+            {result ? <CheckCircle className="h-3 w-3 text-green-600" /> : <span className="flex h-3 w-3 items-center justify-center rounded-full border text-[10px]">2</span>}
+            Submit Task
+          </span>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-3">
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={placeholder}
           rows={8}
-          disabled={isSubmitting}
+          disabled={isProcessing}
           className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm font-mono focus:border-tokamak-500 focus:outline-none focus:ring-1 focus:ring-tokamak-500 disabled:bg-gray-50 disabled:text-gray-500 resize-y"
         />
         <div className="flex items-center justify-between">
@@ -47,7 +133,7 @@ export function TaskSubmission({ agentId, agentName, placeholder }: TaskSubmissi
             {result && (
               <button
                 type="button"
-                onClick={() => { reset(); resetValidation(); setInput(''); }}
+                onClick={handleReset}
                 className="btn-secondary text-sm"
               >
                 Clear
@@ -55,10 +141,20 @@ export function TaskSubmission({ agentId, agentName, placeholder }: TaskSubmissi
             )}
             <button
               type="submit"
-              disabled={!input.trim() || isSubmitting}
+              disabled={!input.trim() || isProcessing || !!insufficientBalance}
               className="btn-primary inline-flex items-center gap-2 text-sm"
             >
-              {isSubmitting ? (
+              {isPayPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Confirm Payment...
+                </>
+              ) : isPayConfirming ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Paying {hasFee ? formatEther(feePerTask) + ' TON' : ''}...
+                </>
+              ) : isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Processing...
@@ -66,7 +162,7 @@ export function TaskSubmission({ agentId, agentName, placeholder }: TaskSubmissi
               ) : (
                 <>
                   <Send className="h-4 w-4" />
-                  Submit to {agentName}
+                  {hasFee ? `Pay & Submit to ${agentName}` : `Submit to ${agentName}`}
                 </>
               )}
             </button>
@@ -74,7 +170,20 @@ export function TaskSubmission({ agentId, agentName, placeholder }: TaskSubmissi
         </div>
       </form>
 
-      {/* Error */}
+      {/* Payment Error */}
+      {payError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-500" />
+            <div>
+              <p className="text-sm font-medium text-red-800">Payment Failed</p>
+              <p className="mt-1 text-sm text-red-700">{payError.message}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Task Error */}
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4">
           <div className="flex items-start gap-2">
@@ -101,6 +210,21 @@ export function TaskSubmission({ agentId, agentName, placeholder }: TaskSubmissi
               {result.taskId.slice(0, 8)}...
             </span>
           </div>
+
+          {/* Payment confirmation */}
+          {payHash && (
+            <div className="mb-3 rounded bg-green-100/50 px-2 py-1">
+              <p className="text-xs text-green-700">Payment Tx</p>
+              <a
+                href={`https://explorer.thanos-sepolia.tokamak.network/tx/${payHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="truncate text-xs font-mono text-green-900 underline"
+              >
+                {payHash.slice(0, 18)}...
+              </a>
+            </div>
+          )}
 
           {/* Hashes for on-chain verification */}
           <div className="mb-3 grid grid-cols-2 gap-2">
@@ -131,7 +255,7 @@ export function TaskSubmission({ agentId, agentName, placeholder }: TaskSubmissi
           <div className="mt-4 border-t border-green-200 pt-4">
             {!validationResult && !validationError && (
               <button
-                onClick={() => validate(result.taskId)}
+                onClick={() => validate(agentId, result.taskId)}
                 disabled={isValidating}
                 className="btn-secondary inline-flex items-center gap-2 text-sm"
               >

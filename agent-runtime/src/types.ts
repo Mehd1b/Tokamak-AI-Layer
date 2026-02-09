@@ -39,6 +39,8 @@ export interface AgentInfo {
 export interface TaskSubmission {
   agentId: string;
   input: TaskInput;
+  paymentTxHash?: string;
+  taskRef?: string;
 }
 
 export interface ValidationRequest {

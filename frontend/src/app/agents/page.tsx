@@ -14,14 +14,24 @@ interface AgentCardProps {
 }
 
 function AgentCard({ agentId, owner, agentURI }: AgentCardProps) {
-  const { name, description, isLoading } = useAgentMetadata(agentURI);
+  const { name, description, active, services, isLoading, error } = useAgentMetadata(agentURI);
+
+  // Hide agents with no URI, failed metadata, inactive status, or localhost endpoints
+  if (!isLoading) {
+    if (!agentURI) return null;
+    if (!name && !error) return null;
+    if (error && !name) return null;
+    if (active === false) return null;
+    const serviceUrls = Object.values(services || {}).join(' ');
+    if (serviceUrls.includes('localhost') || serviceUrls.includes('127.0.0.1')) return null;
+  }
 
   return (
     <Link
       href={`/agents/${agentId}`}
       className="card flex items-center justify-between transition-shadow hover:shadow-md"
     >
-      <div className="flex items-center gap-4">
+      <div className="flex flex-1 min-w-0 items-center gap-4">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-tokamak-100 text-tokamak-700 font-bold">
           #{agentId}
         </div>
@@ -83,9 +93,14 @@ export default function AgentsPage() {
               : `${agentCount} registered agent${agentCount !== 1 ? 's' : ''}`}
           </p>
         </div>
-        <Link href="/agents/register" className="btn-primary">
-          Register Agent
-        </Link>
+        <div className="flex gap-3">
+          <Link href="/agents/fees" className="btn-secondary">
+            My Fees
+          </Link>
+          <Link href="/agents/register" className="btn-primary">
+            Register Agent
+          </Link>
+        </div>
       </div>
 
       {/* Search Bar */}
