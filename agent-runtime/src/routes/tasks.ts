@@ -196,7 +196,10 @@ export function createTaskRoutes(agents: Map<string, BaseAgent>): Router {
           const isPaid = await verifyPaymentWithRetry(publicClient, escrowAddress, taskRef as `0x${string}`);
 
           if (!isPaid) {
-            res.status(402).json({ error: 'Payment required: task fee has not been paid on-chain' });
+            res.status(402).json({
+              error: 'Payment required: task fee has not been paid on-chain',
+              debug: { escrow: escrowAddress, chainId, taskRef, requestChainId: requestChainId ?? 'none' },
+            });
             return;
           }
 

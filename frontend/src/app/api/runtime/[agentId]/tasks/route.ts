@@ -40,11 +40,12 @@ export async function POST(
 
     // Inject the resolved runtime agentId into the request body
     const url = `${runtimeBaseUrl}/api/tasks`;
-    console.log(`[api/tasks POST] Proxying to ${url} for agent ${runtimeAgentId}`);
+    const payload = { ...body, agentId: runtimeAgentId };
+    console.log(`[api/tasks POST] Proxying to ${url} for agent ${runtimeAgentId}, chainId=${body.chainId}, taskRef=${body.taskRef?.slice(0, 18)}...`);
 
     return proxyPost(
       url,
-      { ...body, agentId: runtimeAgentId },
+      payload,
       300_000,
     );
   } catch (err) {

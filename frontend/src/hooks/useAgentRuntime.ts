@@ -112,7 +112,7 @@ export function useSubmitTask() {
         setIsSubmitting(false);
       }
     },
-    [],
+    [chainId],
   );
 
   const reset = useCallback(() => {
