@@ -105,22 +105,22 @@ contract TALValidationRegistry is
     address public treasury;
 
     /// @notice Validation request counter for unique IDs
-    uint256 private _requestNonce;
+    uint256 internal _requestNonce;
 
     /// @notice Validation requests mapping (requestHash => ValidationRequest)
-    mapping(bytes32 => ValidationRequest) private _requests;
+    mapping(bytes32 => ValidationRequest) internal _requests;
 
     /// @notice Validation responses mapping (requestHash => ValidationResponse)
-    mapping(bytes32 => ValidationResponse) private _responses;
+    mapping(bytes32 => ValidationResponse) internal _responses;
 
     /// @notice Selected validators mapping (requestHash => validator address)
-    mapping(bytes32 => address) private _selectedValidators;
+    mapping(bytes32 => address) internal _selectedValidators;
 
     /// @notice Dispute status mapping (requestHash => isDisputed)
-    mapping(bytes32 => bool) private _disputeStatus;
+    mapping(bytes32 => bool) internal _disputeStatus;
 
     /// @notice Dispute evidence mapping (requestHash => evidence)
-    mapping(bytes32 => bytes) private _disputeEvidence;
+    mapping(bytes32 => bytes) internal _disputeEvidence;
 
     /// @notice Trusted TEE providers mapping (provider => isTrusted)
     mapping(address => bool) public trustedTEEProviders;
@@ -129,25 +129,25 @@ contract TALValidationRegistry is
     mapping(address => bytes32) public teeEnclaveHashes;
 
     /// @notice DRB request IDs mapping (requestHash => drbRequestId) - Sprint 2
-    mapping(bytes32 => uint256) private _drbRequestIds;
+    mapping(bytes32 => uint256) internal _drbRequestIds;
 
     /// @notice Array of trusted TEE providers for enumeration
-    address[] private _trustedTEEProviderList;
+    address[] internal _trustedTEEProviderList;
 
     /// @notice Index in trusted provider list (provider => index + 1, 0 means not in list)
-    mapping(address => uint256) private _trustedTEEProviderIndex;
+    mapping(address => uint256) internal _trustedTEEProviderIndex;
 
     /// @notice Agent validations mapping (agentId => requestHashes)
-    mapping(uint256 => bytes32[]) private _agentValidations;
+    mapping(uint256 => bytes32[]) internal _agentValidations;
 
     /// @notice Requester validations mapping (requester => requestHashes)
-    mapping(address => bytes32[]) private _requesterValidations;
+    mapping(address => bytes32[]) internal _requesterValidations;
 
     /// @notice Validator validations mapping (validator => requestHashes)
-    mapping(address => bytes32[]) private _validatorValidations;
+    mapping(address => bytes32[]) internal _validatorValidations;
 
     /// @notice Pending validation count per agent (agentId => count)
-    mapping(uint256 => uint256) private _pendingValidationCount;
+    mapping(uint256 => uint256) internal _pendingValidationCount;
 
     /// @notice Configurable minimum bounty for StakeSecured (can be updated by admin)
     uint256 public minStakeSecuredBounty;
@@ -161,7 +161,7 @@ contract TALValidationRegistry is
     // ============ Storage Gap ============
 
     /// @dev Reserved storage space for future upgrades
-    uint256[40] private __gap;
+    uint256[40] internal __gap;
 
     // ============ Initializer ============
 
@@ -279,7 +279,7 @@ contract TALValidationRegistry is
         uint8 score,
         bytes calldata proof,
         string calldata detailsURI
-    ) external override whenNotPaused nonReentrant {
+    ) external virtual override whenNotPaused nonReentrant {
         ValidationRequest storage request = _requests[requestHash];
 
         // Validate request exists
@@ -663,7 +663,7 @@ contract TALValidationRegistry is
      * @inheritdoc ITALValidationRegistry
      * @dev Resolves a dispute with final determination
      */
-    function resolveDispute(bytes32 requestHash, bool upholdOriginal) external override onlyRole(DISPUTE_RESOLVER_ROLE) {
+    function resolveDispute(bytes32 requestHash, bool upholdOriginal) external virtual override onlyRole(DISPUTE_RESOLVER_ROLE) {
         ValidationRequest storage request = _requests[requestHash];
 
         // Validate request is disputed

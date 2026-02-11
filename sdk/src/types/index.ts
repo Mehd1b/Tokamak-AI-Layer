@@ -139,6 +139,52 @@ export interface ReputationQueryOptions {
 }
 
 // ============================================
+// IDENTITY V2 TYPES
+// ============================================
+
+export enum AgentStatus {
+  Active = 0,
+  Paused = 1,
+  Deregistered = 2,
+}
+
+export enum AgentValidationModel {
+  ReputationOnly = 0,
+  StakeSecured = 1,
+  Hybrid = 2,
+}
+
+export interface OperatorConsentData {
+  operator: Address;
+  agentOwner: Address;
+  agentURI: string;
+  validationModel: AgentValidationModel;
+  nonce: bigint;
+  deadline: bigint;
+}
+
+export interface RegisterV2Params {
+  agentURI: string;
+  validationModel: AgentValidationModel;
+  operatorConsents: OperatorConsentData[];
+  operatorSignatures: `0x${string}`[];
+}
+
+export interface AgentV2Details extends AgentDetails {
+  status: AgentStatus;
+  validationModel: AgentValidationModel;
+  operators: Address[];
+  pausedAt: bigint | null;
+  canReactivate: boolean;
+}
+
+export interface ValidationStats {
+  total: bigint;
+  failed: bigint;
+  failureRate: number;
+}
+
+// ============================================
 // VALIDATION TYPES
 // ============================================
 

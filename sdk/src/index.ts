@@ -18,5 +18,7 @@ export * from './types';
 
 // ABIs
 export { TALIdentityRegistryABI } from './abi/TALIdentityRegistry';
+export { TALIdentityRegistryV2ABI } from './abi/TALIdentityRegistryV2';
 export { TALReputationRegistryABI } from './abi/TALReputationRegistry';
 export { TALValidationRegistryABI } from './abi/TALValidationRegistry';
+export { TALValidationRegistryV2ABI } from './abi/TALValidationRegistryV2';

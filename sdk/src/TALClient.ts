@@ -16,12 +16,16 @@ import type {
   Bytes32,
   TALClientConfig,
   AgentDetails,
+  AgentV2Details,
   RegistrationParams,
+  RegisterV2Params,
+  OperatorConsentData,
   FeedbackInput,
   FeedbackSummary,
   ReputationQueryOptions,
   ValidationRequestParams,
   ValidationDetails,
+  ValidationStats,
   AgentSearchQuery,
   AgentSearchResult,
   ProtocolStats,
@@ -356,6 +360,54 @@ export class TALClient {
     evidence: `0x${string}`,
   ): Promise<TransactionResult> {
     return this.validation.disputeValidation(requestHash, evidence);
+  }
+
+  // ==========================================
+  // V2 IDENTITY CONVENIENCE METHODS
+  // ==========================================
+
+  async registerAgentV2(
+    params: RegisterV2Params,
+  ): Promise<{ agentId: bigint; tx: TransactionResult }> {
+    return this.identity.registerAgentV2(params);
+  }
+
+  async getAgentV2(agentId: bigint): Promise<AgentV2Details> {
+    return this.identity.getAgentV2(agentId);
+  }
+
+  async checkAndSlash(agentId: bigint): Promise<TransactionResult> {
+    return this.identity.checkAndSlash(agentId);
+  }
+
+  async reactivateAgent(agentId: bigint): Promise<TransactionResult> {
+    return this.identity.reactivate(agentId);
+  }
+
+  async addOperator(
+    agentId: bigint,
+    consent: OperatorConsentData,
+    signature: `0x${string}`,
+  ): Promise<TransactionResult> {
+    return this.identity.addOperator(agentId, consent, signature);
+  }
+
+  async removeOperator(
+    agentId: bigint,
+    operator: Address,
+  ): Promise<TransactionResult> {
+    return this.identity.removeOperator(agentId, operator);
+  }
+
+  // ==========================================
+  // V2 VALIDATION CONVENIENCE METHODS
+  // ==========================================
+
+  async getAgentValidationStats(
+    agentId: bigint,
+    windowSeconds?: bigint,
+  ): Promise<ValidationStats> {
+    return this.validation.getAgentValidationStats(agentId, windowSeconds);
   }
 
   // ==========================================

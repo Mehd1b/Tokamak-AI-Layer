@@ -1,5 +1,6 @@
 import { type PublicClient, type WalletClient } from 'viem';
 import { TALValidationRegistryABI } from '../abi/TALValidationRegistry';
+import { TALValidationRegistryV2ABI } from '../abi/TALValidationRegistryV2';
 import type {
   Address,
   Bytes32,
@@ -9,6 +10,7 @@ import type {
   ValidationDetails,
   ValidationModel,
   ValidationStatus,
+  ValidationStats,
   TransactionResult,
 } from '../types';
 
@@ -248,6 +250,61 @@ export class ValidationClient {
       args: [requestHash],
     });
     return validator as Address;
+  }
+
+  // ==========================================
+  // V2 METHODS — Epoch-Based Stats
+  // ==========================================
+
+  /**
+   * Get validation stats for an agent within a time window
+   * @param agentId The agent ID
+   * @param windowSeconds Time window in seconds (default: 30 days)
+   */
+  async getAgentValidationStats(
+    agentId: bigint,
+    windowSeconds: bigint = 2592000n, // 30 days
+  ): Promise<ValidationStats> {
+    const [total, failed] = (await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALValidationRegistryV2ABI,
+      functionName: 'getAgentValidationStats',
+      args: [agentId, windowSeconds],
+    })) as [bigint, bigint];
+
+    const failureRate =
+      total > 0n ? Number((failed * 10000n) / total) / 100 : 0;
+
+    return { total, failed, failureRate };
+  }
+
+  /**
+   * Get raw epoch stats for an agent
+   */
+  async getEpochStats(
+    agentId: bigint,
+    epoch: bigint,
+  ): Promise<{ total: bigint; failed: bigint }> {
+    const [total, failed] = (await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALValidationRegistryV2ABI,
+      functionName: 'getEpochStats',
+      args: [agentId, epoch],
+    })) as [bigint, bigint];
+
+    return { total, failed };
+  }
+
+  /**
+   * Get the current epoch number
+   */
+  async getCurrentEpoch(): Promise<bigint> {
+    const epoch = await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALValidationRegistryV2ABI,
+      functionName: 'currentEpoch',
+    });
+    return epoch as bigint;
   }
 
   private requireWallet(): void {

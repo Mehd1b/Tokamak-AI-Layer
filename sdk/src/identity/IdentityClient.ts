@@ -5,13 +5,19 @@ import {
   getContract,
 } from 'viem';
 import { TALIdentityRegistryABI } from '../abi/TALIdentityRegistry';
+import { TALIdentityRegistryV2ABI } from '../abi/TALIdentityRegistryV2';
 import type {
   Address,
   Bytes32,
   AgentDetails,
+  AgentV2Details,
   RegistrationParams,
+  RegisterV2Params,
+  OperatorConsentData,
   TransactionResult,
+  ValidationStats,
 } from '../types';
+import { AgentStatus, AgentValidationModel } from '../types';
 
 export class IdentityClient {
   private readonly publicClient: PublicClient;
@@ -335,6 +341,329 @@ export class IdentityClient {
       args: [agentId],
     });
     return result as boolean;
+  }
+
+  // ==========================================
+  // V2 METHODS
+  // ==========================================
+
+  /**
+   * Register an agent with V2 multi-operator support
+   */
+  async registerAgentV2(
+    params: RegisterV2Params,
+  ): Promise<{ agentId: bigint; tx: TransactionResult }> {
+    this.requireWallet();
+
+    const hash = await this.walletClient!.writeContract({
+      address: this.contractAddress,
+      abi: TALIdentityRegistryV2ABI,
+      functionName: 'registerV2',
+      args: [
+        params.agentURI,
+        params.validationModel,
+        params.operatorConsents.map((c) => ({
+          operator: c.operator,
+          agentOwner: c.agentOwner,
+          agentURI: c.agentURI,
+          validationModel: c.validationModel,
+          nonce: c.nonce,
+          deadline: c.deadline,
+        })),
+        params.operatorSignatures,
+      ],
+      chain: this.walletClient!.chain,
+      account: this.walletClient!.account!,
+    });
+
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+    const agentId = this.parseAgentIdFromReceipt(receipt);
+
+    return {
+      agentId,
+      tx: {
+        hash,
+        blockNumber: receipt.blockNumber,
+        status: receipt.status === 'success' ? 'success' : 'reverted',
+      },
+    };
+  }
+
+  /**
+   * Get agent details including V2 fields (status, model, operators)
+   */
+  async getAgentV2(agentId: bigint): Promise<AgentV2Details> {
+    const [baseAgent, status, model, operators, pausedAt, reactivatable] =
+      await Promise.all([
+        this.getAgent(agentId),
+        this.getAgentStatus(agentId),
+        this.getAgentValidationModel(agentId),
+        this.getAgentOperators(agentId),
+        this.getAgentPausedAt(agentId),
+        this.canReactivateAgent(agentId),
+      ]);
+
+    return {
+      ...baseAgent,
+      status,
+      validationModel: model,
+      operators,
+      pausedAt: pausedAt > 0n ? pausedAt : null,
+      canReactivate: reactivatable,
+    };
+  }
+
+  /**
+   * Trigger slashing check on an agent
+   */
+  async checkAndSlash(agentId: bigint): Promise<TransactionResult> {
+    this.requireWallet();
+    const hash = await this.walletClient!.writeContract({
+      address: this.contractAddress,
+      abi: TALIdentityRegistryV2ABI,
+      functionName: 'checkAndSlash',
+      args: [agentId],
+      chain: this.walletClient!.chain,
+      account: this.walletClient!.account!,
+    });
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+    return {
+      hash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 'success' ? 'success' : 'reverted',
+    };
+  }
+
+  /**
+   * Reactivate a paused agent after cooldown
+   */
+  async reactivate(agentId: bigint): Promise<TransactionResult> {
+    this.requireWallet();
+    const hash = await this.walletClient!.writeContract({
+      address: this.contractAddress,
+      abi: TALIdentityRegistryV2ABI,
+      functionName: 'reactivate',
+      args: [agentId],
+      chain: this.walletClient!.chain,
+      account: this.walletClient!.account!,
+    });
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+    return {
+      hash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 'success' ? 'success' : 'reverted',
+    };
+  }
+
+  /**
+   * Add an operator to an existing agent with EIP-712 consent
+   */
+  async addOperator(
+    agentId: bigint,
+    consent: OperatorConsentData,
+    signature: `0x${string}`,
+  ): Promise<TransactionResult> {
+    this.requireWallet();
+    const hash = await this.walletClient!.writeContract({
+      address: this.contractAddress,
+      abi: TALIdentityRegistryV2ABI,
+      functionName: 'addOperator',
+      args: [
+        agentId,
+        {
+          operator: consent.operator,
+          agentOwner: consent.agentOwner,
+          agentURI: consent.agentURI,
+          validationModel: consent.validationModel,
+          nonce: consent.nonce,
+          deadline: consent.deadline,
+        },
+        signature,
+      ],
+      chain: this.walletClient!.chain,
+      account: this.walletClient!.account!,
+    });
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+    return {
+      hash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 'success' ? 'success' : 'reverted',
+    };
+  }
+
+  /**
+   * Remove an operator from an agent (owner only)
+   */
+  async removeOperator(
+    agentId: bigint,
+    operator: Address,
+  ): Promise<TransactionResult> {
+    this.requireWallet();
+    const hash = await this.walletClient!.writeContract({
+      address: this.contractAddress,
+      abi: TALIdentityRegistryV2ABI,
+      functionName: 'removeOperator',
+      args: [agentId, operator],
+      chain: this.walletClient!.chain,
+      account: this.walletClient!.account!,
+    });
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+    return {
+      hash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 'success' ? 'success' : 'reverted',
+    };
+  }
+
+  /**
+   * Operator voluntarily exits an agent (called by operator)
+   */
+  async operatorExit(agentId: bigint): Promise<TransactionResult> {
+    this.requireWallet();
+    const hash = await this.walletClient!.writeContract({
+      address: this.contractAddress,
+      abi: TALIdentityRegistryV2ABI,
+      functionName: 'operatorExit',
+      args: [agentId],
+      chain: this.walletClient!.chain,
+      account: this.walletClient!.account!,
+    });
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+    return {
+      hash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 'success' ? 'success' : 'reverted',
+    };
+  }
+
+  // ==========================================
+  // V2 VIEW METHODS
+  // ==========================================
+
+  async getAgentOperators(agentId: bigint): Promise<Address[]> {
+    const result = await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALIdentityRegistryV2ABI,
+      functionName: 'getAgentOperators',
+      args: [agentId],
+    });
+    return result as Address[];
+  }
+
+  async getAgentValidationModel(agentId: bigint): Promise<AgentValidationModel> {
+    const result = await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALIdentityRegistryV2ABI,
+      functionName: 'getAgentValidationModel',
+      args: [agentId],
+    });
+    return Number(result) as AgentValidationModel;
+  }
+
+  async getAgentStatus(agentId: bigint): Promise<AgentStatus> {
+    const result = await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALIdentityRegistryV2ABI,
+      functionName: 'getAgentStatus',
+      args: [agentId],
+    });
+    return Number(result) as AgentStatus;
+  }
+
+  async getOperatorAgents(operator: Address): Promise<bigint[]> {
+    const result = await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALIdentityRegistryV2ABI,
+      functionName: 'getOperatorAgents',
+      args: [operator],
+    });
+    return result as bigint[];
+  }
+
+  async isOperatorOf(agentId: bigint, operator: Address): Promise<boolean> {
+    const result = await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALIdentityRegistryV2ABI,
+      functionName: 'isOperatorOf',
+      args: [agentId, operator],
+    });
+    return result as boolean;
+  }
+
+  async getAgentPausedAt(agentId: bigint): Promise<bigint> {
+    const result = await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALIdentityRegistryV2ABI,
+      functionName: 'getAgentPausedAt',
+      args: [agentId],
+    });
+    return result as bigint;
+  }
+
+  async canReactivateAgent(agentId: bigint): Promise<boolean> {
+    const result = await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALIdentityRegistryV2ABI,
+      functionName: 'canReactivate',
+      args: [agentId],
+    });
+    return result as boolean;
+  }
+
+  async getOperatorNonce(operator: Address): Promise<bigint> {
+    const result = await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALIdentityRegistryV2ABI,
+      functionName: 'operatorNonces',
+      args: [operator],
+    });
+    return result as bigint;
+  }
+
+  // ==========================================
+  // EIP-712 CONSENT SIGNING HELPER
+  // ==========================================
+
+  /**
+   * Build the EIP-712 typed data for operator consent signing.
+   * The operator signs this with their wallet to authorize backing an agent.
+   *
+   * @param consent The consent data to sign
+   * @param verifyingContract The identity registry proxy address
+   * @param chainId The chain ID
+   */
+  buildOperatorConsentTypedData(
+    consent: OperatorConsentData,
+    verifyingContract: Address,
+    chainId: number,
+  ) {
+    return {
+      domain: {
+        name: 'TAL Identity Registry',
+        version: '2',
+        chainId: BigInt(chainId),
+        verifyingContract,
+      },
+      types: {
+        OperatorConsent: [
+          { name: 'operator', type: 'address' },
+          { name: 'agentOwner', type: 'address' },
+          { name: 'agentURI', type: 'string' },
+          { name: 'validationModel', type: 'uint8' },
+          { name: 'nonce', type: 'uint256' },
+          { name: 'deadline', type: 'uint256' },
+        ],
+      },
+      primaryType: 'OperatorConsent' as const,
+      message: {
+        operator: consent.operator,
+        agentOwner: consent.agentOwner,
+        agentURI: consent.agentURI,
+        validationModel: consent.validationModel,
+        nonce: consent.nonce,
+        deadline: consent.deadline,
+      },
+    };
   }
 
   private requireWallet(): void {

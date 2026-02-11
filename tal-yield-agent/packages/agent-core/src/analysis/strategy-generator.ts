@@ -80,7 +80,7 @@ export class StrategyGenerator {
       const history = historyMap?.get(pool.poolId);
       const prediction = history
         ? this.apyPredictor.predict(pool, history)
-        : this.apyPredictor.predictFromCurrent(pool);
+        : this.apyPredictor.predictFromCurrent(pool, snapshot.timestamp);
       predictions.set(pool.poolId, prediction);
     }
     tracer.recordStep("predict_apy", { poolIds: eligiblePools.map((p) => p.poolId) }, { predictions: Object.fromEntries(predictions.entries()) }, Date.now() - start3);

@@ -76,13 +76,15 @@ export class APYPredictor {
   /**
    * Predict APY for a specific pool without historical data.
    * Uses only current state with wider confidence intervals.
+   *
+   * @param timestamp - Deterministic timestamp (e.g. snapshot.timestamp). Avoids Date.now() for reproducibility.
    */
-  predictFromCurrent(pool: PoolData): APYPrediction {
+  predictFromCurrent(pool: PoolData, timestamp = 0): APYPrediction {
     const emptyHistory: APYTimeseries = {
       poolId: pool.poolId,
       protocol: pool.protocol,
       chain: pool.chain,
-      dataPoints: [{ timestamp: Date.now(), apy: pool.currentAPY }],
+      dataPoints: [{ timestamp, apy: pool.currentAPY }],
       periodDays: 1,
     };
     return this.predict(pool, emptyHistory);

@@ -1,0 +1,81 @@
+{
+  "agentId": "4",
+  "metadataURI": "ipfs://QmQuw5JdLXKj7SzFAoAUmoxPJZFKSZHk6XFT8XPBEfAgpW",
+  "operator": "0x0000000000000000000000000000000000000000",
+  "owner": "0x3ec2c9fb15C222Aa273F3f2F20a740FA86b4F618",
+  "registeredAt": "2026-02-11T11:02:53.479Z",
+  "txHash": "pre-existing",
+  "staking": {
+    "bridgeConfigured": false,
+    "currentStake": "0",
+    "minStake": "1000000000000000000000",
+    "meetsMinimum": "n/a",
+    "isVerified": false,
+    "slashingCount": "0",
+    "checkedAt": "2026-02-11T11:07:34.904Z"
+  },
+  "taskRef": "0xc9ef08c4962a1cfddcd67501b15c605d2811d4e64792e5254c44046b1f734142",
+  "requestTxHash": "0x6ae8af53405d7d21c440b719f8242deef95ff9fa982738b411a9c1ee8d0a5fa3",
+  "requestBlock": "6327441",
+  "requestTimestamp": "2026-02-11T11:08:55.529Z",
+  "request": {
+    "tier": "basic",
+    "riskProfile": {
+      "level": "moderate",
+      "maxILTolerance": 0.05,
+      "minTVL": 1000000,
+      "minProtocolAge": 90,
+      "chainPreferences": [
+        1,
+        10
+      ],
+      "excludeProtocols": [],
+      "maxSinglePoolAllocation": 0.4
+    },
+    "capitalUSD": 10000
+  },
+  "strategy": {
+    "reportId": "0x81a5bd1c8487caa3d945b8297b817cb5e05f4e0971b5f9beac24822534f47295",
+    "snapshotId": "0x02929b262fb5718d6895542b2845b1e1f5dd85d5d70216f9c583756e4a2d8fc9",
+    "executionHash": "0x976a5248eec0db75b97937ac8f9494a4ad5520425bc9e5e7cb966bc408f0e1b8",
+    "blendedAPY": 89.7494,
+    "riskScore": 37.8,
+    "allocationCount": 3,
+    "determinismVerified": true,
+    "usedMockData": false,
+    "generatedAt": "2026-02-11T11:10:45.480Z"
+  },
+  "delivery": {
+    "txHash": "0x675761bcdb0d474dc6981856a40289d2d70bc66c48e93c9a457a031f9dd47ea8",
+    "blockNumber": "6327468",
+    "gasUsed": "75941",
+    "amountSettled": "500000000000000000",
+    "agentBalance": "5500000000000000000",
+    "deliveredAt": "2026-02-11T11:11:38.089Z"
+  },
+  "validation": {
+    "originalHash": "0x976a5248eec0db75b97937ac8f9494a4ad5520425bc9e5e7cb966bc408f0e1b8",
+    "validatorHash": "0x976a5248eec0db75b97937ac8f9494a4ad5520425bc9e5e7cb966bc408f0e1b8",
+    "match": true,
+    "reExecutionDuration": 29,
+    "validatedAt": "2026-02-11T11:22:26.023Z",
+    "validationTx": null
+  },
+  "claim": {
+    "amount": "5500000000000000000",
+    "txHash": "0xcc35171096b4ce02ce8d3be1e5831613172fa7edf10d1d60ec72d42662bdc219",
+    "blockNumber": "6327585",
+    "gasUsed": "43777",
+    "walletBalanceAfter": "193999976002322360247",
+    "claimedAt": "2026-02-11T11:23:20.185Z"
+  },
+  "feedback": {
+    "score": "4",
+    "reviewer": "0xc4C75d595E21Af15FddAd252697c6d8973A27360",
+    "feedbackTxHash": "0xdf31e1da3a8bf2c7bea1064669c6c50eb2fb2d9d5a4854cd8e233f67d5f102f0",
+    "feedbackHash": "0x2675e6ccbe1712cbc1858e65da3ef3435b8f37dc0f55fcf5a643450a1a11b67a",
+    "userTaskRef": "0x13819325e8bffec961b3c61fdeb36459dbe0804ef16f32802f0ca091732fe125",
+    "feedbackCountAfter": "2",
+    "submittedAt": "2026-02-11T11:26:21.847Z"
+  }
+}

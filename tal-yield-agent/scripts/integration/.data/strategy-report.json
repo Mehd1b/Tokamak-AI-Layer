@@ -1,0 +1,338 @@
+{
+  "reportId": "0x81a5bd1c8487caa3d945b8297b817cb5e05f4e0971b5f9beac24822534f47295",
+  "requestId": "0xc9ef08c4962a1cfddcd67501b15c605d2811d4e64792e5254c44046b1f734142",
+  "snapshotId": "0x02929b262fb5718d6895542b2845b1e1f5dd85d5d70216f9c583756e4a2d8fc9",
+  "timestamp": 1770808244518,
+  "riskProfile": {
+    "level": "moderate",
+    "maxILTolerance": 0.05,
+    "minTVL": 1000000,
+    "minProtocolAge": 90,
+    "chainPreferences": [
+      1,
+      10
+    ],
+    "excludeProtocols": [],
+    "maxSinglePoolAllocation": 0.4
+  },
+  "capitalUSD": 10000,
+  "allocations": [
+    {
+      "protocol": "Curve",
+      "pool": "7e218bc2-186c-473d-af0c-415bcdfe392b",
+      "chain": 1,
+      "percentage": 0.4,
+      "amountUSD": 4000,
+      "expectedAPY": {
+        "pool": "7e218bc2-186c-473d-af0c-415bcdfe392b",
+        "currentAPY": 122.51,
+        "predicted7d": {
+          "mean": 122.51,
+          "low": 109.5541,
+          "high": 135.4659
+        },
+        "predicted30d": {
+          "mean": 122.51,
+          "low": 107.2382,
+          "high": 137.7818
+        },
+        "predicted90d": {
+          "mean": 122.51,
+          "low": 101.1966,
+          "high": 143.8234
+        },
+        "confidence": 0.4,
+        "methodology": "ema_tvl_adjusted_with_incentive_decay",
+        "factors": [
+          {
+            "name": "base_rate_ema",
+            "impact": 122.51,
+            "description": "30-day EMA: 122.51%, 90-day EMA: 122.51%"
+          },
+          {
+            "name": "tvl_adjustment",
+            "impact": 1,
+            "description": "TVL $0.00B → compression factor 1.000"
+          },
+          {
+            "name": "incentive_decay",
+            "impact": 1,
+            "description": "Reward sustainability factor: 1.000"
+          },
+          {
+            "name": "market_regime",
+            "impact": 1,
+            "description": "Market regime: neutral (factor: 1.000)"
+          }
+        ]
+      },
+      "riskScore": 43,
+      "entrySteps": [
+        {
+          "type": "approve",
+          "contract": "0x0000000000000000000000000000000000000000",
+          "function": "approve",
+          "args": [
+            "curve-pool",
+            "4000"
+          ],
+          "chainId": 1,
+          "description": "Approve IDAI for Curve 7e218bc2-186c-473d-af0c-415bcdfe392b"
+        },
+        {
+          "type": "deposit",
+          "contract": "curve-pool",
+          "function": "deposit",
+          "args": [
+            "0x0000000000000000000000000000000000000000",
+            "4000"
+          ],
+          "chainId": 1,
+          "description": "Deposit IDAI into Curve 7e218bc2-186c-473d-af0c-415bcdfe392b"
+        }
+      ],
+      "exitConditions": [
+        {
+          "type": "apy_drop",
+          "threshold": 61.255,
+          "description": "Exit if APY drops below 61.26% (50% of predicted)"
+        },
+        {
+          "type": "risk_increase",
+          "threshold": 60,
+          "description": "Exit if risk score exceeds moderate tolerance"
+        },
+        {
+          "type": "tvl_drop",
+          "threshold": 709954.5,
+          "description": "Exit if TVL drops below $1M (50% of current)"
+        }
+      ]
+    },
+    {
+      "protocol": "Uniswap V3",
+      "pool": "665dc8bc-c79d-4800-97f7-304bf368e547",
+      "chain": 1,
+      "percentage": 0.4,
+      "amountUSD": 4000,
+      "expectedAPY": {
+        "pool": "665dc8bc-c79d-4800-97f7-304bf368e547",
+        "currentAPY": 68.01469,
+        "predicted7d": {
+          "mean": 68.0147,
+          "low": 60.8219,
+          "high": 75.2075
+        },
+        "predicted30d": {
+          "mean": 68.0147,
+          "low": 59.5361,
+          "high": 76.4932
+        },
+        "predicted90d": {
+          "mean": 68.0147,
+          "low": 56.182,
+          "high": 79.8474
+        },
+        "confidence": 0.4,
+        "methodology": "ema_tvl_adjusted_with_incentive_decay",
+        "factors": [
+          {
+            "name": "base_rate_ema",
+            "impact": 68.01469,
+            "description": "30-day EMA: 68.01%, 90-day EMA: 68.01%"
+          },
+          {
+            "name": "tvl_adjustment",
+            "impact": 1,
+            "description": "TVL $0.08B → compression factor 1.000"
+          },
+          {
+            "name": "incentive_decay",
+            "impact": 1,
+            "description": "Reward sustainability factor: 1.000"
+          },
+          {
+            "name": "market_regime",
+            "impact": 1,
+            "description": "Market regime: neutral (factor: 1.000)"
+          }
+        ]
+      },
+      "riskScore": 33,
+      "entrySteps": [
+        {
+          "type": "approve",
+          "contract": "0x0000000000000000000000000000000000000000",
+          "function": "approve",
+          "args": [
+            "uniswap-v3-pool",
+            "4000"
+          ],
+          "chainId": 1,
+          "description": "Approve USDC for Uniswap V3 665dc8bc-c79d-4800-97f7-304bf368e547"
+        },
+        {
+          "type": "deposit",
+          "contract": "uniswap-v3-pool",
+          "function": "deposit",
+          "args": [
+            "0x0000000000000000000000000000000000000000",
+            "4000"
+          ],
+          "chainId": 1,
+          "description": "Deposit USDC into Uniswap V3 665dc8bc-c79d-4800-97f7-304bf368e547"
+        }
+      ],
+      "exitConditions": [
+        {
+          "type": "apy_drop",
+          "threshold": 34.00735,
+          "description": "Exit if APY drops below 34.01% (50% of predicted)"
+        },
+        {
+          "type": "risk_increase",
+          "threshold": 60,
+          "description": "Exit if risk score exceeds moderate tolerance"
+        },
+        {
+          "type": "tvl_drop",
+          "threshold": 39943176.5,
+          "description": "Exit if TVL drops below $40M (50% of current)"
+        }
+      ]
+    },
+    {
+      "protocol": "Uniswap V3",
+      "pool": "b2cca178-6e44-4e34-bdec-693994727bc4",
+      "chain": 10,
+      "percentage": 0.2,
+      "amountUSD": 2000,
+      "expectedAPY": {
+        "pool": "b2cca178-6e44-4e34-bdec-693994727bc4",
+        "currentAPY": 67.69745,
+        "predicted7d": {
+          "mean": 67.6975,
+          "low": 60.5382,
+          "high": 74.8567
+        },
+        "predicted30d": {
+          "mean": 67.6975,
+          "low": 59.2585,
+          "high": 76.1364
+        },
+        "predicted90d": {
+          "mean": 67.6975,
+          "low": 55.9199,
+          "high": 79.475
+        },
+        "confidence": 0.4,
+        "methodology": "ema_tvl_adjusted_with_incentive_decay",
+        "factors": [
+          {
+            "name": "base_rate_ema",
+            "impact": 67.69745,
+            "description": "30-day EMA: 67.70%, 90-day EMA: 67.70%"
+          },
+          {
+            "name": "tvl_adjustment",
+            "impact": 1,
+            "description": "TVL $0.00B → compression factor 1.000"
+          },
+          {
+            "name": "incentive_decay",
+            "impact": 1,
+            "description": "Reward sustainability factor: 1.000"
+          },
+          {
+            "name": "market_regime",
+            "impact": 1,
+            "description": "Market regime: neutral (factor: 1.000)"
+          }
+        ]
+      },
+      "riskScore": 37,
+      "entrySteps": [
+        {
+          "type": "approve",
+          "contract": "0x0000000000000000000000000000000000000000",
+          "function": "approve",
+          "args": [
+            "uniswap-v3-pool",
+            "2000"
+          ],
+          "chainId": 10,
+          "description": "Approve USDC for Uniswap V3 b2cca178-6e44-4e34-bdec-693994727bc4"
+        },
+        {
+          "type": "deposit",
+          "contract": "uniswap-v3-pool",
+          "function": "deposit",
+          "args": [
+            "0x0000000000000000000000000000000000000000",
+            "2000"
+          ],
+          "chainId": 10,
+          "description": "Deposit USDC into Uniswap V3 b2cca178-6e44-4e34-bdec-693994727bc4"
+        }
+      ],
+      "exitConditions": [
+        {
+          "type": "apy_drop",
+          "threshold": 33.84875,
+          "description": "Exit if APY drops below 33.85% (50% of predicted)"
+        },
+        {
+          "type": "risk_increase",
+          "threshold": 60,
+          "description": "Exit if risk score exceeds moderate tolerance"
+        },
+        {
+          "type": "tvl_drop",
+          "threshold": 617691.5,
+          "description": "Exit if TVL drops below $1M (50% of current)"
+        }
+      ]
+    }
+  ],
+  "expectedAPY": {
+    "blended": 89.7494,
+    "range": {
+      "low": 78.5614,
+      "high": 100.9373
+    }
+  },
+  "riskScore": {
+    "overall": 37.8,
+    "breakdown": {
+      "smartContractRisk": 2.8,
+      "marketRisk": 16.8,
+      "liquidityRisk": 12,
+      "protocolRisk": 3.6,
+      "impermanentLoss": 0,
+      "regulatoryRisk": 2.6
+    },
+    "confidence": 0.8
+  },
+  "reasoning": [
+    "Filtered 1550 pools → 327 eligible for moderate profile",
+    "Top pools by risk-adjusted return: Curve/7e218bc2-186c-473d-af0c-415bcdfe392b (69.83%), Uniswap V3/665dc8bc-c79d-4800-97f7-304bf368e547 (45.57%), Uniswap V3/b2cca178-6e44-4e34-bdec-693994727bc4 (42.65%)",
+    "Allocated across 3 pools with max 40% per pool",
+    "Blended expected APY: 89.75% (range: 78.56% - 100.94%)"
+  ],
+  "alternativesConsidered": [
+    {
+      "name": "safety_first",
+      "blendedAPY": 1.8708,
+      "riskScore": 9,
+      "reason": "Prioritizes lowest-risk pools at the cost of yield"
+    },
+    {
+      "name": "max_yield",
+      "blendedAPY": 89.7494,
+      "riskScore": 43,
+      "reason": "Maximizes yield without regard to risk-adjusted return"
+    }
+  ],
+  "warnings": [],
+  "executionHash": "0x976a5248eec0db75b97937ac8f9494a4ad5520425bc9e5e7cb966bc408f0e1b8"
+}
