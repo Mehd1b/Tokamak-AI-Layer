@@ -37,7 +37,15 @@ const ESCROW_ABI = [
   },
 ] as const;
 
+const thanosChain = {
+  id: config.CHAIN_ID,
+  name: 'Thanos Sepolia',
+  nativeCurrency: { name: 'TON', symbol: 'TON', decimals: 18 },
+  rpcUrls: { default: { http: [config.RPC_URL] } },
+} as const;
+
 const viemClient = createPublicClient({
+  chain: thanosChain,
   transport: http(config.RPC_URL),
 });
 
@@ -46,14 +54,40 @@ function getWalletClient() {
   const account = privateKeyToAccount(config.PRIVATE_KEY as `0x${string}`);
   return createWalletClient({
     account,
-    chain: {
-      id: config.CHAIN_ID,
-      name: 'Thanos Sepolia',
-      nativeCurrency: { name: 'TON', symbol: 'TON', decimals: 18 },
-      rpcUrls: { default: { http: [config.RPC_URL] } },
-    },
+    chain: thanosChain,
     transport: http(config.RPC_URL),
   });
+}
+
+async function verifyPaymentWithRetry(
+  escrowAddress: `0x${string}`,
+  taskRef: `0x${string}`,
+  maxRetries = 3,
+  delayMs = 2000,
+): Promise<boolean> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const isPaid = await viemClient.readContract({
+        address: escrowAddress,
+        abi: ESCROW_ABI,
+        functionName: 'isTaskPaid',
+        args: [taskRef],
+      });
+      if (isPaid) return true;
+      if (attempt < maxRetries) {
+        console.log(`[TASK] Payment not found yet (attempt ${attempt}/${maxRetries}), retrying in ${delayMs}ms...`);
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+    } catch (err) {
+      console.error(`[TASK] Payment verify attempt ${attempt}/${maxRetries} failed:`, err instanceof Error ? err.message : err);
+      if (attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, delayMs));
+      } else {
+        throw err;
+      }
+    }
+  }
+  return false;
 }
 
 export function createTaskRoutes(agents: Map<string, BaseAgent>): Router {
@@ -84,12 +118,8 @@ export function createTaskRoutes(agents: Map<string, BaseAgent>): Router {
       const escrowAddress = config.TASK_FEE_ESCROW as `0x${string}`;
       if (taskRef && escrowAddress !== '0x0000000000000000000000000000000000000000') {
         try {
-          const isPaid = await viemClient.readContract({
-            address: escrowAddress,
-            abi: ESCROW_ABI,
-            functionName: 'isTaskPaid',
-            args: [taskRef as `0x${string}`],
-          });
+          console.log(`[TASK] Verifying payment for taskRef ${taskRef.slice(0, 18)}... on escrow ${escrowAddress}`);
+          const isPaid = await verifyPaymentWithRetry(escrowAddress, taskRef as `0x${string}`);
 
           if (!isPaid) {
             res.status(402).json({ error: 'Payment required: task fee has not been paid on-chain' });
@@ -98,7 +128,7 @@ export function createTaskRoutes(agents: Map<string, BaseAgent>): Router {
 
           console.log(`[TASK] Payment verified for taskRef ${taskRef.slice(0, 18)}...`);
         } catch (verifyErr) {
-          console.error('[TASK] Payment verification failed:', verifyErr);
+          console.error('[TASK] Payment verification failed:', verifyErr instanceof Error ? verifyErr.message : verifyErr);
           res.status(502).json({ error: 'Payment verification failed: could not verify on-chain payment' });
           return;
         }
