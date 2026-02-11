@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { CONTRACTS, CHAIN_ID } from '@/lib/contracts';
+import { useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi';
+import { CONTRACTS } from '@/lib/contracts';
 import { TALValidationRegistryABI } from '../../../sdk/src/abi/TALValidationRegistry';
 
 export interface ValidationRequestData {
@@ -263,6 +263,7 @@ export interface RequestValidationOnChainParams {
 }
 
 export function useRequestValidationOnChain() {
+  const chainId = useChainId();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { data: receipt, isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
@@ -273,7 +274,7 @@ export function useRequestValidationOnChain() {
       functionName: 'requestValidation',
       args: [params.agentId, params.taskHash, params.outputHash, params.model, params.deadline],
       value: params.bountyWei,
-      chainId: CHAIN_ID,
+      chainId,
     });
   };
 
@@ -304,6 +305,7 @@ export interface SubmitValidationParams {
 }
 
 export function useSubmitValidation() {
+  const chainId = useChainId();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
@@ -313,7 +315,7 @@ export function useSubmitValidation() {
       abi: TALValidationRegistryABI,
       functionName: 'submitValidation',
       args: [params.requestHash, params.score, params.proof, params.detailsURI],
-      chainId: CHAIN_ID,
+      chainId,
     });
   };
 
@@ -326,6 +328,7 @@ export interface DisputeValidationParams {
 }
 
 export function useDisputeValidation() {
+  const chainId = useChainId();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
@@ -335,7 +338,7 @@ export function useDisputeValidation() {
       abi: TALValidationRegistryABI,
       functionName: 'disputeValidation',
       args: [params.requestHash, params.evidence],
-      chainId: CHAIN_ID,
+      chainId,
     });
   };
 

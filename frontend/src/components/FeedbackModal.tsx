@@ -5,6 +5,7 @@ import { X, Star, Loader2, CheckCircle } from 'lucide-react';
 import { useSubmitFeedback } from '@/hooks/useSubmitFeedback';
 import { useWallet } from '@/hooks/useWallet';
 import { useHasUsedAgent } from '@/hooks/useTaskFee';
+import { useL2Config } from '@/hooks/useL2Config';
 
 interface FeedbackModalProps {
   agentId: bigint;
@@ -15,6 +16,7 @@ interface FeedbackModalProps {
 const CATEGORIES = ['Quality', 'Speed', 'Accuracy', 'Reliability', 'Value'];
 
 export function FeedbackModal({ agentId, agentOwner, onClose }: FeedbackModalProps) {
+  const { explorerUrl } = useL2Config();
   const { address } = useWallet();
   const { submitFeedback, hash, isPending, isConfirming, isSuccess, error } =
     useSubmitFeedback();
@@ -52,7 +54,7 @@ export function FeedbackModal({ agentId, agentOwner, onClose }: FeedbackModalPro
             </p>
             {hash && (
               <a
-                href={`https://explorer.thanos-sepolia.tokamak.network/tx/${hash}`}
+                href={`${explorerUrl}/tx/${hash}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-2 inline-block text-xs text-[#38BDF8] underline"

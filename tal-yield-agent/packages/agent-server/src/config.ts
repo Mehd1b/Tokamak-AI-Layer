@@ -1,19 +1,19 @@
 import { z } from "zod";
-import { THANOS_SEPOLIA_ADDRESSES } from "@tal-yield-agent/shared";
+import { OPTIMISM_SEPOLIA_ADDRESSES } from "@tal-yield-agent/shared";
 
 const ConfigSchema = z.object({
   PORT: z.coerce.number().default(3000),
   HOST: z.string().default("0.0.0.0"),
 
   // Chain
-  RPC_URL: z.string().default("https://rpc.thanos-sepolia.tokamak.network"),
+  RPC_URL: z.string().default("https://opt-sepolia.g.alchemy.com/v2/N-Gnpjy1WvCfokwj6fiOfuAVL_At6IvE"),
 
   // Contract addresses (override defaults from shared package)
-  IDENTITY_REGISTRY: z.string().default(THANOS_SEPOLIA_ADDRESSES.TALIdentityRegistry),
-  REPUTATION_REGISTRY: z.string().default(THANOS_SEPOLIA_ADDRESSES.TALReputationRegistry),
-  VALIDATION_REGISTRY: z.string().default(THANOS_SEPOLIA_ADDRESSES.TALValidationRegistry),
-  TASK_FEE_ESCROW: z.string().default(THANOS_SEPOLIA_ADDRESSES.TaskFeeEscrow),
-  STAKING_INTEGRATION_MODULE: z.string().default(THANOS_SEPOLIA_ADDRESSES.StakingIntegrationModule),
+  IDENTITY_REGISTRY: z.string().default(OPTIMISM_SEPOLIA_ADDRESSES.TALIdentityRegistry),
+  REPUTATION_REGISTRY: z.string().default(OPTIMISM_SEPOLIA_ADDRESSES.TALReputationRegistry),
+  VALIDATION_REGISTRY: z.string().default(OPTIMISM_SEPOLIA_ADDRESSES.TALValidationRegistry),
+  TASK_FEE_ESCROW: z.string().default(OPTIMISM_SEPOLIA_ADDRESSES.TaskFeeEscrow),
+  STAKING_INTEGRATION_MODULE: z.string().default(OPTIMISM_SEPOLIA_ADDRESSES.StakingIntegrationModule),
 
   // TAL Agent
   AGENT_ID: z.coerce.bigint().optional(),

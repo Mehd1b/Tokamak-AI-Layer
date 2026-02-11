@@ -1,5 +1,5 @@
 import { createPublicClient, http, type Address } from "viem";
-import { thanosSepolia } from "@tal-yield-agent/shared";
+import { optimismSepolia } from "@tal-yield-agent/shared";
 import { TALClient } from "@tal-yield-agent/tal-sdk";
 import {
   DataPipeline,
@@ -47,7 +47,7 @@ export interface TaskRecord {
 
 export function createContext(config: Config, logger: Logger): AppContext {
   const publicClient = createPublicClient({
-    chain: thanosSepolia,
+    chain: optimismSepolia,
     transport: http(config.RPC_URL),
   });
 

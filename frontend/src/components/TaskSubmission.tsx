@@ -7,6 +7,7 @@ import { useRequestValidation, useRequestValidationOnChain } from '@/hooks/useVa
 import { usePayForTask, useTONBalanceL2, generateTaskRef, useRefundTask } from '@/hooks/useTaskFee';
 import { useAccount } from 'wagmi';
 import { formatEther } from 'viem';
+import { useL2Config } from '@/hooks/useL2Config';
 
 interface TaskSubmissionProps {
   agentId: string;
@@ -25,6 +26,7 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
   const [currentTaskRef, setCurrentTaskRef] = useState<`0x${string}` | undefined>();
 
   const { address } = useAccount();
+  const { explorerUrl, nativeCurrency } = useL2Config();
   const { data: balance } = useTONBalanceL2(address);
   const { submitTask, result, isSubmitting, error, reset } = useSubmitTask();
   const { pay, hash: payHash, isPending: isPayPending, isConfirming: isPayConfirming, isSuccess: isPaySuccess, error: payError } = usePayForTask();
@@ -113,12 +115,12 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
           <div className="flex items-center gap-2">
             <Coins className="h-4 w-4 text-[#38BDF8]" />
             <span className="text-sm font-medium text-[#38BDF8]">
-              Fee: {formatEther(feePerTask)} TON per task
+              Fee: {formatEther(feePerTask)} {nativeCurrency} per task
             </span>
           </div>
           {balance && (
             <span className={`text-xs ${insufficientBalance ? 'text-red-400 font-medium' : 'text-zinc-500'}`}>
-              Balance: {parseFloat(formatEther(balance.value)).toFixed(4)} TON
+              Balance: {parseFloat(formatEther(balance.value)).toFixed(4)} {nativeCurrency}
               {insufficientBalance && ' (insufficient)'}
             </span>
           )}
@@ -176,7 +178,7 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
               ) : isPayConfirming ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Paying {hasFee ? formatEther(feePerTask) + ' TON' : ''}...
+                  Paying {hasFee ? formatEther(feePerTask) + ' ' + nativeCurrency : ''}...
                 </>
               ) : isSubmitting ? (
                 <>
@@ -240,7 +242,7 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
             <div className="mb-3 rounded bg-white/5 px-2 py-1">
               <p className="text-xs text-zinc-400">Payment Tx</p>
               <a
-                href={`https://explorer.thanos-sepolia.tokamak.network/tx/${payHash}`}
+                href={`${explorerUrl}/tx/${payHash}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="truncate text-xs font-mono text-zinc-300 underline"
@@ -364,7 +366,7 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
                   <div className="mt-2 flex flex-wrap gap-3 text-xs">
                     {(validationResult.txHash || onChainTxHash) && (
                       <a
-                        href={`https://explorer.thanos-sepolia.tokamak.network/tx/${validationResult.txHash || onChainTxHash}`}
+                        href={`${explorerUrl}/tx/${validationResult.txHash || onChainTxHash}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="font-mono text-blue-400 underline"
@@ -417,7 +419,7 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
                       <span className="text-sm text-emerald-400">Refund confirmed</span>
                       {refundHash && (
                         <a
-                          href={`https://explorer.thanos-sepolia.tokamak.network/tx/${refundHash}`}
+                          href={`${explorerUrl}/tx/${refundHash}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-xs font-mono text-emerald-400/80 underline"

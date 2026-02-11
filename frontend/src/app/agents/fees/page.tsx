@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { ArrowLeft, Coins, Wallet, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
 import { useAgentsByOwner } from '@/hooks/useAgent';
-import { useReadContracts } from 'wagmi';
-import { CONTRACTS, CHAIN_ID } from '@/lib/contracts';
+import { useReadContracts, useChainId } from 'wagmi';
+import { CONTRACTS, CHAIN_ID, getL2Config } from '@/lib/contracts';
+import { useL2Config } from '@/hooks/useL2Config';
 import { TaskFeeEscrowABI } from '../../../../../sdk/src/abi/TaskFeeEscrow';
 import { useClaimFees } from '@/hooks/useTaskFee';
 import { formatEther } from 'viem';
@@ -55,6 +56,9 @@ function ClaimButton({ agentId, balance }: { agentId: bigint; balance: bigint })
 
 export default function AgentFeesPage() {
   const { address, isConnected, isCorrectChain: isL2 } = useWallet();
+  const { nativeCurrency, name: l2Name } = useL2Config();
+  const connectedChainId = useChainId();
+  const chainConfig = getL2Config(connectedChainId);
   const { agentIds, isLoading: agentsLoading } = useAgentsByOwner(address as `0x${string}` | undefined);
 
   const ids = agentIds ?? [];
@@ -63,18 +67,18 @@ export default function AgentFeesPage() {
   // Batch read: fee balance + per-task fee for each agent
   const contracts = ids.flatMap((id) => [
     {
-      address: CONTRACTS.taskFeeEscrow,
+      address: chainConfig.taskFeeEscrow,
       abi: TaskFeeEscrowABI,
       functionName: 'getAgentBalance' as const,
       args: [id],
-      chainId: CHAIN_ID,
+      chainId: connectedChainId,
     },
     {
-      address: CONTRACTS.taskFeeEscrow,
+      address: chainConfig.taskFeeEscrow,
       abi: TaskFeeEscrowABI,
       functionName: 'getAgentFee' as const,
       args: [id],
-      chainId: CHAIN_ID,
+      chainId: connectedChainId,
     },
   ]);
 
@@ -126,7 +130,7 @@ export default function AgentFeesPage() {
       {isConnected && !isL2 && (
         <div className="card border-amber-500/20 bg-amber-500/10">
           <p className="text-sm text-amber-400">
-            Please switch to Thanos Sepolia network.
+            Please switch to {l2Name} network.
           </p>
         </div>
       )}
@@ -139,7 +143,7 @@ export default function AgentFeesPage() {
               <div>
                 <p className="text-sm text-zinc-400">Total Unclaimed Fees</p>
                 <p className="text-3xl font-bold text-[#38BDF8]">
-                  {feesLoading ? '...' : `${formatEther(totalBalance)} TON`}
+                  {feesLoading ? '...' : `${formatEther(totalBalance)} ${nativeCurrency}`}
                 </p>
               </div>
               <Coins className="h-8 w-8 text-[#38BDF8]" />
@@ -176,7 +180,7 @@ export default function AgentFeesPage() {
                             Agent #{agent.id.toString()}
                           </Link>
                           <p className="text-xs text-zinc-500">
-                            Fee: {agent.feePerTask > 0n ? `${formatEther(agent.feePerTask)} TON/task` : 'Free (no fee set)'}
+                            Fee: {agent.feePerTask > 0n ? `${formatEther(agent.feePerTask)} ${nativeCurrency}/task` : 'Free (no fee set)'}
                           </p>
                         </div>
                       </div>
@@ -184,7 +188,7 @@ export default function AgentFeesPage() {
                     <div className="flex items-center gap-4">
                       <div className="text-right">
                         <p className="text-lg font-bold text-[#38BDF8]">
-                          {formatEther(agent.balance)} TON
+                          {formatEther(agent.balance)} {nativeCurrency}
                         </p>
                         <p className="text-xs text-zinc-500">unclaimed</p>
                       </div>

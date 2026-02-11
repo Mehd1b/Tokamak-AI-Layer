@@ -1,6 +1,6 @@
 import { SnapshotManager, StrategyGenerator, RiskScorer, APYPredictor } from "@tal-yield-agent/agent-core";
 import type { DataSnapshot, PoolData } from "@tal-yield-agent/agent-core";
-import { THANOS_SEPOLIA_ADDRESSES } from "@tal-yield-agent/shared";
+import { OPTIMISM_SEPOLIA_ADDRESSES } from "@tal-yield-agent/shared";
 import type { AppContext, TaskRecord } from "../context.js";
 import type { Config } from "../config.js";
 import pino from "pino";
@@ -86,12 +86,12 @@ export function createMockContext(
   const config: Config = {
     PORT: 3000,
     HOST: "0.0.0.0",
-    RPC_URL: "https://rpc.thanos-sepolia.tokamak.network",
-    IDENTITY_REGISTRY: THANOS_SEPOLIA_ADDRESSES.TALIdentityRegistry,
-    REPUTATION_REGISTRY: THANOS_SEPOLIA_ADDRESSES.TALReputationRegistry,
-    VALIDATION_REGISTRY: THANOS_SEPOLIA_ADDRESSES.TALValidationRegistry,
-    TASK_FEE_ESCROW: THANOS_SEPOLIA_ADDRESSES.TaskFeeEscrow,
-    STAKING_INTEGRATION_MODULE: THANOS_SEPOLIA_ADDRESSES.StakingIntegrationModule,
+    RPC_URL: "https://opt-sepolia.g.alchemy.com/v2/N-Gnpjy1WvCfokwj6fiOfuAVL_At6IvE",
+    IDENTITY_REGISTRY: OPTIMISM_SEPOLIA_ADDRESSES.TALIdentityRegistry,
+    REPUTATION_REGISTRY: OPTIMISM_SEPOLIA_ADDRESSES.TALReputationRegistry,
+    VALIDATION_REGISTRY: OPTIMISM_SEPOLIA_ADDRESSES.TALValidationRegistry,
+    TASK_FEE_ESCROW: OPTIMISM_SEPOLIA_ADDRESSES.TaskFeeEscrow,
+    STAKING_INTEGRATION_MODULE: OPTIMISM_SEPOLIA_ADDRESSES.StakingIntegrationModule,
     AGENT_ID: 1n,
     OPERATOR_PRIVATE_KEY: undefined,
     REDIS_URL: "redis://localhost:6379",

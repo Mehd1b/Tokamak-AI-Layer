@@ -2,7 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WagmiProvider, http } from 'wagmi';
-import { sepolia, type Chain } from 'wagmi/chains';
+import { optimismSepolia, sepolia, type Chain } from 'wagmi/chains';
 import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit';
 import '@rainbow-me/rainbowkit/styles.css';
 import { useState, type ReactNode } from 'react';
@@ -27,8 +27,9 @@ const thanosSepolia = {
 const config = getDefaultConfig({
   appName: 'Tokamak Agent Layer',
   projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_ID || 'placeholder',
-  chains: [thanosSepolia, sepolia],
+  chains: [optimismSepolia, thanosSepolia, sepolia],
   transports: {
+    [optimismSepolia.id]: http('https://opt-sepolia.g.alchemy.com/v2/N-Gnpjy1WvCfokwj6fiOfuAVL_At6IvE'),
     [thanosSepolia.id]: http('https://rpc.thanos-sepolia.tokamak.network'),
     [sepolia.id]: http(),
   },

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, Upload, Plus, X, Info, Shield } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
 import { useRegisterAgent, useRegisterAgentV2 } from '@/hooks/useRegisterAgent';
+import { useL2Config } from '@/hooks/useL2Config';
 import { useSetAgentFee } from '@/hooks/useTaskFee';
 import { parseEther } from 'viem';
 import { shortenAddress } from '@/lib/utils';
@@ -27,6 +28,7 @@ const VALIDATION_MODELS = [
 export default function RegisterAgentPage() {
   const router = useRouter();
   const { address, isConnected, isCorrectChain: isL2 } = useWallet();
+  const { explorerUrl, nativeCurrency, name: l2Name } = useL2Config();
   const { register, hash: txHash, isPending, isConfirming, isSuccess, error: txError, newAgentId } = useRegisterAgent();
   const { registerV2, hash: txHashV2, isPending: isPendingV2, isSigning, isConfirming: isConfirmingV2, isSuccess: isSuccessV2, error: txErrorV2, newAgentId: newAgentIdV2 } = useRegisterAgentV2();
   const { setFee, hash: feeHash, isPending: isFeePending, isConfirming: isFeeConfirming, isSuccess: isFeeSuccess, error: feeError } = useSetAgentFee();
@@ -245,7 +247,7 @@ export default function RegisterAgentPage() {
       {isConnected && !isL2 && (
         <div className="card mb-6 border-amber-500/20 bg-amber-500/10">
           <p className="text-sm text-amber-400">
-            Please switch to Optimism Sepolia network.
+            Please switch to {l2Name} network.
           </p>
         </div>
       )}
@@ -444,7 +446,7 @@ export default function RegisterAgentPage() {
           </h2>
           <div>
             <label className="block text-sm font-medium text-zinc-300">
-              Fee per Task (TON)
+              Fee per Task ({nativeCurrency})
             </label>
             <input
               type="number"
@@ -456,7 +458,7 @@ export default function RegisterAgentPage() {
               className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"
             />
             <p className="mt-1 text-xs text-zinc-500">
-              Leave empty or 0 for free agents. Fee is paid in native TON on Thanos L2.
+              Leave empty or 0 for free agents. Fee is paid in native {nativeCurrency} on {l2Name}.
               You can set or update the fee later from the agent detail page.
             </p>
           </div>
@@ -682,7 +684,7 @@ export default function RegisterAgentPage() {
             <p className="text-sm text-emerald-400">
               <strong>Agent registered!</strong>{activeNewAgentId ? ` (ID: ${activeNewAgentId.toString()})` : ''} Transaction:{' '}
               <a
-                href={`https://explorer.thanos-sepolia.tokamak.network/tx/${activeHash}`}
+                href={`${explorerUrl}/tx/${activeHash}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline hover:text-emerald-300"
@@ -697,7 +699,7 @@ export default function RegisterAgentPage() {
             )}
             {isFeeSuccess && (
               <p className="mt-1 text-sm text-emerald-400">
-                <strong>Fee set to {feePerTask} TON per task.</strong> Redirecting...
+                <strong>Fee set to {feePerTask} {nativeCurrency} per task.</strong> Redirecting...
               </p>
             )}
             {!hasFeeToSet && (

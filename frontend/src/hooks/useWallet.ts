@@ -1,14 +1,14 @@
 'use client';
 
 import { useAccount, useChainId, useSwitchChain } from 'wagmi';
-import { CHAIN_ID, L1_CHAIN_ID } from '@/lib/contracts';
+import { CHAIN_ID, L1_CHAIN_ID, isL2Chain } from '@/lib/contracts';
 
 export function useWallet() {
   const { address, isConnected, isConnecting } = useAccount();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
 
-  const isL2 = chainId === CHAIN_ID;
+  const isL2 = isL2Chain(chainId);
   const isL1 = chainId === L1_CHAIN_ID;
   const isCorrectChain = isL1 || isL2;
 

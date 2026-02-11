@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
 import { useAgentCount } from '@/hooks/useAgent';
+import { useL2Config } from '@/hooks/useL2Config';
 import { useAllValidationHashes, useValidationBatch } from '@/hooks/useValidation';
 import {
   getValidationModelLabel,
@@ -24,6 +25,7 @@ import {
 
 export default function ValidationPage() {
   const { isConnected } = useWallet();
+  const { nativeCurrency } = useL2Config();
   const { count: agentCount, isLoading: isLoadingCount } = useAgentCount();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<number | 'all'>('all');
@@ -261,7 +263,7 @@ export default function ValidationPage() {
                           <div>
                             <span className="text-zinc-500">Bounty:</span>{' '}
                             <span className="font-medium">
-                              {formatBigInt(v.request.bounty)} TON
+                              {formatBigInt(v.request.bounty)} {nativeCurrency}
                             </span>
                           </div>
                         )}

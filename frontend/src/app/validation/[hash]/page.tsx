@@ -16,6 +16,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { useValidation, useIsDisputed, useRequestValidation, useDisputeValidation } from '@/hooks/useValidation';
+import { useL2Config } from '@/hooks/useL2Config';
 import {
   shortenAddress,
   getValidationModelLabel,
@@ -85,6 +86,7 @@ function getMatchTypeBadge(matchType: string): string {
 export default function ValidationDetailPage() {
   const params = useParams();
   const hash = params?.hash as `0x${string}` | undefined;
+  const { explorerUrl, nativeCurrency } = useL2Config();
   const { validation, isLoading } = useValidation(hash);
   const { isDisputed } = useIsDisputed(hash);
   const [copied, setCopied] = useState(false);
@@ -236,7 +238,7 @@ export default function ValidationDetailPage() {
                 <dt className="text-sm text-zinc-500">Bounty</dt>
                 <dd className="mt-1 text-sm text-white">
                   {validation[0].bounty > 0n
-                    ? `${formatBigInt(validation[0].bounty)} TON`
+                    ? `${formatBigInt(validation[0].bounty)} ${nativeCurrency}`
                     : 'None'}
                 </dd>
               </div>
@@ -432,21 +434,21 @@ export default function ValidationDetailPage() {
                     <div className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2">
                       <dt className="text-sm text-zinc-400">Protocol Fee (10%)</dt>
                       <dd className="font-mono text-sm font-medium text-white">
-                        {formatBigInt(protocolFee)} TON
+                        {formatBigInt(protocolFee)} {nativeCurrency}
                       </dd>
                     </div>
                     <div className="text-xs text-zinc-600 pl-3">Treasury</div>
                     <div className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2">
                       <dt className="text-sm text-zinc-400">Agent Reward (10%)</dt>
                       <dd className="font-mono text-sm font-medium text-white">
-                        {formatBigInt(agentReward)} TON
+                        {formatBigInt(agentReward)} {nativeCurrency}
                       </dd>
                     </div>
                     <div className="text-xs text-zinc-600 pl-3">Agent Owner</div>
                     <div className="flex items-center justify-between rounded-lg bg-[#38BDF8]/10 px-3 py-2">
                       <dt className="text-sm font-medium text-[#38BDF8]">Validator Reward (80%)</dt>
                       <dd className="font-mono text-sm font-bold text-[#38BDF8]">
-                        {formatBigInt(validatorReward)} TON
+                        {formatBigInt(validatorReward)} {nativeCurrency}
                       </dd>
                     </div>
                     <div className="text-xs text-zinc-600 pl-3">Validator</div>
@@ -454,7 +456,7 @@ export default function ValidationDetailPage() {
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-white">Total Bounty</span>
                         <span className="font-mono text-sm font-bold text-white">
-                          {formatBigInt(bounty)} TON
+                          {formatBigInt(bounty)} {nativeCurrency}
                         </span>
                       </div>
                     </div>
@@ -632,7 +634,7 @@ export default function ValidationDetailPage() {
                         Your dispute has been submitted on-chain.
                       </p>
                       <a
-                        href={`https://explorer.thanos-sepolia.tokamak.network/tx/${disputeHash}`}
+                        href={`${explorerUrl}/tx/${disputeHash}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="mt-1 inline-block text-xs text-[#38BDF8] hover:underline"

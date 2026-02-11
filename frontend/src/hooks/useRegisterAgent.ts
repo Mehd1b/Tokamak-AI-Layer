@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useWriteContract, useWaitForTransactionReceipt, useSignTypedData, usePublicClient, useAccount } from 'wagmi';
-import { CONTRACTS, CHAIN_ID } from '@/lib/contracts';
+import { useWriteContract, useWaitForTransactionReceipt, useSignTypedData, usePublicClient, useAccount, useChainId } from 'wagmi';
+import { CONTRACTS } from '@/lib/contracts';
 import { TALIdentityRegistryABI } from '../../../sdk/src/abi/TALIdentityRegistry';
 import { TALIdentityRegistryV2ABI } from '../../../sdk/src/abi/TALIdentityRegistryV2';
 
@@ -22,6 +22,7 @@ function parseAgentIdFromReceipt(receipt: { logs: Array<{ address: string; topic
 }
 
 export function useRegisterAgent() {
+  const chainId = useChainId();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { data: receipt, isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
@@ -31,7 +32,7 @@ export function useRegisterAgent() {
       abi: TALIdentityRegistryABI,
       functionName: 'register',
       args: [agentURI],
-      chainId: CHAIN_ID,
+      chainId,
     });
   };
 
@@ -39,14 +40,6 @@ export function useRegisterAgent() {
 
   return { register, hash, isPending, isConfirming, isSuccess, error, newAgentId };
 }
-
-// EIP-712 domain for TALIdentityRegistryV2
-const OPERATOR_CONSENT_DOMAIN = {
-  name: 'TAL Identity Registry',
-  version: '2',
-  chainId: BigInt(CHAIN_ID),
-  verifyingContract: CONTRACTS.identityRegistry,
-} as const;
 
 const OPERATOR_CONSENT_TYPES = {
   OperatorConsent: [
@@ -60,6 +53,7 @@ const OPERATOR_CONSENT_TYPES = {
 } as const;
 
 export function useUpdateAgentURI() {
+  const chainId = useChainId();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { data: receipt, isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
@@ -69,7 +63,7 @@ export function useUpdateAgentURI() {
       abi: TALIdentityRegistryABI,
       functionName: 'updateAgentURI',
       args: [agentId, newURI],
-      chainId: CHAIN_ID,
+      chainId,
     });
   };
 
@@ -77,6 +71,7 @@ export function useUpdateAgentURI() {
 }
 
 export function useRegisterAgentV2() {
+  const chainId = useChainId();
   const { writeContractAsync, data: hash, isPending, error: writeError } = useWriteContract();
   const { data: receipt, isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
   const { signTypedDataAsync } = useSignTypedData();
@@ -84,6 +79,14 @@ export function useRegisterAgentV2() {
   const { address } = useAccount();
   const [isSigning, setIsSigning] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+
+  // EIP-712 domain for TALIdentityRegistryV2
+  const operatorConsentDomain = {
+    name: 'TAL Identity Registry',
+    version: '2',
+    chainId: BigInt(chainId),
+    verifyingContract: CONTRACTS.identityRegistry,
+  } as const;
 
   /**
    * Register agent with V2 contract.
@@ -119,7 +122,7 @@ export function useRegisterAgentV2() {
 
         // Sign EIP-712 operator consent
         const signature = await signTypedDataAsync({
-          domain: OPERATOR_CONSENT_DOMAIN,
+          domain: operatorConsentDomain,
           types: OPERATOR_CONSENT_TYPES,
           primaryType: 'OperatorConsent',
           message: {
@@ -157,7 +160,7 @@ export function useRegisterAgentV2() {
       abi: TALIdentityRegistryV2ABI,
       functionName: 'registerV2',
       args: [agentURI, validationModel, operatorConsents, operatorSignatures],
-      chainId: CHAIN_ID,
+      chainId,
     });
   };
 

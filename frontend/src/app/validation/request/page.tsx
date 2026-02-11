@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, Shield, Send, Info, AlertTriangle } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
 import { useRequestValidationOnChain } from '@/hooks/useValidation';
+import { useL2Config } from '@/hooks/useL2Config';
 import { parseEther } from 'viem';
 import { useReadContract } from 'wagmi';
 import { CONTRACTS } from '@/lib/contracts';
@@ -59,6 +60,7 @@ function RequestValidationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isConnected, isCorrectChain } = useWallet();
+  const { explorerUrl, nativeCurrency, name: l2Name } = useL2Config();
   const {
     requestValidation,
     hash,
@@ -146,7 +148,7 @@ function RequestValidationContent() {
       {isConnected && !isCorrectChain && (
         <div className="card mb-6 border-amber-500/20 bg-amber-500/10">
           <p className="text-sm text-amber-400">
-            Please switch to the correct network (Thanos Sepolia).
+            Please switch to the correct network ({l2Name}).
           </p>
         </div>
       )}
@@ -261,7 +263,7 @@ function RequestValidationContent() {
                 {effectiveModel > 0 && !isComingSoon && (
                   <div className="text-right">
                     <p className="text-xs text-zinc-500">Min bounty</p>
-                    <p className="text-sm font-medium text-amber-400">{minBounty} TON</p>
+                    <p className="text-sm font-medium text-amber-400">{minBounty} {nativeCurrency}</p>
                   </div>
                 )}
               </div>
@@ -295,7 +297,7 @@ function RequestValidationContent() {
 
           <div>
             <label className="block text-sm font-medium text-zinc-300">
-              Bounty Amount (TON) *
+              Bounty Amount ({nativeCurrency}) *
             </label>
             <input
               type="number"
@@ -305,12 +307,12 @@ function RequestValidationContent() {
               onChange={(e) => setBountyAmount(e.target.value)}
               required
               disabled={isComingSoon}
-              placeholder={`Min: ${minBounty} TON`}
+              placeholder={`Min: ${minBounty} ${nativeCurrency}`}
               className="mt-1 w-full bg-white/5 border-white/10 text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:ring-1 focus:ring-[#38BDF8]/50 rounded-lg border px-3 py-2 text-sm focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             />
             {bountyAmount && parseFloat(bountyAmount) < parseFloat(minBounty) && (
               <p className="mt-1 text-xs text-red-500">
-                Minimum bounty for {getValidationModelLabel(effectiveModel)} is {minBounty} TON.
+                Minimum bounty for {getValidationModelLabel(effectiveModel)} is {minBounty} {nativeCurrency}.
               </p>
             )}
           </div>
@@ -323,15 +325,15 @@ function RequestValidationContent() {
               <div className="space-y-1 text-xs text-zinc-400">
                 <div className="flex justify-between">
                   <span>Validator reward (80%)</span>
-                  <span className="font-medium">{validatorReward.toFixed(4)} TON</span>
+                  <span className="font-medium">{validatorReward.toFixed(4)} {nativeCurrency}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Agent reward (10%)</span>
-                  <span className="font-medium">{agentReward.toFixed(4)} TON</span>
+                  <span className="font-medium">{agentReward.toFixed(4)} {nativeCurrency}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Protocol fee (10%)</span>
-                  <span className="font-medium">{protocolFee.toFixed(4)} TON</span>
+                  <span className="font-medium">{protocolFee.toFixed(4)} {nativeCurrency}</span>
                 </div>
               </div>
             </div>
@@ -414,7 +416,7 @@ function RequestValidationContent() {
             <p className="text-sm text-emerald-400">
               <strong>Validation requested!</strong> Transaction:{' '}
               <a
-                href={`https://explorer.thanos-sepolia.tokamak.network/tx/${hash}`}
+                href={`${explorerUrl}/tx/${hash}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline hover:text-emerald-300"

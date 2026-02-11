@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useReadContract, useReadContracts } from 'wagmi';
-import { CONTRACTS, CHAIN_ID } from '@/lib/contracts';
+import { useReadContract, useReadContracts, useChainId } from 'wagmi';
+import { CONTRACTS } from '@/lib/contracts';
 import { TALReputationRegistryABI } from '../../../sdk/src/abi/TALReputationRegistry';
 
 export function useFeedbackCount(agentId: bigint | undefined) {
@@ -108,6 +108,7 @@ export interface AgentRating {
  * Step 2: getSummary for agents with clients
  */
 export function useAgentRatings(agentIds: number[]) {
+  const chainId = useChainId();
   const enabled = agentIds.length > 0;
 
   // Step 1: Get client lists for all agents
@@ -117,9 +118,9 @@ export function useAgentRatings(agentIds: number[]) {
       abi: TALReputationRegistryABI,
       functionName: 'getClientList' as const,
       args: [BigInt(id)] as const,
-      chainId: CHAIN_ID,
+      chainId,
     }));
-  }, [agentIds]);
+  }, [agentIds, chainId]);
 
   const { data: clientListResults, isLoading: clientsLoading } = useReadContracts({
     contracts: enabled ? clientListContracts : [],
@@ -140,7 +141,7 @@ export function useAgentRatings(agentIds: number[]) {
           abi: TALReputationRegistryABI,
           functionName: 'getSummary' as const,
           args: [BigInt(id), [...clients]] as const,
-          chainId: CHAIN_ID,
+          chainId,
           _agentId: id,
         };
       })
@@ -149,10 +150,10 @@ export function useAgentRatings(agentIds: number[]) {
         abi: typeof TALReputationRegistryABI;
         functionName: 'getSummary';
         args: readonly [bigint, `0x${string}`[]];
-        chainId: typeof CHAIN_ID;
+        chainId: number;
         _agentId: number;
       }>;
-  }, [agentIds, clientListResults]);
+  }, [agentIds, clientListResults, chainId]);
 
   const summaryEnabled = summaryContracts.length > 0;
 
@@ -222,6 +223,7 @@ export interface FeedbackEntry {
 }
 
 export function useFeedbacks(agentId: bigint | undefined, clients: `0x${string}`[] | undefined) {
+  const chainId = useChainId();
   const enabled = agentId !== undefined && !!clients && clients.length > 0;
 
   const contracts = useMemo(() => {
@@ -231,9 +233,9 @@ export function useFeedbacks(agentId: bigint | undefined, clients: `0x${string}`
       abi: TALReputationRegistryABI,
       functionName: 'getFeedback' as const,
       args: [agentId!, client] as const,
-      chainId: CHAIN_ID,
+      chainId,
     }));
-  }, [agentId, clients, enabled]);
+  }, [agentId, clients, enabled, chainId]);
 
   const { data, isLoading } = useReadContracts({
     contracts: enabled ? contracts : [],

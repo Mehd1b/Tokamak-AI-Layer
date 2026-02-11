@@ -29,6 +29,7 @@ import { useAgentValidations, useValidationStats } from '@/hooks/useValidation';
 import { useRuntimeAgent } from '@/hooks/useAgentRuntime';
 import { useAgentMetadata } from '@/hooks/useAgentMetadata';
 import { useAgentFee } from '@/hooks/useTaskFee';
+import { useL2Config } from '@/hooks/useL2Config';
 import { TaskSubmission } from '@/components/TaskSubmission';
 import { formatEther } from 'viem';
 import { FeedbackModal } from '@/components/FeedbackModal';
@@ -60,6 +61,7 @@ export default function AgentDetailPage() {
   const { agent: runtimeAgent } = useRuntimeAgent(agentId?.toString());
   const { name: metaName, description: metaDescription, capabilities: metaCapabilities, talCapabilities: metaTalCapabilities, requestExample: metaRequestExample, services: metaServices, active: metaActive, pricing: metaPricing } = useAgentMetadata(agent?.agentURI);
   const { data: onChainFee } = useAgentFee(agentId);
+  const { nativeCurrency } = useL2Config();
   const { address } = useWallet();
   const { canReactivate } = useCanReactivate(agentId);
   const { reactivate, isPending: isReactivating, isConfirming: isReactivateConfirming, isSuccess: isReactivateSuccess } = useReactivate();
@@ -498,7 +500,7 @@ export default function AgentDetailPage() {
             </div>
             <div className="text-right">
               <p className="text-2xl font-bold text-[#38BDF8]">
-                {formatEther(onChainFee)} TON
+                {formatEther(onChainFee)} {nativeCurrency}
               </p>
               <p className="text-xs text-zinc-500">per task</p>
             </div>
