@@ -70,6 +70,9 @@ interface ITaskFeeEscrow {
     /// @notice Thrown when the caller is not authorized (not owner, operator, or payer)
     error NotAuthorized();
 
+    /// @notice Thrown when a user has not used the agent (no completed task)
+    error NotAgentUser();
+
     // ============ Events ============
 
     /**
@@ -190,4 +193,12 @@ interface ITaskFeeEscrow {
      * @return The TaskEscrow struct with payer, agentId, amount, paidAt, status
      */
     function getTaskEscrow(bytes32 taskRef) external view returns (TaskEscrow memory);
+
+    /**
+     * @notice Check if a user has completed at least one task for an agent
+     * @param agentId The on-chain agent ID
+     * @param user The user address to check
+     * @return Whether the user has completed a task for this agent
+     */
+    function hasUsedAgent(uint256 agentId, address user) external view returns (bool);
 }

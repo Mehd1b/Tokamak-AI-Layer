@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { X, Star, Loader2, CheckCircle } from 'lucide-react';
 import { useSubmitFeedback } from '@/hooks/useSubmitFeedback';
 import { useWallet } from '@/hooks/useWallet';
+import { useHasUsedAgent } from '@/hooks/useTaskFee';
 
 interface FeedbackModalProps {
   agentId: bigint;
@@ -17,6 +18,7 @@ export function FeedbackModal({ agentId, agentOwner, onClose }: FeedbackModalPro
   const { address } = useWallet();
   const { submitFeedback, hash, isPending, isConfirming, isSuccess, error } =
     useSubmitFeedback();
+  const { data: hasUsed } = useHasUsedAgent(agentId, address as `0x${string}` | undefined);
 
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
@@ -25,6 +27,7 @@ export function FeedbackModal({ agentId, agentOwner, onClose }: FeedbackModalPro
 
   const isSelfFeedback =
     address?.toLowerCase() === agentOwner?.toLowerCase();
+  const hasNotUsedAgent = hasUsed === false;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,6 +88,14 @@ export function FeedbackModal({ agentId, agentOwner, onClose }: FeedbackModalPro
           <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
             <p className="text-sm text-amber-400">
               You cannot submit feedback for your own agent.
+            </p>
+          </div>
+        )}
+
+        {!isSelfFeedback && hasNotUsedAgent && (
+          <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
+            <p className="text-sm text-amber-400">
+              You must complete at least one task with this agent before submitting feedback.
             </p>
           </div>
         )}
@@ -164,7 +175,9 @@ export function FeedbackModal({ agentId, agentOwner, onClose }: FeedbackModalPro
               <p className="text-sm text-red-400">
                 {error.message?.includes('self-feedback')
                   ? 'You cannot submit feedback for your own agent.'
-                  : error.message?.substring(0, 150) || 'Transaction failed'}
+                  : error.message?.includes('NotAgentUser')
+                    ? 'You must complete a task with this agent before submitting feedback.'
+                    : error.message?.substring(0, 150) || 'Transaction failed'}
               </p>
             </div>
           )}
@@ -184,7 +197,8 @@ export function FeedbackModal({ agentId, agentOwner, onClose }: FeedbackModalPro
                 rating === 0 ||
                 isPending ||
                 isConfirming ||
-                isSelfFeedback
+                isSelfFeedback ||
+                hasNotUsedAgent
               }
               className="btn-primary flex-1 inline-flex items-center justify-center gap-2"
             >

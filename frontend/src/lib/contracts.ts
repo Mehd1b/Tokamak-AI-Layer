@@ -6,7 +6,7 @@ export const CONTRACTS = {
   reputationRegistry: '0x0052258E517835081c94c0B685409f2EfC4D502b' as Address,
   validationRegistry: '0x09447147C6E75a60A449f38532F06E19F5F632F3' as Address,
   stakingIntegrationModule: '0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30' as Address,
-  taskFeeEscrow: '0xa0AC7cE8A90a54F9BDebeFB54F9f46B0D6AB9b39' as Address,
+  taskFeeEscrow: '0x43f9E59b6bFCacD70fcba4f3F6234a6a9F064b8C' as Address,
 } as const;
 
 export const L1_CONTRACTS = {

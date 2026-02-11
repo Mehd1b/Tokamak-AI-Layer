@@ -811,6 +811,62 @@ contract TaskFeeEscrowTest is Test {
         assertEq(escrow.getAgentBalance(AGENT_ID), FEE + FEE_2);
     }
 
+    // ============ hasUsedAgent Tests ============
+
+    function test_HasUsedAgent_FalseByDefault() public view {
+        assertFalse(escrow.hasUsedAgent(AGENT_ID, user));
+    }
+
+    function test_HasUsedAgent_TrueAfterConfirm() public {
+        vm.prank(agentOwner);
+        escrow.setAgentFee(AGENT_ID, FEE);
+
+        bytes32 taskRef = _payForTask(AGENT_ID, user, 1);
+
+        vm.prank(agentOwner);
+        escrow.confirmTask(taskRef);
+
+        assertTrue(escrow.hasUsedAgent(AGENT_ID, user));
+    }
+
+    function test_HasUsedAgent_FalseAfterRefund() public {
+        vm.prank(agentOwner);
+        escrow.setAgentFee(AGENT_ID, FEE);
+
+        bytes32 taskRef = _payForTask(AGENT_ID, user, 1);
+
+        vm.prank(agentOwner);
+        escrow.refundTask(taskRef);
+
+        assertFalse(escrow.hasUsedAgent(AGENT_ID, user));
+    }
+
+    function test_HasUsedAgent_FalseWhileEscrowed() public {
+        vm.prank(agentOwner);
+        escrow.setAgentFee(AGENT_ID, FEE);
+
+        _payForTask(AGENT_ID, user, 1);
+
+        assertFalse(escrow.hasUsedAgent(AGENT_ID, user));
+    }
+
+    function test_HasUsedAgent_DifferentAgents() public {
+        vm.startPrank(agentOwner);
+        escrow.setAgentFee(AGENT_ID, FEE);
+        escrow.setAgentFee(AGENT_ID_2, FEE_2);
+        vm.stopPrank();
+
+        // Complete task for agent 1 only
+        bytes32 taskRef = _payForTask(AGENT_ID, user, 1);
+        vm.prank(agentOwner);
+        escrow.confirmTask(taskRef);
+
+        assertTrue(escrow.hasUsedAgent(AGENT_ID, user));
+        assertFalse(escrow.hasUsedAgent(AGENT_ID_2, user));
+    }
+
+    // ============ Mixed Flow Tests ============
+
     function test_MixedConfirmAndRefund() public {
         vm.prank(agentOwner);
         escrow.setAgentFee(AGENT_ID, FEE);

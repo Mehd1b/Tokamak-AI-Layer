@@ -13,7 +13,8 @@ import {
   FileCode,
 } from 'lucide-react';
 import { useAgent } from '@/hooks/useAgent';
-import { useFeedbackCount, useClientList } from '@/hooks/useReputation';
+import { useFeedbackCount, useClientList, useFeedbacks } from '@/hooks/useReputation';
+import { FeedbackList } from '@/components/FeedbackList';
 import { useAgentValidations } from '@/hooks/useValidation';
 import { useRuntimeAgent } from '@/hooks/useAgentRuntime';
 import { useAgentMetadata } from '@/hooks/useAgentMetadata';
@@ -46,6 +47,7 @@ export default function AgentDetailPage() {
   const { agent, isLoading } = useAgent(agentId);
   const { count: feedbackCount } = useFeedbackCount(agentId);
   const { clients } = useClientList(agentId);
+  const { feedbacks, isLoading: feedbacksLoading } = useFeedbacks(agentId, clients);
   const { validationHashes } = useAgentValidations(agentId);
   const { agent: runtimeAgent } = useRuntimeAgent(agentId?.toString());
   const { name: metaName, description: metaDescription, capabilities: metaCapabilities, services: metaServices, active: metaActive, pricing: metaPricing } = useAgentMetadata(agent?.agentURI);
@@ -323,6 +325,22 @@ export default function AgentDetailPage() {
             onChainAgentId={agentId}
             feePerTask={onChainFee}
           />
+        </div>
+      )}
+
+      {/* Recent Feedback */}
+      {feedbacks.length > 0 && (
+        <div className="mt-6 card">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-white">Recent Feedback</h2>
+            <Link
+              href={`/reputation/${agentId}`}
+              className="text-sm text-[#38BDF8] hover:underline"
+            >
+              View all
+            </Link>
+          </div>
+          <FeedbackList feedbacks={feedbacks} isLoading={feedbacksLoading} limit={3} />
         </div>
       )}
 

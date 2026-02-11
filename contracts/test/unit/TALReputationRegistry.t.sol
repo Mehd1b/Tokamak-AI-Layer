@@ -38,6 +38,22 @@ contract MockIdentityRegistry {
 }
 
 /**
+ * @title MockTaskFeeEscrow
+ * @notice Mock contract for testing TaskFeeEscrow usage validation
+ */
+contract MockTaskFeeEscrow {
+    mapping(uint256 => mapping(address => bool)) private _hasUsedAgent;
+
+    function setHasUsedAgent(uint256 agentId, address user, bool used) external {
+        _hasUsedAgent[agentId][user] = used;
+    }
+
+    function hasUsedAgent(uint256 agentId, address user) external view returns (bool) {
+        return _hasUsedAgent[agentId][user];
+    }
+}
+
+/**
  * @title TALReputationRegistryTest
  * @notice Comprehensive unit tests for TALReputationRegistry
  */
@@ -993,6 +1009,68 @@ contract TALReputationRegistryTest is Test {
         assertEq(summary.totalValue, 75); // 100 + (-25)
         assertEq(summary.min, -25);
         assertEq(summary.max, 100);
+    }
+
+    // ============ Fuzz Tests ============
+
+    // ============ TaskFeeEscrow Usage Validation Tests ============
+
+    function test_SubmitFeedback_SucceedsWhenTaskFeeEscrowNotSet() public {
+        // By default taskFeeEscrow is not set (address(0))
+        // Feedback should work normally (backward compatible)
+        _submitDefaultFeedback(client1, AGENT_ID);
+
+        IERC8004ReputationRegistry.Feedback[] memory feedbacks = registry.getFeedback(AGENT_ID, client1);
+        assertEq(feedbacks.length, 1);
+    }
+
+    function test_SubmitFeedback_SucceedsWhenUserHasUsedAgent() public {
+        MockTaskFeeEscrow mockEscrow = new MockTaskFeeEscrow();
+        mockEscrow.setHasUsedAgent(AGENT_ID, client1, true);
+
+        vm.prank(admin);
+        registry.setTaskFeeEscrow(address(mockEscrow));
+
+        _submitDefaultFeedback(client1, AGENT_ID);
+
+        IERC8004ReputationRegistry.Feedback[] memory feedbacks = registry.getFeedback(AGENT_ID, client1);
+        assertEq(feedbacks.length, 1);
+    }
+
+    function test_SubmitFeedback_RevertsWhenUserHasNotUsedAgent() public {
+        MockTaskFeeEscrow mockEscrow = new MockTaskFeeEscrow();
+        // client1 has NOT used the agent (default false)
+
+        vm.prank(admin);
+        registry.setTaskFeeEscrow(address(mockEscrow));
+
+        vm.prank(client1);
+        vm.expectRevert(abi.encodeWithSelector(ITALReputationRegistry.NotAgentUser.selector, AGENT_ID, client1));
+        registry.submitFeedback(
+            AGENT_ID,
+            DEFAULT_VALUE,
+            DEFAULT_DECIMALS,
+            _tag1,
+            _tag2,
+            _endpoint,
+            _feedbackURI,
+            DEFAULT_FEEDBACK_HASH
+        );
+    }
+
+    function test_SetTaskFeeEscrow_OnlyAdmin() public {
+        address mockAddr = address(0xBEEF);
+
+        vm.prank(admin);
+        registry.setTaskFeeEscrow(mockAddr);
+
+        assertEq(registry.taskFeeEscrow(), mockAddr);
+    }
+
+    function test_SetTaskFeeEscrow_RevertsNonAdmin() public {
+        vm.prank(nonAdmin);
+        vm.expectRevert();
+        registry.setTaskFeeEscrow(address(0xBEEF));
     }
 
     // ============ Fuzz Tests ============

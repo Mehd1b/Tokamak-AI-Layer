@@ -157,6 +157,22 @@ export function useTaskEscrow(taskRef?: `0x${string}`) {
 }
 
 /**
+ * Check if a user has completed at least one task for an agent
+ */
+export function useHasUsedAgent(agentId?: bigint, user?: Address) {
+  const enabled = agentId !== undefined && !!user;
+
+  return useReadContract({
+    address: CONTRACTS.taskFeeEscrow,
+    abi: TaskFeeEscrowABI,
+    functionName: 'hasUsedAgent',
+    args: enabled ? [agentId!, user!] : undefined,
+    chainId: CHAIN_ID,
+    query: { enabled },
+  });
+}
+
+/**
  * Refund escrowed funds for a failed task.
  * Callable by agent owner/operator at any time, or by payer after REFUND_DEADLINE (1 hour).
  */

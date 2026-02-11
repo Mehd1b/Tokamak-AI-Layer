@@ -898,6 +898,32 @@ export const TALReputationRegistryABI = [
   },
   {
     "type": "function",
+    "name": "taskFeeEscrow",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "setTaskFeeEscrow",
+    "inputs": [
+      {
+        "name": "_taskFeeEscrow",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "validationRegistry",
     "inputs": [],
     "outputs": [
@@ -1321,6 +1347,22 @@ export const TALReputationRegistryABI = [
   {
     "type": "error",
     "name": "NotAgentOwner",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "NotAgentUser",
     "inputs": [
       {
         "name": "agentId",

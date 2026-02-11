@@ -100,10 +100,13 @@ contract TALReputationRegistry is
     /// @notice Total feedback count per agent (includes revoked)
     mapping(uint256 => uint256) private _feedbackCounts;
 
+    /// @notice TaskFeeEscrow address for usage validation
+    address public taskFeeEscrow;
+
     // ============ Storage Gap ============
 
     /// @dev Reserved storage space for future upgrades
-    uint256[40] private __gap;
+    uint256[39] private __gap;
 
     // ============ Initializer ============
 
@@ -417,6 +420,16 @@ contract TALReputationRegistry is
         validationRegistry = _validationRegistry;
     }
 
+    /**
+     * @notice Set the TaskFeeEscrow address for usage validation
+     * @dev Only callable by DEFAULT_ADMIN_ROLE. When set, only users who have
+     *      completed a task via the escrow can submit feedback.
+     * @param _taskFeeEscrow The TaskFeeEscrow contract address (or address(0) to disable)
+     */
+    function setTaskFeeEscrow(address _taskFeeEscrow) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        taskFeeEscrow = _taskFeeEscrow;
+    }
+
     // ============ Internal Functions ============
 
     /**
@@ -433,6 +446,7 @@ contract TALReputationRegistry is
     ) internal {
         _validateAgent(input.agentId);
         _validateNotSelfFeedback(input.agentId, msg.sender);
+        _validateAgentUser(input.agentId, msg.sender);
 
         // Store feedback and get normalized value
         int128 nv = _storeFeedback(input);
@@ -499,6 +513,24 @@ contract TALReputationRegistry is
      */
     function _emitFeedback(uint256 agentId, int128 value, string memory t1, string memory t2) internal {
         emit FeedbackSubmitted(agentId, msg.sender, value, t1, t2);
+    }
+
+    /**
+     * @notice Validate that the caller has used the agent (completed a task via TaskFeeEscrow)
+     * @dev Skips validation if taskFeeEscrow is not set (backward compatible)
+     * @param agentId The agent ID to check usage for
+     * @param caller The address to validate
+     */
+    function _validateAgentUser(uint256 agentId, address caller) internal view {
+        if (taskFeeEscrow == address(0)) return; // Skip if not set
+
+        (bool success, bytes memory result) = taskFeeEscrow.staticcall(
+            abi.encodeWithSignature("hasUsedAgent(uint256,address)", agentId, caller)
+        );
+        if (success && result.length >= 32) {
+            bool used = abi.decode(result, (bool));
+            if (!used) revert NotAgentUser(agentId, caller);
+        }
     }
 
     /**

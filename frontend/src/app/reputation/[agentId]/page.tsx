@@ -3,8 +3,9 @@
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Star, TrendingUp, Users, Shield } from 'lucide-react';
-import { useFeedbackCount, useClientList, useReputationSummary, useVerifiedSummary } from '@/hooks/useReputation';
+import { useFeedbackCount, useClientList, useReputationSummary, useVerifiedSummary, useFeedbacks } from '@/hooks/useReputation';
 import { useAgent } from '@/hooks/useAgent';
+import { FeedbackList } from '@/components/FeedbackList';
 
 function formatAverage(summary: { totalValue: bigint; count: bigint; min: bigint; max: bigint } | undefined): string {
   if (!summary || summary.count === 0n) {
@@ -34,6 +35,7 @@ export default function ReputationPage() {
     useReputationSummary(agentId, clients ?? []);
   const { summary: verifiedSummary, isLoading: verifiedLoading } =
     useVerifiedSummary(agentId, clients ?? []);
+  const { feedbacks, isLoading: feedbacksLoading } = useFeedbacks(agentId, clients);
 
   const isLoading = agentLoading || feedbackLoading || clientsLoading || standardLoading || verifiedLoading;
 
@@ -139,15 +141,7 @@ export default function ReputationPage() {
             <h2 className="mb-4 text-lg font-semibold text-white">
               Recent Feedback
             </h2>
-            {Number(feedbackCount ?? 0) === 0 ? (
-              <p className="text-center text-sm text-zinc-500 py-8">
-                No feedback submitted yet for this agent.
-              </p>
-            ) : (
-              <p className="text-center text-sm text-zinc-500 py-8">
-                Individual feedback details require the subgraph indexer.
-              </p>
-            )}
+            <FeedbackList feedbacks={feedbacks} isLoading={feedbacksLoading} />
           </div>
         </>
       )}

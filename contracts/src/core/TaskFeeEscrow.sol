@@ -46,6 +46,9 @@ contract TaskFeeEscrow is ITaskFeeEscrow, ReentrancyGuard {
     /// @notice Accumulated confirmed fees per agent (agentId => balance)
     mapping(uint256 agentId => uint256) public agentBalances;
 
+    /// @notice Tracks whether a user has completed a task for an agent (agentId => user => used)
+    mapping(uint256 agentId => mapping(address user => bool)) private _hasUsedAgent;
+
     // ============ Constructor ============
 
     /**
@@ -128,6 +131,7 @@ contract TaskFeeEscrow is ITaskFeeEscrow, ReentrancyGuard {
 
         escrow.status = TaskStatus.Completed;
         agentBalances[escrow.agentId] += escrow.amount;
+        _hasUsedAgent[escrow.agentId][escrow.payer] = true;
 
         emit TaskConfirmed(taskRef, escrow.agentId, escrow.amount);
     }
@@ -176,5 +180,10 @@ contract TaskFeeEscrow is ITaskFeeEscrow, ReentrancyGuard {
     /// @inheritdoc ITaskFeeEscrow
     function getTaskEscrow(bytes32 taskRef) external view returns (TaskEscrow memory) {
         return taskEscrows[taskRef];
+    }
+
+    /// @inheritdoc ITaskFeeEscrow
+    function hasUsedAgent(uint256 agentId, address user) external view returns (bool) {
+        return _hasUsedAgent[agentId][user];
     }
 }

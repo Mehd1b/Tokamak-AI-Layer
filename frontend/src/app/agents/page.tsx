@@ -2,18 +2,23 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Search, ChevronRight } from 'lucide-react';
+import { Search, ChevronRight, Star, ArrowUpDown } from 'lucide-react';
 import { useAgentCount, useAgentList } from '@/hooks/useAgent';
 import { useAgentMetadata } from '@/hooks/useAgentMetadata';
+import { useAgentRatings } from '@/hooks/useReputation';
 import { shortenAddress } from '@/lib/utils';
+
+type SortOption = 'newest' | 'rating' | 'reviews';
 
 interface AgentCardProps {
   agentId: number;
   owner: `0x${string}`;
   agentURI: string;
+  averageScore: number | null;
+  feedbackCount: number;
 }
 
-function AgentCard({ agentId, owner, agentURI }: AgentCardProps) {
+function AgentCard({ agentId, owner, agentURI, averageScore, feedbackCount }: AgentCardProps) {
   const { name, description, active, services, isLoading, error } = useAgentMetadata(agentURI);
 
   // Hide agents with no URI, failed metadata, inactive status, or localhost endpoints
@@ -47,7 +52,14 @@ function AgentCard({ agentId, owner, agentURI }: AgentCardProps) {
         </div>
       </div>
       <div className="flex items-center gap-4">
-        <div className="hidden sm:block text-xs text-zinc-500">
+        {averageScore !== null && (
+          <div className="hidden sm:flex items-center gap-1 text-sm">
+            <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+            <span className="text-white font-medium">{averageScore.toFixed(1)}</span>
+            <span className="text-zinc-600">({feedbackCount})</span>
+          </div>
+        )}
+        <div className="hidden md:block text-xs text-zinc-500">
           {shortenAddress(owner)}
         </div>
         <ChevronRight className="h-5 w-5 text-zinc-600 flex-shrink-0" />
@@ -58,27 +70,46 @@ function AgentCard({ agentId, owner, agentURI }: AgentCardProps) {
 
 export default function AgentsPage() {
   const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<SortOption>('newest');
   const { count, isLoading: countLoading } = useAgentCount();
   const agentCount = count ? Number(count) : 0;
   const { agents, isLoading: agentsLoading } = useAgentList(agentCount);
 
-  const filteredAgents = useMemo(() => {
-    if (!search.trim()) return agents;
+  const agentIds = useMemo(() => agents.map((a) => a.agentId), [agents]);
+  const { ratings } = useAgentRatings(agentIds);
 
-    const searchLower = search.toLowerCase();
-    return agents.filter((agent) => {
-      // Search by agent ID
-      if (agent.agentId.toString().includes(search)) return true;
+  const filteredAndSortedAgents = useMemo(() => {
+    let result = agents;
 
-      // Search by owner address
-      if (agent.owner.toLowerCase().includes(searchLower)) return true;
+    if (search.trim()) {
+      const searchLower = search.toLowerCase();
+      result = result.filter((agent) => {
+        if (agent.agentId.toString().includes(search)) return true;
+        if (agent.owner.toLowerCase().includes(searchLower)) return true;
+        if (agent.agentURI.toLowerCase().includes(searchLower)) return true;
+        return false;
+      });
+    }
 
-      // Search by agentURI
-      if (agent.agentURI.toLowerCase().includes(searchLower)) return true;
+    if (sort === 'rating') {
+      result = [...result].sort((a, b) => {
+        const ra = ratings.get(a.agentId);
+        const rb = ratings.get(b.agentId);
+        const scoreA = ra?.averageScore ?? -Infinity;
+        const scoreB = rb?.averageScore ?? -Infinity;
+        return scoreB - scoreA;
+      });
+    } else if (sort === 'reviews') {
+      result = [...result].sort((a, b) => {
+        const ra = ratings.get(a.agentId);
+        const rb = ratings.get(b.agentId);
+        return (rb?.feedbackCount ?? 0) - (ra?.feedbackCount ?? 0);
+      });
+    }
+    // 'newest' = default order (highest ID first, already the order from useAgentList)
 
-      return false;
-    });
-  }, [agents, search]);
+    return result;
+  }, [agents, search, sort, ratings]);
 
   const isLoading = countLoading || agentsLoading;
 
@@ -103,21 +134,35 @@ export default function AgentsPage() {
         </div>
       </div>
 
-      {/* Search Bar */}
+      {/* Search + Sort */}
       <div className="card mb-8">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
-          <input
-            type="text"
-            placeholder="Search agents by ID, owner address, or URI..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-4 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"
-          />
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
+            <input
+              type="text"
+              placeholder="Search agents by ID, owner address, or URI..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-4 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <ArrowUpDown className="h-4 w-4 text-zinc-500" />
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortOption)}
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"
+            >
+              <option value="newest">Newest</option>
+              <option value="rating">Highest Rated</option>
+              <option value="reviews">Most Reviewed</option>
+            </select>
+          </div>
         </div>
         {search && (
           <p className="mt-2 text-sm text-zinc-500">
-            Showing {filteredAgents.length} of {agents.length} agents
+            Showing {filteredAndSortedAgents.length} of {agents.length} agents
           </p>
         )}
       </div>
@@ -139,21 +184,26 @@ export default function AgentsPage() {
           </div>
         )}
 
-        {!isLoading && filteredAgents.length === 0 && agentCount > 0 && (
+        {!isLoading && filteredAndSortedAgents.length === 0 && agentCount > 0 && (
           <div className="card text-center py-12">
             <p className="text-zinc-500">No agents match your search.</p>
           </div>
         )}
 
         {!isLoading &&
-          filteredAgents.map((agent) => (
-            <AgentCard
-              key={agent.agentId}
-              agentId={agent.agentId}
-              owner={agent.owner}
-              agentURI={agent.agentURI}
-            />
-          ))}
+          filteredAndSortedAgents.map((agent) => {
+            const rating = ratings.get(agent.agentId);
+            return (
+              <AgentCard
+                key={agent.agentId}
+                agentId={agent.agentId}
+                owner={agent.owner}
+                agentURI={agent.agentURI}
+                averageScore={rating?.averageScore ?? null}
+                feedbackCount={rating?.feedbackCount ?? 0}
+              />
+            );
+          })}
       </div>
     </div>
   );

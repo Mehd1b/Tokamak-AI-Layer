@@ -64,6 +64,13 @@ interface ITALReputationRegistry is IERC8004ReputationRegistry {
      */
     error NoFeedbackToAggregate();
 
+    /**
+     * @dev Thrown when a caller has not used the agent (no completed task via TaskFeeEscrow)
+     * @param agentId The ID of the agent
+     * @param caller The address of the caller
+     */
+    error NotAgentUser(uint256 agentId, address caller);
+
     // ============ Events ============
 
     /**

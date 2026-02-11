@@ -212,6 +212,17 @@ export const TaskFeeEscrowABI = [
     stateMutability: 'nonpayable',
   },
 
+  {
+    type: 'function',
+    name: 'hasUsedAgent',
+    inputs: [
+      { name: 'agentId', type: 'uint256', internalType: 'uint256' },
+      { name: 'user', type: 'address', internalType: 'address' },
+    ],
+    outputs: [{ name: '', type: 'bool', internalType: 'bool' }],
+    stateMutability: 'view',
+  },
+
   // ============ Constructor ============
   {
     type: 'constructor',

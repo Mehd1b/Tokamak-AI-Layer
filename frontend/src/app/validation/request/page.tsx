@@ -197,36 +197,49 @@ export default function RequestValidationPage() {
           </h2>
 
           <div className="space-y-3">
-            {VALIDATION_MODELS.map((m) => (
-              <label
-                key={m.value}
-                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
-                  model === m.value
-                    ? 'border-[#38BDF8]/50 bg-[#38BDF8]/10'
-                    : 'border-white/10 hover:border-white/20'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="model"
-                  value={m.value}
-                  checked={model === m.value}
-                  onChange={() => setModel(m.value)}
-                  className="mt-0.5 accent-[#38BDF8]"
-                />
-                <div>
-                  <p className="text-sm font-medium text-white">
-                    {m.label}
-                  </p>
-                  <p className="text-xs text-zinc-500">{m.desc}</p>
-                  {m.minBounty !== '0' && (
-                    <p className="mt-1 text-xs text-amber-400">
-                      Minimum bounty: {m.minBounty} TON
-                    </p>
-                  )}
-                </div>
-              </label>
-            ))}
+            {VALIDATION_MODELS.map((m) => {
+              const comingSoon = m.value === 2 || m.value === 3;
+              return (
+                <label
+                  key={m.value}
+                  className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
+                    comingSoon
+                      ? 'cursor-not-allowed border-white/5 opacity-50'
+                      : model === m.value
+                        ? 'cursor-pointer border-[#38BDF8]/50 bg-[#38BDF8]/10'
+                        : 'cursor-pointer border-white/10 hover:border-white/20'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="model"
+                    value={m.value}
+                    checked={model === m.value}
+                    disabled={comingSoon}
+                    onChange={() => setModel(m.value)}
+                    className="mt-0.5 accent-[#38BDF8]"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-white">
+                        {m.label}
+                      </p>
+                      {comingSoon && (
+                        <span className="rounded bg-zinc-700 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+                          Coming soon
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-zinc-500">{m.desc}</p>
+                    {m.minBounty !== '0' && !comingSoon && (
+                      <p className="mt-1 text-xs text-amber-400">
+                        Minimum bounty: {m.minBounty} TON
+                      </p>
+                    )}
+                  </div>
+                </label>
+              );
+            })}
           </div>
         </div>
 
