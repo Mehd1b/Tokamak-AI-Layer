@@ -132,13 +132,7 @@ export function createTaskRoutes(agents: Map<string, BaseAgent>): Router {
           const errMsg = verifyErr instanceof Error ? verifyErr.message : String(verifyErr);
           console.error('[TASK] Payment verification failed:', errMsg);
           res.status(502).json({
-            error: `Payment verification failed: ${errMsg}`,
-            debug: {
-              escrowAddress,
-              taskRef,
-              rpcUrl: config.RPC_URL,
-              chainId: config.CHAIN_ID,
-            },
+            error: `Payment verification failed [escrow=${escrowAddress}, rpc=${config.RPC_URL}, chainId=${config.CHAIN_ID}]: ${errMsg}`,
           });
           return;
         }
