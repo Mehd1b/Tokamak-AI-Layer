@@ -16,6 +16,8 @@ import {
   processStrategyDeliver,
   processSnapshotPin,
   processPaymentClaim,
+  processAPYAccuracyCheck,
+  processReputationUpdate,
 } from "./jobs/index.js";
 import type {
   PoolDataRefreshData,
@@ -23,6 +25,8 @@ import type {
   StrategyDeliverData,
   SnapshotPinData,
   PaymentClaimData,
+  APYAccuracyCheckData,
+  ReputationUpdateData,
 } from "./jobs/index.js";
 import type { WorkerConfig } from "./config.js";
 import type { Logger } from "./logger.js";
@@ -83,6 +87,8 @@ export class WorkerOrchestrator {
     this.startStrategyDeliverWorker();
     this.startSnapshotPinWorker();
     this.startPaymentClaimWorker();
+    this.startAPYAccuracyCheckWorker();
+    this.startReputationUpdateWorker();
 
     // Schedule cron jobs
     await this.scheduleCronJobs();
@@ -142,11 +148,12 @@ export class WorkerOrchestrator {
         onComplete: (taskId, report, snapshot) => {
           this.taskResults.set(taskId, report);
           this.snapshotCache.set(snapshot.snapshotId, snapshot);
-          // Queue delivery
+          // Queue delivery with serialized report for IPFS pinning
           this.queues.get(JOB_NAMES.STRATEGY_DELIVER)?.add("deliver", {
             taskId,
             snapshotId: snapshot.snapshotId,
             executionHash: report.executionHash,
+            reportJson: JSON.stringify(report),
           } satisfies StrategyDeliverData, { priority: 1 });
         },
       }),
@@ -195,6 +202,33 @@ export class WorkerOrchestrator {
     this.workers.push(worker);
   }
 
+  private startAPYAccuracyCheckWorker(): void {
+    const worker = new Worker<APYAccuracyCheckData>(
+      JOB_NAMES.APY_ACCURACY_CHECK,
+      async (job) => processAPYAccuracyCheck(job, {
+        pipeline: this.pipeline,
+        logger: this.logger,
+        // In production: wire up TALClient.reputation.updateAPYAccuracy here
+      }),
+      { connection: this.connection, concurrency: 1 },
+    );
+    this.registerWorkerEvents(worker, JOB_NAMES.APY_ACCURACY_CHECK);
+    this.workers.push(worker);
+  }
+
+  private startReputationUpdateWorker(): void {
+    const worker = new Worker<ReputationUpdateData>(
+      JOB_NAMES.REPUTATION_UPDATE,
+      async (job) => processReputationUpdate(job, {
+        logger: this.logger,
+        // In production: pass Redis-backed reputation cache here
+      }),
+      { connection: this.connection, concurrency: 1 },
+    );
+    this.registerWorkerEvents(worker, JOB_NAMES.REPUTATION_UPDATE);
+    this.workers.push(worker);
+  }
+
   private async scheduleCronJobs(): Promise<void> {
     const refreshQueue = this.queues.get(JOB_NAMES.POOL_DATA_REFRESH);
     if (refreshQueue) {
@@ -209,6 +243,23 @@ export class WorkerOrchestrator {
       this.logger.info(
         { intervalMs: this.config.POOL_REFRESH_INTERVAL_MS },
         "Pool refresh cron scheduled",
+      );
+    }
+
+    // APY accuracy check: once per day (configured via APY_CHECK_INTERVAL_MS)
+    const apyQueue = this.queues.get(JOB_NAMES.APY_ACCURACY_CHECK);
+    if (apyQueue) {
+      await apyQueue.upsertJobScheduler(
+        "apy-accuracy-cron",
+        { every: this.config.APY_CHECK_INTERVAL_MS },
+        {
+          name: "scheduled-apy-check",
+          data: { taskId: "cron", reportTimestamp: 0, horizon: "7d" as const },
+        },
+      );
+      this.logger.info(
+        { intervalMs: this.config.APY_CHECK_INTERVAL_MS },
+        "APY accuracy check cron scheduled",
       );
     }
   }

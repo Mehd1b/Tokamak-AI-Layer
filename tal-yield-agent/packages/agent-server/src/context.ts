@@ -1,5 +1,5 @@
-import { createPublicClient, http } from "viem";
-import { thanosSepolia, THANOS_SEPOLIA_ADDRESSES } from "@tal-yield-agent/shared";
+import { createPublicClient, http, type Address } from "viem";
+import { thanosSepolia } from "@tal-yield-agent/shared";
 import { TALClient } from "@tal-yield-agent/tal-sdk";
 import {
   DataPipeline,
@@ -54,9 +54,11 @@ export function createContext(config: Config, logger: Logger): AppContext {
   const talClient = new TALClient({
     publicClient,
     addresses: {
-      identityRegistry: THANOS_SEPOLIA_ADDRESSES.TALIdentityRegistry,
-      taskFeeEscrow: THANOS_SEPOLIA_ADDRESSES.TaskFeeEscrow,
-      reputationRegistry: THANOS_SEPOLIA_ADDRESSES.TALReputationRegistry,
+      identityRegistry: config.IDENTITY_REGISTRY as Address,
+      taskFeeEscrow: config.TASK_FEE_ESCROW as Address,
+      reputationRegistry: config.REPUTATION_REGISTRY as Address,
+      validationRegistry: config.VALIDATION_REGISTRY as Address,
+      stakingIntegrationModule: config.STAKING_INTEGRATION_MODULE as Address,
     },
   });
 

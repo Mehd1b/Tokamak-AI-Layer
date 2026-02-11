@@ -3,6 +3,8 @@ import { THANOS_SEPOLIA_ADDRESSES, thanosSepolia } from "@tal-yield-agent/shared
 import { IdentityClient } from "./clients/identity-client.js";
 import { EscrowClient } from "./clients/escrow-client.js";
 import { ReputationClient } from "./clients/reputation-client.js";
+import { ValidationClient } from "./clients/validation-client.js";
+import { StakingClient } from "./clients/staking-client.js";
 import type {
   TALClientConfig,
   AgentInfo,
@@ -10,6 +12,9 @@ import type {
   Feedback,
   FeedbackSummary,
   SubmitFeedbackParams,
+  ValidationResult,
+  ValidationModel,
+  OperatorStatus,
 } from "./types.js";
 
 export interface TALClientOptions {
@@ -20,12 +25,15 @@ export interface TALClientOptions {
 
 /**
  * Facade client for all TAL contract interactions.
- * Wraps IdentityClient, EscrowClient, and ReputationClient.
+ * Wraps IdentityClient, EscrowClient, ReputationClient,
+ * ValidationClient, and StakingClient.
  */
 export class TALClient {
   readonly identity: IdentityClient;
   readonly escrow: EscrowClient;
   readonly reputation: ReputationClient;
+  readonly validation: ValidationClient;
+  readonly staking: StakingClient;
   readonly chain = thanosSepolia;
 
   constructor(options: TALClientOptions) {
@@ -39,12 +47,18 @@ export class TALClient {
           options.addresses?.taskFeeEscrow ?? THANOS_SEPOLIA_ADDRESSES.TaskFeeEscrow,
         reputationRegistry:
           options.addresses?.reputationRegistry ?? THANOS_SEPOLIA_ADDRESSES.TALReputationRegistry,
+        validationRegistry:
+          options.addresses?.validationRegistry ?? THANOS_SEPOLIA_ADDRESSES.TALValidationRegistry,
+        stakingIntegrationModule:
+          options.addresses?.stakingIntegrationModule ?? THANOS_SEPOLIA_ADDRESSES.StakingIntegrationModule,
       },
     };
 
     this.identity = new IdentityClient(config);
     this.escrow = new EscrowClient(config);
     this.reputation = new ReputationClient(config);
+    this.validation = new ValidationClient(config);
+    this.staking = new StakingClient(config);
   }
 
   // === Identity Shortcuts ===
@@ -95,5 +109,45 @@ export class TALClient {
 
   async getFeedback(agentId: bigint, client: Address): Promise<Feedback[]> {
     return this.reputation.getFeedback(agentId, client);
+  }
+
+  async updateAPYAccuracy(agentId: bigint, taskId: string, actualAPY: bigint): Promise<Hash> {
+    return this.reputation.updateAPYAccuracy(agentId, taskId, actualAPY);
+  }
+
+  // === Validation Shortcuts ===
+
+  async getValidationResult(requestHash: Hash): Promise<ValidationResult> {
+    return this.validation.getValidation(requestHash);
+  }
+
+  async submitValidation(
+    requestHash: Hash,
+    score: number,
+    proof: Hash,
+    detailsURI: string,
+  ): Promise<Hash> {
+    return this.validation.submitValidation(requestHash, score, proof, detailsURI);
+  }
+
+  async requestValidation(
+    agentId: bigint,
+    taskHash: Hash,
+    outputHash: Hash,
+    model: ValidationModel,
+    deadline: bigint,
+    bounty: bigint,
+  ): Promise<Hash> {
+    return this.validation.requestValidation(agentId, taskHash, outputHash, model, deadline, bounty);
+  }
+
+  // === Staking Shortcuts ===
+
+  async getStakeBalance(operator: Address): Promise<bigint> {
+    return this.staking.getStakeBalance(operator);
+  }
+
+  async getOperatorStatus(operator: Address): Promise<OperatorStatus> {
+    return this.staking.getOperatorStatus(operator);
   }
 }

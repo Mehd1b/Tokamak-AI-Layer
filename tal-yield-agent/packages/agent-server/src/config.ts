@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { THANOS_SEPOLIA_ADDRESSES } from "@tal-yield-agent/shared";
 
 const ConfigSchema = z.object({
   PORT: z.coerce.number().default(3000),
@@ -6,6 +7,13 @@ const ConfigSchema = z.object({
 
   // Chain
   RPC_URL: z.string().default("https://rpc.thanos-sepolia.tokamak.network"),
+
+  // Contract addresses (override defaults from shared package)
+  IDENTITY_REGISTRY: z.string().default(THANOS_SEPOLIA_ADDRESSES.TALIdentityRegistry),
+  REPUTATION_REGISTRY: z.string().default(THANOS_SEPOLIA_ADDRESSES.TALReputationRegistry),
+  VALIDATION_REGISTRY: z.string().default(THANOS_SEPOLIA_ADDRESSES.TALValidationRegistry),
+  TASK_FEE_ESCROW: z.string().default(THANOS_SEPOLIA_ADDRESSES.TaskFeeEscrow),
+  STAKING_INTEGRATION_MODULE: z.string().default(THANOS_SEPOLIA_ADDRESSES.StakingIntegrationModule),
 
   // TAL Agent
   AGENT_ID: z.coerce.bigint().optional(),
@@ -19,6 +27,12 @@ const ConfigSchema = z.object({
 
   // API Keys (comma-separated)
   API_KEYS: z.string().default(""),
+
+  // EIP-712 wallet signature auth (set to "true" to enable on write endpoints)
+  EIP712_AUTH: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
 
   // Logging
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),

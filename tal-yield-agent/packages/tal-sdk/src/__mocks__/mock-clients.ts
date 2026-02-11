@@ -1,5 +1,5 @@
 import type { Address, Hash } from "viem";
-import { TaskStatus } from "../types.js";
+import { TaskStatus, ValidationModel, ValidationStatus } from "../types.js";
 
 // ============================================================
 // Mock addresses
@@ -9,14 +9,20 @@ export const MOCK_ADDRESSES = {
   identityRegistry: "0x3f89CD27fD877827E7665A9883b3c0180E22A525" as Address,
   taskFeeEscrow: "0x43f9E59b6bFCacD70fcba4f3F6234a6a9F064b8C" as Address,
   reputationRegistry: "0x0052258E517835081c94c0B685409f2EfC4D502b" as Address,
+  validationRegistry: "0x09447147C6E75a60A449f38532F06E19F5F632F3" as Address,
+  stakingIntegrationModule: "0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30" as Address,
 };
 
 export const MOCK_OWNER = "0x1234567890abcdef1234567890abcdef12345678" as Address;
 export const MOCK_OPERATOR = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd" as Address;
 export const MOCK_PAYER = "0x9876543210fedcba9876543210fedcba98765432" as Address;
+export const MOCK_VALIDATOR = "0xdddddddddddddddddddddddddddddddddddddddd" as Address;
 export const MOCK_TX_HASH = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as Hash;
 export const MOCK_TASK_REF = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" as Hash;
 export const MOCK_FEEDBACK_HASH = "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" as Hash;
+export const MOCK_REQUEST_HASH = "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd" as Hash;
+export const MOCK_TASK_HASH = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" as Hash;
+export const MOCK_OUTPUT_HASH = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" as Hash;
 
 // ============================================================
 // Mock contract return values
@@ -58,6 +64,34 @@ export const MOCK_STAKE_WEIGHTED_SUMMARY = {
   min: 75n,
   max: 95n,
 };
+
+// Validation mocks
+export const MOCK_VALIDATION_REQUEST = {
+  agentId: 1n,
+  requester: MOCK_PAYER,
+  taskHash: MOCK_TASK_HASH,
+  outputHash: MOCK_OUTPUT_HASH,
+  model: ValidationModel.StakeSecured as number,
+  bounty: 10000000000000000000n, // 10 TON
+  deadline: 1700100000n,
+  status: ValidationStatus.Completed as number,
+};
+
+export const MOCK_VALIDATION_RESPONSE = {
+  validator: MOCK_VALIDATOR,
+  score: 95,
+  proof: "0x" as Hash,
+  detailsURI: "ipfs://QmValidation123",
+  timestamp: 1700050000n,
+};
+
+// Staking mocks
+export const MOCK_OPERATOR_STATUS = [
+  5000000000000000000000n, // 5000 TON staked
+  true,                     // isVerified
+  0n,                       // slashingCount
+  0n,                       // lastSlashTime
+] as const;
 
 // ============================================================
 // Mock viem clients
@@ -107,6 +141,20 @@ export function createMockReadContract(overrides?: Record<string, unknown>): Rea
     getSummary: MOCK_FEEDBACK_SUMMARY,
     getStakeWeightedSummary: MOCK_STAKE_WEIGHTED_SUMMARY,
     hasPaymentProof: true,
+
+    // Validation
+    getValidation: [MOCK_VALIDATION_REQUEST, MOCK_VALIDATION_RESPONSE],
+    getAgentValidations: [MOCK_REQUEST_HASH],
+    getValidationsByRequester: [MOCK_REQUEST_HASH],
+    getValidationsByValidator: [MOCK_REQUEST_HASH],
+    getPendingValidationCount: 2n,
+    getSelectedValidator: MOCK_VALIDATOR,
+    isDisputed: false,
+
+    // Staking
+    getStake: 5000000000000000000000n, // 5000 TON
+    getOperatorStatus: MOCK_OPERATOR_STATUS,
+    MIN_OPERATOR_STAKE: 1000000000000000000000n, // 1000 TON
 
     ...overrides,
   };

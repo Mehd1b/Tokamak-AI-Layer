@@ -20,17 +20,25 @@ export async function processStrategyDeliver(
   let txHash: string | undefined;
   let ipfsCid: string | undefined;
 
-  // Pin report to IPFS if available
-  if (deps.pinToIPFS && job.data.reportIpfsCid) {
+  // Pin report to IPFS if pinToIPFS is configured and we have report data
+  if (deps.pinToIPFS && job.data.reportJson) {
+    try {
+      const reportData = JSON.parse(job.data.reportJson);
+      ipfsCid = await deps.pinToIPFS(reportData);
+      deps.logger.info({ taskId, ipfsCid }, "Report pinned to IPFS");
+    } catch (err) {
+      deps.logger.error({ taskId, err }, "Failed to pin report to IPFS, continuing without CID");
+    }
+  } else if (job.data.reportIpfsCid) {
     ipfsCid = job.data.reportIpfsCid;
-    deps.logger.info({ taskId, ipfsCid }, "Report already pinned");
+    deps.logger.info({ taskId, ipfsCid }, "Using pre-existing IPFS CID");
   }
 
   // Confirm task on-chain if wallet available
   if (deps.confirmTask) {
     try {
       txHash = await deps.confirmTask(taskId);
-      deps.logger.info({ taskId, txHash }, "Task confirmed on-chain");
+      deps.logger.info({ taskId, txHash, ipfsCid }, "Task confirmed on-chain");
     } catch (err) {
       deps.logger.error({ taskId, err }, "Failed to confirm task on-chain");
       throw err;

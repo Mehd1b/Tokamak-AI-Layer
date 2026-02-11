@@ -18,3 +18,5 @@ export { processStrategyGenerate, type StrategyGenerateDeps } from "./strategy-g
 export { processStrategyDeliver, type StrategyDeliverDeps } from "./strategy-deliver.js";
 export { processSnapshotPin, type SnapshotPinDeps } from "./snapshot-pin.js";
 export { processPaymentClaim, type PaymentClaimDeps } from "./payment-claim.js";
+export { processAPYAccuracyCheck, type APYAccuracyCheckDeps } from "./apy-accuracy-check.js";
+export { processReputationUpdate, type ReputationUpdateDeps } from "./reputation-update.js";

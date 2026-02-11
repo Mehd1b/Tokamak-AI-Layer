@@ -4,6 +4,8 @@ import type {
   RiskProfile,
   StrategyReport,
   Allocation,
+  TransactionStep,
+  ExitCondition,
   ScoredPool,
   AlternativeStrategy,
   RiskScore,
@@ -209,6 +211,9 @@ export class StrategyGenerator {
       const pct = Math.min(maxPoolPct, remainingPct);
       if (pct < 0.05) continue; // Skip allocations under 5%
 
+      const tokenSymbol = scored.pool.tokens[0]?.symbol ?? "TOKEN";
+      const tokenAddress = scored.pool.tokens[0]?.address ?? "0x0";
+
       allocations.push({
         protocol: scored.pool.protocol,
         pool: scored.pool.poolId,
@@ -217,6 +222,8 @@ export class StrategyGenerator {
         amountUSD: Number((capitalUSD * pct).toFixed(2)),
         expectedAPY: scored.prediction,
         riskScore: scored.riskScore.overall,
+        entrySteps: this.buildEntrySteps(scored, tokenSymbol, tokenAddress, capitalUSD * pct),
+        exitConditions: this.buildExitConditions(scored, profile),
       });
 
       remainingPct -= pct;
@@ -236,6 +243,62 @@ export class StrategyGenerator {
     }
 
     return allocations;
+  }
+
+  /**
+   * Build advisory entry transaction steps for an allocation.
+   */
+  private buildEntrySteps(
+    scored: ScoredPool,
+    tokenSymbol: string,
+    tokenAddress: string,
+    amountUSD: number,
+  ): TransactionStep[] {
+    const protocolContract = `${scored.pool.protocol.toLowerCase().replace(/\s+/g, "-")}-pool`;
+    return [
+      {
+        type: "approve",
+        contract: tokenAddress,
+        function: "approve",
+        args: [protocolContract, amountUSD.toFixed(0)],
+        chainId: scored.pool.chain,
+        description: `Approve ${tokenSymbol} for ${scored.pool.protocol} ${scored.pool.poolId}`,
+      },
+      {
+        type: "deposit",
+        contract: protocolContract,
+        function: "deposit",
+        args: [tokenAddress, amountUSD.toFixed(0)],
+        chainId: scored.pool.chain,
+        description: `Deposit ${tokenSymbol} into ${scored.pool.protocol} ${scored.pool.poolId}`,
+      },
+    ];
+  }
+
+  /**
+   * Build advisory exit conditions for an allocation.
+   */
+  private buildExitConditions(
+    scored: ScoredPool,
+    profile: RiskProfile,
+  ): ExitCondition[] {
+    return [
+      {
+        type: "apy_drop",
+        threshold: scored.prediction.predicted30d.mean * 0.5,
+        description: `Exit if APY drops below ${(scored.prediction.predicted30d.mean * 0.5).toFixed(2)}% (50% of predicted)`,
+      },
+      {
+        type: "risk_increase",
+        threshold: profile.level === "conservative" ? 40 : profile.level === "moderate" ? 60 : 80,
+        description: `Exit if risk score exceeds ${profile.level} tolerance`,
+      },
+      {
+        type: "tvl_drop",
+        threshold: scored.pool.tvl * 0.5,
+        description: `Exit if TVL drops below $${(scored.pool.tvl * 0.5 / 1_000_000).toFixed(0)}M (50% of current)`,
+      },
+    ];
   }
 
   /**

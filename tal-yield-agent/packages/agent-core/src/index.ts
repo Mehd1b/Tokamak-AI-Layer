@@ -67,6 +67,8 @@ export type {
   APYFactor,
   StrategyReport,
   Allocation,
+  TransactionStep,
+  ExitCondition,
   AlternativeStrategy,
   ScoredPool,
   ExecutionTrace,

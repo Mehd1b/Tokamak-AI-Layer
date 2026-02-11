@@ -1,1 +1,1 @@
-{"root":["./src/addresses.ts","./src/chains.ts","./src/index.ts","./src/abi/talidentityregistry.ts","./src/abi/talreputationregistry.ts","./src/abi/taskfeeescrow.ts","./src/abi/index.ts"],"version":"5.9.3"}
+{"root":["./src/addresses.ts","./src/chains.ts","./src/index.ts","./src/abi/stakingintegrationmodule.ts","./src/abi/talidentityregistry.ts","./src/abi/talreputationregistry.ts","./src/abi/talvalidationregistry.ts","./src/abi/taskfeeescrow.ts","./src/abi/index.ts"],"version":"5.9.3"}

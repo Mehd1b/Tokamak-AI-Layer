@@ -277,6 +277,103 @@ describe("StrategyGenerator", () => {
   });
 
   // ================================================================
+  // Entry Steps & Exit Conditions (Step 6)
+  // ================================================================
+  describe("entry steps and exit conditions", () => {
+    it("each allocation has approve + deposit entry steps", () => {
+      const report = generator.generate(
+        makeSnapshot(diversePools),
+        DEFAULT_RISK_PROFILES.moderate,
+        100_000,
+        "task-1",
+      );
+
+      for (const alloc of report.allocations) {
+        expect(alloc.entrySteps).toHaveLength(2);
+        expect(alloc.entrySteps[0]!.type).toBe("approve");
+        expect(alloc.entrySteps[0]!.function).toBe("approve");
+        expect(alloc.entrySteps[0]!.chainId).toBe(alloc.chain);
+        expect(alloc.entrySteps[1]!.type).toBe("deposit");
+        expect(alloc.entrySteps[1]!.function).toBe("deposit");
+        expect(alloc.entrySteps[1]!.chainId).toBe(alloc.chain);
+      }
+    });
+
+    it("each allocation has 3 exit conditions", () => {
+      const report = generator.generate(
+        makeSnapshot(diversePools),
+        DEFAULT_RISK_PROFILES.moderate,
+        100_000,
+        "task-1",
+      );
+
+      for (const alloc of report.allocations) {
+        expect(alloc.exitConditions).toHaveLength(3);
+        const types = alloc.exitConditions.map((e) => e.type);
+        expect(types).toContain("apy_drop");
+        expect(types).toContain("risk_increase");
+        expect(types).toContain("tvl_drop");
+      }
+    });
+
+    it("apy_drop threshold is 50% of predicted APY", () => {
+      const report = generator.generate(
+        makeSnapshot(diversePools),
+        DEFAULT_RISK_PROFILES.moderate,
+        100_000,
+        "task-1",
+      );
+
+      for (const alloc of report.allocations) {
+        const apyDrop = alloc.exitConditions.find((e) => e.type === "apy_drop")!;
+        const predicted = alloc.expectedAPY.predicted30d.mean;
+        expect(apyDrop.threshold).toBeCloseTo(predicted * 0.5, 2);
+      }
+    });
+
+    it("risk_increase threshold varies by profile level", () => {
+      const conservative = generator.generate(
+        makeSnapshot(diversePools),
+        DEFAULT_RISK_PROFILES.conservative,
+        100_000,
+        "task-1",
+      );
+      const aggressive = generator.generate(
+        makeSnapshot(diversePools),
+        DEFAULT_RISK_PROFILES.aggressive,
+        100_000,
+        "task-2",
+      );
+
+      if (conservative.allocations.length > 0 && aggressive.allocations.length > 0) {
+        const consRisk = conservative.allocations[0]!.exitConditions.find((e) => e.type === "risk_increase")!;
+        const aggRisk = aggressive.allocations[0]!.exitConditions.find((e) => e.type === "risk_increase")!;
+        expect(consRisk.threshold).toBeLessThan(aggRisk.threshold);
+      }
+    });
+
+    it("entry steps have human-readable descriptions", () => {
+      const report = generator.generate(
+        makeSnapshot(diversePools),
+        DEFAULT_RISK_PROFILES.moderate,
+        100_000,
+        "task-1",
+      );
+
+      for (const alloc of report.allocations) {
+        for (const step of alloc.entrySteps) {
+          expect(step.description).toBeTruthy();
+          expect(step.description.length).toBeGreaterThan(10);
+        }
+        for (const cond of alloc.exitConditions) {
+          expect(cond.description).toBeTruthy();
+          expect(cond.description.length).toBeGreaterThan(10);
+        }
+      }
+    });
+  });
+
+  // ================================================================
   // Determinism (critical for StakeSecured validation)
   // ================================================================
   describe("determinism", () => {

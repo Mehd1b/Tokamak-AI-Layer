@@ -38,6 +38,7 @@ export interface StrategyDeliverData {
   taskId: string;
   snapshotId: string;
   executionHash: string;
+  reportJson?: string;
   reportIpfsCid?: string;
 }
 

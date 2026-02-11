@@ -93,6 +93,26 @@ export interface APYPrediction {
 }
 
 // ============================================================
+// Transaction Steps & Exit Conditions
+// ============================================================
+
+export interface TransactionStep {
+  type: "approve" | "deposit" | "swap" | "bridge";
+  contract: string;
+  function: string;
+  args: unknown[];
+  value?: string;
+  chainId: number;
+  description: string;
+}
+
+export interface ExitCondition {
+  type: "apy_drop" | "risk_increase" | "tvl_drop" | "time_based";
+  threshold: number;
+  description: string;
+}
+
+// ============================================================
 // Strategy Report
 // ============================================================
 
@@ -104,6 +124,8 @@ export interface Allocation {
   amountUSD: number;
   expectedAPY: APYPrediction;
   riskScore: number;
+  entrySteps: TransactionStep[];
+  exitConditions: ExitCondition[];
 }
 
 export interface AlternativeStrategy {
@@ -133,6 +155,7 @@ export interface StrategyReport {
   warnings: string[];
 
   executionHash: string;
+  reportIPFSHash?: string;
 }
 
 // ============================================================

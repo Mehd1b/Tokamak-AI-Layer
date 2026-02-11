@@ -1,6 +1,8 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import type { AppContext } from "./context.js";
+import { verifyEIP712Signature } from "./middleware/eip712-auth.js";
 import {
   healthRoutes,
   strategyRoutes,
@@ -18,6 +20,14 @@ export async function buildApp(ctx: AppContext) {
   // CORS
   await app.register(cors, { origin: true });
 
+  // Rate limiting
+  await app.register(rateLimit, {
+    max: 100,
+    timeWindow: "1 minute",
+    keyGenerator: (req) => (req.headers["x-api-key"] as string) ?? req.ip,
+    errorResponseBuilder: () => ({ error: "rate_limit_exceeded", message: "Rate limit exceeded", statusCode: 429 }),
+  });
+
   // API key auth hook (optional — skipped if no keys configured)
   const apiKeys = ctx.config.API_KEYS
     ? new Set(ctx.config.API_KEYS.split(",").map((k) => k.trim()).filter(Boolean))
@@ -31,6 +41,17 @@ export async function buildApp(ctx: AppContext) {
       const key = req.headers["x-api-key"];
       if (!key || !apiKeys.has(key as string)) {
         return reply.code(401).send({ error: "unauthorized", message: "Invalid or missing API key" });
+      }
+    });
+  }
+
+  // EIP-712 auth on write endpoints (only when EIP712_AUTH env is enabled)
+  // Uses preHandler so that req.body is available (parsed after onRequest)
+  if (ctx.config.EIP712_AUTH) {
+    app.addHook("preHandler", async (req, reply) => {
+      const writePaths = ["/api/v1/strategy/request", "/api/v1/validate/submit"];
+      if (req.method === "POST" && writePaths.includes(req.url)) {
+        await verifyEIP712Signature(req, reply);
       }
     });
   }

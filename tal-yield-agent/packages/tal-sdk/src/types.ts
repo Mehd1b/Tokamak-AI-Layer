@@ -11,6 +11,8 @@ export interface TALClientConfig {
     identityRegistry: Address;
     taskFeeEscrow: Address;
     reputationRegistry: Address;
+    validationRegistry: Address;
+    stakingIntegrationModule: Address;
   };
 }
 
@@ -95,4 +97,57 @@ export interface SubmitFeedbackParams {
   endpoint: string;
   feedbackURI: string;
   feedbackHash: Hash;
+}
+
+// ============================================================
+// Validation Types
+// ============================================================
+
+export enum ValidationModel {
+  ReputationOnly = 0,
+  StakeSecured = 1,
+  TEEAttested = 2,
+  Hybrid = 3,
+}
+
+export enum ValidationStatus {
+  Pending = 0,
+  Completed = 1,
+  Expired = 2,
+  Disputed = 3,
+}
+
+export interface ValidationRequest {
+  agentId: bigint;
+  requester: Address;
+  taskHash: Hash;
+  outputHash: Hash;
+  model: ValidationModel;
+  bounty: bigint;
+  deadline: bigint;
+  status: ValidationStatus;
+}
+
+export interface ValidationResponse {
+  validator: Address;
+  score: number;
+  proof: Hash;
+  detailsURI: string;
+  timestamp: bigint;
+}
+
+export interface ValidationResult {
+  request: ValidationRequest;
+  response: ValidationResponse;
+}
+
+// ============================================================
+// Staking Types
+// ============================================================
+
+export interface OperatorStatus {
+  stakedAmount: bigint;
+  isVerified: boolean;
+  slashingCount: bigint;
+  lastSlashTime: bigint;
 }

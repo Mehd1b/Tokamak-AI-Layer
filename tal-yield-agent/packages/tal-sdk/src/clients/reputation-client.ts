@@ -1,4 +1,5 @@
 import type { Address, Hash, PublicClient, WalletClient } from "viem";
+import { keccak256, toHex } from "viem";
 import { TALReputationRegistryABI } from "@tal-yield-agent/shared";
 import type {
   TALClientConfig,
@@ -132,6 +133,34 @@ export class ReputationClient {
       account: wallet.account!,
     });
     return wallet.writeContract(request);
+  }
+
+  /**
+   * Submit APY accuracy feedback for a completed strategy.
+   * Wraps submitFeedback with standardised "apy-accuracy" tags.
+   *
+   * @param agentId  The agent's token ID
+   * @param taskId   The task reference (used as feedback URI for traceability)
+   * @param actualAPY The actual observed APY (basis points, e.g. 350 = 3.50%)
+   */
+  async updateAPYAccuracy(
+    agentId: bigint,
+    taskId: string,
+    actualAPY: bigint,
+  ): Promise<Hash> {
+    const feedbackHash = keccak256(
+      toHex(`apy-accuracy:${taskId}:${actualAPY.toString()}`),
+    );
+    return this.submitFeedback({
+      agentId,
+      value: actualAPY,
+      valueDecimals: 2,
+      tag1: "apy-accuracy",
+      tag2: "yield-agent",
+      endpoint: "/strategy",
+      feedbackURI: taskId,
+      feedbackHash,
+    });
   }
 
   async respondToFeedback(

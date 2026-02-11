@@ -20,11 +20,12 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@fastify/cors": "^10.0.0",
+    "@fastify/rate-limit": "^10.3.0",
+    "@sinclair/typebox": "^0.34.0",
     "@tal-yield-agent/agent-core": "workspace:*",
     "@tal-yield-agent/shared": "workspace:*",
     "@tal-yield-agent/tal-sdk": "workspace:*",
-    "@fastify/cors": "^10.0.0",
-    "@sinclair/typebox": "^0.34.0",
     "fastify": "^5.0.0",
     "pino": "^9.0.0",
     "viem": "^2.21.0",

@@ -12,6 +12,8 @@ export {
   type APYFactor,
   type StrategyReport,
   type Allocation,
+  type TransactionStep,
+  type ExitCondition,
   type AlternativeStrategy,
   type ScoredPool,
   type ExecutionTrace,

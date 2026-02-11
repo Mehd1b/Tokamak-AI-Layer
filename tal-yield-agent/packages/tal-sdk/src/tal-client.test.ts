@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { PublicClient, WalletClient } from "viem";
 import { TALClient } from "./tal-client.js";
-import { TaskStatus } from "./types.js";
+import { TaskStatus, ValidationModel, ValidationStatus } from "./types.js";
 import {
   MOCK_ADDRESSES,
   MOCK_OWNER,
@@ -9,7 +9,11 @@ import {
   MOCK_TX_HASH,
   MOCK_TASK_REF,
   MOCK_PAYER,
+  MOCK_VALIDATOR,
   MOCK_FEEDBACK_HASH,
+  MOCK_REQUEST_HASH,
+  MOCK_TASK_HASH,
+  MOCK_OUTPUT_HASH,
   MOCK_AGENT_URI,
   createMockPublicClient,
   createMockWalletClient,
@@ -40,6 +44,8 @@ describe("TALClient", () => {
       expect(tal.identity).toBeDefined();
       expect(tal.escrow).toBeDefined();
       expect(tal.reputation).toBeDefined();
+      expect(tal.validation).toBeDefined();
+      expect(tal.staking).toBeDefined();
     });
 
     it("creates with default addresses when not specified", () => {
@@ -49,6 +55,8 @@ describe("TALClient", () => {
       expect(defaultClient.identity).toBeDefined();
       expect(defaultClient.escrow).toBeDefined();
       expect(defaultClient.reputation).toBeDefined();
+      expect(defaultClient.validation).toBeDefined();
+      expect(defaultClient.staking).toBeDefined();
     });
 
     it("exposes Thanos Sepolia chain info", () => {
@@ -137,6 +145,61 @@ describe("TALClient", () => {
       const feedback = await tal.getFeedback(1n, MOCK_PAYER);
       expect(feedback).toHaveLength(1);
       expect(feedback[0]!.tag1).toBe("yield-accuracy");
+    });
+  });
+
+  // ================================================================
+  // Validation Shortcuts
+  // ================================================================
+  describe("validation shortcuts", () => {
+    it("gets validation result", async () => {
+      const result = await tal.getValidationResult(MOCK_REQUEST_HASH);
+      expect(result.request.agentId).toBe(1n);
+      expect(result.response.score).toBe(95);
+      expect(result.response.validator).toBe(MOCK_VALIDATOR);
+    });
+
+    it("submits validation", async () => {
+      const hash = await tal.submitValidation(
+        MOCK_REQUEST_HASH,
+        95,
+        "0x" as `0x${string}`,
+        "ipfs://QmResult",
+      );
+      expect(hash).toBe(MOCK_TX_HASH);
+    });
+
+    it("requests validation", async () => {
+      const hash = await tal.requestValidation(
+        1n,
+        MOCK_TASK_HASH,
+        MOCK_OUTPUT_HASH,
+        ValidationModel.StakeSecured,
+        1700100000n,
+        10000000000000000000n,
+      );
+      expect(hash).toBe(MOCK_TX_HASH);
+    });
+
+    it("updates APY accuracy", async () => {
+      const hash = await tal.updateAPYAccuracy(1n, "task-123", 350n);
+      expect(hash).toBe(MOCK_TX_HASH);
+    });
+  });
+
+  // ================================================================
+  // Staking Shortcuts
+  // ================================================================
+  describe("staking shortcuts", () => {
+    it("gets stake balance", async () => {
+      const balance = await tal.getStakeBalance(MOCK_OPERATOR);
+      expect(balance).toBe(5000000000000000000000n);
+    });
+
+    it("gets operator status", async () => {
+      const status = await tal.getOperatorStatus(MOCK_OPERATOR);
+      expect(status.stakedAmount).toBe(5000000000000000000000n);
+      expect(status.isVerified).toBe(true);
     });
   });
 

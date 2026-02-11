@@ -11,8 +11,8 @@ const config: Config = {
     v4: true,
   },
 
-  url: 'https://docs.tokamak.network',
-  baseUrl: '/tal/',
+  url: 'https://tokamak-ai-layer.vercel.app',
+  baseUrl: '/',
 
   organizationName: 'tokamak-network',
   projectName: 'Tokamak-AI-Layer',
