@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Shield, Send } from 'lucide-react';
@@ -27,6 +27,14 @@ function isValidBytes32(value: string): boolean {
 }
 
 export default function RequestValidationPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8"><div className="h-8 w-48 animate-pulse rounded bg-white/10" /></div>}>
+      <RequestValidationContent />
+    </Suspense>
+  );
+}
+
+function RequestValidationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isConnected, isCorrectChain } = useWallet();
