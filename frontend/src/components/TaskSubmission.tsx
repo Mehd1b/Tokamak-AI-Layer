@@ -4,10 +4,38 @@ import { useState, useEffect } from 'react';
 import { Send, Loader2, AlertCircle, CheckCircle, FileCode, FileText, Shield, CheckCircle2, XCircle, Coins } from 'lucide-react';
 import { useSubmitTask } from '@/hooks/useAgentRuntime';
 import { useRequestValidation, useRequestValidationOnChain } from '@/hooks/useValidation';
+import { StrategyReportView, isStrategyReport } from './StrategyReportView';
 import { usePayForTask, useTONBalanceL2, generateTaskRef, useRefundTask } from '@/hooks/useTaskFee';
 import { useAccount } from 'wagmi';
 import { formatEther } from 'viem';
 import { useL2Config } from '@/hooks/useL2Config';
+
+function FormattedOutput({ output }: { output: string | null }) {
+  if (!output) return <p className="text-sm text-zinc-500">No output</p>;
+
+  // Try to parse as JSON and check if it's a strategy report
+  try {
+    const parsed = JSON.parse(output);
+    if (isStrategyReport(parsed)) {
+      return <StrategyReportView report={parsed} />;
+    }
+    // Valid JSON but not a strategy report — pretty-print it
+    return (
+      <pre className="whitespace-pre-wrap text-sm text-zinc-300 font-mono leading-relaxed">
+        {JSON.stringify(parsed, null, 2)}
+      </pre>
+    );
+  } catch {
+    // Not JSON — render as plain text
+    return (
+      <div className="prose prose-sm max-w-none prose-invert">
+        <pre className="whitespace-pre-wrap text-sm text-zinc-300 font-sans leading-relaxed">
+          {output}
+        </pre>
+      </div>
+    );
+  }
+}
 
 interface TaskSubmissionProps {
   agentId: string;
@@ -270,11 +298,7 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
 
           {/* Output */}
           <div className="rounded-lg border border-white/10 bg-[#0d0d12] p-4">
-            <div className="prose prose-sm max-w-none prose-invert">
-              <pre className="whitespace-pre-wrap text-sm text-zinc-300 font-sans leading-relaxed">
-                {result.output}
-              </pre>
-            </div>
+            <FormattedOutput output={result.output} />
           </div>
 
           {/* Validation */}
