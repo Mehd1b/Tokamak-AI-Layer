@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Send, Loader2, AlertCircle, CheckCircle, FileCode, FileText, Shield, CheckCircle2, XCircle, Coins } from 'lucide-react';
 import { useSubmitTask } from '@/hooks/useAgentRuntime';
-import { useRequestValidation } from '@/hooks/useValidation';
+import { useRequestValidation, useRequestValidationOnChain } from '@/hooks/useValidation';
 import { usePayForTask, useTONBalanceL2, generateTaskRef, useRefundTask } from '@/hooks/useTaskFee';
 import { useAccount } from 'wagmi';
 import { formatEther } from 'viem';
@@ -36,6 +36,15 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
     reset: resetValidation,
   } = useRequestValidation();
   const {
+    requestValidation: requestValidationOnChain,
+    isPending: isOnChainPending,
+    isConfirming: isOnChainConfirming,
+    isSuccess: isOnChainSuccess,
+    requestHash: onChainRequestHash,
+    error: onChainError,
+    hash: onChainTxHash,
+  } = useRequestValidationOnChain();
+  const {
     refund,
     hash: refundHash,
     isPending: isRefundPending,
@@ -61,6 +70,13 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
       submitTask(agentId, input, payHash, currentTaskRef);
     }
   }, [paymentStep, input, isSubmitting, result, agentId, payHash, currentTaskRef, submitTask]);
+
+  // Auto-trigger off-chain validation after on-chain requestValidation confirms
+  useEffect(() => {
+    if (isOnChainSuccess && onChainRequestHash && result?.taskId && !isValidating && !validationResult) {
+      validate(agentId, result.taskId, onChainRequestHash);
+    }
+  }, [isOnChainSuccess, onChainRequestHash, result, agentId, isValidating, validationResult, validate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -263,11 +279,32 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
           <div className="mt-4 border-t border-emerald-500/20 pt-4">
             {!validationResult && !validationError && (
               <button
-                onClick={() => validate(agentId, result.taskId)}
-                disabled={isValidating}
+                onClick={() => {
+                  if (!onChainAgentId || !result?.inputHash || !result?.outputHash) return;
+                  const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
+                  requestValidationOnChain({
+                    agentId: onChainAgentId,
+                    taskHash: result.inputHash as `0x${string}`,
+                    outputHash: result.outputHash as `0x${string}`,
+                    model: 0, // ReputationOnly
+                    deadline,
+                    bountyWei: 0n,
+                  });
+                }}
+                disabled={isOnChainPending || isOnChainConfirming || isValidating || !onChainAgentId}
                 className="btn-secondary inline-flex items-center gap-2 text-sm"
               >
-                {isValidating ? (
+                {isOnChainPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Confirm Validation Request...
+                  </>
+                ) : isOnChainConfirming ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Submitting On-Chain...
+                  </>
+                ) : isValidating ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Validating...
@@ -279,6 +316,12 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
                   </>
                 )}
               </button>
+            )}
+
+            {onChainError && !validationResult && (
+              <div className="mt-2 rounded-lg border border-red-500/20 bg-red-500/10 p-3">
+                <p className="text-sm text-red-400">On-chain request failed: {onChainError.message}</p>
+              </div>
             )}
 
             {validationResult && (
@@ -315,6 +358,28 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
                     <span className="font-mono text-blue-400">
                       {validationResult.reExecutionHash.substring(0, 18)}...
                     </span>
+                  </div>
+                )}
+                {(validationResult.txHash || onChainTxHash) && (
+                  <div className="mt-2 flex flex-wrap gap-3 text-xs">
+                    {(validationResult.txHash || onChainTxHash) && (
+                      <a
+                        href={`https://explorer.thanos-sepolia.tokamak.network/tx/${validationResult.txHash || onChainTxHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-blue-400 underline"
+                      >
+                        View tx on explorer
+                      </a>
+                    )}
+                    {(validationResult.requestHash || onChainRequestHash) && (
+                      <a
+                        href={`/validation/${validationResult.requestHash || onChainRequestHash}`}
+                        className="font-mono text-blue-400 underline"
+                      >
+                        View on-chain validation details
+                      </a>
+                    )}
                   </div>
                 )}
               </div>

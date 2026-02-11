@@ -1,0 +1,110 @@
+version: "3.9"
+
+services:
+  # ============================================================
+  # API Server — Fastify REST API
+  # ============================================================
+  agent-server:
+    build:
+      context: .
+      dockerfile: packages/agent-server/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - HOST=0.0.0.0
+      - RPC_URL=${RPC_URL:-https://rpc.thanos-sepolia.tokamak.network}
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://tal:tal_secret@postgres:5432/tal_yield_agent
+      - IPFS_GATEWAY=${IPFS_GATEWAY:-https://gateway.pinata.cloud}
+      - AGENT_ID=${AGENT_ID:-}
+      - OPERATOR_PRIVATE_KEY=${OPERATOR_PRIVATE_KEY:-}
+      - API_KEYS=${API_KEYS:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ============================================================
+  # Worker — BullMQ job processors + event listener
+  # ============================================================
+  agent-worker:
+    build:
+      context: .
+      dockerfile: packages/agent-worker/Dockerfile
+    environment:
+      - RPC_URL=${RPC_URL:-https://rpc.thanos-sepolia.tokamak.network}
+      - REDIS_URL=redis://redis:6379
+      - IPFS_GATEWAY=${IPFS_GATEWAY:-https://gateway.pinata.cloud}
+      - AGENT_ID=${AGENT_ID:-}
+      - OPERATOR_PRIVATE_KEY=${OPERATOR_PRIVATE_KEY:-}
+      - POOL_REFRESH_INTERVAL_MS=${POOL_REFRESH_INTERVAL_MS:-300000}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ============================================================
+  # Redis — Job queue and caching
+  # ============================================================
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  # ============================================================
+  # PostgreSQL — Persistent storage
+  # ============================================================
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: tal_yield_agent
+      POSTGRES_USER: tal
+      POSTGRES_PASSWORD: tal_secret
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tal -d tal_yield_agent"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================================
+  # IPFS — Local node for snapshot pinning (dev only)
+  # ============================================================
+  ipfs:
+    image: ipfs/kubo:latest
+    ports:
+      - "5001:5001"  # API
+      - "8080:8080"  # Gateway
+    volumes:
+      - ipfs_data:/data/ipfs
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:
+  ipfs_data:

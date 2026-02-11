@@ -167,6 +167,8 @@ export interface ValidationExecuteResult {
   matchType: 'exact' | 'semantic' | 'partial' | 'mismatch' | 'unknown';
   reExecutionHash: string;
   status: string;
+  requestHash?: string;
+  txHash?: string;
 }
 
 export function useRequestValidation() {
@@ -175,18 +177,21 @@ export function useRequestValidation() {
   const [error, setError] = useState<string | null>(null);
 
   const validate = useCallback(
-    async (onChainAgentId: string, taskId: string) => {
+    async (onChainAgentId: string, taskId: string, requestHash?: string) => {
       setIsValidating(true);
       setError(null);
       setResult(null);
 
       try {
+        const payload: Record<string, string> = { taskId };
+        if (requestHash) payload.requestHash = requestHash;
+
         const res = await fetch(
           `/api/runtime/${onChainAgentId}/validate`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ taskId }),
+            body: JSON.stringify(payload),
           },
         );
 

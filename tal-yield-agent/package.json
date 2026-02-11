@@ -1,0 +1,21 @@
+{
+  "name": "tal-yield-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DeFi Yield Strategy Agent on Tokamak Agent Layer",
+  "packageManager": "pnpm@10.8.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "test:core": "cd packages/agent-core && pnpm test",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0"
+  }
+}

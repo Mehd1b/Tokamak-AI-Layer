@@ -1,0 +1,37 @@
+{
+  "name": "@tal-yield-agent/agent-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@tal-yield-agent/agent-core": "workspace:*",
+    "@tal-yield-agent/shared": "workspace:*",
+    "@tal-yield-agent/tal-sdk": "workspace:*",
+    "bullmq": "^5.0.0",
+    "ioredis": "^5.4.0",
+    "pino": "^9.0.0",
+    "viem": "^2.21.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^2.0.0"
+  }
+}

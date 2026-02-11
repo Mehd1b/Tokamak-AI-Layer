@@ -17,6 +17,14 @@ export async function POST(
       );
     }
 
+    // Validate optional requestHash format (bytes32 hex string)
+    if (body.requestHash && !/^0x[0-9a-fA-F]{64}$/.test(body.requestHash)) {
+      return NextResponse.json(
+        { error: 'requestHash must be a valid bytes32 hex string (0x + 64 hex chars)' },
+        { status: 400 },
+      );
+    }
+
     const { runtimeBaseUrl } = await resolveAgent(params.agentId);
 
     // Proxy to agent runtime's validation execute endpoint
