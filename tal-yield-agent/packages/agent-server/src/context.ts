@@ -1,4 +1,4 @@
-import { createPublicClient, http, type Address } from "viem";
+import { createPublicClient, http, type Address, type PublicClient } from "viem";
 import { optimismSepolia } from "@tal-yield-agent/shared";
 import { TALClient } from "@tal-yield-agent/tal-sdk";
 import {
@@ -52,7 +52,7 @@ export function createContext(config: Config, logger: Logger): AppContext {
   });
 
   const talClient = new TALClient({
-    publicClient,
+    publicClient: publicClient as PublicClient,
     addresses: {
       identityRegistry: config.IDENTITY_REGISTRY as Address,
       taskFeeEscrow: config.TASK_FEE_ESCROW as Address,

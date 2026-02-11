@@ -51,10 +51,10 @@ export class EventListener {
     this.config = options.config;
     this.logger = options.logger;
     this.connection = options.connection;
-    this.publicClient = options.publicClient ?? createPublicClient({
+    this.publicClient = (options.publicClient ?? createPublicClient({
       chain: optimismSepolia,
       transport: http(this.config.RPC_URL),
-    });
+    })) as PublicClient;
 
     this.escrowAddress =
       (this.config.TASK_FEE_ESCROW as Address) ?? OPTIMISM_SEPOLIA_ADDRESSES.TaskFeeEscrow;
