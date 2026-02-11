@@ -13,6 +13,7 @@ const navLinks = [
   { href: '/agents', label: 'AGENTS' },
   { href: '/validation', label: 'VALIDATION' },
   { href: '/staking', label: 'STAKING' },
+  { href: 'https://tokamak-ai-layer.vercel.app/', label: 'DOCS', external: true },
 ];
 
 export function Navbar() {
@@ -63,20 +64,32 @@ export function Navbar() {
 
         {/* Desktop Menu */}
         <div className="hidden md:flex items-center gap-4" style={{ fontFamily: 'var(--font-mono), monospace' }}>
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={clsx(
-                'px-4 py-2 rounded-lg border border-dashed transition-all tracking-wider text-sm',
-                pathname?.startsWith(link.href)
-                  ? 'border-[#38BDF8]/60 text-[#38BDF8]'
-                  : 'border-white/30 text-white hover:border-white/60 hover:text-gray-300',
-              )}
-            >
-              {link.label}
-            </Link>
-          ))}
+          {navLinks.map((link) =>
+            link.external ? (
+              <a
+                key={link.href}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 rounded-lg border border-dashed transition-all tracking-wider text-sm border-white/30 text-white hover:border-white/60 hover:text-gray-300"
+              >
+                {link.label}
+              </a>
+            ) : (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={clsx(
+                  'px-4 py-2 rounded-lg border border-dashed transition-all tracking-wider text-sm',
+                  pathname?.startsWith(link.href)
+                    ? 'border-[#38BDF8]/60 text-[#38BDF8]'
+                    : 'border-white/30 text-white hover:border-white/60 hover:text-gray-300',
+                )}
+              >
+                {link.label}
+              </Link>
+            )
+          )}
           <div className="ml-4">
             <ConnectButton />
           </div>
@@ -127,21 +140,34 @@ export function Navbar() {
             </div>
             <div className="flex-1 flex flex-col justify-center px-6" style={{ fontFamily: 'var(--font-mono), monospace' }}>
               <div className="space-y-8 text-center">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={clsx(
-                      'block text-md font-light transition-all duration-300 tracking-wider',
-                      pathname?.startsWith(link.href)
-                        ? 'text-[#38BDF8]'
-                        : 'text-white hover:text-[#38BDF8]',
-                    )}
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
+                {navLinks.map((link) =>
+                  link.external ? (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-md font-light transition-all duration-300 tracking-wider text-white hover:text-[#38BDF8]"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      {link.label}
+                    </a>
+                  ) : (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className={clsx(
+                        'block text-md font-light transition-all duration-300 tracking-wider',
+                        pathname?.startsWith(link.href)
+                          ? 'text-[#38BDF8]'
+                          : 'text-white hover:text-[#38BDF8]',
+                      )}
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      {link.label}
+                    </Link>
+                  )
+                )}
               </div>
             </div>
           </div>
