@@ -15,14 +15,14 @@ import {
 import { useAgent } from '@/hooks/useAgent';
 import { useFeedbackCount, useClientList, useFeedbacks } from '@/hooks/useReputation';
 import { FeedbackList } from '@/components/FeedbackList';
-import { useAgentValidations } from '@/hooks/useValidation';
+import { useAgentValidations, useValidationStats } from '@/hooks/useValidation';
 import { useRuntimeAgent } from '@/hooks/useAgentRuntime';
 import { useAgentMetadata } from '@/hooks/useAgentMetadata';
 import { useAgentFee } from '@/hooks/useTaskFee';
 import { TaskSubmission } from '@/components/TaskSubmission';
 import { formatEther } from 'viem';
 import { FeedbackModal } from '@/components/FeedbackModal';
-import { shortenAddress } from '@/lib/utils';
+import { shortenAddress, getAgentStatusLabel, getAgentStatusColor, getAgentValidationModelLabel, getAgentValidationModelColor } from '@/lib/utils';
 import { useState } from 'react';
 
 const AGENT_CONFIG: Record<
@@ -49,6 +49,7 @@ export default function AgentDetailPage() {
   const { clients } = useClientList(agentId);
   const { feedbacks, isLoading: feedbacksLoading } = useFeedbacks(agentId, clients);
   const { validationHashes } = useAgentValidations(agentId);
+  const { total: valTotal, failed: valFailed, failureRate: valFailureRate, isLoading: valStatsLoading } = useValidationStats(agentId);
   const { agent: runtimeAgent } = useRuntimeAgent(agentId?.toString());
   const { name: metaName, description: metaDescription, capabilities: metaCapabilities, services: metaServices, active: metaActive, pricing: metaPricing } = useAgentMetadata(agent?.agentURI);
   const { data: onChainFee } = useAgentFee(agentId);
@@ -138,10 +139,20 @@ export default function AgentDetailPage() {
               </div>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {runtimeAgent && (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400">
                 <Play className="h-3 w-3" /> Live
+              </span>
+            )}
+            {agent.status !== undefined && (
+              <span className={`${getAgentStatusColor(agent.status)} flex items-center gap-1`}>
+                {getAgentStatusLabel(agent.status)}
+              </span>
+            )}
+            {agent.validationModel !== undefined && agent.validationModel > 0 && (
+              <span className={`${getAgentValidationModelColor(agent.validationModel)} flex items-center gap-1`}>
+                {getAgentValidationModelLabel(agent.validationModel)}
               </span>
             )}
             {agent.isVerifiedOperator && (
@@ -183,7 +194,15 @@ export default function AgentDetailPage() {
               </dd>
             </div>
             <div>
-              <dt className="text-sm text-zinc-500">Operator</dt>
+              <dt className="text-sm text-zinc-500">Validation Model</dt>
+              <dd className="mt-1 text-sm text-white">
+                {agent.validationModel !== undefined
+                  ? getAgentValidationModelLabel(agent.validationModel)
+                  : 'Reputation Only'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm text-zinc-500">Operator (V1)</dt>
               <dd className="mt-1 text-sm font-mono text-white">
                 {agent.operator && agent.operator !== zeroAddr
                   ? shortenAddress(agent.operator)
@@ -242,6 +261,68 @@ export default function AgentDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Validation Stats (V2) */}
+      {!valStatsLoading && valTotal > 0 && (
+        <div className="mt-6 card">
+          <h2 className="mb-4 text-lg font-semibold text-white">
+            Validation Stats (30-day window)
+          </h2>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <p className="text-2xl font-bold text-[#38BDF8]">{valTotal}</p>
+              <p className="text-sm text-zinc-500">Total Validations</p>
+            </div>
+            <div>
+              <p className={`text-2xl font-bold ${valFailed > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                {valFailed}
+              </p>
+              <p className="text-sm text-zinc-500">Failed</p>
+            </div>
+            <div>
+              <p className={`text-2xl font-bold ${valFailureRate > 30 ? 'text-red-400' : valFailureRate > 10 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                {valFailureRate.toFixed(1)}%
+              </p>
+              <p className="text-sm text-zinc-500">Failure Rate</p>
+            </div>
+          </div>
+          {valFailureRate > 30 && (
+            <p className="mt-3 text-sm text-red-400">
+              Warning: Failure rate exceeds 30% slashing threshold
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Operators (V2) */}
+      {agent.operators && agent.operators.length > 0 && (
+        <div className="mt-6 card">
+          <h2 className="mb-4 text-lg font-semibold text-white">
+            Operators ({agent.operators.length})
+          </h2>
+          <div className="space-y-2">
+            {agent.operators.map((op, idx) => (
+              <div
+                key={op}
+                className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-zinc-500">#{idx + 1}</span>
+                  <span className="text-sm font-mono text-white">
+                    {shortenAddress(op)}
+                  </span>
+                </div>
+                <button
+                  onClick={() => copyAddress(op)}
+                  className="text-zinc-600 hover:text-zinc-400"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Capabilities */}
       {((runtimeAgent && runtimeAgent.capabilities.length > 0) || (metaCapabilities && metaCapabilities.length > 0)) && (

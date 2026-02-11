@@ -40,6 +40,42 @@ export function getValidationModelLabel(model: number): string {
   }
 }
 
+export function getAgentStatusLabel(status: number): string {
+  switch (status) {
+    case 0: return 'Active';
+    case 1: return 'Paused';
+    case 2: return 'Deregistered';
+    default: return 'Unknown';
+  }
+}
+
+export function getAgentStatusColor(status: number): string {
+  switch (status) {
+    case 0: return 'badge-success';
+    case 1: return 'badge-warning';
+    case 2: return 'badge-error';
+    default: return 'badge-info';
+  }
+}
+
+export function getAgentValidationModelLabel(model: number): string {
+  switch (model) {
+    case 0: return 'Reputation Only';
+    case 1: return 'Stake Secured';
+    case 2: return 'Hybrid';
+    default: return 'Unknown';
+  }
+}
+
+export function getAgentValidationModelColor(model: number): string {
+  switch (model) {
+    case 0: return 'badge-info';
+    case 1: return 'badge-warning';
+    case 2: return 'badge-error';
+    default: return 'badge-info';
+  }
+}
+
 export function getValidationStatusLabel(status: number): string {
   switch (status) {
     case 0: return 'Pending';

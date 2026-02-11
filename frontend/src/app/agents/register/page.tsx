@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Upload, Plus, X } from 'lucide-react';
+import { ArrowLeft, Upload, Plus, X, Info, Shield } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
-import { useRegisterAgent } from '@/hooks/useRegisterAgent';
+import { useRegisterAgent, useRegisterAgentV2 } from '@/hooks/useRegisterAgent';
 import { useSetAgentFee } from '@/hooks/useTaskFee';
 import { parseEther } from 'viem';
+import { shortenAddress } from '@/lib/utils';
 
 interface Capability {
   id: string;
@@ -15,15 +16,24 @@ interface Capability {
   description: string;
 }
 
+const VALIDATION_MODELS = [
+  { value: 0, label: 'Reputation Only', description: 'Lightweight feedback-based trust. No operators required.' },
+  { value: 1, label: 'Stake Secured', description: 'DRB-selected validator re-execution with stake collateral. Requires operators with sufficient stake.' },
+  { value: 2, label: 'Hybrid', description: 'Combines stake security with additional verification. Requires operators with sufficient stake.' },
+];
+
 export default function RegisterAgentPage() {
   const router = useRouter();
   const { address, isConnected, isCorrectChain: isL2 } = useWallet();
   const { register, hash: txHash, isPending, isConfirming, isSuccess, error: txError, newAgentId } = useRegisterAgent();
+  const { registerV2, hash: txHashV2, isPending: isPendingV2, isSigning, isConfirming: isConfirmingV2, isSuccess: isSuccessV2, error: txErrorV2, newAgentId: newAgentIdV2 } = useRegisterAgentV2();
   const { setFee, hash: feeHash, isPending: isFeePending, isConfirming: isFeeConfirming, isSuccess: isFeeSuccess, error: feeError } = useSetAgentFee();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [feePerTask, setFeePerTask] = useState('');
+  const [validationModel, setValidationModel] = useState(0);
+  const [selfAsOperator, setSelfAsOperator] = useState(true);
   const [services, setServices] = useState<Record<string, string>>({});
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [newServiceType, setNewServiceType] = useState('A2A');
@@ -32,24 +42,33 @@ export default function RegisterAgentPage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [ipfsUri, setIpfsUri] = useState<string | null>(null);
 
+  // Determine which registration path we're using
+  const useV2 = validationModel > 0;
+  const activeHash = useV2 ? txHashV2 : txHash;
+  const activeIsPending = useV2 ? isPendingV2 : isPending;
+  const activeIsConfirming = useV2 ? isConfirmingV2 : isConfirming;
+  const activeIsSuccess = useV2 ? isSuccessV2 : isSuccess;
+  const activeTxError = useV2 ? txErrorV2 : txError;
+  const activeNewAgentId = useV2 ? newAgentIdV2 : newAgentId;
+
   // After registration success, set fee on-chain if configured
   useEffect(() => {
-    if (isSuccess && newAgentId && feePerTask && parseFloat(feePerTask) > 0 && !feeHash && !isFeePending) {
-      setFee(newAgentId, parseEther(feePerTask));
+    if (activeIsSuccess && activeNewAgentId && feePerTask && parseFloat(feePerTask) > 0 && !feeHash && !isFeePending) {
+      setFee(activeNewAgentId, parseEther(feePerTask));
     }
-  }, [isSuccess, newAgentId, feePerTask, feeHash, isFeePending, setFee]);
+  }, [activeIsSuccess, activeNewAgentId, feePerTask, feeHash, isFeePending, setFee]);
 
   // Redirect to /agents after successful registration (and fee set if applicable)
   const hasFeeToSet = feePerTask && parseFloat(feePerTask) > 0;
   useEffect(() => {
-    const done = hasFeeToSet ? (isSuccess && isFeeSuccess) : isSuccess;
+    const done = hasFeeToSet ? (activeIsSuccess && isFeeSuccess) : activeIsSuccess;
     if (done) {
       const timer = setTimeout(() => {
         router.push('/agents');
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [isSuccess, isFeeSuccess, hasFeeToSet, router]);
+  }, [activeIsSuccess, isFeeSuccess, hasFeeToSet, router]);
 
   const addService = () => {
     if (newServiceType && newServiceUrl) {
@@ -91,6 +110,12 @@ export default function RegisterAgentPage() {
     e.preventDefault();
     if (!name || !description) return;
 
+    // For StakeSecured/Hybrid, require at least one operator
+    if (validationModel > 0 && !selfAsOperator) {
+      setUploadError('Stake Secured and Hybrid models require at least one operator. Enable "Register yourself as operator".');
+      return;
+    }
+
     setIsSubmitting(true);
     setUploadError(null);
 
@@ -107,6 +132,7 @@ export default function RegisterAgentPage() {
         ),
         tal: {
           capabilities: capabilities.filter((c) => c.name && c.description),
+          validationModel,
           ...(feePerTask ? { pricing: { currency: 'TON', perRequest: feePerTask } } : {}),
         },
       };
@@ -127,12 +153,27 @@ export default function RegisterAgentPage() {
       setIpfsUri(uri);
 
       // Call contract to register
-      register(uri);
+      if (useV2) {
+        // V2 async flow: sign consent → write contract
+        await registerV2(uri, validationModel, selfAsOperator);
+      } else {
+        register(uri);
+      }
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Registration failed');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const getButtonLabel = () => {
+    if (isSubmitting) return 'Uploading to IPFS...';
+    if (isSigning) return 'Sign operator consent...';
+    if (activeIsPending) return 'Confirm in wallet...';
+    if (activeIsConfirming) return 'Registering...';
+    if (isFeePending) return 'Confirm fee in wallet...';
+    if (isFeeConfirming) return 'Setting fee...';
+    return 'Register Agent';
   };
 
   return (
@@ -224,6 +265,95 @@ export default function RegisterAgentPage() {
             </div>
           </div>
         </div>
+
+        {/* Validation Model */}
+        <div className="card">
+          <h2 className="mb-4 text-lg font-semibold text-white">
+            Validation Model
+          </h2>
+          <div className="space-y-3">
+            {VALIDATION_MODELS.map((model) => (
+              <label
+                key={model.value}
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                  validationModel === model.value
+                    ? 'border-[#38BDF8]/50 bg-[#38BDF8]/5'
+                    : 'border-white/10 bg-white/5 hover:border-white/20'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="validationModel"
+                  value={model.value}
+                  checked={validationModel === model.value}
+                  onChange={() => setValidationModel(model.value)}
+                  className="mt-1 accent-[#38BDF8]"
+                />
+                <div>
+                  <span className="text-sm font-medium text-white">{model.label}</span>
+                  <p className="mt-0.5 text-xs text-zinc-500">{model.description}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Operators — visible for StakeSecured / Hybrid */}
+        {validationModel > 0 && (
+          <div className="card">
+            <h2 className="mb-4 text-lg font-semibold text-white">
+              Operators
+            </h2>
+            <p className="mb-4 text-sm text-zinc-400">
+              Stake Secured and Hybrid agents require at least one operator backing the agent with staked TON.
+              Each operator must sign an EIP-712 consent message.
+            </p>
+
+            {/* Self-as-operator */}
+            <label className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+              selfAsOperator
+                ? 'border-[#38BDF8]/50 bg-[#38BDF8]/5'
+                : 'border-white/10 bg-white/5 hover:border-white/20'
+            }`}>
+              <input
+                type="checkbox"
+                checked={selfAsOperator}
+                onChange={(e) => setSelfAsOperator(e.target.checked)}
+                className="mt-1 accent-[#38BDF8]"
+              />
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-[#38BDF8]" />
+                  <span className="text-sm font-medium text-white">Register yourself as operator</span>
+                </div>
+                <p className="mt-0.5 text-xs text-zinc-500">
+                  Your connected wallet ({address ? shortenAddress(address) : '...'}) will sign an EIP-712 consent
+                  and be registered as an operator for this agent.
+                </p>
+              </div>
+            </label>
+
+            {selfAsOperator && (
+              <div className="mt-3 flex items-start gap-2 rounded-lg bg-blue-500/10 border border-blue-500/20 p-3">
+                <Info className="h-4 w-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-400">
+                  When you click Register, you will be prompted to sign two wallet actions:
+                  first an EIP-712 consent signature (gasless), then the registration transaction.
+                </p>
+              </div>
+            )}
+
+            {!selfAsOperator && (
+              <div className="mt-3 flex items-start gap-2 rounded-lg bg-red-500/10 border border-red-500/20 p-3">
+                <Info className="h-4 w-4 text-red-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-red-400">
+                  At least one operator is required for {validationModel === 1 ? 'Stake Secured' : 'Hybrid'} agents.
+                  Enable the self-operator option or use the SDK to register with external operators.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Fee Configuration */}
         <div className="card">
@@ -374,11 +504,15 @@ export default function RegisterAgentPage() {
           </Link>
           <button
             type="submit"
-            disabled={!isConnected || !isL2 || !name || !description || isPending || isConfirming || isSubmitting}
+            disabled={
+              !isConnected || !isL2 || !name || !description ||
+              activeIsPending || activeIsConfirming || isSubmitting ||
+              (validationModel > 0 && !selfAsOperator)
+            }
             className="btn-primary flex items-center gap-2"
           >
             <Upload className="h-4 w-4" />
-            {isSubmitting ? 'Uploading to IPFS...' : isPending ? 'Confirm in wallet...' : isConfirming ? 'Registering...' : isFeePending ? 'Confirm fee in wallet...' : isFeeConfirming ? 'Setting fee...' : 'Register Agent'}
+            {getButtonLabel()}
           </button>
         </div>
 
@@ -391,10 +525,10 @@ export default function RegisterAgentPage() {
           </div>
         )}
 
-        {txError && (
+        {activeTxError && (
           <div className="card border-red-500/20 bg-red-500/10">
             <p className="text-sm text-red-400">
-              <strong>Transaction Error:</strong> {txError.message}
+              <strong>Transaction Error:</strong> {activeTxError.message}
             </p>
           </div>
         )}
@@ -407,7 +541,7 @@ export default function RegisterAgentPage() {
           </div>
         )}
 
-        {ipfsUri && !isSuccess && (
+        {ipfsUri && !activeIsSuccess && (
           <div className="card border-blue-500/20 bg-blue-500/10">
             <p className="text-sm text-blue-400">
               <strong>Uploaded to IPFS:</strong> {ipfsUri}
@@ -415,17 +549,17 @@ export default function RegisterAgentPage() {
           </div>
         )}
 
-        {isSuccess && txHash && (
+        {activeIsSuccess && activeHash && (
           <div className="card border-emerald-500/20 bg-emerald-500/10">
             <p className="text-sm text-emerald-400">
-              <strong>Agent registered!</strong>{newAgentId ? ` (ID: ${newAgentId.toString()})` : ''} Transaction:{' '}
+              <strong>Agent registered!</strong>{activeNewAgentId ? ` (ID: ${activeNewAgentId.toString()})` : ''} Transaction:{' '}
               <a
-                href={`https://explorer.thanos-sepolia.tokamak.network/tx/${txHash}`}
+                href={`https://explorer.thanos-sepolia.tokamak.network/tx/${activeHash}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline hover:text-emerald-300"
               >
-                {txHash.slice(0, 10)}...{txHash.slice(-8)}
+                {activeHash.slice(0, 10)}...{activeHash.slice(-8)}
               </a>
             </p>
             {hasFeeToSet && !isFeeSuccess && !feeError && (

@@ -6,7 +6,7 @@ import { Search, ChevronRight, Star, ArrowUpDown } from 'lucide-react';
 import { useAgentCount, useAgentList } from '@/hooks/useAgent';
 import { useAgentMetadata } from '@/hooks/useAgentMetadata';
 import { useAgentRatings } from '@/hooks/useReputation';
-import { shortenAddress } from '@/lib/utils';
+import { shortenAddress, getAgentStatusLabel, getAgentStatusColor, getAgentValidationModelLabel } from '@/lib/utils';
 
 type SortOption = 'newest' | 'rating' | 'reviews';
 
@@ -16,9 +16,11 @@ interface AgentCardProps {
   agentURI: string;
   averageScore: number | null;
   feedbackCount: number;
+  status: number;
+  validationModel: number;
 }
 
-function AgentCard({ agentId, owner, agentURI, averageScore, feedbackCount }: AgentCardProps) {
+function AgentCard({ agentId, owner, agentURI, averageScore, feedbackCount, status, validationModel }: AgentCardProps) {
   const { name, description, active, services, isLoading, error } = useAgentMetadata(agentURI);
 
   // Hide agents with no URI, failed metadata, inactive status, or localhost endpoints
@@ -31,19 +33,29 @@ function AgentCard({ agentId, owner, agentURI, averageScore, feedbackCount }: Ag
     if (serviceUrls.includes('localhost') || serviceUrls.includes('127.0.0.1')) return null;
   }
 
+  const statusDotColor = status === 0 ? 'bg-emerald-400' : status === 1 ? 'bg-amber-400' : 'bg-red-400';
+
   return (
     <Link
       href={`/agents/${agentId}`}
       className="card flex items-center justify-between transition-all hover:border-[#38BDF8]/30 hover:-translate-y-1"
     >
       <div className="flex flex-1 min-w-0 items-center gap-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#38BDF8]/20 text-[#38BDF8] font-bold">
+        <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-[#38BDF8]/20 text-[#38BDF8] font-bold">
           #{agentId}
+          <span className={`absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ${statusDotColor} ring-2 ring-zinc-900`} title={getAgentStatusLabel(status)} />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-white truncate">
-            {isLoading ? 'Loading...' : name || `Agent #${agentId}`}
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-white truncate">
+              {isLoading ? 'Loading...' : name || `Agent #${agentId}`}
+            </h3>
+            {validationModel > 0 && (
+              <span className="hidden sm:inline-flex rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400">
+                {getAgentValidationModelLabel(validationModel)}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-zinc-500 truncate">
             {isLoading
               ? 'Fetching metadata...'
@@ -201,6 +213,8 @@ export default function AgentsPage() {
                 agentURI={agent.agentURI}
                 averageScore={rating?.averageScore ?? null}
                 feedbackCount={rating?.feedbackCount ?? 0}
+                status={agent.status}
+                validationModel={agent.validationModel}
               />
             );
           })}

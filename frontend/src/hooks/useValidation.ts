@@ -223,6 +223,34 @@ export function useRequestValidation() {
   return { validate, result, isValidating, error, reset };
 }
 
+// ============ V2: Validation Stats ============
+
+import { TALValidationRegistryV2ABI } from '../../../sdk/src/abi/TALValidationRegistryV2';
+
+export function useValidationStats(agentId: bigint | undefined) {
+  const enabled = agentId !== undefined;
+
+  const { data, isLoading } = useReadContract({
+    address: CONTRACTS.validationRegistry,
+    abi: TALValidationRegistryV2ABI,
+    functionName: 'getAgentValidationStats',
+    args: enabled ? [agentId, 2592000n] : undefined, // 30 days in seconds
+    query: { enabled },
+  });
+
+  const result = data as [bigint, bigint] | undefined;
+  const total = result ? Number(result[0]) : 0;
+  const failed = result ? Number(result[1]) : 0;
+  const failureRate = total > 0 ? (failed / total) * 100 : 0;
+
+  return {
+    total,
+    failed,
+    failureRate,
+    isLoading,
+  };
+}
+
 // ============ On-Chain Write Hooks ============
 
 export interface RequestValidationOnChainParams {

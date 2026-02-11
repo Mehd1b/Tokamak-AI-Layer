@@ -1,71 +1,64 @@
 # ============================================================
-# Stage 1: Install dependencies
+# agent-worker — BullMQ job processor + chain event listener
 # ============================================================
-FROM node:20-alpine AS deps
+# Build context: monorepo root (tal-yield-agent/)
+# Usage: docker build -f packages/agent-worker/Dockerfile .
+# ============================================================
+
+# --- Stage 1: Install + Build ---
+FROM node:20-alpine AS builder
+
 RUN corepack enable && corepack prepare pnpm@10.8.0 --activate
+
 WORKDIR /app
 
-# Copy workspace root config
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml turbo.json ./
+# Copy workspace config first (layer caching)
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json turbo.json ./
 
-# Copy all package.json files (for dependency resolution)
-COPY packages/shared/package.json packages/shared/package.json
-COPY packages/agent-core/package.json packages/agent-core/package.json
-COPY packages/tal-sdk/package.json packages/tal-sdk/package.json
-COPY packages/agent-server/package.json packages/agent-server/package.json
-COPY packages/agent-worker/package.json packages/agent-worker/package.json
+# Copy all package.json files (needed by pnpm install for workspace resolution)
+COPY packages/shared/package.json packages/shared/
+COPY packages/agent-core/package.json packages/agent-core/
+COPY packages/tal-sdk/package.json packages/tal-sdk/
+COPY packages/agent-server/package.json packages/agent-server/
+COPY packages/agent-worker/package.json packages/agent-worker/
 
 RUN pnpm install --frozen-lockfile
 
-# ============================================================
-# Stage 2: Build
-# ============================================================
-FROM node:20-alpine AS builder
-RUN corepack enable && corepack prepare pnpm@10.8.0 --activate
-WORKDIR /app
-
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
-COPY --from=deps /app/packages/agent-core/node_modules ./packages/agent-core/node_modules
-COPY --from=deps /app/packages/tal-sdk/node_modules ./packages/tal-sdk/node_modules
-COPY --from=deps /app/packages/agent-worker/node_modules ./packages/agent-worker/node_modules
-
-# Copy source
-COPY pnpm-workspace.yaml package.json turbo.json ./
+# Copy source for packages needed by agent-worker
 COPY packages/shared/ packages/shared/
 COPY packages/agent-core/ packages/agent-core/
 COPY packages/tal-sdk/ packages/tal-sdk/
 COPY packages/agent-worker/ packages/agent-worker/
 
-# Build all packages (respects turbo dependency graph)
+# Build (turbo resolves dependency order)
 RUN npx turbo run build --filter=@tal-yield-agent/agent-worker...
 
-# ============================================================
-# Stage 3: Production runtime
-# ============================================================
+# --- Stage 2: Production runtime ---
 FROM node:20-alpine AS runner
+
 RUN corepack enable && corepack prepare pnpm@10.8.0 --activate
+
 WORKDIR /app
 
+# Copy workspace config
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+
+# Copy all package.json files (pnpm needs the full workspace to resolve symlinks)
+COPY packages/shared/package.json packages/shared/
+COPY packages/agent-core/package.json packages/agent-core/
+COPY packages/tal-sdk/package.json packages/tal-sdk/
+COPY packages/agent-server/package.json packages/agent-server/
+COPY packages/agent-worker/package.json packages/agent-worker/
+
+# Production install — creates proper pnpm workspace symlinks
+RUN pnpm install --frozen-lockfile --prod
+
+# Copy compiled output from builder
+COPY --from=builder /app/packages/shared/dist packages/shared/dist
+COPY --from=builder /app/packages/agent-core/dist packages/agent-core/dist
+COPY --from=builder /app/packages/tal-sdk/dist packages/tal-sdk/dist
+COPY --from=builder /app/packages/agent-worker/dist packages/agent-worker/dist
+
 ENV NODE_ENV=production
-
-# Copy built artifacts and node_modules
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
-COPY --from=builder /app/packages/shared/package.json ./packages/shared/package.json
-COPY --from=builder /app/packages/agent-core/dist ./packages/agent-core/dist
-COPY --from=builder /app/packages/agent-core/package.json ./packages/agent-core/package.json
-COPY --from=builder /app/packages/tal-sdk/dist ./packages/tal-sdk/dist
-COPY --from=builder /app/packages/tal-sdk/package.json ./packages/tal-sdk/package.json
-COPY --from=builder /app/packages/agent-worker/dist ./packages/agent-worker/dist
-COPY --from=builder /app/packages/agent-worker/package.json ./packages/agent-worker/package.json
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
-
-# Copy node_modules for workspace packages
-COPY --from=builder /app/packages/shared/node_modules ./packages/shared/node_modules
-COPY --from=builder /app/packages/agent-core/node_modules ./packages/agent-core/node_modules
-COPY --from=builder /app/packages/tal-sdk/node_modules ./packages/tal-sdk/node_modules
-COPY --from=builder /app/packages/agent-worker/node_modules ./packages/agent-worker/node_modules
 
 CMD ["node", "packages/agent-worker/dist/index.js"]
