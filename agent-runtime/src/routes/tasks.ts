@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { createPublicClient, createWalletClient, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import type { PublicClient, WalletClient } from 'viem';
+import type { PublicClient } from 'viem';
 import type { BaseAgent } from '../agents/BaseAgent.js';
 import type { TaskSubmission } from '../types.js';
 import { getTask, getAllTasks } from '../services/storage.js';
@@ -84,7 +84,8 @@ const chainConfigs: Record<number, ChainConfig> = {
 
 // Lazily-created clients per chain (avoids creating unused connections)
 const publicClients = new Map<number, PublicClient>();
-const walletClients = new Map<number, WalletClient | null>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const walletClients = new Map<number, any>();
 
 function getPublicClient(chainId: number): PublicClient {
   let client = publicClients.get(chainId);
@@ -100,7 +101,7 @@ function getPublicClient(chainId: number): PublicClient {
   return client;
 }
 
-function getWalletClientForChain(chainId: number): WalletClient | null {
+function getWalletClientForChain(chainId: number) {
   if (!config.PRIVATE_KEY) return null;
   let client = walletClients.get(chainId);
   if (client === undefined) {
