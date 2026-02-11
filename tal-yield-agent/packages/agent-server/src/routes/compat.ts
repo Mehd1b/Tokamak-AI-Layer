@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { DEFAULT_RISK_PROFILES } from "@tal-yield-agent/agent-core";
 import type { RiskLevel, RiskProfile } from "@tal-yield-agent/agent-core";
 import type { AppContext, TaskRecord } from "../context.js";
+import { saveTask, loadTask, loadAllTasks, saveSnapshot, loadSnapshot } from "../storage.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -42,8 +43,8 @@ function taskRecordToResult(task: TaskRecord, inputText?: string) {
   };
 }
 
-// Keep track of the original input text per taskId (taskCache doesn't store it)
-const inputTextByTask = new Map<string, string>();
+// In-memory secondary index: inputHash → taskId
+const inputHashToTaskId = new Map<string, string>();
 
 // ---------------------------------------------------------------------------
 // Routes
@@ -110,7 +111,7 @@ export async function compatRoutes(app: FastifyInstance, ctx: AppContext) {
         ),
       );
 
-      // Create task record (mirrors strategy.ts logic)
+      // Create task record
       const task: TaskRecord = {
         taskId,
         requester: req.body.agentId ?? "frontend",
@@ -120,7 +121,10 @@ export async function compatRoutes(app: FastifyInstance, ctx: AppContext) {
         createdAt: Date.now(),
       };
       ctx.taskCache.set(taskId, task);
-      inputTextByTask.set(taskId, inputText);
+
+      // Index by inputHash so validation can look up by on-chain taskHash
+      const inputHash = keccak256(toHex(inputText));
+      inputHashToTaskId.set(inputHash, taskId);
 
       try {
         task.status = "processing";
@@ -137,6 +141,14 @@ export async function compatRoutes(app: FastifyInstance, ctx: AppContext) {
         task.completedAt = Date.now();
 
         ctx.logger.info({ taskId, executionHash: report.executionHash }, "Strategy generated (compat)");
+
+        // Persist task and snapshot to disk for validation after restarts
+        await saveTask(task, inputText).catch((e) =>
+          ctx.logger.warn({ error: String(e) }, "Failed to persist task"),
+        );
+        await saveSnapshot(snapshot).catch((e) =>
+          ctx.logger.warn({ error: String(e) }, "Failed to persist snapshot"),
+        );
       } catch (err) {
         task.status = "failed";
         task.error = err instanceof Error ? err.message : "Unknown error";
@@ -171,12 +183,27 @@ export async function compatRoutes(app: FastifyInstance, ctx: AppContext) {
    */
   app.get("/api/tasks", {
     handler: async (_req, reply) => {
+      // Merge in-memory cache with disk storage
+      const diskTasks = await loadAllTasks().catch(() => []);
+      for (const { task, inputText } of diskTasks) {
+        if (!ctx.taskCache.has(task.taskId)) {
+          ctx.taskCache.set(task.taskId, task);
+        }
+        const ih = keccak256(toHex(inputText));
+        if (!inputHashToTaskId.has(ih)) {
+          inputHashToTaskId.set(ih, task.taskId);
+        }
+      }
+
       const tasks = [...ctx.taskCache.values()]
         .sort((a, b) => b.createdAt - a.createdAt)
-        .slice(0, 50)
-        .map((t) => taskRecordToResult(t, inputTextByTask.get(t.taskId)));
+        .slice(0, 50);
 
-      return reply.send({ tasks });
+      // Resolve input text: check disk records
+      const diskMap = new Map(diskTasks.map(({ task, inputText }) => [task.taskId, inputText]));
+      const results = tasks.map((t) => taskRecordToResult(t, diskMap.get(t.taskId)));
+
+      return reply.send({ tasks: results });
     },
   });
 
@@ -185,14 +212,50 @@ export async function compatRoutes(app: FastifyInstance, ctx: AppContext) {
    *
    * Accepts { taskId, requestHash? }
    * Re-runs strategy generation on the same snapshot + risk profile and compares hashes.
+   * If requestHash is provided and OPERATOR_PRIVATE_KEY is set, submits result on-chain.
    */
   app.post<{
     Body: { taskId: string; requestHash?: string };
   }>("/api/validations/execute", {
     handler: async (req, reply) => {
-      const { taskId } = req.body;
+      const { taskId, requestHash } = req.body;
 
-      const task = ctx.taskCache.get(taskId);
+      // 1. Resolve the task — try memory, then inputHash index, then disk
+      let task: TaskRecord | undefined;
+      let resolvedTaskId = taskId;
+
+      if (ctx.taskCache.has(taskId)) {
+        task = ctx.taskCache.get(taskId);
+      } else if (inputHashToTaskId.has(taskId)) {
+        resolvedTaskId = inputHashToTaskId.get(taskId)!;
+        task = ctx.taskCache.get(resolvedTaskId);
+      }
+
+      // Fall back to disk storage
+      if (!task) {
+        const diskResult = await loadTask(taskId);
+        if (diskResult) {
+          task = diskResult.task;
+          resolvedTaskId = task.taskId;
+          ctx.taskCache.set(task.taskId, task);
+          const ih = keccak256(toHex(diskResult.inputText));
+          inputHashToTaskId.set(ih, task.taskId);
+        }
+      }
+      // Try disk lookup by iterating all tasks to find by inputHash match
+      if (!task) {
+        const allDisk = await loadAllTasks().catch(() => []);
+        for (const { task: dt, inputText } of allDisk) {
+          const ih = keccak256(toHex(inputText));
+          inputHashToTaskId.set(ih, dt.taskId);
+          ctx.taskCache.set(dt.taskId, dt);
+          if (ih === taskId || dt.taskId === taskId) {
+            task = dt;
+            resolvedTaskId = dt.taskId;
+          }
+        }
+      }
+
       if (!task) {
         return reply.code(404).send({ error: "not_found", message: "Task not found" });
       }
@@ -200,26 +263,65 @@ export async function compatRoutes(app: FastifyInstance, ctx: AppContext) {
         return reply.code(400).send({ error: "invalid_state", message: "Task is not completed" });
       }
 
-      // Re-run strategy on the same snapshot
-      const snapshot = task.snapshotId ? ctx.snapshotCache.get(task.snapshotId) : undefined;
+      // 2. Load snapshot — try memory, then disk
+      let snapshot = task.snapshotId ? ctx.snapshotCache.get(task.snapshotId) : undefined;
+      if (!snapshot && task.snapshotId) {
+        snapshot = (await loadSnapshot(task.snapshotId)) ?? undefined;
+        if (snapshot) {
+          ctx.snapshotCache.set(task.snapshotId, snapshot);
+        }
+      }
       if (!snapshot) {
-        return reply.code(404).send({ error: "snapshot_missing", message: "Original snapshot no longer cached" });
+        return reply.code(404).send({ error: "snapshot_missing", message: "Original snapshot not available" });
       }
 
+      // 3. Re-execute strategy deterministically
       const reReport = ctx.strategyGenerator.generate(
         snapshot,
         task.riskProfile,
         task.capitalUSD,
-        taskId,
+        task.taskId,
       );
 
       const hashMatch = reReport.executionHash === task.report.executionHash;
+      const score = hashMatch ? 100 : 0;
+      const matchType = hashMatch ? "exact" : "mismatch";
+
+      ctx.logger.info(
+        { taskId: task.taskId, score, matchType, requestHash },
+        "Validation re-execution complete",
+      );
+
+      // 4. Submit validation result on-chain if requestHash provided
+      let txHash: string | null = null;
+      if (requestHash) {
+        try {
+          const proofHex = (reReport.executionHash || "0x") as Hash;
+          const submitTx = await ctx.talClient.validation.submitValidation(
+            requestHash as Hash,
+            score,
+            proofHex,
+            `task:${task.taskId}`,
+          );
+          txHash = submitTx;
+          ctx.logger.info({ requestHash, txHash, score }, "Validation submitted on-chain");
+        } catch (err) {
+          ctx.logger.warn(
+            { requestHash, error: err instanceof Error ? err.message : String(err) },
+            "On-chain validation submission failed",
+          );
+        }
+      }
 
       return reply.send({
-        score: hashMatch ? 100 : 0,
-        matchType: hashMatch ? "exact" : "mismatch",
+        taskId: task.taskId,
+        score,
+        matchType,
         reExecutionHash: reReport.executionHash,
         originalHash: task.report.executionHash,
+        requestHash: requestHash ?? null,
+        txHash,
+        status: "completed",
       });
     },
   });

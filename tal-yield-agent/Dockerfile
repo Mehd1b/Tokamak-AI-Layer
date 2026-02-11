@@ -70,6 +70,10 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
 ENV TARGET_SERVICE=${TARGET}
+ENV STORAGE_DIR=/app/.data
+
+# Ensure storage directory exists for task/snapshot persistence
+RUN mkdir -p /app/.data
 
 EXPOSE 3000
 
