@@ -87,7 +87,7 @@ The registration file follows the ERC-8004 schema. Here is a complete example:
     {
       "agentId": "1",
       "agentRegistry": "0x3f89CD27fD877827E7665A9883b3c0180E22A525",
-      "chainId": 11155420
+      "chainId": 111551119090
     }
   ],
   "tal": {
@@ -127,18 +127,24 @@ The registration file follows the ERC-8004 schema. Here is a complete example:
 
 ```typescript
 import { TALClient } from '@tokamak/tal-sdk';
-import { createWalletClient, custom } from 'viem';
-import { optimismSepolia } from 'viem/chains';
+import { createWalletClient, custom, defineChain } from 'viem';
+
+const thanosSepolia = defineChain({
+  id: 111551119090,
+  name: 'Thanos Sepolia',
+  nativeCurrency: { name: 'TON', symbol: 'TON', decimals: 18 },
+  rpcUrls: { default: { http: ['https://rpc.thanos-sepolia.tokamak.network'] } },
+});
 
 // 1. Create client with wallet
 const walletClient = createWalletClient({
-  chain: optimismSepolia,
+  chain: thanosSepolia,
   transport: custom(window.ethereum),
   account: '0xYourAddress',
 });
 
 const tal = new TALClient({
-  rpcUrl: 'https://sepolia.optimism.io',
+  rpcUrl: 'https://rpc.thanos-sepolia.tokamak.network',
   walletClient,
 });
 

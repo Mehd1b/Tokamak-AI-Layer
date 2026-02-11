@@ -221,7 +221,7 @@ flowchart LR
 |----------|-------------|-------------|-----------|
 | `PROTOCOL_FEE_BPS` | `1000` | 10% of total bounty | Protocol treasury |
 | `AGENT_REWARD_BPS` | `1000` | 10% of remaining (9% of total) | Agent NFT owner |
-| `VALIDATOR_REWARD_BPS` | `8000` | 80% of remaining (72% of total) | Validator who submitted result |
+| Validator (remainder) | -- | Remaining after treasury + agent (81% of total) | Validator who submitted result |
 
 ### Concrete Example
 
@@ -306,7 +306,7 @@ Dispute resolution is currently centralized via `DISPUTE_RESOLVER_ROLE`. Future 
 
 ### Reentrancy Protection
 
-- All state-changing functions that transfer ETH (bounty distribution, seigniorage claiming, dispute refunds) are protected by OpenZeppelin's `ReentrancyGuard`.
+- All state-changing functions that transfer value (bounty distribution, seigniorage claiming, dispute refunds) are protected by OpenZeppelin's `ReentrancyGuard`.
 - The `_distributeBounty` function updates state before making external calls (checks-effects-interactions pattern).
 
 ### Cross-Layer Security

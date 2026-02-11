@@ -12,7 +12,7 @@ The TAL cross-layer bridge connects Ethereum L1 staking infrastructure with Toka
 ```mermaid
 flowchart TB
     subgraph L1["Ethereum L1"]
-        SV2[SeigManager<br/>Staking V2]
+        SV2[SeigManager<br/>Staking V3]
         DM[DepositManager]
         SBL1[TALStakingBridgeL1]
         SC[TALSlashingConditionsL1]
@@ -80,7 +80,7 @@ The primary bridge function relays operator stake snapshots from L1 to L2, enabl
 sequenceDiagram
     participant Keeper as Keeper / Anyone
     participant SBL1 as TALStakingBridgeL1<br/>(Ethereum L1)
-    participant SM as SeigManager<br/>(Staking V2)
+    participant SM as SeigManager<br/>(Staking V3)
     participant CDM as CrossDomainMessenger
     participant SBL2 as TALStakingBridgeL2<br/>(Tokamak L2)
 
@@ -181,11 +181,11 @@ struct SlashRequest {
 
 ### Slash Execution on L1
 
-`TALSlashingConditionsL1` executes slashes against Staking V2's `DepositManager`:
+`TALSlashingConditionsL1` executes slashes against Staking V3's `DepositManager`:
 
 ```solidity
-// Slash via Staking V2 DepositManager
-bool success = IDepositManagerV2(depositManager).slash(
+// Slash via Staking V3 DepositManager
+bool success = IDepositManagerV3(depositManager).slash(
     talLayer2Address,   // Layer2 contract address
     slashRecipient,     // Treasury receives slashed funds
     amount              // Amount to slash
@@ -195,7 +195,7 @@ bool success = IDepositManagerV2(depositManager).slash(
 After slashing, `TALStakingBridgeL1` automatically refreshes the operator's stake on L2 so the cache reflects the reduced balance.
 
 :::danger
-Once a slash message passes the 7-day finalization window and is executed on L1, the slashed funds are transferred to the treasury and cannot be recovered. There is no restore mechanism in Staking V2.
+Once a slash message passes the 7-day finalization window and is executed on L1, the slashed funds are transferred to the treasury and cannot be recovered. There is no restore mechanism in Staking V3.
 :::
 
 ## Operator Tiers
@@ -228,22 +228,22 @@ function _calculateTier(uint256 amount) internal pure returns (OperatorTier) {
 
 ## L1 Contract Dependencies
 
-`TALStakingBridgeL1` and `TALSlashingConditionsL1` integrate with Tokamak's existing Staking V2 infrastructure on Ethereum L1:
+`TALStakingBridgeL1` and `TALSlashingConditionsL1` integrate with Tokamak's existing Staking V3 infrastructure on Ethereum L1:
 
 | Dependency | Interface | Used For |
 |-----------|-----------|----------|
-| **SeigManager** | `IStakingV2` | `stakeOf(layer2, operator)` -- query operator stake; `updateSeigniorageLayer(layer2)` -- trigger seigniorage distribution |
-| **DepositManager** | `IDepositManagerV2` | `slash(layer2, recipient, amount)` -- execute slashing, transferring funds to treasury |
+| **SeigManager** | `IStakingV3` | `stakeOf(layer2, operator)` -- query operator stake; `updateSeigniorageLayer(layer2)` -- trigger seigniorage distribution |
+| **DepositManager** | `IDepositManagerV3` | `slash(layer2, recipient, amount)` -- execute slashing, transferring funds to treasury |
 | **L1CrossDomainMessenger** | Optimism standard | `sendMessage(target, data, gasLimit)` -- relay messages to L2 |
 
 ### Seigniorage Flow
 
-Seigniorage (staking rewards) in Staking V2 accrues automatically via coinage tokens. The `stakeOf()` return value includes seigniorage growth, so refreshing the stake snapshot on L2 implicitly captures seigniorage accrual:
+Seigniorage (staking rewards) in Staking V3 accrues automatically via coinage tokens. The `stakeOf()` return value includes seigniorage growth, so refreshing the stake snapshot on L2 implicitly captures seigniorage accrual:
 
 ```solidity
 function claimAndBridgeSeigniorage(address operator) external whenNotPaused {
     // Trigger seigniorage update
-    IStakingV2(seigManager).updateSeigniorageLayer(talLayer2Address);
+    IStakingV3(seigManager).updateSeigniorageLayer(talLayer2Address);
 
     // Query updated stake (now includes latest seigniorage)
     uint256 currentStake = _queryStake(operator);

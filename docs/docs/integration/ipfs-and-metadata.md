@@ -50,7 +50,7 @@ The registration file follows the [ERC-8004](https://eips.ethereum.org/EIPS/eip-
     {
       "agentId": "1",
       "agentRegistry": "0x3f89CD27fD877827E7665A9883b3c0180E22A525",
-      "chainId": 11155420
+      "chainId": 111551119090
     }
   ],
   "tal": {
@@ -131,7 +131,7 @@ The SDK's `RegistrationBuilder` includes built-in IPFS upload support for Pinata
 import { TALClient } from '@tokamak/tal-sdk';
 
 const tal = new TALClient({
-  rpcUrl: 'https://sepolia.optimism.io',
+  rpcUrl: 'https://rpc.thanos-sepolia.tokamak.network',
   walletClient,
 });
 
@@ -264,7 +264,7 @@ The `TALClient` uses a configurable IPFS gateway for fetching registration files
 
 ```typescript
 const tal = new TALClient({
-  rpcUrl: 'https://sepolia.optimism.io',
+  rpcUrl: 'https://rpc.thanos-sepolia.tokamak.network',
   ipfsGateway: 'https://gateway.pinata.cloud/ipfs/', // Custom gateway
 });
 

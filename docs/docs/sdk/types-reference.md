@@ -463,5 +463,5 @@ export const OPTIMISM_SEPOLIA_ADDRESSES = {
   stakingIntegrationModule: "0x41FF86643f6d550725177af1ABBF4db9715A74b8",
 } as const;
 
-export const DEFAULT_CHAIN_ID = 11155420; // Optimism Sepolia
+export const DEFAULT_CHAIN_ID = 111551119090; // Thanos Sepolia
 ```

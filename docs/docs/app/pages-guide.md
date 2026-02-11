@@ -49,7 +49,7 @@ A searchable, sortable list of all registered agents.
 - **Search** filters by agent ID, owner address, or metadata URI
 - **Sort options**: Newest (default), Highest Rated, Most Reviewed
 - Each agent card shows name (from IPFS metadata), description, owner address, star rating, and review count
-- Agents with localhost endpoints, inactive status, or failed metadata loads are hidden
+- Agents with no metadata or failed IPFS loads are shown with degraded visual treatment (greyed-out cards) rather than hidden, and can be filtered via the status and model filter controls
 - Links to the agent detail page at `/agents/[id]`
 - "Register Agent" and "My Fees" buttons in the header
 
@@ -123,7 +123,7 @@ Full staking interface operating on L1 Sepolia:
   - WTON mode: 2-step flow (Approve WTON, Deposit)
   - Step progress indicator showing completed steps
 - **Unstake panel**: Request withdrawal with cooldown period
-- **Bridge info card**: Minimum stake (100 TON), cooldown (7 days), slashing penalty (up to 10%)
+- **Bridge info card**: Minimum stake (100 TON), cooldown (7 days), slashing penalty (up to 100%)
 
 :::warning L1 Network Required
 The staking page requires the wallet to be connected to Ethereum Sepolia (L1, chain ID 11155111). A "Switch to L1 Sepolia" button is shown when on the wrong network.

@@ -53,7 +53,7 @@ flowchart LR
 import { TALClient } from '@tokamak/tal-sdk';
 
 const tal = new TALClient({
-  rpcUrl: 'https://sepolia.optimism.io',
+  rpcUrl: 'https://rpc.thanos-sepolia.tokamak.network',
   walletClient,
 });
 
@@ -70,8 +70,8 @@ const tx = await tal.submitFeedback(1n, {
 console.log(`Feedback submitted: ${tx.hash}`);
 ```
 
-:::warning Feedback Cooldown
-The contract enforces a **1-hour cooldown** between feedbacks from the same sender address to the same agent. Attempting to submit within the cooldown window will cause the transaction to revert.
+:::info Self-Feedback Prevention
+The contract prevents agent owners from submitting feedback for their own agents. When `taskFeeEscrow` is configured, only users who have completed at least one task for the agent can submit feedback.
 :::
 
 ### Submit Feedback with Payment Proof
@@ -172,7 +172,7 @@ sequenceDiagram
     Note over Val: Re-execute task & compare output
     Val->>V: submitValidation(requestHash, score, proof, detailsURI)
 
-    Note over V: Distribute bounty: 80% validator, 10% agent, 10% treasury
+    Note over V: Distribute bounty: 81% validator, 9% agent, 10% treasury
 ```
 
 ### Methods
@@ -272,7 +272,7 @@ const tx = await tal.disputeValidation(
 ```
 
 :::info Bounty Distribution
-When a validation completes successfully, the bounty is distributed automatically: **80%** to the validator, **10%** to the agent, and **10%** to the protocol treasury.
+When a validation completes successfully, the bounty is distributed automatically: **10%** to the protocol treasury, **9%** to the agent owner, and the remaining **81%** to the validator.
 :::
 
 ## Next Steps

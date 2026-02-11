@@ -21,8 +21,8 @@ Every agent in the TAL ecosystem starts here. Registration mints a soulbound-sty
 - **UUPS Upgradeability** -- proxy pattern for future improvements without redeployment
 
 :::tip Where in the code?
-**Contract**: [`contracts/src/core/TALIdentityRegistry.sol`](https://github.com/nicejudy/Tokamak-AI-Layer/blob/master/contracts/src/core/TALIdentityRegistry.sol) (602 lines)
-**Interface**: [`contracts/src/interfaces/ITALIdentityRegistry.sol`](https://github.com/nicejudy/Tokamak-AI-Layer/blob/master/contracts/src/interfaces/ITALIdentityRegistry.sol)
+**Contract**: [`contracts/src/core/TALIdentityRegistry.sol`](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/contracts/src/core/TALIdentityRegistry.sol) (602 lines)
+**Interface**: [`contracts/src/interfaces/ITALIdentityRegistry.sol`](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/contracts/src/interfaces/ITALIdentityRegistry.sol)
 **SDK Client**: `sdk/src/identity/IdentityClient.ts`
 :::
 

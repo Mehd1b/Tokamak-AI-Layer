@@ -21,8 +21,8 @@ The escrow provides a trustless payment mechanism between task clients and AI ag
 - **Non-Upgradeable** -- immutable contract logic for maximum payment security
 
 :::tip Where in the code?
-**Contract**: [`contracts/src/core/TaskFeeEscrow.sol`](https://github.com/nicejudy/Tokamak-AI-Layer/blob/master/contracts/src/core/TaskFeeEscrow.sol) (189 lines)
-**Interface**: [`contracts/src/interfaces/ITaskFeeEscrow.sol`](https://github.com/nicejudy/Tokamak-AI-Layer/blob/master/contracts/src/interfaces/ITaskFeeEscrow.sol)
+**Contract**: [`contracts/src/core/TaskFeeEscrow.sol`](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/contracts/src/core/TaskFeeEscrow.sol) (189 lines)
+**Interface**: [`contracts/src/interfaces/ITaskFeeEscrow.sol`](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/contracts/src/interfaces/ITaskFeeEscrow.sol)
 **SDK ABI**: `sdk/src/abi/TaskFeeEscrow.ts`
 :::
 

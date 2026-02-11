@@ -44,16 +44,23 @@ Create a `TALClient` instance with a `TALClientConfig` object:
 
 ```typescript
 import { TALClient } from '@tokamak/tal-sdk';
-import { createWalletClient, custom } from 'viem';
-import { optimismSepolia } from 'viem/chains';
+import { createWalletClient, custom, defineChain } from 'viem';
+
+const thanosSepolia = defineChain({
+  id: 111551119090,
+  name: 'Thanos Sepolia',
+  nativeCurrency: { name: 'TON', symbol: 'TON', decimals: 18 },
+  rpcUrls: { default: { http: ['https://rpc.thanos-sepolia.tokamak.network'] } },
+  blockExplorers: { default: { name: 'Explorer', url: 'https://explorer.thanos-sepolia.tokamak.network' } },
+});
 
 const walletClient = createWalletClient({
-  chain: optimismSepolia,
+  chain: thanosSepolia,
   transport: custom(window.ethereum),
 });
 
 const tal = new TALClient({
-  rpcUrl: 'https://sepolia.optimism.io',
+  rpcUrl: 'https://rpc.thanos-sepolia.tokamak.network',
   walletClient,
 });
 ```
@@ -62,9 +69,9 @@ const tal = new TALClient({
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `chainId` | `number` | `11155420` | Chain ID (Optimism Sepolia) |
+| `chainId` | `number` | `111551119090` | Chain ID (Thanos Sepolia) |
 | `rpcUrl` | `string` | -- | JSON-RPC endpoint URL |
-| `contracts` | `object` | Optimism Sepolia defaults | Override contract addresses |
+| `contracts` | `object` | Thanos Sepolia defaults | Override contract addresses |
 | `contracts.identityRegistry` | `Address` | `0x3f89...A525` | TALIdentityRegistry address |
 | `contracts.reputationRegistry` | `Address` | `0x0052...502b` | TALReputationRegistry address |
 | `contracts.validationRegistry` | `Address` | `0x0944...32F3` | TALValidationRegistry address |
@@ -84,7 +91,7 @@ import { TALClient } from '@tokamak/tal-sdk';
 
 // Read-only client (no wallet needed)
 const tal = new TALClient({
-  rpcUrl: 'https://sepolia.optimism.io',
+  rpcUrl: 'https://rpc.thanos-sepolia.tokamak.network',
 });
 
 // Fetch an agent by ID
@@ -137,14 +144,14 @@ See the [Identity Client](./identity-client) page for the full builder API.
 
 ## Default Contract Addresses
 
-The SDK ships with default addresses for Optimism Sepolia. Override them via the `contracts` config if deploying to a different network.
+The SDK ships with default addresses for Thanos Sepolia. Override them via the `contracts` config if deploying to a different network.
 
 | Contract | Address |
 |----------|---------|
 | TALIdentityRegistry | `0x3f89CD27fD877827E7665A9883b3c0180E22A525` |
 | TALReputationRegistry | `0x0052258E517835081c94c0B685409f2EfC4D502b` |
 | TALValidationRegistry | `0x09447147C6E75a60A449f38532F06E19F5F632F3` |
-| StakingIntegrationModule | `0x41FF86643f6d550725177af1ABBF4db9715A74b8` |
+| StakingIntegrationModule | `0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30` |
 
 ## Next Steps
 

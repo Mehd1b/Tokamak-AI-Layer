@@ -37,7 +37,7 @@ flowchart LR
 2. **Build reputation** through stake-weighted feedback from clients
 3. **Request validation** — a DRB-selected validator re-executes agent tasks
 4. **Verify results** on-chain with scores, proofs, and optional TEE attestation
-5. **Distribute bounties** — 80% validator, 10% agent, 10% treasury
+5. **Distribute bounties** — 81% validator, 9% agent, 10% treasury
 
 ## Key Features
 
@@ -48,7 +48,7 @@ ERC-721 NFTs representing agent identities with ZK commitments, capability bitma
 Four trust tiers offering flexible security guarantees — from lightweight reputation scoring to hardware-backed TEE attestation with stake collateral.
 
 ### Cross-Layer Economic Security
-TON Staking V2 on Ethereum L1 provides economic security via a CrossDomainMessenger bridge. Slashing conditions propagate from L2 back to L1.
+TON Staking V3 on Ethereum L1 provides economic security via a CrossDomainMessenger bridge. Slashing conditions propagate from L2 back to L1.
 
 ## Protocol Constants
 
@@ -56,8 +56,7 @@ TON Staking V2 on Ethereum L1 provides economic security via a CrossDomainMessen
 |----------|-------|-------------|
 | Minimum Stake | 1,000 TON | Required for verified operator tier |
 | Premium Stake | 10,000 TON | Required for premium operator tier |
-| Bounty Split | 80 / 10 / 10 | Validator / Agent / Treasury |
-| Feedback Cooldown | 1 hour | Between feedbacks from same sender |
+| Bounty Split | 81 / 9 / 10 | Validator / Agent / Treasury (effective %) |
 | Refund Deadline | 1 hour | Task fee escrow refund window |
 | Gas Target (register) | ~143k gas | Agent registration |
 | Gas Target (feedback) | ~318k gas | Feedback submission |
@@ -71,10 +70,10 @@ Constants are defined across the core contracts in [`contracts/src/core/`](https
 
 | Contract | Address |
 |----------|---------|
-| TALIdentityRegistry | [`0x3f89CD27fD877827E7665A9883b3c0180E22A525`](https://sepolia-optimism.etherscan.io/address/0x3f89CD27fD877827E7665A9883b3c0180E22A525) |
-| TALReputationRegistry | [`0x0052258E517835081c94c0B685409f2EfC4D502b`](https://sepolia-optimism.etherscan.io/address/0x0052258E517835081c94c0B685409f2EfC4D502b) |
-| TALValidationRegistry | [`0x09447147C6E75a60A449f38532F06E19F5F632F3`](https://sepolia-optimism.etherscan.io/address/0x09447147C6E75a60A449f38532F06E19F5F632F3) |
-| StakingIntegrationModule | [`0x41FF86643f6d550725177af1ABBF4db9715A74b8`](https://sepolia-optimism.etherscan.io/address/0x41FF86643f6d550725177af1ABBF4db9715A74b8) |
+| TALIdentityRegistry | [`0x3f89CD27fD877827E7665A9883b3c0180E22A525`](https://explorer.thanos-sepolia.tokamak.network/address/0x3f89CD27fD877827E7665A9883b3c0180E22A525) |
+| TALReputationRegistry | [`0x0052258E517835081c94c0B685409f2EfC4D502b`](https://explorer.thanos-sepolia.tokamak.network/address/0x0052258E517835081c94c0B685409f2EfC4D502b) |
+| TALValidationRegistry | [`0x09447147C6E75a60A449f38532F06E19F5F632F3`](https://explorer.thanos-sepolia.tokamak.network/address/0x09447147C6E75a60A449f38532F06E19F5F632F3) |
+| StakingIntegrationModule | [`0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30`](https://explorer.thanos-sepolia.tokamak.network/address/0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30) |
 
 See [Deployed Contracts](/reference/deployed-contracts) for all addresses including L1 and Thanos Sepolia.
 

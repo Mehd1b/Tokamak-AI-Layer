@@ -339,9 +339,9 @@
       <!-- SeigManagerV2 + DepositManagerV2 (external) -->
       <g transform="translate(420, 0)">
         <rect width="180" height="60" rx="8" fill="#fef9c3" stroke="#059669" stroke-width="1.5" stroke-dasharray="5,3"/>
-        <text x="90" y="17" text-anchor="middle" class="box-label">SeigManagerV2</text>
-        <text x="90" y="31" text-anchor="middle" class="box-label">DepositManagerV2</text>
-        <text x="90" y="45" text-anchor="middle" class="box-sublabel">TON Staking V2</text>
+        <text x="90" y="17" text-anchor="middle" class="box-label">SeigManagerV3</text>
+        <text x="90" y="31" text-anchor="middle" class="box-label">DepositManagerV3</text>
+        <text x="90" y="45" text-anchor="middle" class="box-sublabel">TON Staking V3</text>
         <text x="90" y="57" text-anchor="middle" class="box-sublabel" style="fill: #92400e;">(External)</text>
       </g>
     </g>

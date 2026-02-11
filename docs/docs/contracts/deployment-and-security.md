@@ -141,9 +141,9 @@ identityRegistry.pause();   // Requires PAUSER_ROLE
 identityRegistry.unpause(); // Requires PAUSER_ROLE
 ```
 
-## Deployed Addresses (Optimism Sepolia)
+## Deployed Addresses (Thanos Sepolia)
 
-The contracts are deployed on Optimism Sepolia (Chain ID: `11155420`) behind ERC1967 proxies:
+The contracts are deployed on Thanos Sepolia (Chain ID: `111551119090`) behind ERC1967 proxies:
 
 | Contract | Proxy Address | Type |
 |----------|--------------|------|
@@ -153,9 +153,9 @@ The contracts are deployed on Optimism Sepolia (Chain ID: `11155420`) behind ERC
 | StakingIntegrationModule | `0x41FF86643f6d550725177af1ABBF4db9715A74b8` | UUPS Proxy |
 
 :::info Network Configuration
-- **Network**: Optimism Sepolia (testnet)
-- **Chain ID**: `11155420`
-- **Native Token**: ETH (Optimism Sepolia uses ETH as gas token)
+- **Network**: Thanos Sepolia (testnet)
+- **Chain ID**: `111551119090`
+- **Native Token**: TON (Thanos Sepolia uses TON as native gas token)
 - **Standard**: ERC-8004 (Trustless Agents Standard)
 :::
 

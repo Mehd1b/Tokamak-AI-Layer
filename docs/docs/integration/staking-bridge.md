@@ -157,16 +157,22 @@ struct OperatorSlashRecord {
 Here is how to check operator stake status from a frontend application:
 
 ```typescript
-import { createPublicClient, http } from 'viem';
-import { optimismSepolia } from 'viem/chains';
+import { createPublicClient, http, defineChain } from 'viem';
 import { StakingIntegrationModuleABI } from '@tokamak/tal-sdk';
 
-const publicClient = createPublicClient({
-  chain: optimismSepolia,
-  transport: http('https://sepolia.optimism.io'),
+const thanosSepolia = defineChain({
+  id: 111551119090,
+  name: 'Thanos Sepolia',
+  nativeCurrency: { name: 'TON', symbol: 'TON', decimals: 18 },
+  rpcUrls: { default: { http: ['https://rpc.thanos-sepolia.tokamak.network'] } },
 });
 
-const STAKING_MODULE = '0x41FF86643f6d550725177af1ABBF4db9715A74b8';
+const publicClient = createPublicClient({
+  chain: thanosSepolia,
+  transport: http('https://rpc.thanos-sepolia.tokamak.network'),
+});
+
+const STAKING_MODULE = '0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30';
 
 // Check if operator is verified
 const isVerified = await publicClient.readContract({

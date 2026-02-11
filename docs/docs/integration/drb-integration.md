@@ -140,12 +140,18 @@ stateDiagram-v2
 Before requesting validator selection, estimate the required fee:
 
 ```typescript
-import { createPublicClient, http, parseEther } from 'viem';
-import { optimismSepolia } from 'viem/chains';
+import { createPublicClient, http, parseEther, defineChain } from 'viem';
+
+const thanosSepolia = defineChain({
+  id: 111551119090,
+  name: 'Thanos Sepolia',
+  nativeCurrency: { name: 'TON', symbol: 'TON', decimals: 18 },
+  rpcUrls: { default: { http: ['https://rpc.thanos-sepolia.tokamak.network'] } },
+});
 
 const publicClient = createPublicClient({
-  chain: optimismSepolia,
-  transport: http('https://sepolia.optimism.io'),
+  chain: thanosSepolia,
+  transport: http('https://rpc.thanos-sepolia.tokamak.network'),
 });
 
 // Estimate the DRB request fee

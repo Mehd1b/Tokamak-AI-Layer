@@ -16,7 +16,8 @@ Tokamak-AI-Layer/
 │   │   ├── core/                   # Core protocol registries
 │   │   │   ├── TALIdentityRegistry.sol       # ERC-721 agent identity (602 lines)
 │   │   │   ├── TALReputationRegistry.sol     # Feedback aggregation (687 lines)
-│   │   │   └── TALValidationRegistry.sol     # Multi-model validation (1052 lines)
+│   │   │   ├── TALValidationRegistry.sol     # Multi-model validation (1052 lines)
+│   │   │   └── TaskFeeEscrow.sol             # Non-upgradeable task fee escrow (189 lines)
 │   │   ├── bridge/                 # L1 <-> L2 cross-layer bridge
 │   │   │   ├── TALStakingBridgeL2.sol        # L2 stake cache, tier management
 │   │   │   ├── TALStakingBridgeL1.sol        # L1 stake queries, relay
@@ -99,6 +100,7 @@ Tokamak-AI-Layer/
 | `contracts/src/modules/DRBIntegrationModule.sol` | Decentralized random beacon for validator selection | -- |
 | `contracts/src/modules/StakingIntegrationModule.sol` | Stake queries, slashing, seigniorage | -- |
 | `contracts/src/libraries/ReputationMath.sol` | Score normalization, weighted averages | -- |
+| `contracts/src/core/TaskFeeEscrow.sol` | Non-upgradeable native TON task fee escrow | 189 |
 | `contracts/src/libraries/SlashingCalculator.sol` | Slashing percentage calculations | -- |
 
 ### SDK
@@ -129,6 +131,7 @@ Tokamak-AI-Layer/
 | `frontend/src/hooks/useSubmitFeedback.ts` | Feedback submission write hook |
 | `frontend/src/hooks/useAgentMetadata.ts` | IPFS metadata fetching with gateway fallback |
 | `frontend/src/hooks/useAgentRuntime.ts` | Agent runtime API communication |
+| `frontend/src/hooks/useOperatorManagement.ts` | Operator add/remove/exit hooks |
 
 ## Build Commands
 

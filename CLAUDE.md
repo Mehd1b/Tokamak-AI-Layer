@@ -5,8 +5,8 @@
 **Tokamak AI Layer (TAL)** - ERC-8004 compliant infrastructure layer providing trustless AI agent discovery, reputation management, and execution verification on Tokamak L2 (Optimism-based). Cross-chain staking bridges to Ethereum L1 for economic security via TON Staking V3.
 
 - **Standard**: ERC-8004 (Trustless Agents Standard)
-- **Network**: Tokamak L2 (Optimism Sepolia for testnet)
-- **Chain ID**: 11155420 (Optimism Sepolia)
+- **Network**: Tokamak L2 (Thanos Sepolia for testnet)
+- **Chain ID**: 111551119090 (Thanos Sepolia)
 
 ---
 
@@ -213,7 +213,7 @@ cd frontend && npm run build                  # Production build
 
 1. **Agent Registration**: Owner -> SDK RegistrationBuilder -> IPFS -> TALIdentityRegistry.register(ipfsURI) -> ERC-721 NFT minted
 2. **Reputation Flow**: Client -> TALReputationRegistry.submitFeedback() -> On-chain storage -> Stake-weighted aggregation via ReputationMath
-3. **Validation Flow (StakeSecured)**: Requester -> TALValidationRegistry.requestValidation() with bounty -> DRBIntegrationModule.selectValidator() via Commit-Reveal2 -> Validator re-executes -> submitValidation(score, proof) -> Bounty distribution: 80% validator, 10% agent, 10% treasury
+3. **Validation Flow (StakeSecured)**: Requester -> TALValidationRegistry.requestValidation() with bounty -> DRBIntegrationModule.selectValidator() via Commit-Reveal2 -> Validator re-executes -> submitValidation(score, proof) -> Bounty distribution: 10% treasury, 9% agent, 81% validator
 4. **Cross-Layer Bridge**: L1: TALStakingBridgeL1 queries Staking V3 -> relays to L2 via CrossDomainMessenger -> L2: TALStakingBridgeL2 caches stake data
 
 ### Trust Tiers (4 levels)

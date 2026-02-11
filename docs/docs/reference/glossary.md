@@ -27,7 +27,7 @@ The IPFS URI (e.g., `ipfs://Qm...`) pointing to an agent's registration file. St
 
 ### Bounty
 
-Native TON sent with a validation request as payment for the validator. Distributed after validation: 80% to the validator, 10% to the agent, 10% to the protocol treasury.
+Native TON sent with a validation request as payment for the validator. Distributed after validation: 10% to the protocol treasury, 9% to the agent owner, and 81% to the validator.
 
 ### Capability
 
@@ -87,11 +87,11 @@ The `TaskFeeEscrow` contract holds native TON payments for agent tasks in escrow
 
 ### Feedback
 
-An on-chain reputation entry submitted by a client for an agent. Contains a numeric value (1-5 stars mapped to 10-50), category tags, optional comment, and a content hash.
+An on-chain reputation entry submitted by a client for an agent. Contains a numeric value in the range [-100, 100], category tags, an optional feedback URI, and a content hash.
 
-### Feedback Cooldown
+### Feedback Gating
 
-A 1-hour minimum interval between feedback submissions from the same sender to the same agent, enforced by the Reputation Registry to prevent spam.
+When `taskFeeEscrow` is configured on the Reputation Registry, only users who have completed at least one task for an agent (via `TaskFeeEscrow.confirmTask`) can submit feedback. This prevents spam from users who never interacted with the agent.
 
 ### Hybrid Validation
 
@@ -175,7 +175,7 @@ A Solidity library (`contracts/src/libraries/SlashingCalculator.sol`) that compu
 
 ### Stake-Weighted
 
-A scoring method where feedback values are multiplied by the reviewer's staked TON amount, giving economically committed participants more influence over reputation scores.
+A scoring method where feedback values are weighted by `sqrt(reviewer_stake)`, giving economically committed participants more influence over reputation scores while preventing plutocracy. A reviewer with 100x more stake has only ~10x more influence.
 
 ### StakeSecured
 

@@ -21,8 +21,8 @@ When an AI agent executes a task, how do you know the output is correct? The Val
 | **Hybrid** | `3` | max(10, 1) TON | Maximum | Critical infrastructure, high-value operations |
 
 :::tip Where in the code?
-**Contract**: [`contracts/src/core/TALValidationRegistry.sol`](https://github.com/nicejudy/Tokamak-AI-Layer/blob/master/contracts/src/core/TALValidationRegistry.sol) (1052 lines)
-**Interface**: [`contracts/src/interfaces/ITALValidationRegistry.sol`](https://github.com/nicejudy/Tokamak-AI-Layer/blob/master/contracts/src/interfaces/ITALValidationRegistry.sol)
+**Contract**: [`contracts/src/core/TALValidationRegistry.sol`](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/contracts/src/core/TALValidationRegistry.sol) (1052 lines)
+**Interface**: [`contracts/src/interfaces/ITALValidationRegistry.sol`](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/contracts/src/interfaces/ITALValidationRegistry.sol)
 **SDK Client**: `sdk/src/validation/ValidationClient.ts`
 :::
 

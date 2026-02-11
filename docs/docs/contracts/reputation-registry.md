@@ -22,8 +22,8 @@ Reputation in TAL is built from client feedback, weighted by the reviewer's econ
 - **Usage Gating** -- optional requirement that reviewers must have completed a task via TaskFeeEscrow
 
 :::tip Where in the code?
-**Contract**: [`contracts/src/core/TALReputationRegistry.sol`](https://github.com/nicejudy/Tokamak-AI-Layer/blob/master/contracts/src/core/TALReputationRegistry.sol) (719 lines)
-**Library**: [`contracts/src/libraries/ReputationMath.sol`](https://github.com/nicejudy/Tokamak-AI-Layer/blob/master/contracts/src/libraries/ReputationMath.sol) (138 lines)
+**Contract**: [`contracts/src/core/TALReputationRegistry.sol`](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/contracts/src/core/TALReputationRegistry.sol) (719 lines)
+**Library**: [`contracts/src/libraries/ReputationMath.sol`](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/contracts/src/libraries/ReputationMath.sol) (138 lines)
 **SDK Client**: `sdk/src/reputation/ReputationClient.ts`
 :::
 

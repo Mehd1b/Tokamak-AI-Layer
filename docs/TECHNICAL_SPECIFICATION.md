@@ -158,7 +158,7 @@
 │  [Validator] ──► [Re-execute Task] ──► [submitValidation(score, proof)]            │
 │                                                   │                                 │
 │                                                   ▼                                 │
-│                              [Bounty Distribution: 80/10/10]                        │
+│                              [Bounty Distribution: 81/9/10]                         │
 │                              [Validator / Agent / Treasury]                         │
 │                                                                                     │
 │  ZK IDENTITY FLOW                                                                   │
@@ -763,7 +763,7 @@ interface ITALValidationRegistry is IERC8004ValidationRegistry {
     function MIN_TEE_BOUNTY() external view returns (uint256);           // 1 TON
     function PROTOCOL_FEE_BPS() external view returns (uint256);         // 1000 (10%)
     function AGENT_REWARD_BPS() external view returns (uint256);         // 1000 (10%)
-    function VALIDATOR_REWARD_BPS() external view returns (uint256);     // 8000 (80%)
+    function VALIDATOR_REWARD_BPS() external view returns (uint256);     // 8000 (80% of remaining = 81% of total)
 
     // Validator Selection
     function selectValidator(
@@ -816,7 +816,7 @@ contract TALValidationRegistry is
     uint256 public constant MIN_TEE_BOUNTY = 1 ether;             // 1 TON
     uint256 public constant PROTOCOL_FEE_BPS = 1000;              // 10%
     uint256 public constant AGENT_REWARD_BPS = 1000;              // 10%
-    uint256 public constant VALIDATOR_REWARD_BPS = 8000;          // 80%
+    uint256 public constant VALIDATOR_REWARD_BPS = 8000;          // 80% of remaining (81% of total)
     uint256 public constant DISPUTE_PERIOD = 24 hours;
     uint256 public constant CHALLENGE_PERIOD = 48 hours;
 
@@ -3188,14 +3188,14 @@ contracts/
 **Test Coverage Requirements:**
 - DRB selection fairness test (10k iterations)
 - TEE attestation verification test
-- Bounty distribution test (80/10/10 split)
+- Bounty distribution test (81/9/10 split)
 - Slashing execution test
 
 **Definition of Done:**
 - [ ] StakingIntegrationModule: getStake, isVerifiedOperator, executeSlash
 - [ ] DRBIntegrationModule: requestRandomness, selectFromWeightedList
 - [ ] TALValidationRegistry extended with StakeSecured, TEEAttested, Hybrid models
-- [ ] Bounty distribution implemented (80/10/10 split)
+- [ ] Bounty distribution implemented (81/9/10 split)
 - [ ] Mock contracts for testing without external dependencies
 - [ ] Integration tests for full validation flows
 - [ ] Statistical fairness verified for DRB selection
@@ -3435,7 +3435,7 @@ docs/
 
 ## Appendix B: Contract Addresses
 
-### L2 Contracts (Optimism Sepolia - Chain 11155420)
+### L2 Contracts (Thanos Sepolia - Chain 111551119090)
 
 | Contract | Proxy | Implementation |
 |----------|-------|----------------|

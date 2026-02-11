@@ -11,7 +11,7 @@ Tokamak AI Layer (TAL) is an ERC-8004 compliant infrastructure layer that provid
 
 TAL separates concerns between Ethereum L1 and Tokamak L2 to optimize for both security and cost:
 
-**Ethereum L1** handles economic security. Operators stake TON via Staking V2 (SeigManager + DepositManager), and slashing is executed against L1 stake. The 7-day Optimism finalization period acts as a natural appeal window before any slash is finalized.
+**Ethereum L1** handles economic security. Operators stake TON via Staking V3 (SeigManager + DepositManager), and slashing is executed against L1 stake. The 7-day Optimism finalization period acts as a natural appeal window before any slash is finalized.
 
 **Tokamak L2** handles all registry and validation logic. Agent identity NFTs, reputation aggregation, validation requests, TEE attestation, and bounty distribution all execute on L2 where gas costs are orders of magnitude lower. The L2 contracts maintain a cached view of L1 stake data relayed through the CrossDomainMessenger.
 
@@ -31,7 +31,7 @@ flowchart TB
     subgraph L1["Ethereum L1"]
         SBL1[TALStakingBridgeL1]
         SC[TALSlashingConditionsL1]
-        SV2[Staking V2 / SeigManager]
+        SV2[Staking V3 / SeigManager]
         DM[DepositManager]
     end
 
@@ -67,7 +67,7 @@ TAL implements four trust tiers, each providing escalating security guarantees f
 |------|------------|-------------|-------------------|
 | **ReputationOnly** | `0` | Lightweight aggregated feedback scores. Any address can submit a validation. No stake or hardware requirement. | Sybil-resistant via stake-weighted reputation math. Feedback values weighted by `sqrt(stake)` to prevent plutocracy. |
 | **StakeSecured** | `1` | DRB-selected validator re-executes agent output. Validator must hold >= 1,000 TON on L1. Minimum bounty: 10 TON. | Economic security through slashable stake. Fraudulent validators lose up to 100% of staked collateral. |
-| **TEEAttested** | `2` | Execution verified inside a hardware enclave (SGX, Nitro, TrustZone). TEE provider must be whitelisted. Minimum bounty: 100 TON. | Hardware-backed integrity guarantee. Failed attestation triggers 50% stake slash. |
+| **TEEAttested** | `2` | Execution verified inside a hardware enclave (SGX, Nitro, TrustZone). TEE provider must be whitelisted. Minimum bounty: 1 TON. | Hardware-backed integrity guarantee. Failed attestation triggers 50% stake slash. |
 | **Hybrid** | `3` | Combines StakeSecured and TEEAttested. Both validator selection via DRB and TEE attestation verification are required. | Maximum security: economic + hardware guarantees. Dual verification path. |
 
 :::info
@@ -86,7 +86,7 @@ Clients submit feedback via `TALReputationRegistry.submitFeedback()`, providing 
 
 ### Validation Flow
 
-A requester calls `TALValidationRegistry.requestValidation()` with a bounty, specifying the trust tier. For StakeSecured and Hybrid models, a validator is selected via the DRBIntegrationModule (Commit-Reveal2). The selected validator re-executes the task, submits a score and proof, and the bounty is distributed: 80% to the validator, 10% to the agent owner, 10% to the protocol treasury.
+A requester calls `TALValidationRegistry.requestValidation()` with a bounty, specifying the trust tier. For StakeSecured and Hybrid models, a validator is selected via the DRBIntegrationModule (Commit-Reveal2). The selected validator re-executes the task, submits a score and proof, and the bounty is distributed: 10% to the protocol treasury, 9% to the agent owner, and 81% to the validator.
 
 ### Cross-Layer Staking Flow
 
@@ -116,7 +116,7 @@ The `UPGRADER_ROLE` has significant power. In production, this role should be he
 | TALIdentityRegistry | `0x3f89CD27fD877827E7665A9883b3c0180E22A525` |
 | TALReputationRegistry | `0x0052258E517835081c94c0B685409f2EfC4D502b` |
 | TALValidationRegistry | `0x09447147C6E75a60A449f38532F06E19F5F632F3` |
-| StakingIntegrationModule | `0x41FF86643f6d550725177af1ABBF4db9715A74b8` |
+| StakingIntegrationModule | `0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30` |
 
 ## Next Steps
 
