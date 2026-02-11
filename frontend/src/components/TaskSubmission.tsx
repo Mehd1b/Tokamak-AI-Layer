@@ -5,7 +5,7 @@ import { Send, Loader2, AlertCircle, CheckCircle, FileCode, FileText, Shield, Ch
 import { useSubmitTask } from '@/hooks/useAgentRuntime';
 import { useRequestValidation, useRequestValidationOnChain } from '@/hooks/useValidation';
 import { StrategyReportView, isStrategyReport } from './StrategyReportView';
-import { usePayForTask, useTONBalanceL2, generateTaskRef, useRefundTask } from '@/hooks/useTaskFee';
+import { usePayForTask, useTONBalanceL2, generateTaskRef, useRefundTask, useConfirmTask } from '@/hooks/useTaskFee';
 import { useAccount } from 'wagmi';
 import { formatEther } from 'viem';
 import { useL2Config } from '@/hooks/useL2Config';

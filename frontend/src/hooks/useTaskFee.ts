@@ -151,6 +151,31 @@ export function useClaimFees() {
   return { claim, hash, isPending, isConfirming, isSuccess, error };
 }
 
+// ============ Escrow Confirm Hook ============
+
+/**
+ * Confirm a completed task on-chain (agent owner/operator).
+ * Sets _hasUsedAgent and releases escrowed funds to the agent balance.
+ */
+export function useConfirmTask() {
+  const chainId = useChainId();
+  const { taskFeeEscrow } = getL2Config(chainId);
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  const confirm = (taskRef: `0x${string}`) => {
+    writeContract({
+      address: taskFeeEscrow,
+      abi: TaskFeeEscrowABI,
+      functionName: 'confirmTask',
+      args: [taskRef],
+      chainId,
+    });
+  };
+
+  return { confirm, hash, isPending, isConfirming, isSuccess, error };
+}
+
 // ============ Escrow Refund Hooks ============
 
 /**

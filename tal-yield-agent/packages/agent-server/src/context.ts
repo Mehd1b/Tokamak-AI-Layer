@@ -1,4 +1,5 @@
-import { createPublicClient, http, type Address, type PublicClient } from "viem";
+import { createPublicClient, createWalletClient, http, type Address, type PublicClient } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 import { optimismSepolia } from "@tal-yield-agent/shared";
 import { TALClient } from "@tal-yield-agent/tal-sdk";
 import {
@@ -51,8 +52,17 @@ export function createContext(config: Config, logger: Logger): AppContext {
     transport: http(config.RPC_URL),
   });
 
+  const walletClient = config.OPERATOR_PRIVATE_KEY
+    ? createWalletClient({
+        account: privateKeyToAccount(config.OPERATOR_PRIVATE_KEY as `0x${string}`),
+        chain: optimismSepolia,
+        transport: http(config.RPC_URL),
+      })
+    : undefined;
+
   const talClient = new TALClient({
     publicClient: publicClient as PublicClient,
+    walletClient: walletClient as any,
     addresses: {
       identityRegistry: config.IDENTITY_REGISTRY as Address,
       taskFeeEscrow: config.TASK_FEE_ESCROW as Address,

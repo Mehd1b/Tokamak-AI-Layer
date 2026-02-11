@@ -1,4 +1,4 @@
-import { keccak256, toHex } from "viem";
+import { keccak256, toHex, type Hash } from "viem";
 import type { FastifyInstance } from "fastify";
 import { DEFAULT_RISK_PROFILES } from "@tal-yield-agent/agent-core";
 import type { RiskLevel, RiskProfile } from "@tal-yield-agent/agent-core";
@@ -141,6 +141,25 @@ export async function compatRoutes(app: FastifyInstance, ctx: AppContext) {
         task.status = "failed";
         task.error = err instanceof Error ? err.message : "Unknown error";
         ctx.logger.error({ taskId, error: task.error }, "Strategy generation failed (compat)");
+      }
+
+      // On-chain escrow settlement (confirm or refund)
+      const taskRef = req.body.taskRef;
+      if (taskRef) {
+        try {
+          if (task.status === "completed") {
+            const txHash = await ctx.talClient.confirmTask(taskRef as Hash);
+            ctx.logger.info({ taskRef, txHash }, "Escrow confirmed on-chain");
+          } else if (task.status === "failed") {
+            const txHash = await ctx.talClient.escrow.refundTask(taskRef as Hash);
+            ctx.logger.info({ taskRef, txHash }, "Escrow refunded on-chain");
+          }
+        } catch (escrowErr) {
+          ctx.logger.warn(
+            { taskRef, error: escrowErr instanceof Error ? escrowErr.message : String(escrowErr) },
+            "Escrow settlement failed (task result still returned)",
+          );
+        }
       }
 
       return reply.code(201).send(taskRecordToResult(task, inputText));
