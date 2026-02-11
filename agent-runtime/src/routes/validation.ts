@@ -141,13 +141,22 @@ export function createValidationRoutes(agents: Map<string, BaseAgent>): Router {
         }
       }
 
+      let matchType = 'unknown';
+      try {
+        if (validationResult.output) {
+          matchType = JSON.parse(validationResult.output).matchType || 'unknown';
+        }
+      } catch {
+        // output wasn't JSON
+      }
+
       res.json({
         taskId,
         requestHash: requestHash || null,
         validationTaskId: validationResult.taskId,
         score,
         reExecutionHash,
-        matchType: validationResult.output ? JSON.parse(validationResult.output).matchType : 'unknown',
+        matchType,
         txHash,
         status: validationResult.status,
       });
