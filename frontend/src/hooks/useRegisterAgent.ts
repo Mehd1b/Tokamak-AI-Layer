@@ -59,6 +59,23 @@ const OPERATOR_CONSENT_TYPES = {
   ],
 } as const;
 
+export function useUpdateAgentURI() {
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { data: receipt, isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  const updateURI = (agentId: bigint, newURI: string) => {
+    writeContract({
+      address: CONTRACTS.identityRegistry,
+      abi: TALIdentityRegistryABI,
+      functionName: 'updateAgentURI',
+      args: [agentId, newURI],
+      chainId: CHAIN_ID,
+    });
+  };
+
+  return { updateURI, hash, isPending, isConfirming, isSuccess, error };
+}
+
 export function useRegisterAgentV2() {
   const { writeContractAsync, data: hash, isPending, error: writeError } = useWriteContract();
   const { data: receipt, isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });

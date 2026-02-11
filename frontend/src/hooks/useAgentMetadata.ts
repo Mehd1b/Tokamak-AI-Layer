@@ -7,10 +7,18 @@ interface AgentPricing {
   perRequest?: string;
 }
 
+export interface CapabilityMeta {
+  name: string;
+  description: string;
+  placeholder?: string;
+}
+
 interface AgentMetadata {
   name?: string;
   description?: string;
   capabilities?: string[];
+  talCapabilities?: CapabilityMeta[];
+  requestExample?: string;
   active?: boolean;
   services?: Record<string, string>;
   pricing?: AgentPricing;
@@ -20,6 +28,8 @@ interface UseAgentMetadataResult {
   name?: string;
   description?: string;
   capabilities?: string[];
+  talCapabilities?: CapabilityMeta[];
+  requestExample?: string;
   active?: boolean;
   services?: Record<string, string>;
   pricing?: AgentPricing;
@@ -92,10 +102,15 @@ export function useAgentMetadata(agentURI: string | undefined): UseAgentMetadata
           if (cancelled) return;
 
           // Parse ERC-8004 registration file structure
+          const talCaps = data.tal?.capabilities;
           const parsed: AgentMetadata = {
             name: data.name || data.metadata?.name,
             description: data.description || data.metadata?.description,
             capabilities: data.capabilities || data.metadata?.capabilities || [],
+            talCapabilities: Array.isArray(talCaps)
+              ? talCaps.filter((c: CapabilityMeta) => c && typeof c.name === 'string')
+              : undefined,
+            requestExample: data.tal?.requestExample || undefined,
             active: data.active !== undefined ? data.active : true,
             services: data.services || {},
             pricing: data.tal?.pricing || undefined,
@@ -132,6 +147,8 @@ export function useAgentMetadata(agentURI: string | undefined): UseAgentMetadata
     name: metadata?.name,
     description: metadata?.description,
     capabilities: metadata?.capabilities,
+    talCapabilities: metadata?.talCapabilities,
+    requestExample: metadata?.requestExample,
     active: metadata?.active,
     services: metadata?.services,
     pricing: metadata?.pricing,

@@ -14,6 +14,7 @@ interface Capability {
   id: string;
   name: string;
   description: string;
+  placeholder: string;
 }
 
 const VALIDATION_MODELS = [
@@ -36,6 +37,7 @@ export default function RegisterAgentPage() {
   const [selfAsOperator, setSelfAsOperator] = useState(true);
   const [services, setServices] = useState<Record<string, string>>({});
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
+  const [requestExample, setRequestExample] = useState('');
   const [newServiceType, setNewServiceType] = useState('A2A');
   const [newServiceUrl, setNewServiceUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -88,7 +90,7 @@ export default function RegisterAgentPage() {
   const addCapability = () => {
     setCapabilities((prev) => [
       ...prev,
-      { id: `cap-${Date.now()}`, name: '', description: '' },
+      { id: `cap-${Date.now()}`, name: '', description: '', placeholder: '' },
     ]);
   };
 
@@ -133,6 +135,7 @@ export default function RegisterAgentPage() {
         tal: {
           capabilities: capabilities.filter((c) => c.name && c.description),
           validationModel,
+          ...(requestExample ? { requestExample } : {}),
           ...(feePerTask ? { pricing: { currency: 'TON', perRequest: feePerTask } } : {}),
         },
       };
@@ -248,6 +251,23 @@ export default function RegisterAgentPage() {
               />
               <p className="mt-1 text-xs text-zinc-500">
                 {description.length}/1000
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-zinc-300">
+                Request Example
+              </label>
+              <textarea
+                value={requestExample}
+                onChange={(e) => setRequestExample(e.target.value)}
+                maxLength={500}
+                rows={3}
+                placeholder="e.g. I have $10,000 to invest with a conservative risk profile..."
+                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"
+              />
+              <p className="mt-1 text-xs text-zinc-500">
+                Shown to users as a sample request to help them get started.
               </p>
             </div>
 
@@ -486,6 +506,13 @@ export default function RegisterAgentPage() {
                     className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600"
                   />
                 </div>
+                <textarea
+                  value={cap.placeholder}
+                  onChange={(e) => updateCapability(i, 'placeholder', e.target.value)}
+                  placeholder="Input hint shown to users (e.g. 'Describe your yield strategy preferences...')"
+                  rows={2}
+                  className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600"
+                />
               </div>
             ))}
 

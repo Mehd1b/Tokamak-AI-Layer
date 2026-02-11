@@ -29,3 +29,11 @@ coverage/
 postgres_data/
 redis_data/
 ipfs_data/
+
+# Integration test state
+scripts/integration/.agent-state.json
+scripts/integration/.data/
+INTEGRATION_REPORT.md
+
+# Claude
+.claude/

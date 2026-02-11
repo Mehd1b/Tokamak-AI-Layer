@@ -10,7 +10,6 @@ import {
   CheckCircle,
   Play,
   FileText,
-  FileCode,
 } from 'lucide-react';
 import { useAgent } from '@/hooks/useAgent';
 import { useFeedbackCount, useClientList, useFeedbacks } from '@/hooks/useReputation';
@@ -25,21 +24,6 @@ import { FeedbackModal } from '@/components/FeedbackModal';
 import { shortenAddress, getAgentStatusLabel, getAgentStatusColor, getAgentValidationModelLabel, getAgentValidationModelColor } from '@/lib/utils';
 import { useState } from 'react';
 
-const AGENT_CONFIG: Record<
-  string,
-  { icon: typeof FileText; placeholder: string }
-> = {
-  summarizer: {
-    icon: FileText,
-    placeholder:
-      'Paste any text here to get a structured summary with key points...\n\nExample: Paste a news article, research paper abstract, or any long-form text.',
-  },
-  auditor: {
-    icon: FileCode,
-    placeholder:
-      '// Paste Solidity code here for a security audit...\n\npragma solidity ^0.8.24;\n\ncontract Example {\n    // Your contract code here\n}',
-  },
-};
 
 export default function AgentDetailPage() {
   const params = useParams();
@@ -51,7 +35,7 @@ export default function AgentDetailPage() {
   const { validationHashes } = useAgentValidations(agentId);
   const { total: valTotal, failed: valFailed, failureRate: valFailureRate, isLoading: valStatsLoading } = useValidationStats(agentId);
   const { agent: runtimeAgent } = useRuntimeAgent(agentId?.toString());
-  const { name: metaName, description: metaDescription, capabilities: metaCapabilities, services: metaServices, active: metaActive, pricing: metaPricing } = useAgentMetadata(agent?.agentURI);
+  const { name: metaName, description: metaDescription, capabilities: metaCapabilities, talCapabilities: metaTalCapabilities, requestExample: metaRequestExample, services: metaServices, active: metaActive, pricing: metaPricing } = useAgentMetadata(agent?.agentURI);
   const { data: onChainFee } = useAgentFee(agentId);
   const [copied, setCopied] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -90,12 +74,12 @@ export default function AgentDetailPage() {
     '0x0000000000000000000000000000000000000000000000000000000000000000';
   const zeroAddr = '0x0000000000000000000000000000000000000000';
 
-  const agentConfig = runtimeAgent
-    ? AGENT_CONFIG[runtimeAgent.id] || {
-        icon: FileText,
-        placeholder: 'Enter your input...',
-      }
-    : null;
+  const hasRuntime = !!runtimeAgent || !!metaServices?.A2A;
+  const agentDisplayName = metaName || runtimeAgent?.name || `Agent #${agentId?.toString()}`;
+  const placeholder =
+    metaTalCapabilities?.[0]?.placeholder ||
+    runtimeAgent?.capabilities?.[0]?.description ||
+    'Describe your request...';
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
@@ -337,7 +321,7 @@ export default function AgentDetailPage() {
                 className="rounded-lg border border-white/10 bg-white/5 p-3"
               >
                 <div className="flex items-center gap-2">
-                  {agentConfig && <agentConfig.icon className="h-4 w-4 text-[#38BDF8]" />}
+                  <FileText className="h-4 w-4 text-[#38BDF8]" />
                   <span className="font-medium text-white">{cap.name}</span>
                   <span className="rounded bg-[#38BDF8]/20 px-1.5 py-0.5 text-xs font-mono text-[#38BDF8]">
                     {cap.id}
@@ -391,18 +375,24 @@ export default function AgentDetailPage() {
       )}
 
       {/* Use Agent */}
-      {runtimeAgent && agentConfig && (
+      {hasRuntime && (
         <div className="mt-6 card">
           <div className="mb-4 flex items-center gap-2">
             <Play className="h-5 w-5 text-[#38BDF8]" />
             <h2 className="text-lg font-semibold text-white">
-              Use {metaName || runtimeAgent.name}
+              Use {agentDisplayName}
             </h2>
           </div>
+          {metaRequestExample && (
+            <div className="mb-4 rounded-lg border border-white/10 bg-white/5 px-4 py-3">
+              <p className="mb-1 text-xs font-medium text-zinc-500">Example request</p>
+              <p className="text-sm text-zinc-300 italic">{metaRequestExample}</p>
+            </div>
+          )}
           <TaskSubmission
             agentId={agentId!.toString()}
-            agentName={metaName || runtimeAgent.name}
-            placeholder={agentConfig.placeholder}
+            agentName={agentDisplayName}
+            placeholder={placeholder}
             onChainAgentId={agentId}
             feePerTask={onChainFee}
           />

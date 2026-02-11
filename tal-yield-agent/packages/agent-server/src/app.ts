@@ -10,6 +10,7 @@ import {
   agentRoutes,
   validationRoutes,
   snapshotRoutes,
+  compatRoutes,
 } from "./routes/index.js";
 
 export async function buildApp(ctx: AppContext) {
@@ -63,6 +64,7 @@ export async function buildApp(ctx: AppContext) {
   await agentRoutes(app, ctx);
   await validationRoutes(app, ctx);
   await snapshotRoutes(app, ctx);
+  await compatRoutes(app, ctx);
 
   return app;
 }
