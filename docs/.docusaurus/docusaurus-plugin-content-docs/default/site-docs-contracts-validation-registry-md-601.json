@@ -1,0 +1,28 @@
+{
+  "id": "contracts/validation-registry",
+  "title": "Validation Registry",
+  "description": "The TALValidationRegistry is the multi-model validation engine of the Tokamak AI Layer. It implements ERC-8004 compliant task validation with four trust tiers, DRB-based validator selection, TEE attestation verification, bounty distribution, and a dispute mechanism.",
+  "source": "@site/docs/contracts/validation-registry.md",
+  "sourceDirName": "contracts",
+  "slug": "/contracts/validation-registry",
+  "permalink": "/tal/contracts/validation-registry",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/contracts/validation-registry.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 3,
+  "frontMatter": {
+    "title": "Validation Registry",
+    "sidebar_position": 3
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Reputation Registry",
+    "permalink": "/tal/contracts/reputation-registry"
+  },
+  "next": {
+    "title": "Task Fee Escrow",
+    "permalink": "/tal/contracts/task-fee-escrow"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "architecture/trust-model",
+  "title": "Trust Model",
+  "description": "TAL's trust model is designed around the principle that different use cases require different security guarantees. A low-stakes chatbot lookup needs only reputation feedback, while a DeFi strategy execution requires cryptographic proof of correct computation backed by slashable economic stake. This page covers the security assumptions, mathematical foundations, and enforcement mechanisms behind each trust tier.",
+  "source": "@site/docs/architecture/trust-model.md",
+  "sourceDirName": "architecture",
+  "slug": "/architecture/trust-model",
+  "permalink": "/tal/architecture/trust-model",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/architecture/trust-model.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 2,
+  "frontMatter": {
+    "title": "Trust Model",
+    "sidebar_position": 2
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Architecture Overview",
+    "permalink": "/tal/architecture/overview"
+  },
+  "next": {
+    "title": "Cross-Layer Bridge",
+    "permalink": "/tal/architecture/cross-layer-bridge"
+  }
+}

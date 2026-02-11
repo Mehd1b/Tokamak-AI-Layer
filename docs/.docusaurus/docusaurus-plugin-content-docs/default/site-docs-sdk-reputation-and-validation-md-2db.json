@@ -1,0 +1,28 @@
+{
+  "id": "sdk/reputation-and-validation",
+  "title": "Reputation & Validation",
+  "description": "The ReputationClient and ValidationClient handle the two core trust mechanisms in TAL: feedback-based reputation and validator-based execution verification.",
+  "source": "@site/docs/sdk/reputation-and-validation.md",
+  "sourceDirName": "sdk",
+  "slug": "/sdk/reputation-and-validation",
+  "permalink": "/tal/sdk/reputation-and-validation",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/sdk/reputation-and-validation.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 3,
+  "frontMatter": {
+    "title": "Reputation & Validation",
+    "sidebar_position": 3
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Identity Client",
+    "permalink": "/tal/sdk/identity-client"
+  },
+  "next": {
+    "title": "Types Reference",
+    "permalink": "/tal/sdk/types-reference"
+  }
+}

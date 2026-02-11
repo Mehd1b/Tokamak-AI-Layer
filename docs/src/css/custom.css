@@ -1,0 +1,41 @@
+/**
+ * Tokamak AI Layer - Documentation Theme
+ * Brand color: Tokamak Blue #2775CA
+ */
+
+:root {
+  --ifm-color-primary: #2775CA;
+  --ifm-color-primary-dark: #2269b6;
+  --ifm-color-primary-darker: #2063ac;
+  --ifm-color-primary-darkest: #1a528e;
+  --ifm-color-primary-light: #3c84d1;
+  --ifm-color-primary-lighter: #4a8dd4;
+  --ifm-color-primary-lightest: #6da3dd;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #4A9AE8;
+  --ifm-color-primary-dark: #2e8be4;
+  --ifm-color-primary-darker: #2282e1;
+  --ifm-color-primary-darkest: #1b6bba;
+  --ifm-color-primary-light: #66a9ec;
+  --ifm-color-primary-lighter: #72b0ee;
+  --ifm-color-primary-lightest: #9ac8f3;
+  --docusaurus-highlighted-code-line-bg: rgba(74, 154, 232, 0.1);
+  --ifm-background-color: #0a0e1a;
+  --ifm-navbar-background-color: #0a0e1a;
+  --ifm-footer-background-color: #0a0e1a;
+}
+
+[data-theme='dark'] .navbar {
+  background-color: var(--ifm-background-color);
+  box-shadow: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme='dark'] .footer {
+  background-color: var(--ifm-background-color);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}

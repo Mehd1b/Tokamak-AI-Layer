@@ -1,0 +1,28 @@
+{
+  "id": "contracts/identity-registry",
+  "title": "Identity Registry",
+  "description": "The TALIdentityRegistry is the core identity layer of the Tokamak AI Layer. It implements the ERC-8004 standard for trustless AI agent identities, representing each agent as an ERC-721 NFT with associated metadata, ZK identity commitments, and operator management capabilities.",
+  "source": "@site/docs/contracts/identity-registry.md",
+  "sourceDirName": "contracts",
+  "slug": "/contracts/identity-registry",
+  "permalink": "/tal/contracts/identity-registry",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/contracts/identity-registry.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "title": "Identity Registry",
+    "sidebar_position": 1
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Cross-Layer Bridge",
+    "permalink": "/tal/architecture/cross-layer-bridge"
+  },
+  "next": {
+    "title": "Reputation Registry",
+    "permalink": "/tal/contracts/reputation-registry"
+  }
+}

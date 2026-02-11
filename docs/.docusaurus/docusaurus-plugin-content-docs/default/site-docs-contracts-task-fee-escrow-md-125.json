@@ -1,0 +1,28 @@
+{
+  "id": "contracts/task-fee-escrow",
+  "title": "Task Fee Escrow",
+  "description": "The TaskFeeEscrow is the payment escrow contract for AI agent task execution on the Tokamak AI Layer. Unlike the core registry contracts, it is non-upgradeable and uses native TON (the gas token on Thanos L2) for all payments.",
+  "source": "@site/docs/contracts/task-fee-escrow.md",
+  "sourceDirName": "contracts",
+  "slug": "/contracts/task-fee-escrow",
+  "permalink": "/tal/contracts/task-fee-escrow",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/contracts/task-fee-escrow.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 4,
+  "frontMatter": {
+    "title": "Task Fee Escrow",
+    "sidebar_position": 4
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Validation Registry",
+    "permalink": "/tal/contracts/validation-registry"
+  },
+  "next": {
+    "title": "Deployment & Security",
+    "permalink": "/tal/contracts/deployment-and-security"
+  }
+}

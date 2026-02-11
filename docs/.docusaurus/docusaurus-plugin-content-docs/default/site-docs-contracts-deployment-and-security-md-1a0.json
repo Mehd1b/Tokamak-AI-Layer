@@ -1,0 +1,28 @@
+{
+  "id": "contracts/deployment-and-security",
+  "title": "Deployment & Security",
+  "description": "This page covers the security architecture, deployment patterns, and operational details of the Tokamak AI Layer smart contracts. All core registry contracts use battle-tested OpenZeppelin patterns for upgradeability, access control, and emergency response.",
+  "source": "@site/docs/contracts/deployment-and-security.md",
+  "sourceDirName": "contracts",
+  "slug": "/contracts/deployment-and-security",
+  "permalink": "/tal/contracts/deployment-and-security",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/contracts/deployment-and-security.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 5,
+  "frontMatter": {
+    "title": "Deployment & Security",
+    "sidebar_position": 5
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Task Fee Escrow",
+    "permalink": "/tal/contracts/task-fee-escrow"
+  },
+  "next": {
+    "title": "SDK Overview",
+    "permalink": "/tal/sdk/overview"
+  }
+}

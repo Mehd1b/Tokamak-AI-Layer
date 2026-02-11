@@ -1,0 +1,28 @@
+{
+  "id": "reference/deployed-contracts",
+  "title": "Deployed Contracts",
+  "description": "This page lists all deployed contract addresses for the Tokamak AI Layer across both Thanos Sepolia (L2) and Ethereum Sepolia (L1).",
+  "source": "@site/docs/reference/deployed-contracts.md",
+  "sourceDirName": "reference",
+  "slug": "/reference/deployed-contracts",
+  "permalink": "/tal/reference/deployed-contracts",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/reference/deployed-contracts.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 2,
+  "frontMatter": {
+    "title": "Deployed Contracts",
+    "sidebar_position": 2
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Glossary",
+    "permalink": "/tal/reference/glossary"
+  },
+  "next": {
+    "title": "Repository Map",
+    "permalink": "/tal/reference/repo-map"
+  }
+}

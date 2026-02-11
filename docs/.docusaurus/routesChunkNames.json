@@ -1,0 +1,154 @@
+{
+  "/tal/__docusaurus/debug-4f1": {
+    "__comp": "__comp---theme-debug-config-23-a-2ff",
+    "__context": {
+      "plugin": "plugin---tal-docusaurus-debugb-38-bb2"
+    }
+  },
+  "/tal/__docusaurus/debug/config-ab0": {
+    "__comp": "__comp---theme-debug-config-23-a-2ff",
+    "__context": {
+      "plugin": "plugin---tal-docusaurus-debugb-38-bb2"
+    }
+  },
+  "/tal/__docusaurus/debug/content-58f": {
+    "__comp": "__comp---theme-debug-contentba-8-ce7",
+    "__context": {
+      "plugin": "plugin---tal-docusaurus-debugb-38-bb2"
+    },
+    "__props": "__props---tal-docusaurus-debug-content-095-745"
+  },
+  "/tal/__docusaurus/debug/globalData-052": {
+    "__comp": "__comp---theme-debug-global-dataede-0fa",
+    "__context": {
+      "plugin": "plugin---tal-docusaurus-debugb-38-bb2"
+    }
+  },
+  "/tal/__docusaurus/debug/metadata-d8f": {
+    "__comp": "__comp---theme-debug-site-metadata-68-e-3d4",
+    "__context": {
+      "plugin": "plugin---tal-docusaurus-debugb-38-bb2"
+    }
+  },
+  "/tal/__docusaurus/debug/registry-2b1": {
+    "__comp": "__comp---theme-debug-registry-679-501",
+    "__context": {
+      "plugin": "plugin---tal-docusaurus-debugb-38-bb2"
+    }
+  },
+  "/tal/__docusaurus/debug/routes-f6a": {
+    "__comp": "__comp---theme-debug-routes-946-699",
+    "__context": {
+      "plugin": "plugin---tal-docusaurus-debugb-38-bb2"
+    }
+  },
+  "/tal/-a18": {
+    "__comp": "__comp---theme-docs-root-5-e-9-0b6",
+    "__context": {
+      "plugin": "plugin---tal-aba-def"
+    }
+  },
+  "/tal/-fcb": {
+    "__comp": "__comp---theme-doc-version-roota-7-b-5de",
+    "__props": "__props---tal-b-02-9cb"
+  },
+  "/tal/-75c": {
+    "__comp": "__comp---theme-doc-roota-94-67a"
+  },
+  "/tal/app/contract-integration-533": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-app-contract-integrationf-84-810"
+  },
+  "/tal/app/hooks-reference-e4b": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-app-hooks-reference-9-e-2-10e"
+  },
+  "/tal/app/pages-guide-c8b": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-app-pages-guideefb-32e"
+  },
+  "/tal/app/setup-5aa": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-app-setupdf-1-9bb"
+  },
+  "/tal/app/wallet-and-chains-3b0": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-app-wallet-and-chains-054-4a8"
+  },
+  "/tal/architecture/cross-layer-bridge-c16": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-architecture-cross-layer-bridge-5-c-5-501"
+  },
+  "/tal/architecture/overview-2af": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-architecture-overview-0-b-1-913"
+  },
+  "/tal/architecture/trust-model-470": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-architecture-trust-model-103-374"
+  },
+  "/tal/contracts/deployment-and-security-73f": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-contracts-deployment-and-security-1-a-0-94f"
+  },
+  "/tal/contracts/identity-registry-e05": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-contracts-identity-registryc-1-d-e9c"
+  },
+  "/tal/contracts/reputation-registry-e7a": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-contracts-reputation-registry-43-c-f2b"
+  },
+  "/tal/contracts/task-fee-escrow-a0f": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-contracts-task-fee-escrow-125-0e3"
+  },
+  "/tal/contracts/validation-registry-37c": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-contracts-validation-registry-601-301"
+  },
+  "/tal/integration/drb-integration-af8": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-integration-drb-integration-6-a-9-5b2"
+  },
+  "/tal/integration/ipfs-and-metadata-a55": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-integration-ipfs-and-metadatab-90-0da"
+  },
+  "/tal/integration/staking-bridge-c92": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-integration-staking-bridge-291-1e1"
+  },
+  "/tal/reference/deployed-contracts-c03": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-reference-deployed-contractsa-37-7ba"
+  },
+  "/tal/reference/glossary-69f": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-reference-glossary-846-fda"
+  },
+  "/tal/reference/repo-map-99d": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-reference-repo-mapfd-2-89f"
+  },
+  "/tal/sdk/identity-client-bb7": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-sdk-identity-client-2-ed-ac9"
+  },
+  "/tal/sdk/overview-d99": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-sdk-overviewd-81-ba7"
+  },
+  "/tal/sdk/reputation-and-validation-1bf": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-sdk-reputation-and-validation-2-db-548"
+  },
+  "/tal/sdk/types-reference-52a": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-sdk-types-reference-447-3db"
+  },
+  "/tal/-59b": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---tal-0-e-3-88f"
+  }
+}

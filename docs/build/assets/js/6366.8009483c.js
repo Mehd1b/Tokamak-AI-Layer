@@ -1,0 +1,1 @@
+"use strict";(globalThis.webpackChunktal_docs=globalThis.webpackChunktal_docs||[]).push([[6366],{6366(c,e,a){a.d(e,{createArchitectureServices:()=>s.S});var s=a(8980);a(7960)}}]);

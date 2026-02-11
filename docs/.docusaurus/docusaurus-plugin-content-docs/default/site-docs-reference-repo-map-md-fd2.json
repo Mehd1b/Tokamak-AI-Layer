@@ -1,0 +1,24 @@
+{
+  "id": "reference/repo-map",
+  "title": "Repository Map",
+  "description": "A complete guide to the Tokamak AI Layer repository structure, key files, build commands, and test suite.",
+  "source": "@site/docs/reference/repo-map.md",
+  "sourceDirName": "reference",
+  "slug": "/reference/repo-map",
+  "permalink": "/tal/reference/repo-map",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/reference/repo-map.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 3,
+  "frontMatter": {
+    "title": "Repository Map",
+    "sidebar_position": 3
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Deployed Contracts",
+    "permalink": "/tal/reference/deployed-contracts"
+  }
+}

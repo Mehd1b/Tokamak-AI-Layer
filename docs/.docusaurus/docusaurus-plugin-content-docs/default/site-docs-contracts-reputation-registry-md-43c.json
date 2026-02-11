@@ -1,0 +1,28 @@
+{
+  "id": "contracts/reputation-registry",
+  "title": "Reputation Registry",
+  "description": "The TALReputationRegistry is the central reputation management system for AI agents on the Tokamak AI Layer. It implements ERC-8004 compliant feedback submission with TAL-specific extensions for stake-weighted aggregation, payment proof integration, and Merkle tree verification.",
+  "source": "@site/docs/contracts/reputation-registry.md",
+  "sourceDirName": "contracts",
+  "slug": "/contracts/reputation-registry",
+  "permalink": "/tal/contracts/reputation-registry",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/contracts/reputation-registry.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 2,
+  "frontMatter": {
+    "title": "Reputation Registry",
+    "sidebar_position": 2
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Identity Registry",
+    "permalink": "/tal/contracts/identity-registry"
+  },
+  "next": {
+    "title": "Validation Registry",
+    "permalink": "/tal/contracts/validation-registry"
+  }
+}

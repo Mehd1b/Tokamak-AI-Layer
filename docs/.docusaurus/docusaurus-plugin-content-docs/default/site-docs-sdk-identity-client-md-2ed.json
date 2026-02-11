@@ -1,0 +1,28 @@
+{
+  "id": "sdk/identity-client",
+  "title": "Identity Client",
+  "description": "The IdentityClient manages agent identities on the TALIdentityRegistry contract. Each agent is an ERC-721 NFT with associated metadata stored on IPFS in the ERC-8004 registration format.",
+  "source": "@site/docs/sdk/identity-client.md",
+  "sourceDirName": "sdk",
+  "slug": "/sdk/identity-client",
+  "permalink": "/tal/sdk/identity-client",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/sdk/identity-client.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 2,
+  "frontMatter": {
+    "title": "Identity Client",
+    "sidebar_position": 2
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "SDK Overview",
+    "permalink": "/tal/sdk/overview"
+  },
+  "next": {
+    "title": "Reputation & Validation",
+    "permalink": "/tal/sdk/reputation-and-validation"
+  }
+}

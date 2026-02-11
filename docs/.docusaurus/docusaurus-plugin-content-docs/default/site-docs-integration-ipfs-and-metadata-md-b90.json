@@ -1,0 +1,28 @@
+{
+  "id": "integration/ipfs-and-metadata",
+  "title": "IPFS & Metadata",
+  "description": "TAL stores agent registration files and extended feedback data on IPFS, with only content hashes and URIs stored on-chain. This keeps gas costs low while maintaining verifiability through content addressing.",
+  "source": "@site/docs/integration/ipfs-and-metadata.md",
+  "sourceDirName": "integration",
+  "slug": "/integration/ipfs-and-metadata",
+  "permalink": "/tal/integration/ipfs-and-metadata",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/integration/ipfs-and-metadata.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 3,
+  "frontMatter": {
+    "title": "IPFS & Metadata",
+    "sidebar_position": 3
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "DRB Integration",
+    "permalink": "/tal/integration/drb-integration"
+  },
+  "next": {
+    "title": "Glossary",
+    "permalink": "/tal/reference/glossary"
+  }
+}

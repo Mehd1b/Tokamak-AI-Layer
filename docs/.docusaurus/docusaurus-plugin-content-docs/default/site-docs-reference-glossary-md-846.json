@@ -1,0 +1,28 @@
+{
+  "id": "reference/glossary",
+  "title": "Glossary",
+  "description": "Alphabetical reference of key terms used throughout the Tokamak AI Layer documentation and codebase.",
+  "source": "@site/docs/reference/glossary.md",
+  "sourceDirName": "reference",
+  "slug": "/reference/glossary",
+  "permalink": "/tal/reference/glossary",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/reference/glossary.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "title": "Glossary",
+    "sidebar_position": 1
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "IPFS & Metadata",
+    "permalink": "/tal/integration/ipfs-and-metadata"
+  },
+  "next": {
+    "title": "Deployed Contracts",
+    "permalink": "/tal/reference/deployed-contracts"
+  }
+}

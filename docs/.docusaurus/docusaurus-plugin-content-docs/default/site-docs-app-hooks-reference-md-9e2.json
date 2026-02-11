@@ -1,0 +1,28 @@
+{
+  "id": "app/hooks-reference",
+  "title": "Hooks Reference",
+  "description": "The TAL frontend exposes a set of custom React hooks that wrap wagmi's useReadContract, useWriteContract, and useWaitForTransactionReceipt primitives. Each hook targets a specific smart contract function and handles ABI imports, address resolution, and chain ID configuration internally.",
+  "source": "@site/docs/app/hooks-reference.md",
+  "sourceDirName": "app",
+  "slug": "/app/hooks-reference",
+  "permalink": "/tal/app/hooks-reference",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/app/hooks-reference.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 4,
+  "frontMatter": {
+    "title": "Hooks Reference",
+    "sidebar_position": 4
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Wallet & Chains",
+    "permalink": "/tal/app/wallet-and-chains"
+  },
+  "next": {
+    "title": "Contract Integration",
+    "permalink": "/tal/app/contract-integration"
+  }
+}

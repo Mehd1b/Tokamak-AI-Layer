@@ -1,0 +1,28 @@
+{
+  "id": "app/contract-integration",
+  "title": "Contract Integration",
+  "description": "The TAL frontend reads and writes to smart contracts using wagmi v2 hooks backed by viem. All contract ABIs are imported from the SDK package, and contract addresses are centralized in a single configuration file.",
+  "source": "@site/docs/app/contract-integration.md",
+  "sourceDirName": "app",
+  "slug": "/app/contract-integration",
+  "permalink": "/tal/app/contract-integration",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/app/contract-integration.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 5,
+  "frontMatter": {
+    "title": "Contract Integration",
+    "sidebar_position": 5
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Hooks Reference",
+    "permalink": "/tal/app/hooks-reference"
+  },
+  "next": {
+    "title": "Staking Bridge",
+    "permalink": "/tal/integration/staking-bridge"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "architecture/cross-layer-bridge",
+  "title": "Cross-Layer Bridge",
+  "description": "The TAL cross-layer bridge connects Ethereum L1 staking infrastructure with Tokamak L2 registry contracts. It enables L2 contracts to make trust decisions based on L1 economic security without requiring L2 users to pay L1 gas costs for every stake lookup. The bridge consists of three contracts: TALStakingBridgeL1 on Ethereum, TALStakingBridgeL2 on Tokamak L2, and TALSlashingConditionsL1 for slash execution on L1.",
+  "source": "@site/docs/architecture/cross-layer-bridge.md",
+  "sourceDirName": "architecture",
+  "slug": "/architecture/cross-layer-bridge",
+  "permalink": "/tal/architecture/cross-layer-bridge",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/architecture/cross-layer-bridge.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 3,
+  "frontMatter": {
+    "title": "Cross-Layer Bridge",
+    "sidebar_position": 3
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Trust Model",
+    "permalink": "/tal/architecture/trust-model"
+  },
+  "next": {
+    "title": "Identity Registry",
+    "permalink": "/tal/contracts/identity-registry"
+  }
+}

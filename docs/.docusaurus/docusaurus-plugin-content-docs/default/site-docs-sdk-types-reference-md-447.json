@@ -1,0 +1,28 @@
+{
+  "id": "sdk/types-reference",
+  "title": "Types Reference",
+  "description": "Complete reference for all TypeScript types exported by the TAL SDK. Types are organized by domain: core primitives, identity, reputation, validation, ZK proofs, discovery, and configuration.",
+  "source": "@site/docs/sdk/types-reference.md",
+  "sourceDirName": "sdk",
+  "slug": "/sdk/types-reference",
+  "permalink": "/tal/sdk/types-reference",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/sdk/types-reference.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 4,
+  "frontMatter": {
+    "title": "Types Reference",
+    "sidebar_position": 4
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Reputation & Validation",
+    "permalink": "/tal/sdk/reputation-and-validation"
+  },
+  "next": {
+    "title": "Setup",
+    "permalink": "/tal/app/setup"
+  }
+}

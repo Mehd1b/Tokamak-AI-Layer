@@ -1,0 +1,25 @@
+{
+  "id": "intro",
+  "title": "Introduction",
+  "description": "Tokamak AI Layer (TAL) is an ERC-8004 compliant infrastructure layer providing trustless AI agent discovery, reputation management, and execution verification on Tokamak L2 (Optimism-based). Cross-chain staking bridges to Ethereum L1 for economic security via TON Staking V3.",
+  "source": "@site/docs/intro.md",
+  "sourceDirName": ".",
+  "slug": "/",
+  "permalink": "/tal/",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/intro.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "title": "Introduction",
+    "sidebar_position": 1,
+    "slug": "/"
+  },
+  "sidebar": "docsSidebar",
+  "next": {
+    "title": "Architecture Overview",
+    "permalink": "/tal/architecture/overview"
+  }
+}

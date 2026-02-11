@@ -1,0 +1,28 @@
+{
+  "id": "app/wallet-and-chains",
+  "title": "Wallet & Chains",
+  "description": "The TAL frontend uses RainbowKit for wallet connection UI and wagmi v2 for React hooks that interact with Ethereum-compatible chains. The application operates across two networks: Thanos Sepolia (L2) for core protocol operations and Ethereum Sepolia (L1) for staking.",
+  "source": "@site/docs/app/wallet-and-chains.md",
+  "sourceDirName": "app",
+  "slug": "/app/wallet-and-chains",
+  "permalink": "/tal/app/wallet-and-chains",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/app/wallet-and-chains.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 3,
+  "frontMatter": {
+    "title": "Wallet & Chains",
+    "sidebar_position": 3
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Pages Guide",
+    "permalink": "/tal/app/pages-guide"
+  },
+  "next": {
+    "title": "Hooks Reference",
+    "permalink": "/tal/app/hooks-reference"
+  }
+}

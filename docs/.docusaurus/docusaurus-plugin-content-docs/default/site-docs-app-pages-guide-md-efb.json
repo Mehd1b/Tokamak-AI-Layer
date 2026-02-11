@@ -1,0 +1,28 @@
+{
+  "id": "app/pages-guide",
+  "title": "Pages Guide",
+  "description": "The TAL frontend is a Next.js 14 application using the App Router. It provides a complete interface for agent discovery, registration, reputation viewing, validation management, staking, and fee management.",
+  "source": "@site/docs/app/pages-guide.md",
+  "sourceDirName": "app",
+  "slug": "/app/pages-guide",
+  "permalink": "/tal/app/pages-guide",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/app/pages-guide.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 2,
+  "frontMatter": {
+    "title": "Pages Guide",
+    "sidebar_position": 2
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Setup",
+    "permalink": "/tal/app/setup"
+  },
+  "next": {
+    "title": "Wallet & Chains",
+    "permalink": "/tal/app/wallet-and-chains"
+  }
+}

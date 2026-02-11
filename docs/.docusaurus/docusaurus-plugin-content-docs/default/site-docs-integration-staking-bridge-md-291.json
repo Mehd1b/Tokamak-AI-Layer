@@ -1,0 +1,28 @@
+{
+  "id": "integration/staking-bridge",
+  "title": "Staking Bridge",
+  "description": "The TAL Staking Bridge provides cross-layer economic security by bridging TON Staking V3 data from Ethereum L1 to Tokamak L2. Operator stakes on L1 back the validation and slashing mechanisms on L2, creating a trustless economic security layer.",
+  "source": "@site/docs/integration/staking-bridge.md",
+  "sourceDirName": "integration",
+  "slug": "/integration/staking-bridge",
+  "permalink": "/tal/integration/staking-bridge",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/integration/staking-bridge.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "title": "Staking Bridge",
+    "sidebar_position": 1
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Contract Integration",
+    "permalink": "/tal/app/contract-integration"
+  },
+  "next": {
+    "title": "DRB Integration",
+    "permalink": "/tal/integration/drb-integration"
+  }
+}

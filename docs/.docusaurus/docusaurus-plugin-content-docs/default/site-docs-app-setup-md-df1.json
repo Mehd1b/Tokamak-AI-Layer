@@ -1,0 +1,28 @@
+{
+  "id": "app/setup",
+  "title": "Setup",
+  "description": "This guide covers installing, configuring, and running the Tokamak AI Layer frontend application locally.",
+  "source": "@site/docs/app/setup.md",
+  "sourceDirName": "app",
+  "slug": "/app/setup",
+  "permalink": "/tal/app/setup",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/app/setup.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "title": "Setup",
+    "sidebar_position": 1
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Types Reference",
+    "permalink": "/tal/sdk/types-reference"
+  },
+  "next": {
+    "title": "Pages Guide",
+    "permalink": "/tal/app/pages-guide"
+  }
+}

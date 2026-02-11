@@ -1,0 +1,28 @@
+{
+  "id": "integration/drb-integration",
+  "title": "DRB Integration",
+  "description": "The DRBIntegrationModule wraps Tokamak's DRB Commit-Reveal2 protocol to provide fair, verifiable random validator selection for the TAL validation system. It ensures no party can predict or manipulate which validator is assigned to verify an agent's output.",
+  "source": "@site/docs/integration/drb-integration.md",
+  "sourceDirName": "integration",
+  "slug": "/integration/drb-integration",
+  "permalink": "/tal/integration/drb-integration",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/integration/drb-integration.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 2,
+  "frontMatter": {
+    "title": "DRB Integration",
+    "sidebar_position": 2
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Staking Bridge",
+    "permalink": "/tal/integration/staking-bridge"
+  },
+  "next": {
+    "title": "IPFS & Metadata",
+    "permalink": "/tal/integration/ipfs-and-metadata"
+  }
+}
