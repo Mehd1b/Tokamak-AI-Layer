@@ -48,4 +48,11 @@ export const config = {
 
   // Storage
   STORAGE_DIR: optional('STORAGE_DIR', './data'),
+
+  // Multi-chain: Thanos Sepolia (used when frontend sends chainId=111551119090)
+  THANOS_RPC_URL: optional('THANOS_RPC_URL', 'https://rpc.thanos-sepolia.tokamak.network'),
+  THANOS_TASK_FEE_ESCROW: optional(
+    'THANOS_TASK_FEE_ESCROW',
+    '0x43f9E59b6bFCacD70fcba4f3F6234a6a9F064b8C',
+  ),
 } as const;
