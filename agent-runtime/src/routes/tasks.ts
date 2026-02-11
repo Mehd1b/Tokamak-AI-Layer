@@ -91,6 +91,7 @@ async function verifyPaymentWithRetry(
 }
 
 export function createTaskRoutes(agents: Map<string, BaseAgent>): Router {
+  console.log(`[TASK] Routes initialized — escrow: ${config.TASK_FEE_ESCROW}, rpc: ${config.RPC_URL}, chainId: ${config.CHAIN_ID}`);
   const router = Router();
 
   // POST /api/tasks - Submit a new task
@@ -128,8 +129,17 @@ export function createTaskRoutes(agents: Map<string, BaseAgent>): Router {
 
           console.log(`[TASK] Payment verified for taskRef ${taskRef.slice(0, 18)}...`);
         } catch (verifyErr) {
-          console.error('[TASK] Payment verification failed:', verifyErr instanceof Error ? verifyErr.message : verifyErr);
-          res.status(502).json({ error: 'Payment verification failed: could not verify on-chain payment' });
+          const errMsg = verifyErr instanceof Error ? verifyErr.message : String(verifyErr);
+          console.error('[TASK] Payment verification failed:', errMsg);
+          res.status(502).json({
+            error: `Payment verification failed: ${errMsg}`,
+            debug: {
+              escrowAddress,
+              taskRef,
+              rpcUrl: config.RPC_URL,
+              chainId: config.CHAIN_ID,
+            },
+          });
           return;
         }
       }
