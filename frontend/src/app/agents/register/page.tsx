@@ -20,7 +20,8 @@ interface Capability {
 const VALIDATION_MODELS = [
   { value: 0, label: 'Reputation Only', description: 'Lightweight feedback-based trust. No operators required.' },
   { value: 1, label: 'Stake Secured', description: 'DRB-selected validator re-execution with stake collateral. Requires operators with sufficient stake.' },
-  { value: 2, label: 'Hybrid', description: 'Combines stake security with additional verification. Requires operators with sufficient stake.' },
+  { value: 2, label: 'TEE Attested', description: 'Hardware-attested execution verification (SGX, Nitro, TrustZone). Requires operators with sufficient stake.' },
+  { value: 3, label: 'Hybrid', description: 'Combines stake security with TEE attestation for maximum trust. Requires operators with sufficient stake.' },
 ];
 
 export default function RegisterAgentPage() {
@@ -40,6 +41,8 @@ export default function RegisterAgentPage() {
   const [requestExample, setRequestExample] = useState('');
   const [newServiceType, setNewServiceType] = useState('A2A');
   const [newServiceUrl, setNewServiceUrl] = useState('');
+  const [customServiceType, setCustomServiceType] = useState('');
+  const [serviceUrlError, setServiceUrlError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [ipfsUri, setIpfsUri] = useState<string | null>(null);
@@ -108,13 +111,50 @@ export default function RegisterAgentPage() {
     setCapabilities((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const getServicePlaceholder = (type: string): string => {
+    switch (type) {
+      case 'DID': return 'did:web:example.com';
+      case 'ENS': return 'agent.eth';
+      default: return 'https://...';
+    }
+  };
+
+  const validateServiceUrl = (type: string, url: string): string | null => {
+    if (!url.trim()) return 'URL is required';
+    if (type === 'DID') {
+      if (!url.startsWith('did:')) return 'DID must start with "did:" prefix';
+    } else if (type === 'ENS') {
+      if (!url.endsWith('.eth')) return 'ENS name must end with ".eth"';
+    } else if (['A2A', 'MCP', 'OASF', 'web'].includes(type)) {
+      if (!url.startsWith('http://') && !url.startsWith('https://')) return 'URL must start with http:// or https://';
+    }
+    return null;
+  };
+
+  const handleAddService = () => {
+    const type = newServiceType === '_custom' ? customServiceType : newServiceType;
+    if (!type || !newServiceUrl) return;
+    const error = validateServiceUrl(type, newServiceUrl);
+    if (error) {
+      setServiceUrlError(error);
+      return;
+    }
+    setServices((prev) => ({ ...prev, [type]: newServiceUrl }));
+    setNewServiceUrl('');
+    setServiceUrlError(null);
+    if (newServiceType === '_custom') {
+      setCustomServiceType('');
+      setNewServiceType('A2A');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !description) return;
 
     // For StakeSecured/Hybrid, require at least one operator
     if (validationModel > 0 && !selfAsOperator) {
-      setUploadError('Stake Secured and Hybrid models require at least one operator. Enable "Register yourself as operator".');
+      setUploadError('Stake Secured, TEE Attested, and Hybrid models require at least one operator. Enable "Register yourself as operator".');
       return;
     }
 
@@ -292,29 +332,42 @@ export default function RegisterAgentPage() {
             Validation Model
           </h2>
           <div className="space-y-3">
-            {VALIDATION_MODELS.map((model) => (
-              <label
-                key={model.value}
-                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
-                  validationModel === model.value
-                    ? 'border-[#38BDF8]/50 bg-[#38BDF8]/5'
-                    : 'border-white/10 bg-white/5 hover:border-white/20'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="validationModel"
-                  value={model.value}
-                  checked={validationModel === model.value}
-                  onChange={() => setValidationModel(model.value)}
-                  className="mt-1 accent-[#38BDF8]"
-                />
-                <div>
-                  <span className="text-sm font-medium text-white">{model.label}</span>
-                  <p className="mt-0.5 text-xs text-zinc-500">{model.description}</p>
-                </div>
-              </label>
-            ))}
+            {VALIDATION_MODELS.map((m) => {
+              const comingSoon = m.value === 2 || m.value === 3;
+              return (
+                <label
+                  key={m.value}
+                  className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
+                    comingSoon
+                      ? 'cursor-not-allowed border-white/5 opacity-50'
+                      : validationModel === m.value
+                        ? 'cursor-pointer border-[#38BDF8]/50 bg-[#38BDF8]/5'
+                        : 'cursor-pointer border-white/10 bg-white/5 hover:border-white/20'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="validationModel"
+                    value={m.value}
+                    checked={validationModel === m.value}
+                    disabled={comingSoon}
+                    onChange={() => setValidationModel(m.value)}
+                    className="mt-1 accent-[#38BDF8]"
+                  />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-white">{m.label}</span>
+                      {comingSoon && (
+                        <span className="rounded bg-zinc-700 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+                          Coming soon
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-xs text-zinc-500">{m.description}</p>
+                  </div>
+                </label>
+              );
+            })}
           </div>
         </div>
 
@@ -367,11 +420,20 @@ export default function RegisterAgentPage() {
               <div className="mt-3 flex items-start gap-2 rounded-lg bg-red-500/10 border border-red-500/20 p-3">
                 <Info className="h-4 w-4 text-red-400 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-red-400">
-                  At least one operator is required for {validationModel === 1 ? 'Stake Secured' : 'Hybrid'} agents.
+                  At least one operator is required for {validationModel === 1 ? 'Stake Secured' : validationModel === 2 ? 'TEE Attested' : 'Hybrid'} agents.
                   Enable the self-operator option or use the SDK to register with external operators.
                 </p>
               </div>
             )}
+
+            {/* External Operator Info */}
+            <div className="mt-3 flex items-start gap-2 rounded-lg bg-white/5 border border-white/10 p-3">
+              <Info className="h-4 w-4 text-zinc-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-zinc-400">
+                To add external operators, use the SDK after registration. External operators must sign an EIP-712 consent
+                message before being added to your agent.
+              </p>
+            </div>
           </div>
         )}
 
@@ -431,34 +493,60 @@ export default function RegisterAgentPage() {
             </div>
           )}
 
-          <div className="flex gap-2">
-            <select
-              value={newServiceType}
-              onChange={(e) => setNewServiceType(e.target.value)}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
-            >
-              <option value="A2A">A2A</option>
-              <option value="MCP">MCP</option>
-              <option value="OASF">OASF</option>
-              <option value="web">Web</option>
-              <option value="email">Email</option>
-              <option value="DID">DID</option>
-            </select>
-            <input
-              type="text"
-              value={newServiceUrl}
-              onChange={(e) => setNewServiceUrl(e.target.value)}
-              placeholder="https://..."
-              className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600"
-            />
-            <button
-              type="button"
-              onClick={addService}
-              className="btn-secondary"
-            >
-              Add
-            </button>
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              {newServiceType === '_custom' ? (
+                <input
+                  type="text"
+                  value={customServiceType}
+                  onChange={(e) => setCustomServiceType(e.target.value)}
+                  placeholder="Custom type..."
+                  className="w-24 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600"
+                />
+              ) : (
+                <select
+                  value={newServiceType}
+                  onChange={(e) => setNewServiceType(e.target.value)}
+                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
+                >
+                  <option value="A2A">A2A</option>
+                  <option value="MCP">MCP</option>
+                  <option value="OASF">OASF</option>
+                  <option value="web">Web</option>
+                  <option value="email">Email</option>
+                  <option value="DID">DID</option>
+                  <option value="ENS">ENS</option>
+                  <option value="_custom">Custom...</option>
+                </select>
+              )}
+              <input
+                type="text"
+                value={newServiceUrl}
+                onChange={(e) => { setNewServiceUrl(e.target.value); setServiceUrlError(null); }}
+                placeholder={getServicePlaceholder(newServiceType === '_custom' ? customServiceType : newServiceType)}
+                className={`flex-1 rounded-lg border ${serviceUrlError ? 'border-red-500/50' : 'border-white/10'} bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600`}
+              />
+              <button
+                type="button"
+                onClick={handleAddService}
+                className="btn-secondary"
+              >
+                Add
+              </button>
+            </div>
+            {serviceUrlError && (
+              <p className="text-xs text-red-400">{serviceUrlError}</p>
+            )}
           </div>
+
+          {Object.keys(services).length === 0 && (
+            <div className="mt-3 flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 p-2">
+              <Info className="h-3.5 w-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-400">
+                Agents without service endpoints cannot be invoked by clients.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Capabilities */}
@@ -491,6 +579,7 @@ export default function RegisterAgentPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <input
                     type="text"
+                    list="capability-suggestions"
                     value={cap.name}
                     onChange={(e) => updateCapability(i, 'name', e.target.value)}
                     placeholder="Capability name"
@@ -521,6 +610,18 @@ export default function RegisterAgentPage() {
                 No capabilities added yet.
               </p>
             )}
+            <datalist id="capability-suggestions">
+              <option value="text-summarization" />
+              <option value="code-generation" />
+              <option value="solidity-audit" />
+              <option value="yield-optimization" />
+              <option value="data-analysis" />
+              <option value="translation" />
+              <option value="image-generation" />
+              <option value="sentiment-analysis" />
+              <option value="portfolio-management" />
+              <option value="smart-contract-review" />
+            </datalist>
           </div>
         </div>
 

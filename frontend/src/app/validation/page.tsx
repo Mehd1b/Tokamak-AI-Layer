@@ -26,6 +26,9 @@ export default function ValidationPage() {
   const { isConnected } = useWallet();
   const { count: agentCount, isLoading: isLoadingCount } = useAgentCount();
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<number | 'all'>('all');
+  const [modelFilter, setModelFilter] = useState<number | 'all'>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   const totalAgents = agentCount ? Number(agentCount) : 0;
   const { validations: allHashes, isLoading: isLoadingHashes } = useAllValidationHashes(totalAgents);
@@ -34,8 +37,10 @@ export default function ValidationPage() {
 
   const isLoading = isLoadingCount || isLoadingHashes || isLoadingDetails;
 
-  // Filter validations by search query
+  // Filter validations by search query, status, and model
   const filteredValidations = validations.filter((v) => {
+    if (statusFilter !== 'all' && v.request.status !== statusFilter) return false;
+    if (modelFilter !== 'all' && v.request.model !== modelFilter) return false;
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -120,11 +125,69 @@ export default function ValidationPage() {
               className="w-full bg-white/5 border-white/10 text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:ring-1 focus:ring-[#38BDF8]/50 rounded-lg border py-2 pl-10 pr-4 text-sm focus:outline-none"
             />
           </div>
-          <button className="btn-secondary flex items-center gap-2">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`btn-secondary flex items-center gap-2 ${(statusFilter !== 'all' || modelFilter !== 'all') ? 'border-[#38BDF8]/50 text-[#38BDF8]' : ''}`}
+          >
             <Filter className="h-4 w-4" />
             Filters
+            {(statusFilter !== 'all' || modelFilter !== 'all') && (
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#38BDF8] text-[10px] font-bold text-black">
+                {(statusFilter !== 'all' ? 1 : 0) + (modelFilter !== 'all' ? 1 : 0)}
+              </span>
+            )}
           </button>
         </div>
+
+        {/* Filter Panel */}
+        {showFilters && (
+          <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-white/10 pt-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-zinc-500">Status:</span>
+              <div className="flex gap-1">
+                {([['all', 'All'], [0, 'Pending'], [1, 'Completed'], [2, 'Expired'], [3, 'Disputed']] as const).map(([value, label]) => (
+                  <button
+                    key={String(value)}
+                    onClick={() => setStatusFilter(value)}
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                      statusFilter === value
+                        ? 'bg-[#38BDF8]/20 text-[#38BDF8]'
+                        : 'bg-white/5 text-zinc-400 hover:bg-white/10'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-zinc-500">Model:</span>
+              <div className="flex gap-1">
+                {([['all', 'All'], [0, 'Reputation'], [1, 'Stake'], [2, 'TEE'], [3, 'Hybrid']] as const).map(([value, label]) => (
+                  <button
+                    key={String(value)}
+                    onClick={() => setModelFilter(value)}
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                      modelFilter === value
+                        ? 'bg-[#38BDF8]/20 text-[#38BDF8]'
+                        : 'bg-white/5 text-zinc-400 hover:bg-white/10'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {(statusFilter !== 'all' || modelFilter !== 'all') && (
+              <button
+                onClick={() => { setStatusFilter('all'); setModelFilter('all'); }}
+                className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300"
+              >
+                <XCircle className="h-3 w-3" /> Clear filters
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Validation List */}

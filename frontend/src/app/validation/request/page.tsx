@@ -3,17 +3,21 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Shield, Send } from 'lucide-react';
+import { ArrowLeft, Shield, Send, Info, AlertTriangle } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
 import { useRequestValidationOnChain } from '@/hooks/useValidation';
 import { parseEther } from 'viem';
+import { useReadContract } from 'wagmi';
+import { CONTRACTS } from '@/lib/contracts';
+import { TALIdentityRegistryV2ABI } from '../../../../../sdk/src/abi/TALIdentityRegistryV2';
+import { getValidationModelLabel, getValidationModelColor } from '@/lib/utils';
 
-const VALIDATION_MODELS = [
-  { value: 0, label: 'Reputation Only', desc: 'Lightweight, aggregated feedback scores', minBounty: '0' },
-  { value: 1, label: 'Stake Secured', desc: 'DRB-selected validator with stake collateral', minBounty: '10' },
-  { value: 2, label: 'TEE Attested', desc: 'Hardware-attested execution verification', minBounty: '1' },
-  { value: 3, label: 'Hybrid', desc: 'Combines stake + TEE for maximum security', minBounty: '10' },
-] as const;
+const MODEL_INFO: Record<number, { desc: string; minBounty: string }> = {
+  0: { desc: 'Lightweight, aggregated feedback scores', minBounty: '0' },
+  1: { desc: 'DRB-selected validator with stake collateral', minBounty: '10' },
+  2: { desc: 'Hardware-attested execution verification', minBounty: '1' },
+  3: { desc: 'Combines stake + TEE for maximum security', minBounty: '10' },
+};
 
 const DEADLINE_OPTIONS = [
   { label: '24 hours', seconds: 86400 },
@@ -24,6 +28,23 @@ const DEADLINE_OPTIONS = [
 
 function isValidBytes32(value: string): boolean {
   return /^0x[0-9a-fA-F]{64}$/.test(value);
+}
+
+function useAgentValidationModel(agentId: string) {
+  const enabled = !!agentId && parseInt(agentId) > 0;
+  const { data, isLoading, error } = useReadContract({
+    address: CONTRACTS.identityRegistry,
+    abi: TALIdentityRegistryV2ABI,
+    functionName: 'getAgentValidationModel',
+    args: enabled ? [BigInt(agentId)] : undefined,
+    query: { enabled },
+  });
+
+  return {
+    model: data !== undefined ? Number(data) : undefined,
+    isLoading: enabled && isLoading,
+    error,
+  };
 }
 
 export default function RequestValidationPage() {
@@ -51,12 +72,16 @@ function RequestValidationContent() {
   const [agentId, setAgentId] = useState(searchParams.get('agentId') || '');
   const [taskHash, setTaskHash] = useState('');
   const [outputHash, setOutputHash] = useState('');
-  const [model, setModel] = useState(0);
   const [bountyAmount, setBountyAmount] = useState('');
   const [deadlineSeconds, setDeadlineSeconds] = useState(86400);
 
-  const selectedModel = VALIDATION_MODELS[model];
-  const minBounty = selectedModel.minBounty;
+  // Auto-detect validation model from agent's on-chain registration
+  const { model: agentModel, isLoading: modelLoading } = useAgentValidationModel(agentId);
+
+  const effectiveModel = agentModel ?? 0;
+  const modelInfo = MODEL_INFO[effectiveModel] ?? MODEL_INFO[0];
+  const minBounty = modelInfo.minBounty;
+  const isComingSoon = effectiveModel === 2 || effectiveModel === 3;
 
   // Redirect after success
   useEffect(() => {
@@ -73,6 +98,7 @@ function RequestValidationContent() {
 
     if (!agentId || !taskHash || !outputHash) return;
     if (!isValidBytes32(taskHash) || !isValidBytes32(outputHash)) return;
+    if (isComingSoon) return;
 
     const bounty = bountyAmount || '0';
     if (parseFloat(bounty) < parseFloat(minBounty)) return;
@@ -81,7 +107,7 @@ function RequestValidationContent() {
       agentId: BigInt(agentId),
       taskHash: taskHash as `0x${string}`,
       outputHash: outputHash as `0x${string}`,
-      model,
+      model: effectiveModel,
       deadline: BigInt(Math.floor(Date.now() / 1000) + deadlineSeconds),
       bountyWei: parseEther(bounty),
     });
@@ -197,58 +223,68 @@ function RequestValidationContent() {
           </div>
         </div>
 
-        {/* Validation Model */}
+        {/* Validation Model (auto-detected) */}
         <div className="card">
           <h2 className="mb-4 text-lg font-semibold text-white">
             <Shield className="mr-2 inline h-5 w-5" />
             Validation Model
           </h2>
 
-          <div className="space-y-3">
-            {VALIDATION_MODELS.map((m) => {
-              const comingSoon = m.value === 2 || m.value === 3;
-              return (
-                <label
-                  key={m.value}
-                  className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
-                    comingSoon
-                      ? 'cursor-not-allowed border-white/5 opacity-50'
-                      : model === m.value
-                        ? 'cursor-pointer border-[#38BDF8]/50 bg-[#38BDF8]/10'
-                        : 'cursor-pointer border-white/10 hover:border-white/20'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="model"
-                    value={m.value}
-                    checked={model === m.value}
-                    disabled={comingSoon}
-                    onChange={() => setModel(m.value)}
-                    className="mt-0.5 accent-[#38BDF8]"
-                  />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-white">
-                        {m.label}
-                      </p>
-                      {comingSoon && (
-                        <span className="rounded bg-zinc-700 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
-                          Coming soon
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-zinc-500">{m.desc}</p>
-                    {m.minBounty !== '0' && !comingSoon && (
-                      <p className="mt-1 text-xs text-amber-400">
-                        Minimum bounty: {m.minBounty} TON
-                      </p>
+          {!agentId ? (
+            <div className="rounded-lg bg-white/5 p-4 text-center">
+              <p className="text-sm text-zinc-500">
+                Enter an Agent ID above to detect its validation model.
+              </p>
+            </div>
+          ) : modelLoading ? (
+            <div className="rounded-lg bg-white/5 p-4 text-center">
+              <p className="text-sm text-zinc-500">
+                Loading agent validation model...
+              </p>
+            </div>
+          ) : (
+            <div className={`rounded-lg border p-4 ${isComingSoon ? 'border-amber-500/20 bg-amber-500/5' : 'border-[#38BDF8]/30 bg-[#38BDF8]/5'}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className={`${getValidationModelColor(effectiveModel)} text-sm`}>
+                      {getValidationModelLabel(effectiveModel)}
+                    </span>
+                    {isComingSoon && (
+                      <span className="rounded bg-zinc-700 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+                        Coming soon
+                      </span>
                     )}
                   </div>
-                </label>
-              );
-            })}
-          </div>
+                  <p className="mt-1 text-xs text-zinc-500">{modelInfo.desc}</p>
+                </div>
+                {effectiveModel > 0 && !isComingSoon && (
+                  <div className="text-right">
+                    <p className="text-xs text-zinc-500">Min bounty</p>
+                    <p className="text-sm font-medium text-amber-400">{minBounty} TON</p>
+                  </div>
+                )}
+              </div>
+
+              {isComingSoon && (
+                <div className="mt-3 flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-400">
+                    {effectiveModel === 2
+                      ? 'TEE Attested validation requires TEE infrastructure that is not yet deployed. This agent cannot be validated until TEE provider support is live.'
+                      : 'Hybrid validation requires both TEE infrastructure and DRB validator selection, which are not yet deployed.'}
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-3 flex items-start gap-2">
+                <Info className="h-3.5 w-3.5 text-zinc-600 flex-shrink-0 mt-0.5" />
+                <p className="text-[11px] text-zinc-600">
+                  The validation model is determined by the agent&apos;s on-chain registration and cannot be changed per request.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Bounty */}
@@ -268,12 +304,13 @@ function RequestValidationContent() {
               value={bountyAmount}
               onChange={(e) => setBountyAmount(e.target.value)}
               required
+              disabled={isComingSoon}
               placeholder={`Min: ${minBounty} TON`}
-              className="mt-1 w-full bg-white/5 border-white/10 text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:ring-1 focus:ring-[#38BDF8]/50 rounded-lg border px-3 py-2 text-sm focus:outline-none"
+              className="mt-1 w-full bg-white/5 border-white/10 text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:ring-1 focus:ring-[#38BDF8]/50 rounded-lg border px-3 py-2 text-sm focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             />
             {bountyAmount && parseFloat(bountyAmount) < parseFloat(minBounty) && (
               <p className="mt-1 text-xs text-red-500">
-                Minimum bounty for {selectedModel.label} is {minBounty} TON.
+                Minimum bounty for {getValidationModelLabel(effectiveModel)} is {minBounty} TON.
               </p>
             )}
           </div>
@@ -313,11 +350,12 @@ function RequestValidationContent() {
                 key={opt.seconds}
                 type="button"
                 onClick={() => setDeadlineSeconds(opt.seconds)}
+                disabled={isComingSoon}
                 className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
                   deadlineSeconds === opt.seconds
                     ? 'border-[#38BDF8]/50 bg-[#38BDF8]/10 font-medium text-[#38BDF8]'
                     : 'border-white/10 bg-white/5 text-zinc-300 hover:border-white/20'
-                }`}
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {opt.label}
               </button>
@@ -347,7 +385,8 @@ function RequestValidationContent() {
               !bountyAmount ||
               parseFloat(bountyAmount) < parseFloat(minBounty) ||
               isPending ||
-              isConfirming
+              isConfirming ||
+              isComingSoon
             }
             className="btn-primary flex items-center gap-2"
           >

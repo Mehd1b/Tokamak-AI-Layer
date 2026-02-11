@@ -23,8 +23,42 @@ import {
   getStatusColor,
   formatBigInt,
 } from '@/lib/utils';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toHex } from 'viem';
+
+function useCountdown(deadline: bigint | undefined) {
+  const [remaining, setRemaining] = useState('');
+
+  useEffect(() => {
+    if (!deadline || deadline === 0n) return;
+    const target = Number(deadline) * 1000;
+
+    const update = () => {
+      const diff = target - Date.now();
+      if (diff <= 0) {
+        setRemaining('Expired');
+        return;
+      }
+      const days = Math.floor(diff / 86400000);
+      const hours = Math.floor((diff % 86400000) / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+      const seconds = Math.floor((diff % 60000) / 1000);
+      if (days > 0) {
+        setRemaining(`${days}d ${hours}h ${minutes}m`);
+      } else if (hours > 0) {
+        setRemaining(`${hours}h ${minutes}m ${seconds}s`);
+      } else {
+        setRemaining(`${minutes}m ${seconds}s`);
+      }
+    };
+
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [deadline]);
+
+  return remaining;
+}
 
 function getScoreColor(score: number): string {
   if (score >= 80) return 'bg-green-500';
@@ -57,6 +91,10 @@ export default function ValidationDetailPage() {
 
   // Validation execution state
   const { validate, result: execResult, isValidating, error: execError, reset: resetExec } = useRequestValidation();
+
+  // Countdown timer for pending validations
+  const deadlineValue = validation ? validation[0].deadline : undefined;
+  const countdown = useCountdown(validation?.[0].status === 0 ? deadlineValue : undefined);
 
   // Dispute form state
   const { disputeValidation, hash: disputeHash, isPending: isDisputePending, isConfirming: isDisputeConfirming, isSuccess: isDisputeSuccess, error: disputeError } = useDisputeValidation();
@@ -209,6 +247,11 @@ export default function ValidationDetailPage() {
                     ? new Date(Number(validation[0].deadline) * 1000).toLocaleString()
                     : 'No deadline'}
                 </dd>
+                {validation[0].status === 0 && countdown && (
+                  <dd className={`mt-0.5 text-xs font-medium ${countdown === 'Expired' ? 'text-red-400' : 'text-amber-400'}`}>
+                    {countdown === 'Expired' ? 'Deadline expired' : `${countdown} remaining`}
+                  </dd>
+                )}
               </div>
               <div>
                 <dt className="text-sm text-zinc-500">Status</dt>

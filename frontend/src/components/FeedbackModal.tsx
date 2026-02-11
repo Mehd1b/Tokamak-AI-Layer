@@ -52,7 +52,7 @@ export function FeedbackModal({ agentId, agentOwner, onClose }: FeedbackModalPro
             </p>
             {hash && (
               <a
-                href={`https://sepolia-optimism.etherscan.io/tx/${hash}`}
+                href={`https://explorer.thanos-sepolia.tokamak.network/tx/${hash}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-2 inline-block text-xs text-[#38BDF8] underline"

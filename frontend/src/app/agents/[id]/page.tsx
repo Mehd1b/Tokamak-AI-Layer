@@ -10,8 +10,19 @@ import {
   CheckCircle,
   Play,
   FileText,
+  UserPlus,
+  UserMinus,
+  LogOut,
+  RefreshCw,
+  Clock,
+  Globe,
+  Link2,
+  Fingerprint,
+  Hash,
+  Cpu,
 } from 'lucide-react';
-import { useAgent } from '@/hooks/useAgent';
+import { useAgent, useCanReactivate, useReactivate } from '@/hooks/useAgent';
+import { useOperatorManagement } from '@/hooks/useOperatorManagement';
 import { useFeedbackCount, useClientList, useFeedbacks } from '@/hooks/useReputation';
 import { FeedbackList } from '@/components/FeedbackList';
 import { useAgentValidations, useValidationStats } from '@/hooks/useValidation';
@@ -21,9 +32,21 @@ import { useAgentFee } from '@/hooks/useTaskFee';
 import { TaskSubmission } from '@/components/TaskSubmission';
 import { formatEther } from 'viem';
 import { FeedbackModal } from '@/components/FeedbackModal';
-import { shortenAddress, getAgentStatusLabel, getAgentStatusColor, getAgentValidationModelLabel, getAgentValidationModelColor } from '@/lib/utils';
+import { shortenAddress, getAgentStatusLabel, getAgentStatusColor, getValidationModelLabel, getValidationModelColor } from '@/lib/utils';
 import { useState } from 'react';
+import { useWallet } from '@/hooks/useWallet';
 
+const SERVICE_TYPE_CONFIG: Record<string, { icon: typeof Globe; color: string; label: string }> = {
+  A2A: { icon: Link2, color: 'text-blue-400', label: 'Agent-to-Agent Protocol' },
+  MCP: { icon: Cpu, color: 'text-emerald-400', label: 'Model Context Protocol' },
+  OASF: { icon: Globe, color: 'text-purple-400', label: 'Open Agent Service Format' },
+  DID: { icon: Fingerprint, color: 'text-amber-400', label: 'Decentralized Identifier' },
+  ENS: { icon: Hash, color: 'text-cyan-400', label: 'Ethereum Name Service' },
+};
+
+function getServiceConfig(type: string) {
+  return SERVICE_TYPE_CONFIG[type] || { icon: Globe, color: 'text-zinc-400', label: type };
+}
 
 export default function AgentDetailPage() {
   const params = useParams();
@@ -37,8 +60,14 @@ export default function AgentDetailPage() {
   const { agent: runtimeAgent } = useRuntimeAgent(agentId?.toString());
   const { name: metaName, description: metaDescription, capabilities: metaCapabilities, talCapabilities: metaTalCapabilities, requestExample: metaRequestExample, services: metaServices, active: metaActive, pricing: metaPricing } = useAgentMetadata(agent?.agentURI);
   const { data: onChainFee } = useAgentFee(agentId);
+  const { address } = useWallet();
+  const { canReactivate } = useCanReactivate(agentId);
+  const { reactivate, isPending: isReactivating, isConfirming: isReactivateConfirming, isSuccess: isReactivateSuccess } = useReactivate();
+  const { removeOperator, operatorExit, isRemoving, isExiting } = useOperatorManagement();
   const [copied, setCopied] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [showAddOperator, setShowAddOperator] = useState(false);
+  const [newOperatorAddress, setNewOperatorAddress] = useState('');
 
   const copyAddress = (addr: string) => {
     navigator.clipboard.writeText(addr);
@@ -74,6 +103,7 @@ export default function AgentDetailPage() {
     '0x0000000000000000000000000000000000000000000000000000000000000000';
   const zeroAddr = '0x0000000000000000000000000000000000000000';
 
+  const isOwner = address && agent?.owner && address.toLowerCase() === agent.owner.toLowerCase();
   const hasRuntime = !!runtimeAgent || !!metaServices?.A2A;
   const agentDisplayName = metaName || runtimeAgent?.name || `Agent #${agentId?.toString()}`;
   const placeholder =
@@ -134,9 +164,9 @@ export default function AgentDetailPage() {
                 {getAgentStatusLabel(agent.status)}
               </span>
             )}
-            {agent.validationModel !== undefined && agent.validationModel > 0 && (
-              <span className={`${getAgentValidationModelColor(agent.validationModel)} flex items-center gap-1`}>
-                {getAgentValidationModelLabel(agent.validationModel)}
+            {agent.validationModel !== undefined && (
+              <span className={`${getValidationModelColor(agent.validationModel)} flex items-center gap-1`}>
+                {getValidationModelLabel(agent.validationModel)}
               </span>
             )}
             {agent.isVerifiedOperator && (
@@ -145,11 +175,40 @@ export default function AgentDetailPage() {
               </span>
             )}
             {agent.zkIdentity && agent.zkIdentity !== zeroBytes && (
-              <span className="badge-info">ZK Identity</span>
+              <span className="badge-info flex items-center gap-1" title="This agent has a zero-knowledge verified identity commitment on-chain">
+                <Fingerprint className="h-3 w-3" /> ZK-Verified Identity
+              </span>
             )}
           </div>
         </div>
       </div>
+
+      {/* Reactivation Banner */}
+      {agent.status === 1 && isOwner && (
+        <div className="mb-6 card border-amber-500/20 bg-amber-500/10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Clock className="h-5 w-5 text-amber-400" />
+              <div>
+                <p className="text-sm font-medium text-amber-400">Agent is Paused</p>
+                <p className="text-xs text-amber-300">
+                  {canReactivate
+                    ? 'Cooldown period has elapsed. You can reactivate this agent.'
+                    : 'Cooldown period has not elapsed yet.'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => agentId && reactivate(agentId)}
+              disabled={!canReactivate || isReactivating || isReactivateConfirming}
+              className="btn-primary flex items-center gap-1.5 text-sm"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isReactivating || isReactivateConfirming ? 'animate-spin' : ''}`} />
+              {isReactivating ? 'Confirm...' : isReactivateConfirming ? 'Reactivating...' : isReactivateSuccess ? 'Reactivated!' : 'Reactivate'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Details Grid */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -181,7 +240,7 @@ export default function AgentDetailPage() {
               <dt className="text-sm text-zinc-500">Validation Model</dt>
               <dd className="mt-1 text-sm text-white">
                 {agent.validationModel !== undefined
-                  ? getAgentValidationModelLabel(agent.validationModel)
+                  ? getValidationModelLabel(agent.validationModel)
                   : 'Reputation Only'}
               </dd>
             </div>
@@ -281,29 +340,92 @@ export default function AgentDetailPage() {
       {/* Operators (V2) */}
       {agent.operators && agent.operators.length > 0 && (
         <div className="mt-6 card">
-          <h2 className="mb-4 text-lg font-semibold text-white">
-            Operators ({agent.operators.length})
-          </h2>
-          <div className="space-y-2">
-            {agent.operators.map((op, idx) => (
-              <div
-                key={op}
-                className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2"
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-white">
+              Operators ({agent.operators.length})
+            </h2>
+            {isOwner && (
+              <button
+                onClick={() => setShowAddOperator(!showAddOperator)}
+                className="btn-secondary flex items-center gap-1 text-xs"
               >
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-500">#{idx + 1}</span>
-                  <span className="text-sm font-mono text-white">
-                    {shortenAddress(op)}
-                  </span>
-                </div>
+                <UserPlus className="h-3 w-3" /> Add Operator
+              </button>
+            )}
+          </div>
+
+          {/* Add Operator Form */}
+          {showAddOperator && isOwner && (
+            <div className="mb-4 rounded-lg border border-white/10 bg-white/5 p-3">
+              <p className="mb-2 text-xs text-zinc-400">
+                External operators must sign an EIP-712 consent separately (via SDK). Enter the operator address to register.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newOperatorAddress}
+                  onChange={(e) => setNewOperatorAddress(e.target.value)}
+                  placeholder="0x... operator address"
+                  className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-mono text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none"
+                />
                 <button
-                  onClick={() => copyAddress(op)}
-                  className="text-zinc-600 hover:text-zinc-400"
+                  onClick={() => setShowAddOperator(false)}
+                  className="btn-secondary text-xs"
                 >
-                  <Copy className="h-3.5 w-3.5" />
+                  Cancel
                 </button>
               </div>
-            ))}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {agent.operators.map((op, idx) => {
+              const isOperatorSelf = address?.toLowerCase() === op.toLowerCase();
+              return (
+                <div
+                  key={op}
+                  className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-zinc-500">#{idx + 1}</span>
+                    <span className="text-sm font-mono text-white">
+                      {shortenAddress(op)}
+                    </span>
+                    {isOperatorSelf && (
+                      <span className="rounded bg-[#38BDF8]/20 px-1.5 py-0.5 text-[10px] text-[#38BDF8]">You</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => copyAddress(op)}
+                      className="text-zinc-600 hover:text-zinc-400"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                    {isOwner && (
+                      <button
+                        onClick={() => agentId && removeOperator(agentId, op as `0x${string}`)}
+                        disabled={isRemoving}
+                        className="text-zinc-600 hover:text-red-400"
+                        title="Remove operator"
+                      >
+                        <UserMinus className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {isOperatorSelf && !isOwner && (
+                      <button
+                        onClick={() => agentId && operatorExit(agentId)}
+                        disabled={isExiting}
+                        className="text-zinc-600 hover:text-amber-400"
+                        title="Exit as operator"
+                      >
+                        <LogOut className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -341,17 +463,27 @@ export default function AgentDetailPage() {
             Service Endpoints
           </h2>
           <div className="space-y-2">
-            {Object.entries(metaServices).map(([type, url]) => (
-              <div key={type} className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2">
-                <div className="min-w-0 flex-1">
-                  <span className="text-sm font-medium text-zinc-300">{type}:</span>{' '}
-                  <span className="text-sm text-zinc-400 break-all">{url}</span>
+            {Object.entries(metaServices).map(([type, url]) => {
+              const config = getServiceConfig(type);
+              const ServiceIcon = config.icon;
+              return (
+                <div key={type} className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2">
+                  <div className="min-w-0 flex-1 flex items-center gap-2">
+                    <ServiceIcon className={`h-4 w-4 flex-shrink-0 ${config.color}`} />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-sm font-medium ${config.color}`}>{type}</span>
+                        <span className="text-[10px] text-zinc-600">{config.label}</span>
+                      </div>
+                      <span className="text-sm text-zinc-400 break-all">{url}</span>
+                    </div>
+                  </div>
+                  <a href={url} target="_blank" rel="noopener noreferrer" className="ml-2 text-[#38BDF8] hover:text-[#38BDF8] flex-shrink-0">
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
                 </div>
-                <a href={url} target="_blank" rel="noopener noreferrer" className="ml-2 text-[#38BDF8] hover:text-[#38BDF8] flex-shrink-0">
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

@@ -118,6 +118,9 @@ export default function ReputationPage() {
                 <p className="text-xl font-bold text-white">{formatAverage(standardSummary)}</p>
                 <p className="text-xs text-zinc-500">Weighted Score</p>
                 <p className="text-xs text-zinc-600 mt-1">Range: {formatRange(standardSummary)}</p>
+                <p className="text-[10px] text-zinc-700 mt-2">
+                  Uses standard summary as proxy (stake-weighted API not yet available)
+                </p>
               </div>
             </div>
 

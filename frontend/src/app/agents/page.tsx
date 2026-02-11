@@ -2,13 +2,15 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Search, ChevronRight, Star, ArrowUpDown } from 'lucide-react';
+import { Search, ChevronRight, Star, ArrowUpDown, Filter, X } from 'lucide-react';
 import { useAgentCount, useAgentList } from '@/hooks/useAgent';
 import { useAgentMetadata } from '@/hooks/useAgentMetadata';
 import { useAgentRatings } from '@/hooks/useReputation';
-import { shortenAddress, getAgentStatusLabel, getAgentStatusColor, getAgentValidationModelLabel } from '@/lib/utils';
+import { shortenAddress, getAgentStatusLabel, getAgentStatusColor, getValidationModelLabel, getValidationModelColor } from '@/lib/utils';
 
 type SortOption = 'newest' | 'rating' | 'reviews';
+type StatusFilter = 'all' | 0 | 1 | 2;
+type ModelFilter = 'all' | 0 | 1 | 2 | 3;
 
 interface AgentCardProps {
   agentId: number;
@@ -23,22 +25,17 @@ interface AgentCardProps {
 function AgentCard({ agentId, owner, agentURI, averageScore, feedbackCount, status, validationModel }: AgentCardProps) {
   const { name, description, active, services, isLoading, error } = useAgentMetadata(agentURI);
 
-  // Hide agents with no URI, failed metadata, inactive status, or localhost endpoints
-  if (!isLoading) {
-    if (!agentURI) return null;
-    if (!name && !error) return null;
-    if (error && !name) return null;
-    if (active === false) return null;
-    const serviceUrls = Object.values(services || {}).join(' ');
-    if (serviceUrls.includes('localhost') || serviceUrls.includes('127.0.0.1')) return null;
-  }
+  const hasNoMetadata = !isLoading && !agentURI;
+  const metadataFailed = !isLoading && error && !name;
+  const isInactive = !isLoading && active === false;
+  const isDegraded = hasNoMetadata || metadataFailed || isInactive;
 
   const statusDotColor = status === 0 ? 'bg-emerald-400' : status === 1 ? 'bg-amber-400' : 'bg-red-400';
 
   return (
     <Link
       href={`/agents/${agentId}`}
-      className="card flex items-center justify-between transition-all hover:border-[#38BDF8]/30 hover:-translate-y-1"
+      className={`card flex items-center justify-between transition-all hover:border-[#38BDF8]/30 hover:-translate-y-1 ${isDegraded ? 'opacity-60' : ''}`}
     >
       <div className="flex flex-1 min-w-0 items-center gap-4">
         <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-[#38BDF8]/20 text-[#38BDF8] font-bold">
@@ -50,9 +47,22 @@ function AgentCard({ agentId, owner, agentURI, averageScore, feedbackCount, stat
             <h3 className="font-semibold text-white truncate">
               {isLoading ? 'Loading...' : name || `Agent #${agentId}`}
             </h3>
-            {validationModel > 0 && (
-              <span className="hidden sm:inline-flex rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400">
-                {getAgentValidationModelLabel(validationModel)}
+            <span className={`hidden sm:inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium ${getValidationModelColor(validationModel)}`}>
+              {getValidationModelLabel(validationModel)}
+            </span>
+            {hasNoMetadata && (
+              <span className="hidden sm:inline-flex rounded bg-zinc-700 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400">
+                No Metadata
+              </span>
+            )}
+            {metadataFailed && (
+              <span className="hidden sm:inline-flex rounded bg-zinc-700 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400">
+                Metadata Unavailable
+              </span>
+            )}
+            {isInactive && (
+              <span className="hidden sm:inline-flex rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">
+                Inactive
               </span>
             )}
           </div>
@@ -83,6 +93,9 @@ function AgentCard({ agentId, owner, agentURI, averageScore, feedbackCount, stat
 export default function AgentsPage() {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortOption>('newest');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [modelFilter, setModelFilter] = useState<ModelFilter>('all');
+  const [showFilters, setShowFilters] = useState(false);
   const { count, isLoading: countLoading } = useAgentCount();
   const agentCount = count ? Number(count) : 0;
   const { agents, isLoading: agentsLoading } = useAgentList(agentCount);
@@ -90,8 +103,20 @@ export default function AgentsPage() {
   const agentIds = useMemo(() => agents.map((a) => a.agentId), [agents]);
   const { ratings } = useAgentRatings(agentIds);
 
+  const activeFilterCount = (statusFilter !== 'all' ? 1 : 0) + (modelFilter !== 'all' ? 1 : 0);
+
   const filteredAndSortedAgents = useMemo(() => {
     let result = agents;
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      result = result.filter((agent) => agent.status === statusFilter);
+    }
+
+    // Apply model filter
+    if (modelFilter !== 'all') {
+      result = result.filter((agent) => agent.validationModel === modelFilter);
+    }
 
     if (search.trim()) {
       const searchLower = search.toLowerCase();
@@ -121,7 +146,7 @@ export default function AgentsPage() {
     // 'newest' = default order (highest ID first, already the order from useAgentList)
 
     return result;
-  }, [agents, search, sort, ratings]);
+  }, [agents, search, sort, ratings, statusFilter, modelFilter]);
 
   const isLoading = countLoading || agentsLoading;
 
@@ -146,7 +171,7 @@ export default function AgentsPage() {
         </div>
       </div>
 
-      {/* Search + Sort */}
+      {/* Search + Sort + Filters */}
       <div className="card mb-8">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
@@ -160,6 +185,18 @@ export default function AgentsPage() {
             />
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`btn-secondary flex items-center gap-1.5 text-sm ${activeFilterCount > 0 ? 'border-[#38BDF8]/50 text-[#38BDF8]' : ''}`}
+            >
+              <Filter className="h-3.5 w-3.5" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#38BDF8] text-[10px] font-bold text-black">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
             <ArrowUpDown className="h-4 w-4 text-zinc-500" />
             <select
               value={sort}
@@ -172,7 +209,58 @@ export default function AgentsPage() {
             </select>
           </div>
         </div>
-        {search && (
+
+        {/* Filter Row */}
+        {showFilters && (
+          <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-white/10 pt-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-zinc-500">Status:</span>
+              <div className="flex gap-1">
+                {([['all', 'All'], [0, 'Active'], [1, 'Paused'], [2, 'Deregistered']] as const).map(([value, label]) => (
+                  <button
+                    key={String(value)}
+                    onClick={() => setStatusFilter(value as StatusFilter)}
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                      statusFilter === value
+                        ? 'bg-[#38BDF8]/20 text-[#38BDF8]'
+                        : 'bg-white/5 text-zinc-400 hover:bg-white/10'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-zinc-500">Model:</span>
+              <div className="flex gap-1">
+                {([['all', 'All'], [0, 'Reputation'], [1, 'Stake'], [2, 'TEE'], [3, 'Hybrid']] as const).map(([value, label]) => (
+                  <button
+                    key={String(value)}
+                    onClick={() => setModelFilter(value as ModelFilter)}
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                      modelFilter === value
+                        ? 'bg-[#38BDF8]/20 text-[#38BDF8]'
+                        : 'bg-white/5 text-zinc-400 hover:bg-white/10'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {activeFilterCount > 0 && (
+              <button
+                onClick={() => { setStatusFilter('all'); setModelFilter('all'); }}
+                className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300"
+              >
+                <X className="h-3 w-3" /> Clear filters
+              </button>
+            )}
+          </div>
+        )}
+
+        {(search || activeFilterCount > 0) && (
           <p className="mt-2 text-sm text-zinc-500">
             Showing {filteredAndSortedAgents.length} of {agents.length} agents
           </p>

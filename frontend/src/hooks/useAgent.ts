@@ -1,6 +1,6 @@
 'use client';
 
-import { useReadContract, useReadContracts } from 'wagmi';
+import { useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { CONTRACTS } from '@/lib/contracts';
 import { TALIdentityRegistryABI } from '../../../sdk/src/abi/TALIdentityRegistry';
 import { TALIdentityRegistryV2ABI } from '../../../sdk/src/abi/TALIdentityRegistryV2';
@@ -201,4 +201,35 @@ export function useAgentList(count: number) {
     agents,
     isLoading,
   };
+}
+
+export function useCanReactivate(agentId: bigint | undefined) {
+  const enabled = agentId !== undefined;
+  const { data } = useReadContract({
+    address: CONTRACTS.identityRegistry,
+    abi: TALIdentityRegistryV2ABI,
+    functionName: 'canReactivate',
+    args: enabled ? [agentId] : undefined,
+    query: { enabled },
+  });
+
+  return {
+    canReactivate: data as boolean | undefined,
+  };
+}
+
+export function useReactivate() {
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  const reactivate = (agentId: bigint) => {
+    writeContract({
+      address: CONTRACTS.identityRegistry,
+      abi: TALIdentityRegistryV2ABI,
+      functionName: 'reactivate',
+      args: [agentId],
+    });
+  };
+
+  return { reactivate, hash, isPending, isConfirming, isSuccess, error };
 }
