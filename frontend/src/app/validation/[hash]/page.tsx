@@ -115,7 +115,7 @@ export default function ValidationDetailPage() {
     if (!validation) return;
     const agentId = validation[0].agentId.toString();
     const taskId = validation[0].taskHash;
-    await validate(agentId, taskId);
+    await validate(agentId, taskId, hash);
   };
 
   const handleDisputeSubmit = () => {
