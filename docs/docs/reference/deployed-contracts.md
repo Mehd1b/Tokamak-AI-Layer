@@ -19,7 +19,7 @@ The core TAL protocol contracts are deployed on Thanos Sepolia, a Tokamak Networ
 | StakingIntegrationModule | [`0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30`](https://explorer.thanos-sepolia.tokamak.network/address/0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30) | Stake queries, slashing, seigniorage routing |
 | TaskFeeEscrow | [`0x6D68Cd8fD89BF1746A1948783C92A00E591d1227`](https://explorer.thanos-sepolia.tokamak.network/address/0x6D68Cd8fD89BF1746A1948783C92A00E591d1227) | Native TON task fee escrow with refund support |
 | WSTON (L2 Bridged) | [`0x4d7b29213c9ad19a2aaa01e3ccf6f209636a786f`](https://explorer.thanos-sepolia.tokamak.network/address/0x4d7b29213c9ad19a2aaa01e3ccf6f209636a786f) | Bridged WrappedStakedTON (ERC-20, 27 decimals) via OptimismMintableERC20Factory |
-| WSTONVault | *Pending deployment* | L2 vault for locking bridged WSTON with slashing support |
+| WSTONVault | [`0x6aa6a7B9e51B636417025403053855B788107C27`](https://explorer.thanos-sepolia.tokamak.network/address/0x6aa6a7B9e51B636417025403053855B788107C27) | L2 vault for locking bridged WSTON with slashing support |
 
 ## Ethereum Sepolia L1
 

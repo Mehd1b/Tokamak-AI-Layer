@@ -13,6 +13,7 @@ import {
   CheckCircle,
   Loader2,
   ExternalLink,
+  ArrowRight,
 } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
 import { formatEther, formatUnits, parseEther, parseUnits } from 'viem';
@@ -32,6 +33,9 @@ import {
   useClaimableAmount,
   useWithdrawalRequestCount,
   toWTONAmount,
+  useWSTONAllowanceForBridge,
+  useApproveWSTONForBridge,
+  useBridgeWSTON,
 } from '@/hooks/useStaking';
 import {
   useLockedBalance,
@@ -45,6 +49,9 @@ import {
   useVaultWithdrawalRequestCount,
   useVaultReadyAmount,
   tierLabel,
+  useL2WSTONAllowanceForBridge,
+  useApproveL2WSTONForBridge,
+  useWithdrawWSTONToL1,
 } from '@/hooks/useVault';
 
 export default function StakingPage() {
@@ -54,7 +61,9 @@ export default function StakingPage() {
   const [tokenMode, setTokenMode] = useState<'TON' | 'WTON'>('WTON');
   const [vaultLockAmount, setVaultLockAmount] = useState('');
   const [vaultUnlockAmount, setVaultUnlockAmount] = useState('');
-  const [activeTab, setActiveTab] = useState<'l1' | 'l2'>('l1');
+  const [bridgeAmount, setBridgeAmount] = useState('');
+  const [bridgeDirection, setBridgeDirection] = useState<'l1-to-l2' | 'l2-to-l1'>('l1-to-l2');
+  const [activeTab, setActiveTab] = useState<'l1' | 'bridge' | 'l2'>('l1');
   const isWTONMode = tokenMode === 'WTON';
 
   // --- Read state ---
@@ -150,6 +159,42 @@ export default function StakingPage() {
     isConfirming: isProcessConfirming,
     isSuccess: isProcessSuccess,
   } = useProcessVaultUnlock();
+
+  // --- Bridge hooks ---
+  const { data: wstonBridgeAllowance } = useWSTONAllowanceForBridge(address);
+
+  const {
+    approve: approveWSTONBridge,
+    isPending: isApprovingBridge,
+    isConfirming: isApproveBridgeConfirming,
+    isSuccess: isApproveBridgeSuccess,
+  } = useApproveWSTONForBridge();
+
+  const {
+    bridge: bridgeWSTON,
+    isPending: isBridging,
+    isConfirming: isBridgeConfirming,
+    isSuccess: isBridgeSuccess,
+    error: bridgeError,
+  } = useBridgeWSTON();
+
+  // --- L2 → L1 Bridge hooks ---
+  const { data: l2WstonBridgeAllowance } = useL2WSTONAllowanceForBridge(address);
+
+  const {
+    approve: approveL2WSTONBridge,
+    isPending: isApprovingL2Bridge,
+    isConfirming: isApproveL2BridgeConfirming,
+    isSuccess: isApproveL2BridgeSuccess,
+  } = useApproveL2WSTONForBridge();
+
+  const {
+    withdraw: withdrawWSTONToL1,
+    isPending: isWithdrawingToL1,
+    isConfirming: isWithdrawToL1Confirming,
+    isSuccess: isWithdrawToL1Success,
+    error: withdrawToL1Error,
+  } = useWithdrawWSTONToL1();
 
   // --- Formatting helpers ---
   const formatBalance = (value: bigint | undefined, decimals = 18) => {
@@ -249,7 +294,7 @@ export default function StakingPage() {
 
   // --- L2 Vault handlers ---
   const vaultLockBigInt = vaultLockAmount && parseFloat(vaultLockAmount) > 0
-    ? parseEther(vaultLockAmount)
+    ? parseUnits(vaultLockAmount, 27)
     : 0n;
 
   const needsL2Approval =
@@ -269,7 +314,7 @@ export default function StakingPage() {
 
   const handleVaultUnlock = () => {
     if (!vaultUnlockAmount || parseFloat(vaultUnlockAmount) <= 0) return;
-    vaultRequestUnlock(parseEther(vaultUnlockAmount));
+    vaultRequestUnlock(parseUnits(vaultUnlockAmount, 27));
   };
 
   const isAnyVaultLockPending = isApprovingL2WSTON || isApproveL2WSTONConfirming || isLocking || isLockConfirming;
@@ -295,6 +340,16 @@ export default function StakingPage() {
           }`}
         >
           L1 Wrapping
+        </button>
+        <button
+          onClick={() => setActiveTab('bridge')}
+          className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'bridge'
+              ? 'bg-white/10 text-[#38BDF8] shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          Bridge
         </button>
         <button
           onClick={() => setActiveTab('l2')}
@@ -668,51 +723,345 @@ export default function StakingPage() {
         </div>
       </div>
 
-      {/* Bridge Info Card */}
-      <div className="mt-8 card border-[#38BDF8]/20 bg-[#38BDF8]/5">
-        <div className="flex items-start gap-3">
-          <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#38BDF8]" />
-          <div>
-            <h3 className="font-semibold text-white">
-              Bridge WSTON to L2
-            </h3>
-            <p className="mt-1 text-sm text-zinc-400">
-              After wrapping your TON/WTON into WSTON, bridge your WSTON tokens
-              to Thanos Sepolia (L2) using the Tokamak Bridge Portal. Once on L2,
-              you can lock WSTON in the vault to participate in agent validation
-              and earn rewards.
-            </p>
-            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-              <div className="rounded-lg bg-white/5 p-3">
-                <p className="text-xs font-medium text-zinc-500">
-                  Step 1
-                </p>
-                <p className="text-sm font-bold text-white">Wrap to WSTON</p>
-                <p className="text-xs text-zinc-500">On L1 Sepolia (this page)</p>
+      </>}
+
+      {/* ======================== BRIDGE TAB ======================== */}
+      {activeTab === 'bridge' && <>
+
+      {/* Network warning */}
+      {isConnected && bridgeDirection === 'l1-to-l2' && !isL1 && (
+        <div className="card mb-6 border-amber-500/20 bg-amber-500/10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-400" />
+              <p className="text-sm text-amber-400">
+                L1 → L2 bridging requires Sepolia. Please switch networks.
+              </p>
+            </div>
+            <button onClick={switchToL1} className="rounded-lg bg-amber-500 px-3 py-1 text-xs font-medium text-white hover:bg-amber-600">
+              Switch to L1 Sepolia
+            </button>
+          </div>
+        </div>
+      )}
+      {isConnected && bridgeDirection === 'l2-to-l1' && !isL2 && (
+        <div className="card mb-6 border-amber-500/20 bg-amber-500/10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-400" />
+              <p className="text-sm text-amber-400">
+                L2 → L1 bridging requires Thanos Sepolia. Please switch networks.
+              </p>
+            </div>
+            <button onClick={switchToL2} className="rounded-lg bg-amber-500 px-3 py-1 text-xs font-medium text-white hover:bg-amber-600">
+              Switch to L2
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        {/* Bridge Portal Card */}
+        <div className="card">
+          {/* Direction toggle */}
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ArrowRight className="h-5 w-5 text-[#38BDF8]" />
+              <h2 className="text-lg font-semibold text-white">Bridge WSTON</h2>
+            </div>
+            <div className="flex items-center rounded-lg border border-white/10 bg-white/5 p-0.5">
+              <button
+                onClick={() => { setBridgeDirection('l1-to-l2'); setBridgeAmount(''); }}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                  bridgeDirection === 'l1-to-l2'
+                    ? 'bg-white/10 text-[#38BDF8] shadow-sm'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                L1 → L2
+              </button>
+              <button
+                onClick={() => { setBridgeDirection('l2-to-l1'); setBridgeAmount(''); }}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                  bridgeDirection === 'l2-to-l1'
+                    ? 'bg-white/10 text-[#38BDF8] shadow-sm'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                L2 → L1
+              </button>
+            </div>
+          </div>
+
+          <p className="mb-4 text-sm text-zinc-400">
+            {bridgeDirection === 'l1-to-l2'
+              ? 'Send L1 WSTON to Thanos Sepolia. Tokens arrive within ~1-3 minutes.'
+              : 'Withdraw L2 WSTON back to Ethereum Sepolia. Subject to ~24 min fault-proof period.'}
+          </p>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-zinc-300">Amount (WSTON)</label>
+              <div className="mt-1 flex gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.0"
+                  value={bridgeAmount}
+                  onChange={(e) => setBridgeAmount(e.target.value)}
+                  disabled={!isConnected || (bridgeDirection === 'l1-to-l2' ? !isL1 : !isL2)}
+                  className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50 disabled:bg-white/[0.02] disabled:text-zinc-600"
+                />
+                <button
+                  onClick={() => {
+                    if (bridgeDirection === 'l1-to-l2' && wstonBalance !== undefined) {
+                      setBridgeAmount(formatUnits(wstonBalance, 27));
+                    } else if (bridgeDirection === 'l2-to-l1' && l2WstonBalance !== undefined) {
+                      setBridgeAmount(formatUnits(l2WstonBalance, 27));
+                    }
+                  }}
+                  disabled={!isConnected || (bridgeDirection === 'l1-to-l2' ? !isL1 : !isL2)}
+                  className="rounded-lg bg-white/10 px-3 text-xs font-medium text-zinc-300 hover:bg-white/20 disabled:opacity-50"
+                >
+                  MAX
+                </button>
               </div>
-              <div className="rounded-lg bg-white/5 p-3">
-                <p className="text-xs font-medium text-zinc-500">
-                  Step 2
-                </p>
-                <p className="text-sm font-bold text-white">Bridge to L2</p>
-                <p className="text-xs text-zinc-500">Via Tokamak Bridge Portal</p>
-              </div>
-              <div className="rounded-lg bg-white/5 p-3">
-                <p className="text-xs font-medium text-zinc-500">
-                  Step 3
-                </p>
-                <p className="text-sm font-bold text-white">Lock in Vault</p>
-                <p className="text-xs text-zinc-500">On L2 (switch to L2 below)</p>
+              <p className="mt-1 text-xs text-zinc-500">
+                Available: {bridgeDirection === 'l1-to-l2'
+                  ? `${formatWTON(wstonBalance)} WSTON (L1)`
+                  : `${formatWTON(l2WstonBalance)} WSTON (L2)`}
+              </p>
+            </div>
+
+            {/* Bridge direction visual */}
+            <div className="rounded-lg bg-white/5 p-4">
+              <div className="flex items-center justify-between">
+                <div className="text-center">
+                  <p className="text-xs font-medium text-zinc-500">From</p>
+                  <p className="text-sm font-bold text-white">
+                    {bridgeDirection === 'l1-to-l2' ? 'L1 Sepolia' : 'L2 Thanos'}
+                  </p>
+                  <p className="text-xs text-zinc-500">
+                    {bridgeDirection === 'l1-to-l2' ? 'Ethereum' : 'Tokamak'}
+                  </p>
+                </div>
+                <div className="flex flex-col items-center">
+                  <ArrowRight className="h-5 w-5 text-[#38BDF8]" />
+                  <p className="mt-1 text-xs text-zinc-500">
+                    {bridgeAmount && parseFloat(bridgeAmount) > 0
+                      ? `${parseFloat(bridgeAmount).toLocaleString(undefined, { maximumFractionDigits: 4 })} WSTON`
+                      : '\u2014'}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs font-medium text-zinc-500">To</p>
+                  <p className="text-sm font-bold text-white">
+                    {bridgeDirection === 'l1-to-l2' ? 'L2 Thanos' : 'L1 Sepolia'}
+                  </p>
+                  <p className="text-xs text-zinc-500">
+                    {bridgeDirection === 'l1-to-l2' ? 'Tokamak' : 'Ethereum'}
+                  </p>
+                </div>
               </div>
             </div>
-            <a
-              href="https://bridge.tokamak.network"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-[#38BDF8] hover:underline"
-            >
-              Open Tokamak Bridge Portal <ExternalLink className="h-3 w-3" />
-            </a>
+
+            {/* Step indicator — L1 → L2 */}
+            {bridgeDirection === 'l1-to-l2' && bridgeAmount && parseFloat(bridgeAmount) > 0 && (() => {
+              const bridgeBigInt = parseUnits(bridgeAmount, 27);
+              const needsApproval =
+                wstonBridgeAllowance !== undefined &&
+                !isApproveBridgeSuccess &&
+                wstonBridgeAllowance < bridgeBigInt;
+              return (
+                <div className="space-y-1 rounded-lg bg-white/5 p-3">
+                  <p className="text-xs font-medium text-zinc-400">Bridge steps:</p>
+                  <StepLine label="1. Approve WSTON for bridge" done={!needsApproval || isApproveBridgeSuccess} active={needsApproval && !isApproveBridgeSuccess} />
+                  <StepLine label="2. Bridge to L2" done={isBridgeSuccess} active={!needsApproval && !isBridgeSuccess} />
+                </div>
+              );
+            })()}
+
+            {/* Step indicator — L2 → L1 */}
+            {bridgeDirection === 'l2-to-l1' && bridgeAmount && parseFloat(bridgeAmount) > 0 && (() => {
+              const bridgeBigInt = parseUnits(bridgeAmount, 27);
+              const needsApproval =
+                l2WstonBridgeAllowance !== undefined &&
+                !isApproveL2BridgeSuccess &&
+                l2WstonBridgeAllowance < bridgeBigInt;
+              return (
+                <div className="space-y-1 rounded-lg bg-white/5 p-3">
+                  <p className="text-xs font-medium text-zinc-400">Withdraw steps:</p>
+                  <StepLine label="1. Approve WSTON for bridge" done={!needsApproval || isApproveL2BridgeSuccess} active={needsApproval && !isApproveL2BridgeSuccess} />
+                  <StepLine label="2. Initiate withdrawal" done={isWithdrawToL1Success} active={!needsApproval && !isWithdrawToL1Success} />
+                </div>
+              );
+            })()}
+
+            {/* Success messages */}
+            {bridgeDirection === 'l1-to-l2' && isBridgeSuccess && (
+              <div className="flex items-center gap-1 text-xs text-emerald-400">
+                <CheckCircle className="h-3 w-3" />
+                Bridge transaction submitted! Tokens will arrive on L2 within ~1-3 minutes.
+              </div>
+            )}
+            {bridgeDirection === 'l2-to-l1' && isWithdrawToL1Success && (
+              <div className="flex items-center gap-1 text-xs text-emerald-400">
+                <CheckCircle className="h-3 w-3" />
+                Withdrawal initiated! Tokens will be claimable on L1 after ~24 min fault-proof period.
+              </div>
+            )}
+
+            {/* Error messages */}
+            {bridgeDirection === 'l1-to-l2' && bridgeError && (
+              <p className="text-xs text-red-400">{bridgeError.message.substring(0, 120)}</p>
+            )}
+            {bridgeDirection === 'l2-to-l1' && withdrawToL1Error && (
+              <p className="text-xs text-red-400">{withdrawToL1Error.message.substring(0, 120)}</p>
+            )}
+
+            {/* L1 → L2 button */}
+            {bridgeDirection === 'l1-to-l2' && (
+              <button
+                onClick={() => {
+                  if (!bridgeAmount || parseFloat(bridgeAmount) <= 0 || !address) return;
+                  const bridgeBigInt = parseUnits(bridgeAmount, 27);
+                  const needsApproval =
+                    wstonBridgeAllowance !== undefined &&
+                    !isApproveBridgeSuccess &&
+                    wstonBridgeAllowance < bridgeBigInt;
+                  if (needsApproval) {
+                    approveWSTONBridge(bridgeBigInt);
+                  } else {
+                    bridgeWSTON(bridgeBigInt, address);
+                  }
+                }}
+                disabled={
+                  !isConnected || !isL1 || !bridgeAmount || parseFloat(bridgeAmount) <= 0 ||
+                  isApprovingBridge || isApproveBridgeConfirming || isBridging || isBridgeConfirming
+                }
+                className="btn-primary w-full"
+              >
+                {isApprovingBridge || isApproveBridgeConfirming ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Approving...
+                  </span>
+                ) : isBridging || isBridgeConfirming ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Bridging...
+                  </span>
+                ) : (() => {
+                  const bridgeBigInt = bridgeAmount && parseFloat(bridgeAmount) > 0
+                    ? parseUnits(bridgeAmount, 27) : 0n;
+                  const needsApproval = bridgeBigInt > 0n && wstonBridgeAllowance !== undefined &&
+                    !isApproveBridgeSuccess && wstonBridgeAllowance < bridgeBigInt;
+                  return needsApproval ? 'Step 1/2: Approve WSTON' : 'Step 2/2: Bridge to L2';
+                })()}
+              </button>
+            )}
+
+            {/* L2 → L1 button */}
+            {bridgeDirection === 'l2-to-l1' && (
+              <button
+                onClick={() => {
+                  if (!bridgeAmount || parseFloat(bridgeAmount) <= 0 || !address) return;
+                  const bridgeBigInt = parseUnits(bridgeAmount, 27);
+                  const needsApproval =
+                    l2WstonBridgeAllowance !== undefined &&
+                    !isApproveL2BridgeSuccess &&
+                    l2WstonBridgeAllowance < bridgeBigInt;
+                  if (needsApproval) {
+                    approveL2WSTONBridge(bridgeBigInt);
+                  } else {
+                    withdrawWSTONToL1(bridgeBigInt, address);
+                  }
+                }}
+                disabled={
+                  !isConnected || !isL2 || !bridgeAmount || parseFloat(bridgeAmount) <= 0 ||
+                  isApprovingL2Bridge || isApproveL2BridgeConfirming || isWithdrawingToL1 || isWithdrawToL1Confirming
+                }
+                className="btn-primary w-full"
+              >
+                {isApprovingL2Bridge || isApproveL2BridgeConfirming ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Approving...
+                  </span>
+                ) : isWithdrawingToL1 || isWithdrawToL1Confirming ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Withdrawing...
+                  </span>
+                ) : (() => {
+                  const bridgeBigInt = bridgeAmount && parseFloat(bridgeAmount) > 0
+                    ? parseUnits(bridgeAmount, 27) : 0n;
+                  const needsApproval = bridgeBigInt > 0n && l2WstonBridgeAllowance !== undefined &&
+                    !isApproveL2BridgeSuccess && l2WstonBridgeAllowance < bridgeBigInt;
+                  return needsApproval ? 'Step 1/2: Approve WSTON' : 'Step 2/2: Withdraw to L1';
+                })()}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Bridge Info & Balances */}
+        <div className="space-y-6">
+          <div className="card border-[#38BDF8]/20 bg-[#38BDF8]/5">
+            <div className="flex items-start gap-3">
+              <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#38BDF8]" />
+              <div>
+                <h3 className="font-semibold text-white">How Bridging Works</h3>
+                <ul className="mt-2 space-y-2 text-sm text-zinc-400">
+                  <li className="flex items-start gap-2">
+                    <span className="mt-0.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#38BDF8]" />
+                    <b className="text-zinc-300">L1 → L2:</b>&nbsp;WSTON is locked in the L1StandardBridge. Equivalent WSTON is minted on L2. Arrives in ~1-3 minutes.
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-0.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#38BDF8]" />
+                    <b className="text-zinc-300">L2 → L1:</b>&nbsp;L2 WSTON is burned. After a ~24 minute fault-proof period, WSTON is released on L1.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <h3 className="font-semibold text-white mb-3">Balances</h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-lg bg-white/5 p-3">
+                <div>
+                  <p className="text-xs text-zinc-500">L1 WSTON</p>
+                  <p className="text-sm font-bold text-white">{formatWTON(wstonBalance)}</p>
+                </div>
+                <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-xs text-blue-400">Sepolia</span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg bg-white/5 p-3">
+                <div>
+                  <p className="text-xs text-zinc-500">L2 WSTON</p>
+                  <p className="text-sm font-bold text-white">{formatWTON(l2WstonBalance)}</p>
+                </div>
+                <span className="rounded-full bg-purple-500/10 px-2 py-0.5 text-xs text-purple-400">Thanos</span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg bg-white/5 p-3">
+                <div>
+                  <p className="text-xs text-zinc-500">Locked in Vault</p>
+                  <p className="text-sm font-bold text-white">{formatWTON(lockedBalance)}</p>
+                </div>
+                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-400">Vault</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="card border-amber-500/20 bg-amber-500/5">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-400" />
+              <div>
+                <h3 className="font-semibold text-white">Important</h3>
+                <p className="mt-1 text-sm text-zinc-400">
+                  {bridgeDirection === 'l1-to-l2'
+                    ? 'You need ETH on Sepolia to pay L1 gas fees for bridging.'
+                    : 'You need TON on Thanos Sepolia to pay L2 gas fees. L2 → L1 withdrawals have a ~24 min fault-proof period before tokens can be claimed on L1.'}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -725,7 +1074,7 @@ export default function StakingPage() {
         <div className="card text-center">
           <Lock className="mx-auto h-8 w-8 text-purple-500" />
           <p className="mt-2 text-2xl font-bold text-white">
-            {formatBalance(lockedBalance)}
+            {formatWTON(lockedBalance)}
           </p>
           <p className="text-sm text-zinc-500">Locked WSTON</p>
         </div>
@@ -739,7 +1088,7 @@ export default function StakingPage() {
         <div className="card text-center">
           <Coins className="mx-auto h-8 w-8 text-green-500" />
           <p className="mt-2 text-2xl font-bold text-white">
-            {formatBalance(l2WstonBalance)}
+            {formatWTON(l2WstonBalance)}
           </p>
           <p className="text-sm text-zinc-500">L2 WSTON Balance</p>
         </div>
@@ -781,7 +1130,7 @@ export default function StakingPage() {
                 <button
                   onClick={() => {
                     if (l2WstonBalance !== undefined) {
-                      setVaultLockAmount(formatEther(l2WstonBalance));
+                      setVaultLockAmount(formatUnits(l2WstonBalance, 27));
                     }
                   }}
                   disabled={!isConnected || !isL2}
@@ -791,7 +1140,7 @@ export default function StakingPage() {
                 </button>
               </div>
               <p className="mt-1 text-xs text-zinc-500">
-                Available: {formatBalance(l2WstonBalance)} WSTON
+                Available: {formatWTON(l2WstonBalance)} WSTON
               </p>
             </div>
 
@@ -860,7 +1209,7 @@ export default function StakingPage() {
                 <button
                   onClick={() => {
                     if (lockedBalance !== undefined) {
-                      setVaultUnlockAmount(formatEther(lockedBalance));
+                      setVaultUnlockAmount(formatUnits(lockedBalance, 27));
                     }
                   }}
                   disabled={!isConnected || !isL2}
@@ -870,7 +1219,7 @@ export default function StakingPage() {
                 </button>
               </div>
               <p className="mt-1 text-xs text-zinc-500">
-                Locked: {formatBalance(lockedBalance)} WSTON
+                Locked: {formatWTON(lockedBalance)} WSTON
               </p>
             </div>
 
@@ -911,7 +1260,7 @@ export default function StakingPage() {
               <div className="mb-3 flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-zinc-300">Ready to Claim</p>
-                  <p className="text-lg font-bold text-white">{formatBalance(vaultReadyAmount)} WSTON</p>
+                  <p className="text-lg font-bold text-white">{formatWTON(vaultReadyAmount)} WSTON</p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-medium text-zinc-300">Pending</p>

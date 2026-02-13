@@ -1,8 +1,8 @@
 'use client';
 
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseEther, type Address } from 'viem';
-import { CONTRACTS, THANOS_CHAIN_ID } from '@/lib/contracts';
+import { type Address } from 'viem';
+import { CONTRACTS, THANOS_CHAIN_ID, L1_CONTRACTS } from '@/lib/contracts';
 
 // ============ ABI ============
 
@@ -327,4 +327,90 @@ export function useProcessVaultUnlock() {
   };
 
   return { processUnlock, hash, isPending, isConfirming, isSuccess, error };
+}
+
+// ============ L2 → L1 Bridge (L2StandardBridge) ============
+
+const L2_STANDARD_BRIDGE_ABI = [
+  {
+    name: 'bridgeERC20To',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: '_localToken', type: 'address' },
+      { name: '_remoteToken', type: 'address' },
+      { name: '_to', type: 'address' },
+      { name: '_amount', type: 'uint256' },
+      { name: '_minGasLimit', type: 'uint32' },
+      { name: '_extraData', type: 'bytes' },
+    ],
+    outputs: [],
+  },
+] as const;
+
+function getL2BridgeAddress(): Address {
+  return (CONTRACTS as Record<string, string>).l2StandardBridge as Address;
+}
+
+/** L2 WSTON allowance to L2StandardBridge */
+export function useL2WSTONAllowanceForBridge(owner?: Address) {
+  const tokenAddr = getL2WSTONAddress();
+  const bridgeAddr = getL2BridgeAddress();
+  return useReadContract({
+    address: tokenAddr,
+    abi: ERC20_ABI,
+    functionName: 'allowance',
+    args: owner && bridgeAddr ? [owner, bridgeAddr] : undefined,
+    chainId: THANOS_CHAIN_ID,
+    query: { enabled: !!owner && !!tokenAddr && !!bridgeAddr },
+  });
+}
+
+/** Approve L2 WSTON spending by L2StandardBridge */
+export function useApproveL2WSTONForBridge() {
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  const approve = (amount: bigint) => {
+    const tokenAddr = getL2WSTONAddress();
+    const bridgeAddr = getL2BridgeAddress();
+    if (!tokenAddr || !bridgeAddr) return;
+    writeContract({
+      address: tokenAddr,
+      abi: ERC20_ABI,
+      functionName: 'approve',
+      args: [bridgeAddr, amount],
+      chainId: THANOS_CHAIN_ID,
+    });
+  };
+
+  return { approve, hash, isPending, isConfirming, isSuccess, error };
+}
+
+/** Bridge WSTON from L2 → L1 via L2StandardBridge.bridgeERC20To */
+export function useWithdrawWSTONToL1() {
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  const withdraw = (amount: bigint, recipient: Address) => {
+    const l2TokenAddr = getL2WSTONAddress();
+    const bridgeAddr = getL2BridgeAddress();
+    if (!l2TokenAddr || !bridgeAddr) return;
+    writeContract({
+      address: bridgeAddr,
+      abi: L2_STANDARD_BRIDGE_ABI,
+      functionName: 'bridgeERC20To',
+      args: [
+        l2TokenAddr,
+        L1_CONTRACTS.wston,
+        recipient,
+        amount,
+        200000,
+        '0x',
+      ],
+      chainId: THANOS_CHAIN_ID,
+    });
+  };
+
+  return { withdraw, hash, isPending, isConfirming, isSuccess, error };
 }

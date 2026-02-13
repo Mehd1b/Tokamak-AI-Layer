@@ -17,6 +17,8 @@ export const CONTRACTS = {
   stakingIntegrationModule: '0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30' as Address,
   taskFeeEscrow: '0x6D68Cd8fD89BF1746A1948783C92A00E591d1227' as Address,
   wstonL2: '0x4d7b29213c9ad19a2aaa01e3ccf6f209636a786f' as Address,
+  wstonVault: '0x6aa6a7B9e51B636417025403053855B788107C27' as Address,
+  l2StandardBridge: '0x4200000000000000000000000000000000000010' as Address,
   explorerUrl: 'https://explorer.thanos-sepolia.tokamak.network',
   nativeCurrency: 'TON',
   name: 'Thanos Sepolia',
@@ -36,4 +38,5 @@ export const L1_CONTRACTS = {
   ton: '0xa30fe40285B8f5c0457DbC3B7C8A280373c40044' as Address,
   wton: '0x79E0d92670106c85E9067b56B8F674340dCa0Bbd' as Address,
   wston: '0x4e1e3e6De6F9aE2C0D8a21626082Ef70dBa87e6D' as Address,
+  l1StandardBridge: '0x757EC5b8F81eDdfC31F305F3325Ac6Abf4A63a5D' as Address,
 } as const;

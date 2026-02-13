@@ -3,7 +3,7 @@
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther, parseUnits, type Address } from 'viem';
 import { sepolia } from 'wagmi/chains';
-import { L1_CONTRACTS } from '@/lib/contracts';
+import { L1_CONTRACTS, CONTRACTS } from '@/lib/contracts';
 
 // ============ ABIs ============
 
@@ -328,4 +328,80 @@ export function useClaimWithdrawal() {
   };
 
   return { claim, hash, isPending, isConfirming, isSuccess, error };
+}
+
+// ============ L1 Standard Bridge — Bridge WSTON L1 → L2 ============
+
+const L1_STANDARD_BRIDGE_ABI = [
+  {
+    name: 'bridgeERC20To',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: '_localToken', type: 'address' },
+      { name: '_remoteToken', type: 'address' },
+      { name: '_to', type: 'address' },
+      { name: '_amount', type: 'uint256' },
+      { name: '_minGasLimit', type: 'uint32' },
+      { name: '_extraData', type: 'bytes' },
+    ],
+    outputs: [],
+  },
+] as const;
+
+/** WSTON allowance to L1StandardBridge */
+export function useWSTONAllowanceForBridge(owner?: Address) {
+  return useReadContract({
+    address: L1_CONTRACTS.wston,
+    abi: ERC20_ABI,
+    functionName: 'allowance',
+    args: owner ? [owner, L1_CONTRACTS.l1StandardBridge] : undefined,
+    chainId: sepolia.id,
+    query: { enabled: !!owner },
+  });
+}
+
+/** Approve WSTON spending by L1StandardBridge */
+export function useApproveWSTONForBridge() {
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  const approve = (amount: bigint) => {
+    writeContract({
+      address: L1_CONTRACTS.wston,
+      abi: ERC20_ABI,
+      functionName: 'approve',
+      args: [L1_CONTRACTS.l1StandardBridge, amount],
+      chainId: sepolia.id,
+    });
+  };
+
+  return { approve, hash, isPending, isConfirming, isSuccess, error };
+}
+
+/** Bridge WSTON from L1 → L2 via L1StandardBridge.bridgeERC20To */
+export function useBridgeWSTON() {
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  const bridge = (amount: bigint, recipient: Address) => {
+    const l2WstonAddr = (CONTRACTS as Record<string, string>).wstonL2;
+    if (!l2WstonAddr) return;
+    writeContract({
+      address: L1_CONTRACTS.l1StandardBridge,
+      abi: L1_STANDARD_BRIDGE_ABI,
+      functionName: 'bridgeERC20To',
+      args: [
+        L1_CONTRACTS.wston,
+        l2WstonAddr as Address,
+        recipient,
+        amount,
+        200000,
+        '0x',
+      ],
+      chainId: sepolia.id,
+    });
+  };
+
+  return { bridge, hash, isPending, isConfirming, isSuccess, error };
 }
