@@ -43,12 +43,63 @@ export const CHAIN_IDS = {
     ethereum: 1,
     thanosSepolia: 111551119090,
 };
-// ── Default Risk Parameters ──────────────────────────────
-export const DEFAULT_RISK_PARAMS = {
-    maxSingleTradePercent: 50,
-    maxSlippagePercent: 1,
-    minPoolTvlUsd: 100_000,
-    maxPriceImpactPercent: 2,
-    requireStopLoss: true,
+// ── Horizon to milliseconds ─────────────────────────────
+export const HORIZON_MS = {
+    "1h": 60 * 60 * 1000,
+    "4h": 4 * 60 * 60 * 1000,
+    "1d": 24 * 60 * 60 * 1000,
+    "1w": 7 * 24 * 60 * 60 * 1000,
+    "1m": 30 * 24 * 60 * 60 * 1000,
+    "3m": 90 * 24 * 60 * 60 * 1000,
+    "6m": 180 * 24 * 60 * 60 * 1000,
+    "1y": 365 * 24 * 60 * 60 * 1000,
 };
+// ── Horizon to DeFiLlama chart period ───────────────────
+export const HORIZON_TO_LLAMA_PERIOD = {
+    "1h": "1w",
+    "4h": "1w",
+    "1d": "1w",
+    "1w": "2w",
+    "1m": "3m",
+    "3m": "6m",
+    "6m": "1y",
+    "1y": "1y",
+};
+// ── Minimum data points per horizon for reliable indicators ─
+export const MIN_DATA_POINTS = {
+    "1h": 5,
+    "4h": 10,
+    "1d": 15,
+    "1w": 20,
+    "1m": 30,
+    "3m": 50,
+    "6m": 80,
+    "1y": 100,
+};
+// ── Risk Presets per tolerance ───────────────────────────
+export const RISK_PRESETS = {
+    conservative: {
+        maxSingleTradePercent: 20,
+        maxSlippagePercent: 0.5,
+        minPoolTvlUsd: 500_000,
+        maxPriceImpactPercent: 1,
+        requireStopLoss: true,
+    },
+    moderate: {
+        maxSingleTradePercent: 35,
+        maxSlippagePercent: 1,
+        minPoolTvlUsd: 100_000,
+        maxPriceImpactPercent: 2,
+        requireStopLoss: true,
+    },
+    aggressive: {
+        maxSingleTradePercent: 50,
+        maxSlippagePercent: 2,
+        minPoolTvlUsd: 25_000,
+        maxPriceImpactPercent: 5,
+        requireStopLoss: false,
+    },
+};
+// ── Default Risk Parameters ──────────────────────────────
+export const DEFAULT_RISK_PARAMS = RISK_PRESETS.moderate;
 //# sourceMappingURL=constants.js.map

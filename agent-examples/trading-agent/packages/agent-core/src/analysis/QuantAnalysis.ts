@@ -1,7 +1,7 @@
 import type { Address } from "viem";
 import pino from "pino";
-import { DEFILLAMA } from "@tal-trading-agent/shared";
-import type { PoolData, QuantScore } from "@tal-trading-agent/shared";
+import { DEFILLAMA, HORIZON_TO_LLAMA_PERIOD, MIN_DATA_POINTS } from "@tal-trading-agent/shared";
+import type { PoolData, QuantScore, DataQuality, TradeRequest } from "@tal-trading-agent/shared";
 
 const logger = pino({ name: "quant-analysis" });
 
@@ -69,16 +69,20 @@ export class QuantAnalysis {
   }
 
   /**
-   * Fetch historical price data (1 week) from DeFiLlama chart API.
-   * Returns an array of [timestamp, price] sorted by timestamp ascending.
+   * Fetch historical price data from DeFiLlama chart API.
+   * Period is determined by the trading horizon.
    */
-  async getHistoricalPrices(tokenAddress: Address): Promise<number[]> {
+  async getHistoricalPrices(
+    tokenAddress: Address,
+    horizon: TradeRequest["horizon"] = "1w",
+  ): Promise<number[]> {
     try {
       const coinId = `ethereum:${tokenAddress}`;
-      const url = `${DEFILLAMA.chartUrl}/${encodeURIComponent(coinId)}?period=1w`;
+      const period = HORIZON_TO_LLAMA_PERIOD[horizon];
+      const url = `${DEFILLAMA.chartUrl}/${encodeURIComponent(coinId)}?period=${period}`;
       const response = await fetch(url);
       if (!response.ok) {
-        logger.warn({ tokenAddress, status: response.status }, "DeFiLlama chart request failed");
+        logger.warn({ tokenAddress, status: response.status, period }, "DeFiLlama chart request failed");
         return [];
       }
 
@@ -126,6 +130,39 @@ export class QuantAnalysis {
   }
 
   /**
+   * Compute data confidence score based on available data points vs minimum needed.
+   */
+  computeDataConfidence(
+    dataPoints: number,
+    horizon: TradeRequest["horizon"],
+  ): DataQuality {
+    const minNeeded = MIN_DATA_POINTS[horizon];
+    const ratio = dataPoints / minNeeded;
+    const confidenceScore = Math.min(1, ratio);
+
+    let confidenceNote: string;
+    let indicatorsReliable: boolean;
+
+    if (ratio >= 1) {
+      confidenceNote = "Sufficient price data for reliable technical analysis.";
+      indicatorsReliable = true;
+    } else if (ratio >= 0.5) {
+      confidenceNote = `Only ${dataPoints}/${minNeeded} data points available. Technical indicators have reduced reliability.`;
+      indicatorsReliable = false;
+    } else {
+      confidenceNote = `Insufficient data (${dataPoints}/${minNeeded} points). RSI=50 and MACD=0 are DEFAULT values, NOT real market signals. Rely on DeFi metrics instead.`;
+      indicatorsReliable = false;
+    }
+
+    return {
+      priceDataPoints: dataPoints,
+      indicatorsReliable,
+      confidenceScore,
+      confidenceNote,
+    };
+  }
+
+  /**
    * Full analysis: fetches prices, computes indicators and DeFi metrics.
    * Returns a complete QuantScore for a single token.
    */
@@ -133,10 +170,11 @@ export class QuantAnalysis {
     tokenAddress: Address,
     symbol: string,
     pools: PoolData[],
+    horizon: TradeRequest["horizon"] = "1w",
   ): Promise<QuantScore> {
     const [currentPrice, historicalPrices] = await Promise.all([
       this.getCurrentPrice(tokenAddress),
-      this.getHistoricalPrices(tokenAddress),
+      this.getHistoricalPrices(tokenAddress, horizon),
     ]);
 
     // Need at least some price data for meaningful analysis
@@ -145,8 +183,9 @@ export class QuantAnalysis {
 
     const indicators = this.computeTechnicalIndicators(prices);
     const defiMetrics = this.computeDeFiMetrics(pools, prices);
+    const dataQuality = this.computeDataConfidence(historicalPrices.length, horizon);
 
-    const reasoning = this.generateReasoning(symbol, indicators, defiMetrics);
+    const reasoning = this.generateReasoning(symbol, indicators, defiMetrics, dataQuality);
 
     return {
       tokenAddress,
@@ -155,6 +194,7 @@ export class QuantAnalysis {
       defiMetrics,
       overallScore: 0, // Filled by TokenScorer
       reasoning,
+      dataQuality,
     };
   }
 
@@ -212,7 +252,6 @@ export class QuantAnalysis {
 
     // Signal line = EMA of MACD line
     const signalLine = this.computeEMA(macdLine, signalPeriod);
-    const macdOffset = macdLine.length - signalLine.length;
 
     const latestMacd = macdLine.at(-1) ?? 0;
     const latestSignal = signalLine.at(-1) ?? 0;
@@ -416,8 +455,14 @@ export class QuantAnalysis {
     symbol: string,
     indicators: TechnicalIndicators,
     defiMetrics: DeFiMetrics,
+    dataQuality?: DataQuality,
   ): string {
     const parts: string[] = [];
+
+    // Data quality warning first
+    if (dataQuality && dataQuality.confidenceScore < 0.5) {
+      parts.push(`WARNING: ${dataQuality.confidenceNote}`);
+    }
 
     // RSI
     if (indicators.rsi > 70) {

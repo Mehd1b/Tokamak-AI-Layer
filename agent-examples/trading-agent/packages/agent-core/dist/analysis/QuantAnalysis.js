@@ -1,5 +1,5 @@
 import pino from "pino";
-import { DEFILLAMA } from "@tal-trading-agent/shared";
+import { DEFILLAMA, HORIZON_TO_LLAMA_PERIOD, MIN_DATA_POINTS } from "@tal-trading-agent/shared";
 const logger = pino({ name: "quant-analysis" });
 // ── QuantAnalysis ───────────────────────────────────────────
 export class QuantAnalysis {
@@ -24,16 +24,17 @@ export class QuantAnalysis {
         }
     }
     /**
-     * Fetch historical price data (1 week) from DeFiLlama chart API.
-     * Returns an array of [timestamp, price] sorted by timestamp ascending.
+     * Fetch historical price data from DeFiLlama chart API.
+     * Period is determined by the trading horizon.
      */
-    async getHistoricalPrices(tokenAddress) {
+    async getHistoricalPrices(tokenAddress, horizon = "1w") {
         try {
             const coinId = `ethereum:${tokenAddress}`;
-            const url = `${DEFILLAMA.chartUrl}/${encodeURIComponent(coinId)}?period=1w`;
+            const period = HORIZON_TO_LLAMA_PERIOD[horizon];
+            const url = `${DEFILLAMA.chartUrl}/${encodeURIComponent(coinId)}?period=${period}`;
             const response = await fetch(url);
             if (!response.ok) {
-                logger.warn({ tokenAddress, status: response.status }, "DeFiLlama chart request failed");
+                logger.warn({ tokenAddress, status: response.status, period }, "DeFiLlama chart request failed");
                 return [];
             }
             const data = (await response.json());
@@ -73,19 +74,48 @@ export class QuantAnalysis {
         };
     }
     /**
+     * Compute data confidence score based on available data points vs minimum needed.
+     */
+    computeDataConfidence(dataPoints, horizon) {
+        const minNeeded = MIN_DATA_POINTS[horizon];
+        const ratio = dataPoints / minNeeded;
+        const confidenceScore = Math.min(1, ratio);
+        let confidenceNote;
+        let indicatorsReliable;
+        if (ratio >= 1) {
+            confidenceNote = "Sufficient price data for reliable technical analysis.";
+            indicatorsReliable = true;
+        }
+        else if (ratio >= 0.5) {
+            confidenceNote = `Only ${dataPoints}/${minNeeded} data points available. Technical indicators have reduced reliability.`;
+            indicatorsReliable = false;
+        }
+        else {
+            confidenceNote = `Insufficient data (${dataPoints}/${minNeeded} points). RSI=50 and MACD=0 are DEFAULT values, NOT real market signals. Rely on DeFi metrics instead.`;
+            indicatorsReliable = false;
+        }
+        return {
+            priceDataPoints: dataPoints,
+            indicatorsReliable,
+            confidenceScore,
+            confidenceNote,
+        };
+    }
+    /**
      * Full analysis: fetches prices, computes indicators and DeFi metrics.
      * Returns a complete QuantScore for a single token.
      */
-    async analyzeToken(tokenAddress, symbol, pools) {
+    async analyzeToken(tokenAddress, symbol, pools, horizon = "1w") {
         const [currentPrice, historicalPrices] = await Promise.all([
             this.getCurrentPrice(tokenAddress),
-            this.getHistoricalPrices(tokenAddress),
+            this.getHistoricalPrices(tokenAddress, horizon),
         ]);
         // Need at least some price data for meaningful analysis
         const prices = historicalPrices.length > 0 ? historicalPrices : [currentPrice];
         const indicators = this.computeTechnicalIndicators(prices);
         const defiMetrics = this.computeDeFiMetrics(pools, prices);
-        const reasoning = this.generateReasoning(symbol, indicators, defiMetrics);
+        const dataQuality = this.computeDataConfidence(historicalPrices.length, horizon);
+        const reasoning = this.generateReasoning(symbol, indicators, defiMetrics, dataQuality);
         return {
             tokenAddress,
             symbol,
@@ -93,6 +123,7 @@ export class QuantAnalysis {
             defiMetrics,
             overallScore: 0, // Filled by TokenScorer
             reasoning,
+            dataQuality,
         };
     }
     // ── Technical Indicators ──────────────────────────────────
@@ -139,7 +170,6 @@ export class QuantAnalysis {
         }
         // Signal line = EMA of MACD line
         const signalLine = this.computeEMA(macdLine, signalPeriod);
-        const macdOffset = macdLine.length - signalLine.length;
         const latestMacd = macdLine.at(-1) ?? 0;
         const latestSignal = signalLine.at(-1) ?? 0;
         return {
@@ -313,8 +343,12 @@ export class QuantAnalysis {
     /**
      * Generate human-readable reasoning for the analysis.
      */
-    generateReasoning(symbol, indicators, defiMetrics) {
+    generateReasoning(symbol, indicators, defiMetrics, dataQuality) {
         const parts = [];
+        // Data quality warning first
+        if (dataQuality && dataQuality.confidenceScore < 0.5) {
+            parts.push(`WARNING: ${dataQuality.confidenceNote}`);
+        }
         // RSI
         if (indicators.rsi > 70) {
             parts.push(`${symbol} RSI at ${indicators.rsi.toFixed(1)} suggests overbought conditions`);

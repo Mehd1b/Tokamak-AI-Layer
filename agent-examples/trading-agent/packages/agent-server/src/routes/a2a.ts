@@ -186,7 +186,7 @@ async function handleTasksSend(
           parts: [
             {
               type: "text",
-              text: "Please provide a trading prompt. You can send a text message like 'Invest 1 ETH in DeFi tokens for a week' or structured JSON with: prompt, budget (wei string), walletAddress, horizon (1h/4h/1d/1w/1m), riskTolerance (conservative/moderate/aggressive).",
+              text: "Please provide a trading prompt. You can send a text message like 'Invest 1 ETH in DeFi tokens for a week' or structured JSON with: prompt, budget (wei string), walletAddress, horizon (1h/4h/1d/1w/1m/3m/6m/1y), riskTolerance (conservative/moderate/aggressive).",
             },
           ],
         },
@@ -233,7 +233,7 @@ async function handleTasksSend(
 
     // 1. Score tokens
     const topTokens = Object.values(TOKENS).slice(0, 8);
-    const candidates = await ctx.tokenScorer.scoreTokens(topTokens, budgetToken);
+    const candidates = await ctx.tokenScorer.scoreTokens(topTokens, budgetToken, request.horizon);
 
     // 2. Generate strategy via LLM
     const strategy = await ctx.strategyEngine.generateStrategy(request, candidates);
@@ -429,7 +429,7 @@ function extractTradeParams(message: A2AMessage): ParsedTradeParams {
       if (typeof d.budgetToken === "string") result.budgetToken = d.budgetToken;
       if (typeof d.walletAddress === "string") result.walletAddress = d.walletAddress;
       if (typeof d.horizon === "string") {
-        const valid = ["1h", "4h", "1d", "1w", "1m"];
+        const valid = ["1h", "4h", "1d", "1w", "1m", "3m", "6m", "1y"];
         if (valid.includes(d.horizon)) result.horizon = d.horizon as TradeRequest["horizon"];
       }
       if (typeof d.riskTolerance === "string") {
@@ -446,12 +446,15 @@ function extractTradeParams(message: A2AMessage): ParsedTradeParams {
 function serializeStrategy(s: TradingStrategy) {
   return {
     id: s.id,
+    mode: s.mode,
     analysis: s.analysis,
     trades: s.trades.map((t) => ({
       ...t,
       amountIn: t.amountIn.toString(),
       minAmountOut: t.minAmountOut.toString(),
     })),
+    investmentPlan: s.investmentPlan,
+    llmReasoning: s.llmReasoning,
     riskMetrics: {
       ...s.riskMetrics,
       stopLossPrice: s.riskMetrics.stopLossPrice.toString(),
@@ -470,13 +473,51 @@ function buildSummaryText(
 ): string {
   const lines: string[] = [
     `Strategy ${strategy.id} generated successfully.`,
+    `Mode: ${strategy.mode}`,
     ``,
     `Market: ${strategy.analysis.marketCondition} (confidence: ${(strategy.analysis.confidence * 100).toFixed(0)}%)`,
-    `Trades: ${strategy.trades.length}`,
+  ];
+
+  // Investment plan summary
+  if (strategy.investmentPlan) {
+    const plan = strategy.investmentPlan;
+    lines.push(``, `--- Investment Plan ---`);
+    lines.push(`Entry strategy: ${plan.entryStrategy}`);
+    lines.push(`Thesis: ${plan.thesis}`);
+    lines.push(``, `Allocations:`);
+    for (const alloc of plan.allocations) {
+      lines.push(`  - ${alloc.symbol}: ${alloc.targetPercent}% — ${alloc.reasoning}`);
+    }
+    if (plan.dcaSchedule) {
+      lines.push(``, `DCA Schedule: ${plan.dcaSchedule.frequency}, ${plan.dcaSchedule.totalPeriods} periods, ${plan.dcaSchedule.amountPerPeriodPercent}% per period`);
+    }
+    if (plan.rebalancing) {
+      lines.push(`Rebalancing: ${plan.rebalancing.type}${plan.rebalancing.frequency ? ` (${plan.rebalancing.frequency})` : ""}${plan.rebalancing.driftThresholdPercent ? `, drift threshold: ${plan.rebalancing.driftThresholdPercent}%` : ""}`);
+    }
+    if (plan.exitCriteria) {
+      const exits: string[] = [];
+      if (plan.exitCriteria.takeProfitPercent) exits.push(`take profit: ${plan.exitCriteria.takeProfitPercent}%`);
+      if (plan.exitCriteria.stopLossPercent) exits.push(`stop loss: ${plan.exitCriteria.stopLossPercent}%`);
+      if (plan.exitCriteria.trailingStopPercent) exits.push(`trailing stop: ${plan.exitCriteria.trailingStopPercent}%`);
+      if (plan.exitCriteria.timeExitMonths) exits.push(`time exit: ${plan.exitCriteria.timeExitMonths} months`);
+      if (exits.length > 0) lines.push(`Exit criteria: ${exits.join(", ")}`);
+    }
+    lines.push(`---`);
+  }
+
+  // Trade summary
+  if (strategy.trades.length > 0) {
+    lines.push(
+      ``,
+      `Trades: ${strategy.trades.length}`,
+    );
+  }
+
+  lines.push(
     `Expected return: ${strategy.estimatedReturn.expected}% (optimistic: ${strategy.estimatedReturn.optimistic}%, pessimistic: ${strategy.estimatedReturn.pessimistic}%)`,
     `Risk score: ${strategy.riskMetrics.score}/100`,
     `Position size: ${strategy.riskMetrics.positionSizePercent}% of budget`,
-  ];
+  );
 
   if (riskAdjusted) {
     lines.push(``, `Note: Strategy was auto-adjusted to comply with risk limits.`);
@@ -486,10 +527,17 @@ function buildSummaryText(
     lines.push(``, `Warnings:`, ...warnings.map((w) => `  - ${w}`));
   }
 
-  lines.push(
-    ``,
-    `The strategy and unsigned swap calldata are in the artifacts. Sign the transactions with your wallet and submit to execute.`,
-  );
+  if (strategy.trades.length > 0) {
+    lines.push(
+      ``,
+      `The strategy and unsigned swap calldata are in the artifacts. Sign the transactions with your wallet and submit to execute.`,
+    );
+  } else {
+    lines.push(
+      ``,
+      `This is a portfolio allocation plan. Review the investment plan in the artifacts for detailed allocation, DCA schedule, and rebalancing strategy.`,
+    );
+  }
 
   return lines.join("\n");
 }

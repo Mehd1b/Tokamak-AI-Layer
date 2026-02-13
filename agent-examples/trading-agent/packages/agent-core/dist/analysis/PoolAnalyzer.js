@@ -432,7 +432,7 @@ export class PoolAnalyzer {
         // This is a placeholder; real APY requires volume data from subgraph/indexer
         const feePercent = feeTier / 1_000_000;
         // Assume ~$1M daily volume per $10M TVL as a baseline
-        const assumedDailyVolumeRatio = 0.1;
+        const assumedDailyVolumeRatio = 0.01;
         const dailyFees = tvlUsd * assumedDailyVolumeRatio * feePercent;
         const annualFees = dailyFees * 365;
         return tvlUsd > 0 ? (annualFees / tvlUsd) * 100 : 0;

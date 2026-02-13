@@ -14,6 +14,9 @@ const AnalyzeBody = Type.Object({
         Type.Literal("1d"),
         Type.Literal("1w"),
         Type.Literal("1m"),
+        Type.Literal("3m"),
+        Type.Literal("6m"),
+        Type.Literal("1y"),
     ])),
     riskTolerance: Type.Optional(Type.Union([
         Type.Literal("conservative"),
@@ -50,7 +53,7 @@ export async function tradeRoutes(app, ctx) {
         // 1. Get top token candidates
         const topTokens = Object.values(TOKENS).slice(0, 8);
         // 2. Score tokens via pool analysis + quant
-        const candidates = await ctx.tokenScorer.scoreTokens(topTokens, budgetToken);
+        const candidates = await ctx.tokenScorer.scoreTokens(topTokens, budgetToken, request.horizon);
         // 3. Generate strategy via LLM
         const strategy = await ctx.strategyEngine.generateStrategy(request, candidates);
         // 4. Validate via risk manager
@@ -150,12 +153,15 @@ export async function tradeRoutes(app, ctx) {
 function serializeStrategy(s) {
     return {
         id: s.id,
+        mode: s.mode,
         analysis: s.analysis,
         trades: s.trades.map((t) => ({
             ...t,
             amountIn: t.amountIn.toString(),
             minAmountOut: t.minAmountOut.toString(),
         })),
+        investmentPlan: s.investmentPlan,
+        llmReasoning: s.llmReasoning,
         riskMetrics: {
             ...s.riskMetrics,
             stopLossPrice: s.riskMetrics.stopLossPrice.toString(),

@@ -1,14 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk";
 import pino from "pino";
-import { isAddress, type Address } from "viem";
+import { type Address } from "viem";
 import type {
   TradeRequest,
   TradingStrategy,
   TradeAction,
-  RiskMetrics,
   QuantScore,
+  StrategyMode,
+  InvestmentPlan,
 } from "@tal-trading-agent/shared";
-import { TOKENS } from "@tal-trading-agent/shared";
+import { TOKENS, HORIZON_MS, RISK_PRESETS } from "@tal-trading-agent/shared";
 
 // ── LLM response shape (amounts as strings for bigint) ──
 interface LLMStrategyResponse {
@@ -39,16 +40,33 @@ interface LLMStrategyResponse {
     expected: number;
     pessimistic: number;
   };
+  investmentPlan?: {
+    allocations: Array<{
+      tokenAddress: string;
+      symbol: string;
+      targetPercent: number;
+      reasoning: string;
+    }>;
+    entryStrategy: "lump-sum" | "dca" | "hybrid";
+    dcaSchedule?: {
+      frequency: "daily" | "weekly" | "biweekly" | "monthly";
+      totalPeriods: number;
+      amountPerPeriodPercent: number;
+    };
+    rebalancing?: {
+      type: "calendar" | "drift";
+      frequency?: "weekly" | "monthly" | "quarterly";
+      driftThresholdPercent?: number;
+    };
+    exitCriteria?: {
+      takeProfitPercent?: number;
+      stopLossPercent?: number;
+      trailingStopPercent?: number;
+      timeExitMonths?: number;
+    };
+    thesis: string;
+  };
 }
-
-// ── Horizon to milliseconds mapping ─────────────────────
-const HORIZON_MS: Record<TradeRequest["horizon"], number> = {
-  "1h": 60 * 60 * 1000,
-  "4h": 4 * 60 * 60 * 1000,
-  "1d": 24 * 60 * 60 * 1000,
-  "1w": 7 * 24 * 60 * 60 * 1000,
-  "1m": 30 * 24 * 60 * 60 * 1000,
-};
 
 export interface StrategyEngineConfig {
   anthropicApiKey: string;
@@ -56,6 +74,25 @@ export interface StrategyEngineConfig {
 }
 
 const DEFAULT_MODEL = "claude-sonnet-4-5-20250929";
+
+// ── Mode Resolution ─────────────────────────────────────
+
+function resolveMode(horizon: TradeRequest["horizon"]): StrategyMode {
+  switch (horizon) {
+    case "1h":
+    case "4h":
+      return "scalp";
+    case "1d":
+    case "1w":
+      return "swing";
+    case "1m":
+    case "3m":
+      return "position";
+    case "6m":
+    case "1y":
+      return "investment";
+  }
+}
 
 export class StrategyEngine {
   private readonly client: Anthropic;
@@ -72,30 +109,43 @@ export class StrategyEngine {
     request: TradeRequest,
     candidates: QuantScore[],
   ): Promise<TradingStrategy> {
+    const mode = resolveMode(request.horizon);
+
     this.log.info(
-      { horizon: request.horizon, riskTolerance: request.riskTolerance, candidateCount: candidates.length },
+      { horizon: request.horizon, mode, riskTolerance: request.riskTolerance, candidateCount: candidates.length },
       "Generating trading strategy via LLM",
     );
 
-    const systemPrompt = this.buildSystemPrompt();
-    const userMessage = this.buildUserMessage(request, candidates);
+    const systemPrompt = this.buildSystemPrompt(mode, request.riskTolerance);
+    const userMessage = this.buildUserMessage(request, candidates, mode);
 
-    let llmResponse = await this.callLLM(systemPrompt, userMessage);
+    let llmResponse: string;
+    let llmReasoning: string | undefined;
+
+    // Use extended thinking for investment/position modes
+    if (mode === "investment" || mode === "position") {
+      const result = await this.callLLMWithThinking(systemPrompt, userMessage);
+      llmResponse = result.text;
+      llmReasoning = result.thinking;
+    } else {
+      llmResponse = await this.callLLM(systemPrompt, userMessage);
+    }
 
     // Parse the response - retry once if invalid JSON
     let parsed: LLMStrategyResponse;
     try {
-      parsed = this.parseResponse(llmResponse);
+      parsed = this.parseResponse(llmResponse, mode);
     } catch (firstError) {
       this.log.warn({ error: firstError }, "First LLM response had invalid JSON, retrying with correction");
       llmResponse = await this.callLLMWithCorrection(systemPrompt, userMessage, llmResponse);
-      parsed = this.parseResponse(llmResponse);
+      parsed = this.parseResponse(llmResponse, mode);
     }
 
     const now = Date.now();
     const strategy: TradingStrategy = {
       id: crypto.randomUUID(),
       request,
+      mode,
       analysis: {
         marketCondition: parsed.analysis.marketCondition,
         confidence: Math.max(0, Math.min(1, parsed.analysis.confidence)),
@@ -103,6 +153,8 @@ export class StrategyEngine {
         topCandidates: candidates.slice(0, 5),
       },
       trades: parsed.trades.map((t) => this.toLLMTradeAction(t)),
+      investmentPlan: parsed.investmentPlan as InvestmentPlan | undefined,
+      llmReasoning,
       riskMetrics: {
         score: Math.max(0, Math.min(100, parsed.riskMetrics.score)),
         maxDrawdown: parsed.riskMetrics.maxDrawdown,
@@ -116,35 +168,102 @@ export class StrategyEngine {
     };
 
     this.log.info(
-      { strategyId: strategy.id, tradeCount: strategy.trades.length, confidence: strategy.analysis.confidence },
+      { strategyId: strategy.id, mode, tradeCount: strategy.trades.length, confidence: strategy.analysis.confidence },
       "Strategy generated successfully",
     );
 
     return strategy;
   }
 
-  // ── Private helpers ─────────────────────────────────────
+  // ── System Prompt Builder ─────────────────────────────
 
-  private buildSystemPrompt(): string {
+  private buildSystemPrompt(mode: StrategyMode, riskTolerance: TradeRequest["riskTolerance"]): string {
     const tokenList = Object.entries(TOKENS)
       .map(([symbol, address]) => `  - ${symbol}: ${address}`)
       .join("\n");
 
-    return `You are a quantitative DeFi trading analyst. Your task is to analyze market data and produce precise, actionable trading strategies.
+    const riskPreset = RISK_PRESETS[riskTolerance];
+
+    const modeGuidance = this.getModeGuidance(mode);
+    const riskRules = this.getRiskRules(riskTolerance, riskPreset);
+    const outputSchema = this.getOutputSchema(mode);
+
+    return `${modeGuidance}
 
 ## Available Tokens (Ethereum Mainnet)
 ${tokenList}
 
-## Risk Rules (MANDATORY)
-1. NEVER suggest allocating more than 50% of the budget to a single position.
-2. ALWAYS include a stop-loss price.
-3. Each trade must specify a realistic priceImpact (0-100 as percent).
-4. The poolFee must be one of: 100, 500, 3000, or 10000 (Uniswap V3 fee tiers in hundredths of a basis point).
-5. The route array must contain valid Ethereum addresses representing the swap path.
-6. minAmountOut must be strictly less than amountIn to account for slippage and fees.
-7. The sum of all amountIn values must not exceed the user's budget.
+${riskRules}
 
-## Output Format
+${outputSchema}
+
+IMPORTANT: All token amounts MUST be strings (representing wei values) since they may exceed JavaScript's Number.MAX_SAFE_INTEGER.
+IMPORTANT: Respond with ONLY the JSON object. No surrounding text, no markdown code blocks.`;
+  }
+
+  private getModeGuidance(mode: StrategyMode): string {
+    switch (mode) {
+      case "scalp":
+        return `You are a quantitative DeFi SCALP TRADER optimizing for short-term trades (hours).
+Technical indicators (RSI, MACD, momentum) are your PRIMARY signals.
+Focus on tokens with high recent momentum and clear technical setups.
+Prioritize quick entries and exits with tight risk management.`;
+
+      case "swing":
+        return `You are a quantitative DeFi SWING TRADER optimizing for multi-day trades.
+Blend technical indicators with DeFi fundamentals for balanced analysis.
+Look for confluence between technical signals and on-chain metrics.`;
+
+      case "position":
+        return `You are a quantitative DeFi POSITION TRADER building medium-term positions.
+DeFi fundamentals (liquidity, TVL stability, smart money flows) OUTWEIGH short-term technical indicators.
+Technical indicators with low data confidence should be treated with skepticism.
+Focus on protocol health and sustainable yield.`;
+
+      case "investment":
+        return `You are a DeFi PORTFOLIO MANAGER building a long-term investment allocation.
+Your job is to build an INVESTMENT THESIS, define portfolio ALLOCATIONS, and recommend a DCA schedule.
+Short-term RSI, MACD, and momentum indicators are IRRELEVANT for 6-month to 1-year holds — IGNORE them.
+Focus exclusively on: protocol fundamentals, liquidity depth, TVL stability, ecosystem positioning, and smart money flows.
+You MUST include an investmentPlan with allocations, entry strategy, and thesis.
+Trades array can be empty if recommending pure DCA entry.`;
+    }
+  }
+
+  private getRiskRules(tolerance: TradeRequest["riskTolerance"], preset: typeof RISK_PRESETS["moderate"]): string {
+    const toleranceRules: Record<TradeRequest["riskTolerance"], string> = {
+      conservative: `## Risk Rules (CONSERVATIVE - MANDATORY)
+1. NEVER allocate more than ${preset.maxSingleTradePercent}% of the budget to a single position.
+2. ALWAYS include a stop-loss price — stop-loss is REQUIRED.
+3. Prefer high-liquidity blue-chip tokens (minimum TVL: $${(preset.minPoolTvlUsd / 1000).toFixed(0)}k).
+4. Maximum price impact: ${preset.maxPriceImpactPercent}%.
+5. Diversify across at least 3-4 positions.`,
+
+      moderate: `## Risk Rules (MODERATE - MANDATORY)
+1. NEVER allocate more than ${preset.maxSingleTradePercent}% of the budget to a single position.
+2. ALWAYS include a stop-loss price — stop-loss is REQUIRED.
+3. Minimum pool TVL: $${(preset.minPoolTvlUsd / 1000).toFixed(0)}k.
+4. Maximum price impact: ${preset.maxPriceImpactPercent}%.
+5. Balance between concentrated and diversified positions.`,
+
+      aggressive: `## Risk Rules (AGGRESSIVE - MANDATORY)
+1. NEVER allocate more than ${preset.maxSingleTradePercent}% of the budget to a single position.
+2. Stop-loss is OPTIONAL — wider stops or no stops acceptable for conviction plays.
+3. Higher volatility tokens acceptable (minimum TVL: $${(preset.minPoolTvlUsd / 1000).toFixed(0)}k).
+4. Maximum price impact: ${preset.maxPriceImpactPercent}%.
+5. Concentrated bets on high-conviction tokens are acceptable.`,
+    };
+
+    return toleranceRules[tolerance] + `
+6. Each trade must specify a realistic priceImpact (0-100 as percent).
+7. The poolFee must be one of: 100, 500, 3000, or 10000 (Uniswap V3 fee tiers).
+8. The route array must contain valid Ethereum addresses representing the swap path.
+9. minAmountOut must be strictly less than amountIn to account for slippage and fees.
+10. The sum of all amountIn values must not exceed the user's budget.`;
+  }
+
+  private getOutputSchema(mode: StrategyMode): string {
+    const baseSchema = `## Output Format
 Respond ONLY with a valid JSON object (no markdown, no explanation). The schema is:
 
 {
@@ -176,52 +295,130 @@ Respond ONLY with a valid JSON object (no markdown, no explanation). The schema 
     "optimistic": <number, percent>,
     "expected": <number, percent>,
     "pessimistic": <number, percent>
+  }`;
+
+    if (mode === "investment" || mode === "position") {
+      return baseSchema + `,
+  "investmentPlan": {
+    "allocations": [
+      {
+        "tokenAddress": "<address>",
+        "symbol": "<string>",
+        "targetPercent": <number, 0-100>,
+        "reasoning": "<string, why this token>"
+      }
+    ],
+    "entryStrategy": "lump-sum" | "dca" | "hybrid",
+    "dcaSchedule": {
+      "frequency": "daily" | "weekly" | "biweekly" | "monthly",
+      "totalPeriods": <number>,
+      "amountPerPeriodPercent": <number>
+    },
+    "rebalancing": {
+      "type": "calendar" | "drift",
+      "frequency": "weekly" | "monthly" | "quarterly",
+      "driftThresholdPercent": <number>
+    },
+    "exitCriteria": {
+      "takeProfitPercent": <number>,
+      "stopLossPercent": <number>,
+      "trailingStopPercent": <number>,
+      "timeExitMonths": <number>
+    },
+    "thesis": "<string, overall investment thesis>"
   }
 }
 
-IMPORTANT: All token amounts MUST be strings (representing wei values) since they may exceed JavaScript's Number.MAX_SAFE_INTEGER.
-IMPORTANT: Respond with ONLY the JSON object. No surrounding text, no markdown code blocks.`;
+NOTE: For investment mode, the investmentPlan is REQUIRED. The trades array may be empty if recommending DCA entry.
+NOTE: Allocation targetPercent values should sum to approximately 100%.`;
+    }
+
+    return baseSchema + "\n}";
   }
 
-  private buildUserMessage(request: TradeRequest, candidates: QuantScore[]): string {
-    const candidateSummaries = candidates.map((c) => ({
-      token: c.symbol,
-      address: c.tokenAddress,
-      overallScore: c.overallScore,
-      reasoning: c.reasoning,
-      indicators: {
-        rsi: c.indicators.rsi,
-        macdHistogram: c.indicators.macd.histogram,
-        momentum: c.indicators.momentum,
-        vwap: c.indicators.vwap,
-      },
-      defi: {
-        liquidityDepth: c.defiMetrics.liquidityDepth,
-        feeApy: c.defiMetrics.feeApy,
-        volumeTrend: c.defiMetrics.volumeTrend,
-        tvlStability: c.defiMetrics.tvlStability,
-        smartMoneyFlow: c.defiMetrics.smartMoneyFlow,
-      },
-    }));
+  // ── User Message Builder ──────────────────────────────
+
+  private buildUserMessage(request: TradeRequest, candidates: QuantScore[], mode: StrategyMode): string {
+    // Build data quality warnings
+    const unreliableTokens = candidates.filter(
+      (c) => c.dataQuality && !c.dataQuality.indicatorsReliable,
+    );
+
+    let dataWarning = "";
+    if (unreliableTokens.length > 0) {
+      const tokenNames = unreliableTokens.map((c) => c.symbol).join(", ");
+      dataWarning = `\n## DATA QUALITY WARNING
+The following tokens have INSUFFICIENT price data: ${tokenNames}.
+RSI=50.0 and MACD=0 are DEFAULT values, NOT real market signals.
+For these tokens, rely ONLY on DeFi metrics (liquidity, TVL, smart money flows).\n`;
+    }
+
+    // For investment mode, omit short-term indicators entirely
+    const candidateSummaries = candidates.map((c) => {
+      if (mode === "investment" || mode === "position") {
+        return {
+          token: c.symbol,
+          address: c.tokenAddress,
+          overallScore: c.overallScore,
+          reasoning: c.reasoning,
+          dataQuality: c.dataQuality ? {
+            confidence: c.dataQuality.confidenceScore,
+            reliable: c.dataQuality.indicatorsReliable,
+            note: c.dataQuality.confidenceNote,
+          } : undefined,
+          defi: {
+            liquidityDepth: c.defiMetrics.liquidityDepth,
+            feeApy: c.defiMetrics.feeApy,
+            volumeTrend: c.defiMetrics.volumeTrend,
+            tvlStability: c.defiMetrics.tvlStability,
+            smartMoneyFlow: c.defiMetrics.smartMoneyFlow,
+          },
+        };
+      }
+
+      return {
+        token: c.symbol,
+        address: c.tokenAddress,
+        overallScore: c.overallScore,
+        reasoning: c.reasoning,
+        dataQuality: c.dataQuality ? {
+          confidence: c.dataQuality.confidenceScore,
+          reliable: c.dataQuality.indicatorsReliable,
+        } : undefined,
+        indicators: {
+          rsi: c.indicators.rsi,
+          macdHistogram: c.indicators.macd.histogram,
+          momentum: c.indicators.momentum,
+          vwap: c.indicators.vwap,
+        },
+        defi: {
+          liquidityDepth: c.defiMetrics.liquidityDepth,
+          feeApy: c.defiMetrics.feeApy,
+          volumeTrend: c.defiMetrics.volumeTrend,
+          tvlStability: c.defiMetrics.tvlStability,
+          smartMoneyFlow: c.defiMetrics.smartMoneyFlow,
+        },
+      };
+    });
 
     return `## Trade Request
 - User prompt: "${request.prompt}"
 - Budget: ${request.budget.toString()} wei of token ${request.budgetToken}
 - Horizon: ${request.horizon}
+- Mode: ${mode}
 - Risk tolerance: ${request.riskTolerance}
 - Chain: Ethereum Mainnet (ID: ${request.chainId})
 - Wallet: ${request.walletAddress}
-
+${dataWarning}
 ## Market Analysis (Quantitative Scores)
 ${JSON.stringify(candidateSummaries, null, 2)}
 
-Based on the above data, generate an optimal trading strategy. Consider the user's risk tolerance ("${request.riskTolerance}") when sizing positions and setting stop-losses:
-- Conservative: smaller positions, tighter stops, prefer high-liquidity tokens
-- Moderate: balanced approach
-- Aggressive: larger positions, wider stops, accept higher volatility tokens
+Based on the above data, generate an optimal ${mode === "investment" ? "investment portfolio allocation" : "trading strategy"}. The risk tolerance is "${request.riskTolerance}" and the time horizon is "${request.horizon}".
 
-Produce the JSON strategy now.`;
+Produce the JSON ${mode === "investment" ? "investment plan" : "strategy"} now.`;
   }
+
+  // ── LLM Callers ───────────────────────────────────────
 
   private async callLLM(systemPrompt: string, userMessage: string): Promise<string> {
     const response = await this.client.messages.create({
@@ -236,6 +433,36 @@ Produce the JSON strategy now.`;
       throw new Error("LLM returned no text content");
     }
     return textBlock.text;
+  }
+
+  private async callLLMWithThinking(
+    systemPrompt: string,
+    userMessage: string,
+  ): Promise<{ text: string; thinking?: string }> {
+    const response = await this.client.messages.create({
+      model: this.model,
+      max_tokens: 16000,
+      thinking: { type: "enabled", budget_tokens: 8000 },
+      system: systemPrompt,
+      messages: [{ role: "user", content: userMessage }],
+    });
+
+    let text = "";
+    let thinking: string | undefined;
+
+    for (const block of response.content) {
+      if (block.type === "thinking") {
+        thinking = block.thinking;
+      } else if (block.type === "text") {
+        text = block.text;
+      }
+    }
+
+    if (!text) {
+      throw new Error("LLM returned no text content");
+    }
+
+    return { text, thinking };
   }
 
   private async callLLMWithCorrection(
@@ -265,7 +492,9 @@ Produce the JSON strategy now.`;
     return textBlock.text;
   }
 
-  private parseResponse(raw: string): LLMStrategyResponse {
+  // ── Response Parser ───────────────────────────────────
+
+  private parseResponse(raw: string, mode: StrategyMode): LLMStrategyResponse {
     // Strip markdown code blocks if present
     let cleaned = raw.trim();
     if (cleaned.startsWith("```")) {
@@ -275,12 +504,32 @@ Produce the JSON strategy now.`;
     const parsed = JSON.parse(cleaned) as LLMStrategyResponse;
 
     // Validate required fields exist
-    if (!parsed.analysis || !parsed.trades || !parsed.riskMetrics || !parsed.estimatedReturn) {
+    if (!parsed.analysis || !parsed.riskMetrics || !parsed.estimatedReturn) {
       throw new Error("LLM response missing required top-level fields");
     }
 
-    if (!Array.isArray(parsed.trades) || parsed.trades.length === 0) {
-      throw new Error("LLM response must include at least one trade");
+    if (!Array.isArray(parsed.trades)) {
+      throw new Error("LLM response must include trades array");
+    }
+
+    // For investment mode: require investmentPlan, trades can be empty
+    if (mode === "investment") {
+      if (!parsed.investmentPlan?.allocations?.length) {
+        throw new Error("Investment mode requires investmentPlan with allocations");
+      }
+      // Validate allocation percentages roughly sum to 100%
+      const totalAlloc = parsed.investmentPlan.allocations.reduce(
+        (sum, a) => sum + a.targetPercent,
+        0,
+      );
+      if (totalAlloc < 80 || totalAlloc > 120) {
+        this.log.warn({ totalAlloc }, "Allocation percentages don't sum to ~100%");
+      }
+    } else {
+      // Trading modes require at least one trade
+      if (parsed.trades.length === 0) {
+        throw new Error("Trading mode must include at least one trade");
+      }
     }
 
     for (const trade of parsed.trades) {

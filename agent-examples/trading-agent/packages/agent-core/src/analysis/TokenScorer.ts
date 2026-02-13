@@ -1,7 +1,7 @@
 import type { Address, PublicClient } from "viem";
 import pino from "pino";
 import { TOKENS, FEE_TIERS } from "@tal-trading-agent/shared";
-import type { PoolData, QuantScore } from "@tal-trading-agent/shared";
+import type { PoolData, QuantScore, TradeRequest } from "@tal-trading-agent/shared";
 import { PoolAnalyzer } from "./PoolAnalyzer.js";
 import { QuantAnalysis } from "./QuantAnalysis.js";
 
@@ -9,12 +9,15 @@ const logger = pino({ name: "token-scorer" });
 
 // ── Scoring Weights ─────────────────────────────────────────
 
-const WEIGHTS = {
-  liquidityDepth: 0.2,
-  volumeTrend: 0.15,
+const TECHNICAL_WEIGHTS = {
   priceMomentum: 0.15,
   rsiSignal: 0.1,
   macdSignal: 0.1,
+} as const;
+
+const DEFI_WEIGHTS = {
+  liquidityDepth: 0.2,
+  volumeTrend: 0.15,
   tvlStability: 0.1,
   feeEfficiency: 0.1,
   smartMoneyFlow: 0.1,
@@ -38,9 +41,10 @@ export class TokenScorer {
   async scoreTokens(
     candidates: Address[],
     quoteToken: Address = TOKENS.WETH,
+    horizon: TradeRequest["horizon"] = "1w",
   ): Promise<QuantScore[]> {
     logger.info(
-      { candidateCount: candidates.length, quoteToken },
+      { candidateCount: candidates.length, quoteToken, horizon },
       "Starting token scoring",
     );
 
@@ -49,7 +53,7 @@ export class TokenScorer {
     // Process each candidate in parallel
     const promises = candidates.map(async (tokenAddress) => {
       try {
-        return await this.scoreToken(tokenAddress, quoteToken);
+        return await this.scoreToken(tokenAddress, quoteToken, horizon);
       } catch (error) {
         logger.error({ tokenAddress, error }, "Failed to score token");
         return null;
@@ -87,6 +91,7 @@ export class TokenScorer {
   private async scoreToken(
     tokenAddress: Address,
     quoteToken: Address,
+    horizon: TradeRequest["horizon"],
   ): Promise<QuantScore> {
     // Fetch pools for this token across all fee tiers
     const pools = await this.fetchPoolsForToken(tokenAddress, quoteToken);
@@ -99,6 +104,7 @@ export class TokenScorer {
       tokenAddress,
       tokenInfo.symbol,
       pools,
+      horizon,
     );
 
     // Compute weighted overall score
@@ -132,33 +138,44 @@ export class TokenScorer {
 
   /**
    * Compute weighted overall score from indicators and DeFi metrics.
-   * Each component is normalized to 0-100, then combined with weights.
+   * When data confidence is low, technical indicators are down-weighted
+   * and DeFi metrics (liquidity, TVL) dominate instead of fake-neutral technicals.
    */
   private computeOverallScore(score: QuantScore): number {
-    const { indicators, defiMetrics } = score;
+    const { indicators, defiMetrics, dataQuality } = score;
+
+    // Determine data confidence weighting factor
+    const confidence = dataQuality?.confidenceScore ?? 1;
 
     // Normalize technical indicators to 0-100 signals
-
-    // RSI signal: oversold (< 30) is bullish -> high score; overbought (> 70) bearish -> low
-    // Neutral zone (30-70) gives moderate scores
     const rsiSignal = this.rsiToSignal(indicators.rsi);
-
-    // MACD signal: positive histogram is bullish
     const macdSignal = this.macdToSignal(indicators.macd);
-
-    // Price momentum: positive is good, cap at reasonable range
     const momentumSignal = this.momentumToSignal(indicators.momentum);
 
-    // Combine with weights
-    const overall =
-      defiMetrics.liquidityDepth * WEIGHTS.liquidityDepth +
-      defiMetrics.volumeTrend * WEIGHTS.volumeTrend +
-      momentumSignal * WEIGHTS.priceMomentum +
-      rsiSignal * WEIGHTS.rsiSignal +
-      macdSignal * WEIGHTS.macdSignal +
-      defiMetrics.tvlStability * WEIGHTS.tvlStability +
-      defiMetrics.feeApy * WEIGHTS.feeEfficiency +
-      defiMetrics.smartMoneyFlow * WEIGHTS.smartMoneyFlow;
+    // Total technical weight and DeFi weight
+    const rawTechWeight = TECHNICAL_WEIGHTS.priceMomentum + TECHNICAL_WEIGHTS.rsiSignal + TECHNICAL_WEIGHTS.macdSignal;
+    const rawDefiWeight = DEFI_WEIGHTS.liquidityDepth + DEFI_WEIGHTS.volumeTrend + DEFI_WEIGHTS.tvlStability + DEFI_WEIGHTS.feeEfficiency + DEFI_WEIGHTS.smartMoneyFlow;
+
+    // Scale technical weight by data confidence; redistribute remainder to DeFi
+    const effectiveTechWeight = rawTechWeight * confidence;
+    const redistributed = rawTechWeight - effectiveTechWeight;
+    const defiBoost = rawDefiWeight > 0 ? 1 + redistributed / rawDefiWeight : 1;
+
+    // Technical component (scaled by confidence)
+    const techScore =
+      momentumSignal * TECHNICAL_WEIGHTS.priceMomentum * confidence +
+      rsiSignal * TECHNICAL_WEIGHTS.rsiSignal * confidence +
+      macdSignal * TECHNICAL_WEIGHTS.macdSignal * confidence;
+
+    // DeFi component (boosted when technicals are unreliable)
+    const defiScore =
+      defiMetrics.liquidityDepth * DEFI_WEIGHTS.liquidityDepth * defiBoost +
+      defiMetrics.volumeTrend * DEFI_WEIGHTS.volumeTrend * defiBoost +
+      defiMetrics.tvlStability * DEFI_WEIGHTS.tvlStability * defiBoost +
+      defiMetrics.feeApy * DEFI_WEIGHTS.feeEfficiency * defiBoost +
+      defiMetrics.smartMoneyFlow * DEFI_WEIGHTS.smartMoneyFlow * defiBoost;
+
+    const overall = techScore + defiScore;
 
     return Math.round(overall * 10) / 10;
   }

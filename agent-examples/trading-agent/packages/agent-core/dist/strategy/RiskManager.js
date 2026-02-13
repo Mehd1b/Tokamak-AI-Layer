@@ -1,12 +1,24 @@
 import pino from "pino";
 import { getAddress, isAddress } from "viem";
-import { DEFAULT_RISK_PARAMS } from "@tal-trading-agent/shared";
+import { RISK_PRESETS } from "@tal-trading-agent/shared";
 export class RiskManager {
-    params;
+    defaultParams;
     log;
     constructor(config = {}) {
-        this.params = { ...DEFAULT_RISK_PARAMS, ...config.params };
+        this.defaultParams = { ...RISK_PRESETS.moderate, ...config.params };
         this.log = pino({ name: "RiskManager" });
+    }
+    /**
+     * Create a RiskManager tuned for a specific risk tolerance.
+     */
+    static forTolerance(tolerance) {
+        return new RiskManager({ params: RISK_PRESETS[tolerance] });
+    }
+    /**
+     * Get the risk params for a strategy based on its risk tolerance.
+     */
+    getParams(strategy) {
+        return RISK_PRESETS[strategy.request.riskTolerance] ?? this.defaultParams;
     }
     /**
      * Validates a trading strategy against risk parameters.
@@ -16,6 +28,7 @@ export class RiskManager {
         const errors = [];
         const warnings = [];
         const budget = strategy.request.budget;
+        const params = this.getParams(strategy);
         // 1. Check strategy expiration
         if (strategy.expiresAt <= Date.now()) {
             errors.push("Strategy has expired");
@@ -28,8 +41,8 @@ export class RiskManager {
         // 3. Check individual trade sizes against maxSingleTradePercent
         for (const trade of strategy.trades) {
             const tradePercent = Number((trade.amountIn * 10000n) / budget) / 100;
-            if (tradePercent > this.params.maxSingleTradePercent) {
-                errors.push(`Trade ${trade.tokenIn} -> ${trade.tokenOut}: ${tradePercent.toFixed(1)}% of budget exceeds max single trade limit (${this.params.maxSingleTradePercent}%)`);
+            if (tradePercent > params.maxSingleTradePercent) {
+                errors.push(`Trade ${trade.tokenIn} -> ${trade.tokenOut}: ${tradePercent.toFixed(1)}% of budget exceeds max single trade limit (${params.maxSingleTradePercent}%)`);
             }
         }
         // 4. Validate token addresses are valid checksummed addresses
@@ -49,15 +62,15 @@ export class RiskManager {
         }
         // 5. Check price impact against max threshold
         for (const trade of strategy.trades) {
-            if (trade.priceImpact > this.params.maxPriceImpactPercent) {
-                errors.push(`Trade ${trade.tokenIn} -> ${trade.tokenOut}: price impact ${trade.priceImpact.toFixed(2)}% exceeds max (${this.params.maxPriceImpactPercent}%)`);
+            if (trade.priceImpact > params.maxPriceImpactPercent) {
+                errors.push(`Trade ${trade.tokenIn} -> ${trade.tokenOut}: price impact ${trade.priceImpact.toFixed(2)}% exceeds max (${params.maxPriceImpactPercent}%)`);
             }
-            else if (trade.priceImpact > this.params.maxPriceImpactPercent * 0.75) {
-                warnings.push(`Trade ${trade.tokenIn} -> ${trade.tokenOut}: price impact ${trade.priceImpact.toFixed(2)}% is approaching max (${this.params.maxPriceImpactPercent}%)`);
+            else if (trade.priceImpact > params.maxPriceImpactPercent * 0.75) {
+                warnings.push(`Trade ${trade.tokenIn} -> ${trade.tokenOut}: price impact ${trade.priceImpact.toFixed(2)}% is approaching max (${params.maxPriceImpactPercent}%)`);
             }
         }
         // 6. Check stop-loss requirement
-        if (this.params.requireStopLoss && strategy.riskMetrics.stopLossPrice === 0n) {
+        if (params.requireStopLoss && strategy.riskMetrics.stopLossPrice === 0n) {
             errors.push("Stop-loss is required but not set");
         }
         // 7. Validate liquidity from quant scores (top candidates)
@@ -65,8 +78,8 @@ export class RiskManager {
             const candidateScore = strategy.analysis.topCandidates.find((c) => c.tokenAddress.toLowerCase() === trade.tokenOut.toLowerCase());
             if (candidateScore) {
                 const liquidityUsd = candidateScore.defiMetrics.liquidityDepth;
-                if (liquidityUsd < this.params.minPoolTvlUsd) {
-                    errors.push(`Token ${candidateScore.symbol}: liquidity depth $${liquidityUsd.toFixed(0)} below minimum $${this.params.minPoolTvlUsd}`);
+                if (liquidityUsd < params.minPoolTvlUsd) {
+                    errors.push(`Token ${candidateScore.symbol}: liquidity depth $${liquidityUsd.toFixed(0)} below minimum $${params.minPoolTvlUsd}`);
                 }
             }
         }
@@ -74,6 +87,20 @@ export class RiskManager {
         for (const trade of strategy.trades) {
             if (trade.minAmountOut === 0n) {
                 errors.push(`Trade ${trade.tokenIn} -> ${trade.tokenOut}: minAmountOut is zero - no slippage protection`);
+            }
+        }
+        // 9. Validate investment plan if present
+        if (strategy.investmentPlan) {
+            const plan = strategy.investmentPlan;
+            const totalAlloc = plan.allocations.reduce((s, a) => s + a.targetPercent, 0);
+            if (totalAlloc < 80 || totalAlloc > 120) {
+                warnings.push(`Investment plan allocations sum to ${totalAlloc.toFixed(1)}% (expected ~100%)`);
+            }
+            // Check concentration limits per risk profile
+            for (const alloc of plan.allocations) {
+                if (alloc.targetPercent > params.maxSingleTradePercent) {
+                    warnings.push(`Allocation ${alloc.symbol}: ${alloc.targetPercent}% exceeds recommended max single position (${params.maxSingleTradePercent}%)`);
+                }
             }
         }
         const valid = errors.length === 0;
@@ -87,7 +114,8 @@ export class RiskManager {
     adjustForRisk(strategy) {
         this.log.info({ strategyId: strategy.id }, "Adjusting strategy for risk compliance");
         const budget = strategy.request.budget;
-        const maxSingleAmount = (budget * BigInt(this.params.maxSingleTradePercent)) / 100n;
+        const params = this.getParams(strategy);
+        const maxSingleAmount = (budget * BigInt(params.maxSingleTradePercent)) / 100n;
         const adjustedTrades = [];
         for (const trade of strategy.trades) {
             let adjustedTrade = { ...trade };
@@ -103,14 +131,9 @@ export class RiskManager {
                 };
             }
             // 2. Increase minAmountOut for better slippage protection
-            // Enforce at least (100% - maxSlippage%) of the proportional amount
             if (adjustedTrade.minAmountOut > 0n) {
-                const slippageFactor = BigInt(10000 - Math.round(this.params.maxSlippagePercent * 100));
+                const slippageFactor = BigInt(10000 - Math.round(params.maxSlippagePercent * 100));
                 const minWithSlippage = (adjustedTrade.amountIn * slippageFactor) / 10000n;
-                // Use the higher of current minAmountOut and slippage-adjusted value
-                // (only when they're in the same token, which is a simplification -
-                //  in practice the swap output is a different token with different decimals)
-                // We keep the existing minAmountOut if it's already more protective
                 if (adjustedTrade.minAmountOut < minWithSlippage) {
                     adjustedTrade = { ...adjustedTrade, minAmountOut: minWithSlippage };
                 }
@@ -133,9 +156,7 @@ export class RiskManager {
         }
         // 4. Ensure stop-loss is set if required
         let adjustedRiskMetrics = { ...strategy.riskMetrics };
-        if (this.params.requireStopLoss && adjustedRiskMetrics.stopLossPrice === 0n) {
-            // Default stop-loss: 10% below current implied price
-            // Use take-profit or budget as reference if available
+        if (params.requireStopLoss && adjustedRiskMetrics.stopLossPrice === 0n) {
             const reference = adjustedRiskMetrics.takeProfitPrice > 0n
                 ? adjustedRiskMetrics.takeProfitPrice
                 : budget;

@@ -1,23 +1,13 @@
 import { NextResponse } from 'next/server';
-import { keccak256, toHex, createWalletClient, createPublicClient, http, type Chain } from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
+import { keccak256, toHex } from 'viem';
 import { resolveAgent, proxyGet, proxyPost } from '../../resolve';
-import { THANOS_RPC_URL } from '@/lib/rpc';
-import { TaskFeeEscrowABI } from '../../../../../../../sdk/src/abi/TaskFeeEscrow';
 
 const TASK_FEE_ESCROW_ADDRESS = '0x6D68Cd8fD89BF1746A1948783C92A00E591d1227' as const;
-
-const thanosSepolia = {
-  id: 111551119090,
-  name: 'Thanos Sepolia',
-  nativeCurrency: { name: 'TON', symbol: 'TON', decimals: 18 },
-  rpcUrls: { default: { http: ['https://rpc.thanos-sepolia.tokamak.network'] } },
-} as const satisfies Chain;
 
 /**
  * Server-side confirmTask: releases escrowed fees to agentBalances.
  * Uses the OPERATOR_PRIVATE_KEY env var (agent owner/operator's key).
- * Runs fire-and-forget after the task result is built — does not block the response.
+ * All viem/accounts imports are dynamic to avoid polluting global types.
  */
 async function serverConfirmTask(taskRef: string): Promise<{ txHash: string } | null> {
   const pk = process.env.OPERATOR_PRIVATE_KEY;
@@ -26,6 +16,18 @@ async function serverConfirmTask(taskRef: string): Promise<{ txHash: string } | 
     return null;
   }
   try {
+    const { createWalletClient, createPublicClient, http } = await import('viem');
+    const { privateKeyToAccount } = await import('viem/accounts');
+    const { THANOS_RPC_URL } = await import('@/lib/rpc');
+    const { TaskFeeEscrowABI } = await import('../../../../../../../sdk/src/abi/TaskFeeEscrow');
+
+    const thanosSepolia = {
+      id: 111551119090,
+      name: 'Thanos Sepolia',
+      nativeCurrency: { name: 'TON', symbol: 'TON', decimals: 18 },
+      rpcUrls: { default: { http: ['https://rpc.thanos-sepolia.tokamak.network'] } },
+    } as const;
+
     const account = privateKeyToAccount(pk as `0x${string}`);
     const walletClient = createWalletClient({
       account,

@@ -1,4 +1,5 @@
 import type { Address } from "viem";
+import type { RiskParams, TradeRequest } from "./types.js";
 export declare const TAL_CONTRACTS: {
     readonly identityRegistry: Address;
     readonly reputationRegistry: Address;
@@ -37,11 +38,9 @@ export declare const CHAIN_IDS: {
     readonly ethereum: 1;
     readonly thanosSepolia: 111551119090;
 };
-export declare const DEFAULT_RISK_PARAMS: {
-    readonly maxSingleTradePercent: 50;
-    readonly maxSlippagePercent: 1;
-    readonly minPoolTvlUsd: 100000;
-    readonly maxPriceImpactPercent: 2;
-    readonly requireStopLoss: true;
-};
+export declare const HORIZON_MS: Record<TradeRequest["horizon"], number>;
+export declare const HORIZON_TO_LLAMA_PERIOD: Record<TradeRequest["horizon"], string>;
+export declare const MIN_DATA_POINTS: Record<TradeRequest["horizon"], number>;
+export declare const RISK_PRESETS: Record<TradeRequest["riskTolerance"], RiskParams>;
+export declare const DEFAULT_RISK_PARAMS: RiskParams;
 //# sourceMappingURL=constants.d.ts.map

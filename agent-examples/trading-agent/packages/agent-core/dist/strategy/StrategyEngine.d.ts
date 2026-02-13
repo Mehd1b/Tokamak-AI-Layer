@@ -10,8 +10,12 @@ export declare class StrategyEngine {
     constructor(config: StrategyEngineConfig);
     generateStrategy(request: TradeRequest, candidates: QuantScore[]): Promise<TradingStrategy>;
     private buildSystemPrompt;
+    private getModeGuidance;
+    private getRiskRules;
+    private getOutputSchema;
     private buildUserMessage;
     private callLLM;
+    private callLLMWithThinking;
     private callLLMWithCorrection;
     private parseResponse;
     private toLLMTradeAction;

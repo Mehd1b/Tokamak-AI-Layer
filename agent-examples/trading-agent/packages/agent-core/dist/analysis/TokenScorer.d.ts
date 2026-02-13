@@ -1,5 +1,5 @@
 import type { Address, PublicClient } from "viem";
-import type { QuantScore } from "@tal-trading-agent/shared";
+import type { QuantScore, TradeRequest } from "@tal-trading-agent/shared";
 export declare class TokenScorer {
     private readonly poolAnalyzer;
     private readonly quantAnalysis;
@@ -8,7 +8,7 @@ export declare class TokenScorer {
      * Score and rank a list of candidate tokens against a quote token.
      * Returns QuantScore[] sorted by overallScore descending.
      */
-    scoreTokens(candidates: Address[], quoteToken?: Address): Promise<QuantScore[]>;
+    scoreTokens(candidates: Address[], quoteToken?: Address, horizon?: TradeRequest["horizon"]): Promise<QuantScore[]>;
     /**
      * Score a single token. Fetches pool data, runs quant analysis,
      * and computes weighted overall score.
@@ -20,7 +20,8 @@ export declare class TokenScorer {
     private fetchPoolsForToken;
     /**
      * Compute weighted overall score from indicators and DeFi metrics.
-     * Each component is normalized to 0-100, then combined with weights.
+     * When data confidence is low, technical indicators are down-weighted
+     * and DeFi metrics (liquidity, TVL) dominate instead of fake-neutral technicals.
      */
     private computeOverallScore;
     /**

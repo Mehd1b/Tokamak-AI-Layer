@@ -1,5 +1,8 @@
 import type { Address, Hash, Hex } from "viem";
 
+// ── Strategy Mode ───────────────────────────────────────
+export type StrategyMode = "scalp" | "swing" | "position" | "investment";
+
 // ── Trade Request (user input) ───────────────────────────
 export interface TradeRequest {
   /** Natural language prompt from the user */
@@ -11,7 +14,7 @@ export interface TradeRequest {
   /** User's wallet address */
   walletAddress: Address;
   /** Trading time horizon */
-  horizon: "1h" | "4h" | "1d" | "1w" | "1m";
+  horizon: "1h" | "4h" | "1d" | "1w" | "1m" | "3m" | "6m" | "1y";
   /** Risk tolerance level */
   riskTolerance: "conservative" | "moderate" | "aggressive";
   /** Chain ID for execution */
@@ -40,6 +43,14 @@ export interface TokenInfo {
   priceUsd: number;
 }
 
+// ── Data Quality Assessment ─────────────────────────────
+export interface DataQuality {
+  priceDataPoints: number;
+  indicatorsReliable: boolean;
+  confidenceScore: number; // 0-1
+  confidenceNote: string;
+}
+
 // ── Quantitative Analysis ────────────────────────────────
 export interface QuantScore {
   tokenAddress: Address;
@@ -60,12 +71,50 @@ export interface QuantScore {
   };
   overallScore: number;
   reasoning: string;
+  dataQuality?: DataQuality;
+}
+
+// ── Investment Plan Types ────────────────────────────────
+export interface PortfolioAllocation {
+  tokenAddress: string;
+  symbol: string;
+  targetPercent: number;
+  reasoning: string;
+}
+
+export interface DCASchedule {
+  frequency: "daily" | "weekly" | "biweekly" | "monthly";
+  totalPeriods: number;
+  amountPerPeriodPercent: number;
+}
+
+export interface RebalanceTrigger {
+  type: "calendar" | "drift";
+  frequency?: "weekly" | "monthly" | "quarterly";
+  driftThresholdPercent?: number;
+}
+
+export interface ExitCriteria {
+  takeProfitPercent?: number;
+  stopLossPercent?: number;
+  trailingStopPercent?: number;
+  timeExitMonths?: number;
+}
+
+export interface InvestmentPlan {
+  allocations: PortfolioAllocation[];
+  entryStrategy: "lump-sum" | "dca" | "hybrid";
+  dcaSchedule?: DCASchedule;
+  rebalancing?: RebalanceTrigger;
+  exitCriteria?: ExitCriteria;
+  thesis: string;
 }
 
 // ── Trading Strategy (agent output) ──────────────────────
 export interface TradingStrategy {
   id: string;
   request: TradeRequest;
+  mode: StrategyMode;
   analysis: {
     marketCondition: "bullish" | "bearish" | "sideways";
     confidence: number;
@@ -73,6 +122,8 @@ export interface TradingStrategy {
     topCandidates: QuantScore[];
   };
   trades: TradeAction[];
+  investmentPlan?: InvestmentPlan;
+  llmReasoning?: string;
   riskMetrics: RiskMetrics;
   estimatedReturn: {
     optimistic: number;

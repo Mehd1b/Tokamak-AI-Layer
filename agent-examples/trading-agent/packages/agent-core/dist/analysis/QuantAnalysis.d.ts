@@ -1,5 +1,5 @@
 import type { Address } from "viem";
-import type { PoolData, QuantScore } from "@tal-trading-agent/shared";
+import type { PoolData, QuantScore, DataQuality, TradeRequest } from "@tal-trading-agent/shared";
 interface TechnicalIndicators {
     rsi: number;
     macd: {
@@ -28,10 +28,10 @@ export declare class QuantAnalysis {
      */
     getCurrentPrice(tokenAddress: Address): Promise<number>;
     /**
-     * Fetch historical price data (1 week) from DeFiLlama chart API.
-     * Returns an array of [timestamp, price] sorted by timestamp ascending.
+     * Fetch historical price data from DeFiLlama chart API.
+     * Period is determined by the trading horizon.
      */
-    getHistoricalPrices(tokenAddress: Address): Promise<number[]>;
+    getHistoricalPrices(tokenAddress: Address, horizon?: TradeRequest["horizon"]): Promise<number[]>;
     /**
      * Compute all technical indicators from price series.
      */
@@ -41,10 +41,14 @@ export declare class QuantAnalysis {
      */
     computeDeFiMetrics(pools: PoolData[], historicalPrices: number[]): DeFiMetrics;
     /**
+     * Compute data confidence score based on available data points vs minimum needed.
+     */
+    computeDataConfidence(dataPoints: number, horizon: TradeRequest["horizon"]): DataQuality;
+    /**
      * Full analysis: fetches prices, computes indicators and DeFi metrics.
      * Returns a complete QuantScore for a single token.
      */
-    analyzeToken(tokenAddress: Address, symbol: string, pools: PoolData[]): Promise<QuantScore>;
+    analyzeToken(tokenAddress: Address, symbol: string, pools: PoolData[], horizon?: TradeRequest["horizon"]): Promise<QuantScore>;
     /**
      * RSI (Relative Strength Index) - 14-period default.
      * Returns value between 0 and 100.

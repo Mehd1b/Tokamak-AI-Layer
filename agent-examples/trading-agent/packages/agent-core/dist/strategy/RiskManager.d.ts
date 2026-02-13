@@ -3,9 +3,17 @@ export interface RiskManagerConfig {
     params?: Partial<RiskParams>;
 }
 export declare class RiskManager {
-    private readonly params;
+    private readonly defaultParams;
     private readonly log;
     constructor(config?: RiskManagerConfig);
+    /**
+     * Create a RiskManager tuned for a specific risk tolerance.
+     */
+    static forTolerance(tolerance: "conservative" | "moderate" | "aggressive"): RiskManager;
+    /**
+     * Get the risk params for a strategy based on its risk tolerance.
+     */
+    private getParams;
     /**
      * Validates a trading strategy against risk parameters.
      * Returns validation result with errors (hard blockers) and warnings (advisory).

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Send, Loader2, AlertCircle, CheckCircle, FileCode, FileText, Shield, CheckCircle2, XCircle, Coins, Download } from 'lucide-react';
+import { Send, Loader2, AlertCircle, CheckCircle, FileCode, FileText, Shield, CheckCircle2, XCircle, Coins, Download, ChevronDown, ChevronUp, PieChart, Calendar, Target, TrendingUp } from 'lucide-react';
 import { useSubmitTask } from '@/hooks/useAgentRuntime';
 import { useRequestValidation, useRequestValidationOnChain } from '@/hooks/useValidation';
 import { StrategyReportView, isStrategyReport } from './StrategyReportView';
@@ -11,7 +11,7 @@ import { formatEther } from 'viem';
 import { useL2Config } from '@/hooks/useL2Config';
 
 /** Detect trading strategy output (from trading-agent) */
-function isTradingStrategy(obj: unknown): obj is { strategy: { id: string; analysis: unknown; trades: unknown[] }; unsignedSwaps?: unknown[] } {
+function isTradingStrategy(obj: unknown): obj is { strategy: { id: string; analysis: unknown; trades: unknown[]; mode?: string; investmentPlan?: unknown; llmReasoning?: string }; unsignedSwaps?: unknown[] } {
   if (!obj || typeof obj !== 'object') return false;
   const o = obj as Record<string, unknown>;
   if (!o.strategy || typeof o.strategy !== 'object') return false;
@@ -35,10 +35,115 @@ async function downloadZip(strategyId: string, agentBaseUrl: string) {
   URL.revokeObjectURL(blobUrl);
 }
 
-function TradingStrategyView({ data, serviceUrl }: { data: { strategy: { id: string; analysis: { marketCondition: string; confidence: number; reasoning: string }; trades: Array<{ action: string; tokenIn: string; tokenOut: string; amountIn: string; poolFee: number; priceImpact: number }>; estimatedReturn?: { optimistic: number; expected: number; pessimistic: number } }; riskWarnings?: string[]; unsignedSwaps?: unknown[] }; serviceUrl?: string }) {
+interface InvestmentPlanData {
+  allocations: Array<{ tokenAddress: string; symbol: string; targetPercent: number; reasoning: string }>;
+  entryStrategy: string;
+  dcaSchedule?: { frequency: string; totalPeriods: number; amountPerPeriodPercent: number };
+  rebalancing?: { type: string; frequency?: string; driftThresholdPercent?: number };
+  exitCriteria?: { takeProfitPercent?: number; stopLossPercent?: number; trailingStopPercent?: number; timeExitMonths?: number };
+  thesis: string;
+}
+
+function InvestmentPlanView({ plan }: { plan: InvestmentPlanData }) {
+  return (
+    <div className="space-y-3">
+      {/* Thesis */}
+      <div className="rounded-lg border border-[#38BDF8]/20 bg-[#38BDF8]/5 p-3">
+        <div className="flex items-center gap-2 mb-1">
+          <TrendingUp className="h-4 w-4 text-[#38BDF8]" />
+          <p className="text-xs font-medium text-[#38BDF8] uppercase tracking-wide">Investment Thesis</p>
+        </div>
+        <p className="text-sm text-zinc-300">{plan.thesis}</p>
+      </div>
+
+      {/* Portfolio Allocation */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <PieChart className="h-4 w-4 text-zinc-400" />
+          <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Portfolio Allocation</p>
+        </div>
+        <div className="space-y-1">
+          {plan.allocations.map((alloc, i) => (
+            <div key={i} className="rounded-lg bg-white/5 px-3 py-2">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-medium text-white">{alloc.symbol}</span>
+                <span className="text-sm font-mono font-bold text-[#38BDF8]">{alloc.targetPercent}%</span>
+              </div>
+              <div className="w-full bg-white/10 rounded-full h-1.5 mb-1">
+                <div
+                  className="bg-[#38BDF8] h-1.5 rounded-full"
+                  style={{ width: `${Math.min(100, alloc.targetPercent)}%` }}
+                />
+              </div>
+              <p className="text-xs text-zinc-400">{alloc.reasoning}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Entry Strategy & DCA */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-lg bg-white/5 p-2">
+          <div className="flex items-center gap-1 mb-1">
+            <Target className="h-3 w-3 text-zinc-400" />
+            <p className="text-[10px] text-zinc-500">Entry Strategy</p>
+          </div>
+          <p className="text-sm font-medium text-white capitalize">{plan.entryStrategy}</p>
+        </div>
+        {plan.dcaSchedule && (
+          <div className="rounded-lg bg-white/5 p-2">
+            <div className="flex items-center gap-1 mb-1">
+              <Calendar className="h-3 w-3 text-zinc-400" />
+              <p className="text-[10px] text-zinc-500">DCA Schedule</p>
+            </div>
+            <p className="text-sm font-medium text-white capitalize">{plan.dcaSchedule.frequency}</p>
+            <p className="text-[10px] text-zinc-400">{plan.dcaSchedule.totalPeriods} periods, {plan.dcaSchedule.amountPerPeriodPercent}% each</p>
+          </div>
+        )}
+      </div>
+
+      {/* Rebalancing */}
+      {plan.rebalancing && (
+        <div className="rounded-lg bg-white/5 p-2">
+          <p className="text-[10px] text-zinc-500 mb-1">Rebalancing</p>
+          <p className="text-sm text-white capitalize">
+            {plan.rebalancing.type}
+            {plan.rebalancing.frequency && ` (${plan.rebalancing.frequency})`}
+            {plan.rebalancing.driftThresholdPercent != null && ` — drift threshold: ${plan.rebalancing.driftThresholdPercent}%`}
+          </p>
+        </div>
+      )}
+
+      {/* Exit Criteria */}
+      {plan.exitCriteria && (
+        <div className="rounded-lg bg-white/5 p-2">
+          <p className="text-[10px] text-zinc-500 mb-1">Exit Criteria</p>
+          <div className="grid grid-cols-2 gap-1 text-xs">
+            {plan.exitCriteria.takeProfitPercent != null && (
+              <span className="text-emerald-400">Take Profit: {plan.exitCriteria.takeProfitPercent}%</span>
+            )}
+            {plan.exitCriteria.stopLossPercent != null && (
+              <span className="text-red-400">Stop Loss: {plan.exitCriteria.stopLossPercent}%</span>
+            )}
+            {plan.exitCriteria.trailingStopPercent != null && (
+              <span className="text-amber-400">Trailing Stop: {plan.exitCriteria.trailingStopPercent}%</span>
+            )}
+            {plan.exitCriteria.timeExitMonths != null && (
+              <span className="text-zinc-300">Time Exit: {plan.exitCriteria.timeExitMonths} months</span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TradingStrategyView({ data, serviceUrl }: { data: { strategy: { id: string; mode?: string; analysis: { marketCondition: string; confidence: number; reasoning: string }; trades: Array<{ action: string; tokenIn: string; tokenOut: string; amountIn: string; poolFee: number; priceImpact: number }>; investmentPlan?: InvestmentPlanData; llmReasoning?: string; estimatedReturn?: { optimistic: number; expected: number; pessimistic: number } }; riskWarnings?: string[]; unsignedSwaps?: unknown[] }; serviceUrl?: string }) {
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [showReasoning, setShowReasoning] = useState(false);
   const { strategy, riskWarnings } = data;
+  const isInvestmentMode = strategy.mode === 'investment' || strategy.mode === 'position';
 
   const handleDownload = async () => {
     setDownloading(true);
@@ -62,8 +167,13 @@ function TradingStrategyView({ data, serviceUrl }: { data: { strategy: { id: str
 
   return (
     <div className="space-y-3">
-      {/* Market Analysis */}
-      <div className="flex items-center gap-3">
+      {/* Mode Badge + Market Analysis */}
+      <div className="flex items-center gap-3 flex-wrap">
+        {strategy.mode && (
+          <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-[#38BDF8]/20 text-[#38BDF8]">
+            {strategy.mode.toUpperCase()}
+          </span>
+        )}
         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
           strategy.analysis.marketCondition === 'bullish'
             ? 'bg-emerald-500/20 text-emerald-400'
@@ -79,28 +189,55 @@ function TradingStrategyView({ data, serviceUrl }: { data: { strategy: { id: str
       </div>
       <p className="text-sm text-zinc-300">{strategy.analysis.reasoning}</p>
 
+      {/* Investment Plan (for investment/position modes) */}
+      {isInvestmentMode && strategy.investmentPlan && (
+        <InvestmentPlanView plan={strategy.investmentPlan} />
+      )}
+
+      {/* LLM Reasoning (collapsible) */}
+      {strategy.llmReasoning && (
+        <div className="rounded-lg border border-white/10 bg-white/[0.02]">
+          <button
+            onClick={() => setShowReasoning(!showReasoning)}
+            className="flex items-center justify-between w-full px-3 py-2 text-xs text-zinc-400 hover:text-zinc-300"
+          >
+            <span>LLM Reasoning</span>
+            {showReasoning ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </button>
+          {showReasoning && (
+            <div className="px-3 pb-3">
+              <pre className="whitespace-pre-wrap text-xs text-zinc-400 font-mono leading-relaxed">
+                {strategy.llmReasoning}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Trades */}
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Trades ({strategy.trades.length})</p>
-        {strategy.trades.map((t, i) => (
-          <div key={i} className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2">
-            <div className="flex items-center gap-2">
-              <span className={`text-xs font-bold ${t.action === 'buy' ? 'text-emerald-400' : 'text-red-400'}`}>
-                {t.action.toUpperCase()}
-              </span>
-              <span className="text-xs font-mono text-zinc-300">{t.tokenIn.slice(0, 6)}...{t.tokenIn.slice(-4)}</span>
-              <span className="text-zinc-600">&rarr;</span>
-              <span className="text-xs font-mono text-zinc-300">{t.tokenOut.slice(0, 6)}...{t.tokenOut.slice(-4)}</span>
+      {strategy.trades.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Trades ({strategy.trades.length})</p>
+          {strategy.trades.map((t, i) => (
+            <div key={i} className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-bold ${t.action === 'buy' ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {t.action.toUpperCase()}
+                </span>
+                <span className="text-xs font-mono text-zinc-300">{t.tokenIn.slice(0, 6)}...{t.tokenIn.slice(-4)}</span>
+                <span className="text-zinc-600">&rarr;</span>
+                <span className="text-xs font-mono text-zinc-300">{t.tokenOut.slice(0, 6)}...{t.tokenOut.slice(-4)}</span>
+              </div>
+              <div className="text-right text-xs">
+                <span className="text-zinc-400">Fee: {t.poolFee / 10000}%</span>
+                {t.priceImpact > 0 && (
+                  <span className="ml-2 text-amber-400">Impact: {t.priceImpact.toFixed(2)}%</span>
+                )}
+              </div>
             </div>
-            <div className="text-right text-xs">
-              <span className="text-zinc-400">Fee: {t.poolFee / 10000}%</span>
-              {t.priceImpact > 0 && (
-                <span className="ml-2 text-amber-400">Impact: {t.priceImpact.toFixed(2)}%</span>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Expected Returns */}
       {strategy.estimatedReturn && (
@@ -131,26 +268,28 @@ function TradingStrategyView({ data, serviceUrl }: { data: { strategy: { id: str
       )}
 
       {/* Download Bot Button */}
-      <div className="flex items-center gap-3 pt-2 border-t border-white/10">
-        <button
-          onClick={handleDownload}
-          disabled={downloading}
-          className="btn-primary inline-flex items-center gap-2 text-sm"
-        >
-          {downloading ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Generating Bot...
-            </>
-          ) : (
-            <>
-              <Download className="h-4 w-4" />
-              Download Trading Bot (.zip)
-            </>
-          )}
-        </button>
-        <span className="text-xs text-zinc-500">Self-contained Node.js bot for this strategy</span>
-      </div>
+      {strategy.trades.length > 0 && (
+        <div className="flex items-center gap-3 pt-2 border-t border-white/10">
+          <button
+            onClick={handleDownload}
+            disabled={downloading}
+            className="btn-primary inline-flex items-center gap-2 text-sm"
+          >
+            {downloading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Generating Bot...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                Download Trading Bot (.zip)
+              </>
+            )}
+          </button>
+          <span className="text-xs text-zinc-500">Self-contained Node.js bot for this strategy</span>
+        </div>
+      )}
       {downloadError && (
         <p className="text-xs text-red-400">{downloadError}</p>
       )}
@@ -199,6 +338,51 @@ function FormattedOutput({ output, serviceUrl }: { output: string | null; servic
   }
 }
 
+function renderPaymentInfo(payHash: string | undefined, explorerUrl: string) {
+  if (!payHash) return null;
+  return (
+    <div className="mb-3 rounded bg-white/5 px-2 py-1">
+      <p className="text-xs text-zinc-400">Payment Tx</p>
+      <a
+        href={`${explorerUrl}/tx/${payHash}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="truncate text-xs font-mono text-zinc-300 underline"
+      >
+        {payHash.slice(0, 18)}...
+      </a>
+    </div>
+  );
+}
+
+function renderFeeEscrowStatus(
+  hasFee: boolean | 0n | undefined,
+  currentTaskRef: string | undefined,
+  result: { metadata: Record<string, unknown> } | null,
+  explorerUrl: string,
+) {
+  if (!hasFee || !currentTaskRef || !result?.metadata?.feeConfirmed) return null;
+  const confirmTxHash = typeof result.metadata.confirmTxHash === 'string' ? result.metadata.confirmTxHash : null;
+  return (
+    <div className="mb-3 rounded bg-white/5 px-2 py-1">
+      <p className="text-xs text-zinc-400">Fee Escrow</p>
+      <p className="text-xs text-emerald-400 flex items-center gap-1">
+        <CheckCircle className="h-3 w-3" /> Fees released to agent
+        {confirmTxHash && (
+          <a
+            href={`${explorerUrl}/tx/${confirmTxHash}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-1 font-mono underline"
+          >
+            {confirmTxHash.slice(0, 14)}...
+          </a>
+        )}
+      </p>
+    </div>
+  );
+}
+
 interface TaskSubmissionProps {
   agentId: string;
   agentName: string;
@@ -220,8 +404,8 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
   const { explorerUrl, nativeCurrency } = useL2Config();
   const { data: balance } = useTONBalanceL2(address);
   const { submitTask, result, isSubmitting, error, reset } = useSubmitTask();
-  const { pay, hash: payHash_, isPending: isPayPending, isConfirming: isPayConfirming, isSuccess: isPaySuccess, error: payError } = usePayForTask();
-  const payHash = payHash_ as `0x${string}` | undefined;
+  const { pay, hash: payHashRaw, isPending: isPayPending, isConfirming: isPayConfirming, isSuccess: isPaySuccess, error: payError } = usePayForTask();
+  const payHash: string | undefined = payHashRaw ? String(payHashRaw) : undefined;
   const {
     validate,
     result: validationResult,
@@ -430,39 +614,10 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
           </div>
 
           {/* Payment confirmation */}
-          {payHash ? (
-            <div className="mb-3 rounded bg-white/5 px-2 py-1">
-              <p className="text-xs text-zinc-400">Payment Tx</p>
-              <a
-                href={`${explorerUrl}/tx/${payHash}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="truncate text-xs font-mono text-zinc-300 underline"
-              >
-                {payHash.slice(0, 18)}...
-              </a>
-            </div>
-          ) : null}
+          {renderPaymentInfo(payHash, explorerUrl)}
 
-          {/* Fee escrow status */}
-          {hasFee && currentTaskRef && result?.metadata?.feeConfirmed && (
-            <div className="mb-3 rounded bg-white/5 px-2 py-1">
-              <p className="text-xs text-zinc-400">Fee Escrow</p>
-              <p className="text-xs text-emerald-400 flex items-center gap-1">
-                <CheckCircle className="h-3 w-3" /> Fees released to agent
-                {result.metadata.confirmTxHash && (
-                  <a
-                    href={`${explorerUrl}/tx/${result.metadata.confirmTxHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="ml-1 font-mono underline"
-                  >
-                    {String(result.metadata.confirmTxHash).slice(0, 14)}...
-                  </a>
-                )}
-              </p>
-            </div>
-          )}
+          {/* Fee escrow status — rendered via helper to avoid unknown type in JSX */}
+          {renderFeeEscrowStatus(hasFee, currentTaskRef, result, explorerUrl)}
 
           {/* Hashes for on-chain verification */}
           <div className="mb-3 grid grid-cols-2 gap-2">
