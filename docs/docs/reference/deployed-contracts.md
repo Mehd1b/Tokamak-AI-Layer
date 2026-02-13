@@ -18,6 +18,8 @@ The core TAL protocol contracts are deployed on Thanos Sepolia, a Tokamak Networ
 | TALValidationRegistry | [`0x09447147C6E75a60A449f38532F06E19F5F632F3`](https://explorer.thanos-sepolia.tokamak.network/address/0x09447147C6E75a60A449f38532F06E19F5F632F3) | Multi-model validation, TEE attestation, bounty distribution |
 | StakingIntegrationModule | [`0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30`](https://explorer.thanos-sepolia.tokamak.network/address/0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30) | Stake queries, slashing, seigniorage routing |
 | TaskFeeEscrow | [`0x6D68Cd8fD89BF1746A1948783C92A00E591d1227`](https://explorer.thanos-sepolia.tokamak.network/address/0x6D68Cd8fD89BF1746A1948783C92A00E591d1227) | Native TON task fee escrow with refund support |
+| WSTON (L2 Bridged) | [`0x4d7b29213c9ad19a2aaa01e3ccf6f209636a786f`](https://explorer.thanos-sepolia.tokamak.network/address/0x4d7b29213c9ad19a2aaa01e3ccf6f209636a786f) | Bridged WrappedStakedTON (ERC-20, 27 decimals) via OptimismMintableERC20Factory |
+| WSTONVault | *Pending deployment* | L2 vault for locking bridged WSTON with slashing support |
 
 ## Ethereum Sepolia L1
 
@@ -27,6 +29,7 @@ Tokamak Network staking infrastructure on Ethereum Sepolia, used for economic se
 |----------|---------|-------------|
 | TON | [`0xa30fe40285B8f5c0457DbC3B7C8A280373c40044`](https://sepolia.etherscan.io/address/0xa30fe40285B8f5c0457DbC3B7C8A280373c40044) | Tokamak Network Token (ERC-20, 18 decimals) |
 | WTON | [`0x79E0d92670106c85E9067b56B8F674340dCa0Bbd`](https://sepolia.etherscan.io/address/0x79E0d92670106c85E9067b56B8F674340dCa0Bbd) | Wrapped TON (ERC-20, 27 decimals) |
+| WSTON | [`0x4e1e3e6De6F9aE2C0D8a21626082Ef70dBa87e6D`](https://sepolia.etherscan.io/address/0x4e1e3e6De6F9aE2C0D8a21626082Ef70dBa87e6D) | Wrapped Staked TON (ERC-20, transferable staking receipt) |
 | DepositManager | [`0x90ffcc7F168DceDBEF1Cb6c6eB00cA73F922956F`](https://sepolia.etherscan.io/address/0x90ffcc7F168DceDBEF1Cb6c6eB00cA73F922956F) | WTON staking deposits and withdrawal requests |
 | SeigManager | [`0x2320542ae933FbAdf8f5B97cA348c7CeDA90fAd7`](https://sepolia.etherscan.io/address/0x2320542ae933FbAdf8f5B97cA348c7CeDA90fAd7) | Seigniorage management and stake tracking |
 | Layer2Registry | [`0xA0a9576b437E52114aDA8b0BC4149F2F5c604581`](https://sepolia.etherscan.io/address/0xA0a9576b437E52114aDA8b0BC4149F2F5c604581) | Registry of Layer2 operator contracts |

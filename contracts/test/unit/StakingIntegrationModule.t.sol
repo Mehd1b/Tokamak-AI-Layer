@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {Test, console} from "forge-std/Test.sol";
 import {StakingIntegrationModule} from "../../src/modules/StakingIntegrationModule.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {MockStakingV3} from "../mocks/MockStakingV3.sol";
 
 /**
  * @title MockIdentityRegistryForStaking
@@ -23,15 +22,52 @@ contract MockIdentityRegistryForStaking {
 }
 
 /**
+ * @title MockWSTONVault
+ * @notice Minimal mock implementing the IWSTONVault interface for staking tests
+ */
+contract MockWSTONVault {
+    uint256 public constant VERIFIED_THRESHOLD = 1000 ether;
+    uint256 public constant PREMIUM_THRESHOLD = 10000 ether;
+
+    mapping(address => uint256) public lockedBalances;
+    mapping(address => bool) public slashed;
+
+    function getLockedBalance(address operator) external view returns (uint256) {
+        return lockedBalances[operator];
+    }
+
+    function isVerifiedOperator(address operator) external view returns (bool) {
+        return lockedBalances[operator] >= VERIFIED_THRESHOLD;
+    }
+
+    function getOperatorTier(address operator) external view returns (uint8) {
+        if (lockedBalances[operator] >= PREMIUM_THRESHOLD) return 2; // PREMIUM
+        if (lockedBalances[operator] >= VERIFIED_THRESHOLD) return 1; // VERIFIED
+        return 0; // UNVERIFIED
+    }
+
+    function slash(address operator, uint256 amount) external {
+        require(lockedBalances[operator] >= amount, "Insufficient balance");
+        lockedBalances[operator] -= amount;
+        slashed[operator] = true;
+    }
+
+    // Test helpers
+    function setLockedBalance(address operator, uint256 amount) external {
+        lockedBalances[operator] = amount;
+    }
+}
+
+/**
  * @title StakingIntegrationModuleTest
- * @notice Unit tests for StakingIntegrationModule
+ * @notice Unit tests for StakingIntegrationModule (updated for WSTONVault)
  * @dev Tests stake queries, operator verification, and slashing functionality
  */
 contract StakingIntegrationModuleTest is Test {
     // ============ Contracts ============
     StakingIntegrationModule public stakingModule;
     StakingIntegrationModule public implementation;
-    MockStakingV3 public mockBridge;
+    MockWSTONVault public mockVault;
     MockIdentityRegistryForStaking public mockIdentity;
 
     // ============ Test Accounts ============
@@ -46,7 +82,7 @@ contract StakingIntegrationModuleTest is Test {
 
     function setUp() public {
         // Deploy mocks
-        mockBridge = new MockStakingV3();
+        mockVault = new MockWSTONVault();
         mockIdentity = new MockIdentityRegistryForStaking();
 
         // Deploy implementation
@@ -56,7 +92,7 @@ contract StakingIntegrationModuleTest is Test {
         bytes memory initData = abi.encodeWithSelector(
             StakingIntegrationModule.initialize.selector,
             admin,
-            address(mockBridge),
+            address(mockVault),
             address(mockIdentity),
             address(0) // reputation registry not needed for these tests
         );
@@ -69,19 +105,22 @@ contract StakingIntegrationModuleTest is Test {
         stakingModule.grantRole(stakingModule.SEIGNIORAGE_ROUTER_ROLE(), seigniorageRouter);
         vm.stopPrank();
 
-        // Setup operators with stake
-        mockBridge.setStake(operator1, 5000 ether);
-        mockBridge.setStake(operator2, 500 ether);
+        // Setup operators with locked WSTON in vault
+        mockVault.setLockedBalance(operator1, 5000 ether);
+        mockVault.setLockedBalance(operator2, 500 ether);
 
         // Setup agent ownership
         mockIdentity.setOwner(1, operator1);
         mockIdentity.setOwner(2, operator2);
+
+        // Grant SLASH_ROLE on vault to the staking module
+        // (In prod, vault.grantRole(SLASH_ROLE, address(stakingModule)) is needed)
     }
 
     // ============ Initialization Tests ============
 
     function test_Initialize() public view {
-        assertEq(stakingModule.stakingBridge(), address(mockBridge));
+        assertEq(stakingModule.wstonVault(), address(mockVault));
         assertEq(stakingModule.identityRegistry(), address(mockIdentity));
         assertTrue(stakingModule.hasRole(stakingModule.DEFAULT_ADMIN_ROLE(), admin));
         assertTrue(stakingModule.hasRole(stakingModule.UPGRADER_ROLE(), admin));
@@ -198,6 +237,8 @@ contract StakingIntegrationModuleTest is Test {
 
         // 50% of 5000 ether = 2500 ether
         assertEq(slashedAmount, 2500 ether);
+        // Vault balance should be reduced
+        assertEq(mockVault.getLockedBalance(operator1), 2500 ether);
     }
 
     function test_ExecuteSlash_UpdatesSlashRecord() public {
@@ -234,7 +275,7 @@ contract StakingIntegrationModuleTest is Test {
     // ============ Seigniorage Tests ============
 
     function test_CalculateSeigniorageBonus() public view {
-        // Currently returns 0 as placeholder
+        // Currently returns 0 as reputation registry is address(0)
         uint256 bonus = stakingModule.calculateSeigniorageBonus(1, 100 ether);
         assertEq(bonus, 0);
     }
@@ -242,7 +283,7 @@ contract StakingIntegrationModuleTest is Test {
     function test_RouteSeigniorage() public {
         vm.prank(seigniorageRouter);
         stakingModule.routeSeigniorage(1);
-        // Should emit event (currently emits with 0 amount as placeholder)
+        // Should emit event (currently emits with 0 amount since no rep registry)
     }
 
     function test_RouteSeigniorage_RevertOnUnauthorized() public {
@@ -263,13 +304,13 @@ contract StakingIntegrationModuleTest is Test {
 
     // ============ Admin Functions Tests ============
 
-    function test_SetStakingBridge() public {
-        address newBridge = address(0x999);
+    function test_SetWSTONVault() public {
+        address newVault = address(0x999);
 
         vm.prank(admin);
-        stakingModule.setStakingBridge(newBridge);
+        stakingModule.setWSTONVault(newVault);
 
-        assertEq(stakingModule.stakingBridge(), newBridge);
+        assertEq(stakingModule.wstonVault(), newVault);
     }
 
     function test_SetIdentityRegistry() public {
@@ -290,46 +331,46 @@ contract StakingIntegrationModuleTest is Test {
         assertEq(stakingModule.reputationRegistry(), newRegistry);
     }
 
-    function test_RevertOnUnauthorizedSetStakingBridge() public {
+    function test_RevertOnUnauthorizedSetWSTONVault() public {
         vm.prank(unauthorized);
         vm.expectRevert();
-        stakingModule.setStakingBridge(address(0x999));
+        stakingModule.setWSTONVault(address(0x999));
     }
 
     // ============ Edge Case Tests ============
 
-    function test_GetStake_WhenBridgeNotSet() public {
-        // Deploy new module without bridge
+    function test_GetStake_WhenVaultNotSet() public {
+        // Deploy new module without vault
         StakingIntegrationModule newModule = new StakingIntegrationModule();
         bytes memory initData = abi.encodeWithSelector(
             StakingIntegrationModule.initialize.selector,
             admin,
-            address(0), // no bridge
+            address(0), // no vault
             address(0),
             address(0)
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(newModule), initData);
-        StakingIntegrationModule moduleNoBridge = StakingIntegrationModule(address(proxy));
+        StakingIntegrationModule moduleNoVault = StakingIntegrationModule(address(proxy));
 
-        vm.expectRevert(abi.encodeWithSignature("StakingBridgeNotSet()"));
-        moduleNoBridge.getStake(operator1);
+        vm.expectRevert(abi.encodeWithSignature("VaultNotSet()"));
+        moduleNoVault.getStake(operator1);
     }
 
-    function test_IsVerifiedOperator_WhenBridgeNotSet() public {
-        // Deploy new module without bridge
+    function test_IsVerifiedOperator_WhenVaultNotSet() public {
+        // Deploy new module without vault
         StakingIntegrationModule newModule = new StakingIntegrationModule();
         bytes memory initData = abi.encodeWithSelector(
             StakingIntegrationModule.initialize.selector,
             admin,
-            address(0), // no bridge
+            address(0), // no vault
             address(0),
             address(0)
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(newModule), initData);
-        StakingIntegrationModule moduleNoBridge = StakingIntegrationModule(address(proxy));
+        StakingIntegrationModule moduleNoVault = StakingIntegrationModule(address(proxy));
 
-        // Should return false when bridge not set
-        assertFalse(moduleNoBridge.isVerifiedOperator(operator1));
+        // Should return false when vault not set
+        assertFalse(moduleNoVault.isVerifiedOperator(operator1));
     }
 
     // ============ Fuzz Tests ============
@@ -359,5 +400,6 @@ contract StakingIntegrationModuleTest is Test {
 
         uint256 expectedSlash = (5000 ether * percentage) / 100;
         assertEq(slashedAmount, expectedSlash);
+        assertEq(mockVault.getLockedBalance(operator1), 5000 ether - expectedSlash);
     }
 }

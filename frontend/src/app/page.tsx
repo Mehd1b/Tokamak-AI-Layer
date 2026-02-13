@@ -6,7 +6,7 @@ import { useReadContracts } from 'wagmi';
 import { useAgentCount } from '@/hooks/useAgent';
 import { useRecentTasks } from '@/hooks/useAgentRuntime';
 import { useWallet } from '@/hooks/useWallet';
-import { useStakeBalance } from '@/hooks/useStaking';
+import { useWSTONBalance } from '@/hooks/useStaking';
 import { CONTRACTS } from '@/lib/contracts';
 import { formatBigInt } from '@/lib/utils';
 import { TALValidationRegistryABI } from '../../../sdk/src/abi/TALValidationRegistry';
@@ -274,7 +274,7 @@ export default function HomePage() {
   const { count: agentCount } = useAgentCount();
   const { tasks } = useRecentTasks();
   const { address, isConnected } = useWallet();
-  const { data: stakeBalance } = useStakeBalance(address);
+  const { data: stakeBalance } = useWSTONBalance(address);
 
   // Foundation cards state
   const sectionRef = useRef<HTMLDivElement>(null);

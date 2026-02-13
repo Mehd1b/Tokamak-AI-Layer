@@ -1,9 +1,11 @@
 'use client';
 
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseEther, type Address } from 'viem';
+import { parseEther, parseUnits, type Address } from 'viem';
 import { sepolia } from 'wagmi/chains';
 import { L1_CONTRACTS } from '@/lib/contracts';
+
+// ============ ABIs ============
 
 const ERC20_ABI = [
   {
@@ -46,58 +48,71 @@ const WTON_ABI = [
   },
 ] as const;
 
-const DEPOSIT_MANAGER_ABI = [
+const WSTON_ABI = [
   {
-    name: 'deposit',
+    name: 'getStakingIndex',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'stakeOf',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'balanceOf',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'owner', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'depositWTONAndGetWSTON',
     type: 'function',
     stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'layer2', type: 'address' },
-      { name: 'amount', type: 'uint256' },
-    ],
-    outputs: [{ name: '', type: 'bool' }],
+    inputs: [{ name: '_amount', type: 'uint256' }],
+    outputs: [],
   },
   {
     name: 'requestWithdrawal',
     type: 'function',
     stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'layer2', type: 'address' },
-      { name: 'amount', type: 'uint256' },
-    ],
-    outputs: [{ name: '', type: 'bool' }],
+    inputs: [{ name: '_wstonAmount', type: 'uint256' }],
+    outputs: [],
   },
   {
-    name: 'processRequest',
+    name: 'claimWithdrawalTotal',
     type: 'function',
     stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'layer2', type: 'address' },
-      { name: 'deposit', type: 'bool' },
-    ],
-    outputs: [{ name: '', type: 'bool' }],
+    inputs: [],
+    outputs: [],
   },
-] as const;
-
-const SEIG_MANAGER_ABI = [
   {
-    name: 'stakeOf',
+    name: 'getWithdrawalRequestIndex',
     type: 'function',
     stateMutability: 'view',
-    inputs: [
-      { name: 'layer2', type: 'address' },
-      { name: 'account', type: 'address' },
-    ],
+    inputs: [{ name: '_user', type: 'address' }],
     outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'getTotalClaimableAmountByUser',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'user', type: 'address' }],
+    outputs: [{ name: 'totalClaimableAmount', type: 'uint256' }],
   },
 ] as const;
 
-const TOKAMAK_LAYER2 = L1_CONTRACTS.layer2;
+// ============ Helpers ============
 
-// Convert TON amount (18 decimals) to WTON amount (27 decimals)
+/** Convert TON amount (18 decimals) to WTON amount (27 decimals) */
 export const toWTONAmount = (tonRawAmount: bigint): bigint => tonRawAmount * 10n ** 9n;
 
-// --- Read hooks ---
+// ============ Read Hooks — Token Balances ============
 
 export function useTONBalance(address?: Address) {
   return useReadContract({
@@ -121,7 +136,40 @@ export function useWTONBalance(address?: Address) {
   });
 }
 
-// TON allowance to WTON contract (for swap)
+export function useWSTONBalance(address?: Address) {
+  return useReadContract({
+    address: L1_CONTRACTS.wston,
+    abi: WSTON_ABI,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+    chainId: sepolia.id,
+    query: { enabled: !!address },
+  });
+}
+
+// ============ Read Hooks — WSTON Contract State ============
+
+export function useStakingIndex() {
+  return useReadContract({
+    address: L1_CONTRACTS.wston,
+    abi: WSTON_ABI,
+    functionName: 'getStakingIndex',
+    chainId: sepolia.id,
+  });
+}
+
+export function useTotalStake() {
+  return useReadContract({
+    address: L1_CONTRACTS.wston,
+    abi: WSTON_ABI,
+    functionName: 'stakeOf',
+    chainId: sepolia.id,
+  });
+}
+
+// ============ Read Hooks — Allowances ============
+
+/** TON allowance to WTON contract (for TON→WTON swap) */
 export function useTONAllowance(owner?: Address) {
   return useReadContract({
     address: L1_CONTRACTS.ton,
@@ -133,32 +181,45 @@ export function useTONAllowance(owner?: Address) {
   });
 }
 
-// WTON allowance to DepositManager (for deposit)
-export function useWTONAllowance(owner?: Address) {
+/** WTON allowance to WSTON contract (for deposit) */
+export function useWTONAllowanceForWSTON(owner?: Address) {
   return useReadContract({
     address: L1_CONTRACTS.wton,
     abi: ERC20_ABI,
     functionName: 'allowance',
-    args: owner ? [owner, L1_CONTRACTS.depositManager] : undefined,
+    args: owner ? [owner, L1_CONTRACTS.wston] : undefined,
     chainId: sepolia.id,
     query: { enabled: !!owner },
   });
 }
 
-export function useStakeBalance(address?: Address) {
+// ============ Read Hooks — Withdrawal State ============
+
+export function useClaimableAmount(address?: Address) {
   return useReadContract({
-    address: L1_CONTRACTS.seigManager,
-    abi: SEIG_MANAGER_ABI,
-    functionName: 'stakeOf',
-    args: address ? [TOKAMAK_LAYER2, address] : undefined,
+    address: L1_CONTRACTS.wston,
+    abi: WSTON_ABI,
+    functionName: 'getTotalClaimableAmountByUser',
+    args: address ? [address] : undefined,
     chainId: sepolia.id,
     query: { enabled: !!address },
   });
 }
 
-// --- Write hooks ---
+export function useWithdrawalRequestCount(address?: Address) {
+  return useReadContract({
+    address: L1_CONTRACTS.wston,
+    abi: WSTON_ABI,
+    functionName: 'getWithdrawalRequestIndex',
+    args: address ? [address] : undefined,
+    chainId: sepolia.id,
+    query: { enabled: !!address },
+  });
+}
 
-// Step 1: Approve TON to WTON contract (for swap)
+// ============ Write Hooks — TON→WTON Flow ============
+
+/** Approve TON spending by WTON contract (for swap) */
 export function useApproveTON() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
@@ -176,7 +237,7 @@ export function useApproveTON() {
   return { approve, hash, isPending, isConfirming, isSuccess, error };
 }
 
-// Step 2: Swap TON → WTON
+/** Swap TON → WTON */
 export function useSwapToWTON() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
@@ -194,17 +255,19 @@ export function useSwapToWTON() {
   return { swap, hash, isPending, isConfirming, isSuccess, error };
 }
 
-// Step 3: Approve WTON to DepositManager (for deposit)
-export function useApproveWTON() {
+// ============ Write Hooks — WSTON Deposit ============
+
+/** Approve WTON spending by WSTON contract (for deposit) */
+export function useApproveWTONForWSTON() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  const approve = (amount: string) => {
+  const approve = (wtonAmount: bigint) => {
     writeContract({
       address: L1_CONTRACTS.wton,
       abi: ERC20_ABI,
       functionName: 'approve',
-      args: [L1_CONTRACTS.depositManager, toWTONAmount(parseEther(amount))],
+      args: [L1_CONTRACTS.wston, wtonAmount],
       chainId: sepolia.id,
     });
   };
@@ -212,38 +275,57 @@ export function useApproveWTON() {
   return { approve, hash, isPending, isConfirming, isSuccess, error };
 }
 
-// Step 4: Deposit WTON to DepositManager
-export function useStakeTON() {
+/** Deposit WTON into WSTON contract → receive WSTON */
+export function useDepositWTON() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  const stake = (amount: string) => {
+  const deposit = (wtonAmount: bigint) => {
     writeContract({
-      address: L1_CONTRACTS.depositManager,
-      abi: DEPOSIT_MANAGER_ABI,
-      functionName: 'deposit',
-      args: [TOKAMAK_LAYER2, toWTONAmount(parseEther(amount))],
+      address: L1_CONTRACTS.wston,
+      abi: WSTON_ABI,
+      functionName: 'depositWTONAndGetWSTON',
+      args: [wtonAmount],
       chainId: sepolia.id,
     });
   };
 
-  return { stake, hash, isPending, isConfirming, isSuccess, error };
+  return { deposit, hash, isPending, isConfirming, isSuccess, error };
 }
 
-// Unstake: requestWithdrawal (amount in WTON 27 decimals)
-export function useUnstakeTON() {
+// ============ Write Hooks — WSTON Withdrawal ============
+
+/** Request withdrawal of WSTON (burns WSTON, queues WTON return) */
+export function useRequestWithdrawal() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  const unstake = (amount: string) => {
+  const requestWithdrawal = (wstonAmount: bigint) => {
     writeContract({
-      address: L1_CONTRACTS.depositManager,
-      abi: DEPOSIT_MANAGER_ABI,
+      address: L1_CONTRACTS.wston,
+      abi: WSTON_ABI,
       functionName: 'requestWithdrawal',
-      args: [TOKAMAK_LAYER2, toWTONAmount(parseEther(amount))],
+      args: [wstonAmount],
       chainId: sepolia.id,
     });
   };
 
-  return { unstake, hash, isPending, isConfirming, isSuccess, error };
+  return { requestWithdrawal, hash, isPending, isConfirming, isSuccess, error };
+}
+
+/** Claim all ready withdrawals (receive WTON) */
+export function useClaimWithdrawal() {
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  const claim = () => {
+    writeContract({
+      address: L1_CONTRACTS.wston,
+      abi: WSTON_ABI,
+      functionName: 'claimWithdrawalTotal',
+      chainId: sepolia.id,
+    });
+  };
+
+  return { claim, hash, isPending, isConfirming, isSuccess, error };
 }
