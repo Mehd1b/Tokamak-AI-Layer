@@ -20,9 +20,12 @@ import {
   Fingerprint,
   Hash,
   Cpu,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAgent, useCanReactivate, useReactivate } from '@/hooks/useAgent';
 import { useOperatorManagement } from '@/hooks/useOperatorManagement';
+import { useDeregisterAgent } from '@/hooks/useDeregisterAgent';
 import { useFeedbackCount, useClientList, useFeedbacks } from '@/hooks/useReputation';
 import { FeedbackList } from '@/components/FeedbackList';
 import { useAgentValidations, useValidationStats } from '@/hooks/useValidation';
@@ -66,8 +69,10 @@ export default function AgentDetailPage() {
   const { canReactivate } = useCanReactivate(agentId);
   const { reactivate, isPending: isReactivating, isConfirming: isReactivateConfirming, isSuccess: isReactivateSuccess } = useReactivate();
   const { removeOperator, operatorExit, isRemoving, isExiting } = useOperatorManagement();
+  const { deregister, hash: deregisterHash, isPending: isDeregisterPending, isConfirming: isDeregisterConfirming, isSuccess: isDeregisterSuccess } = useDeregisterAgent();
   const [copied, setCopied] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAddOperator, setShowAddOperator] = useState(false);
   const [newOperatorAddress, setNewOperatorAddress] = useState('');
 
@@ -550,7 +555,7 @@ export default function AgentDetailPage() {
       )}
 
       {/* Actions */}
-      <div className="mt-6 flex gap-4">
+      <div className="mt-6 flex flex-wrap gap-4">
         <Link href={`/reputation/${agentId}`} className="btn-primary">
           View Reputation
         </Link>
@@ -566,7 +571,84 @@ export default function AgentDetailPage() {
         >
           Request Validation
         </Link>
+        {isOwner && agent.status !== 2 && (
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Delete Agent
+          </button>
+        )}
       </div>
+
+      {/* Deregister Success Banner */}
+      {isDeregisterSuccess && (
+        <div className="mt-4 card border-emerald-500/20 bg-emerald-500/10">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5 text-emerald-400" />
+            <div>
+              <p className="text-sm font-medium text-emerald-400">Agent deregistered successfully</p>
+              {deregisterHash && (
+                <a
+                  href={`https://explorer.thanos-sepolia.tokamak.network/tx/${deregisterHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-emerald-300 hover:underline"
+                >
+                  View transaction
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="mx-4 w-full max-w-md rounded-xl border border-white/10 bg-zinc-900 p-6 shadow-xl">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/20">
+                <AlertTriangle className="h-5 w-5 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">Delete Agent</h3>
+                <p className="text-sm text-zinc-400">This action is irreversible</p>
+              </div>
+            </div>
+            <p className="mb-2 text-sm text-zinc-300">
+              Are you sure you want to permanently delete <strong>{agentDisplayName}</strong> (ID: {agentId?.toString()})?
+            </p>
+            <ul className="mb-6 space-y-1 text-sm text-zinc-400">
+              <li>- The agent NFT will be burned</li>
+              <li>- All operators will be removed</li>
+              <li>- Agent data will be cleared on-chain</li>
+            </ul>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="btn-secondary text-sm"
+                disabled={isDeregisterPending || isDeregisterConfirming}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (agentId) {
+                    deregister(agentId);
+                    setShowDeleteConfirm(false);
+                  }
+                }}
+                disabled={isDeregisterPending || isDeregisterConfirming}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {isDeregisterPending ? 'Confirm in wallet...' : isDeregisterConfirming ? 'Deleting...' : 'Delete Agent'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Feedback Modal */}
       {showFeedbackModal && (

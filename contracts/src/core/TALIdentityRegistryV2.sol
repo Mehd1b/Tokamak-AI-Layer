@@ -155,6 +155,7 @@ contract TALIdentityRegistryV2 is
     event AgentPaused(uint256 indexed agentId, string reason);
     event AgentPausedNoOperators(uint256 indexed agentId);
     event AgentReactivated(uint256 indexed agentId, address indexed owner);
+    event AgentDeregistered(uint256 indexed agentId, address indexed owner);
     event OperatorAdded(uint256 indexed agentId, address indexed operator);
     event OperatorRemoved(uint256 indexed agentId, address indexed operator);
     event OperatorExited(uint256 indexed agentId, address indexed operator);
@@ -171,6 +172,7 @@ contract TALIdentityRegistryV2 is
     error BelowSlashThreshold(uint256 failed, uint256 total);
     error NoValidationsInWindow(uint256 agentId);
     error NoOperatorsToSlash(uint256 agentId);
+    error AgentAlreadyDeregistered(uint256 agentId);
     error OperatorAlreadyBacking(uint256 agentId, address operator);
     error OperatorNotBacking(uint256 agentId, address operator);
     error MustKeepOneOperator(uint256 agentId);
@@ -629,6 +631,45 @@ contract TALIdentityRegistryV2 is
         _agentPausedAt[agentId] = 0;
 
         emit AgentReactivated(agentId, msg.sender);
+    }
+
+    // =====================================================================
+    // V2 FUNCTIONS — Deregistration
+    // =====================================================================
+
+    /**
+     * @notice Permanently deregister an agent (owner only)
+     * @dev Burns the ERC-721 NFT, removes all operators, and clears agent data.
+     *      This action is irreversible.
+     * @param agentId The agent to deregister
+     */
+    function deregister(uint256 agentId) external nonReentrant {
+        if (!_exists(agentId)) revert AgentNotFound(agentId);
+        if (ownerOf(agentId) != msg.sender) revert NotAgentOwner(agentId, msg.sender);
+        if (_agentStatus[agentId] == STATUS_DEREGISTERED) revert AgentAlreadyDeregistered(agentId);
+
+        // Remove all operators
+        address[] storage operators = _agentOperators[agentId];
+        for (uint256 i = operators.length; i > 0; i--) {
+            address op = operators[i - 1];
+            _removeOperatorFromAgent(agentId, op);
+        }
+
+        // Clear agent data
+        delete _agentURIs[agentId];
+        _agentStatus[agentId] = STATUS_DEREGISTERED;
+        _agentPausedAt[agentId] = 0;
+
+        // Clear V1 operator
+        delete _operators[agentId];
+        verifiedOperators[agentId] = false;
+
+        address owner = ownerOf(agentId);
+
+        // Burn the ERC-721 NFT (also removes from _agentsByOwner via _update override)
+        _burn(agentId);
+
+        emit AgentDeregistered(agentId, owner);
     }
 
     // =====================================================================

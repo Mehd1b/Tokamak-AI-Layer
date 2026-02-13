@@ -30,6 +30,15 @@ export const TALIdentityRegistryV2ABI = [
   },
   {
     "type": "function",
+    "name": "deregister",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "checkAndSlash",
     "inputs": [
       { "name": "agentId", "type": "uint256", "internalType": "uint256" }
@@ -294,6 +303,15 @@ export const TALIdentityRegistryV2ABI = [
   },
   {
     "type": "event",
+    "name": "AgentDeregistered",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "indexed": true, "internalType": "uint256" },
+      { "name": "owner", "type": "address", "indexed": true, "internalType": "address" }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "AgentReactivated",
     "inputs": [
       { "name": "agentId", "type": "uint256", "indexed": true, "internalType": "uint256" },
@@ -339,6 +357,13 @@ export const TALIdentityRegistryV2ABI = [
     "anonymous": false
   },
   // V2 Errors
+  {
+    "type": "error",
+    "name": "AgentAlreadyDeregistered",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "internalType": "uint256" }
+    ]
+  },
   {
     "type": "error",
     "name": "AgentNotActive",

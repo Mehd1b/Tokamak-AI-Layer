@@ -861,4 +861,110 @@ contract TALIdentityRegistryV2Test is Test {
         vm.expectRevert(abi.encodeWithSelector(TALIdentityRegistryV2.AgentNotActive.selector, agentId));
         registry.addOperator(agentId, consent, sig);
     }
+
+    // =====================================================================
+    // DEREGISTRATION TESTS
+    // =====================================================================
+
+    function test_deregister_v1_agent() public {
+        vm.prank(user1);
+        uint256 agentId = registry.register(AGENT_URI);
+
+        vm.prank(user1);
+        registry.deregister(agentId);
+
+        // Agent should no longer exist (NFT burned)
+        assertFalse(registry.agentExists(agentId));
+        assertEq(registry.getAgentStatus(agentId), 2); // STATUS_DEREGISTERED
+    }
+
+    function test_deregister_v2_agent_with_operators() public {
+        uint256 agentId = _registerV2WithTwoOperators(user1, AGENT_URI, 1);
+
+        // Verify operators exist before
+        address[] memory opsBefore = registry.getAgentOperators(agentId);
+        assertEq(opsBefore.length, 2);
+
+        vm.prank(user1);
+        registry.deregister(agentId);
+
+        // Agent should no longer exist
+        assertFalse(registry.agentExists(agentId));
+        assertEq(registry.getAgentStatus(agentId), 2);
+
+        // Operators should be cleared
+        address[] memory opsAfter = registry.getAgentOperators(agentId);
+        assertEq(opsAfter.length, 0);
+    }
+
+    function test_deregister_emits_event() public {
+        vm.prank(user1);
+        uint256 agentId = registry.register(AGENT_URI);
+
+        vm.prank(user1);
+        vm.expectEmit(true, true, false, false);
+        emit TALIdentityRegistryV2.AgentDeregistered(agentId, user1);
+        registry.deregister(agentId);
+    }
+
+    function test_deregister_not_owner_reverts() public {
+        vm.prank(user1);
+        uint256 agentId = registry.register(AGENT_URI);
+
+        vm.prank(user2);
+        vm.expectRevert(abi.encodeWithSelector(ITALIdentityRegistry.NotAgentOwner.selector, agentId, user2));
+        registry.deregister(agentId);
+    }
+
+    function test_deregister_nonexistent_reverts() public {
+        vm.prank(user1);
+        vm.expectRevert(abi.encodeWithSelector(ITALIdentityRegistry.AgentNotFound.selector, 999));
+        registry.deregister(999);
+    }
+
+    function test_deregister_already_deregistered_reverts() public {
+        vm.prank(user1);
+        uint256 agentId = registry.register(AGENT_URI);
+
+        vm.prank(user1);
+        registry.deregister(agentId);
+
+        // Trying again should fail (NFT burned → AgentNotFound)
+        vm.prank(user1);
+        vm.expectRevert(abi.encodeWithSelector(ITALIdentityRegistry.AgentNotFound.selector, agentId));
+        registry.deregister(agentId);
+    }
+
+    function test_deregister_removes_from_owner_list() public {
+        vm.prank(user1);
+        uint256 agent1 = registry.register(AGENT_URI);
+        vm.prank(user1);
+        uint256 agent2 = registry.register(AGENT_URI_2);
+
+        uint256[] memory beforeIds = registry.getAgentsByOwner(user1);
+        assertEq(beforeIds.length, 2);
+
+        vm.prank(user1);
+        registry.deregister(agent1);
+
+        uint256[] memory afterIds = registry.getAgentsByOwner(user1);
+        assertEq(afterIds.length, 1);
+        assertEq(afterIds[0], agent2);
+    }
+
+    function test_deregister_paused_agent() public {
+        uint256 agentId = _registerV2WithSingleOperator(user1, AGENT_URI, 1, operator1PrivateKey);
+
+        // Slash to pause
+        validationRegistry.setAgentStats(agentId, 10, 5);
+        registry.checkAndSlash(agentId);
+        assertEq(registry.getAgentStatus(agentId), 1); // PAUSED
+
+        // Owner can still deregister a paused agent
+        vm.prank(user1);
+        registry.deregister(agentId);
+
+        assertFalse(registry.agentExists(agentId));
+        assertEq(registry.getAgentStatus(agentId), 2);
+    }
 }
