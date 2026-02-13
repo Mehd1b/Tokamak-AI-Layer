@@ -82,24 +82,59 @@ export function useSubmitTask() {
       text: string,
       paymentTxHash?: string,
       taskRef?: string,
+      serviceUrl?: string,
     ) => {
       setIsSubmitting(true);
       setError(null);
       setResult(null);
 
       try {
-        const res = await fetch(`/api/runtime/${onChainAgentId}/tasks`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ input: { text }, paymentTxHash, taskRef }),
-        });
+        let data: TaskResult;
 
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || `Request failed: ${res.status}`);
+        if (serviceUrl) {
+          // Direct submission to the agent's A2A service endpoint
+          const res = await fetch(serviceUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ input: { text }, paymentTxHash, taskRef }),
+          });
+
+          if (!res.ok) {
+            const errBody = await res.json().catch(() => ({ error: res.statusText }));
+            throw new Error(errBody.error || `Request failed: ${res.status}`);
+          }
+
+          const raw = await res.json();
+          // Normalize: agent may return a TaskResult or a raw response
+          data = raw.taskId ? raw : {
+            taskId: raw.strategy?.id || raw.id || crypto.randomUUID(),
+            agentId: onChainAgentId,
+            status: 'completed' as const,
+            input: { text },
+            output: JSON.stringify(raw),
+            outputHash: null,
+            inputHash: null,
+            createdAt: new Date().toISOString(),
+            completedAt: new Date().toISOString(),
+            error: null,
+            metadata: {},
+          };
+        } else {
+          // Proxy submission via Next.js API route
+          const res = await fetch(`/api/runtime/${onChainAgentId}/tasks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ input: { text }, paymentTxHash, taskRef }),
+          });
+
+          if (!res.ok) {
+            const errBody = await res.json();
+            throw new Error(errBody.error || `Request failed: ${res.status}`);
+          }
+
+          data = (await res.json()) as TaskResult;
         }
 
-        const data = (await res.json()) as TaskResult;
         setResult(data);
         return data;
       } catch (err) {

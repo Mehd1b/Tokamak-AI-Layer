@@ -204,11 +204,12 @@ interface TaskSubmissionProps {
   placeholder: string;
   onChainAgentId?: bigint;
   feePerTask?: bigint;
+  serviceUrl?: string;
 }
 
 type PaymentStep = 'input' | 'paying' | 'paid' | 'submitting';
 
-export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId, feePerTask }: TaskSubmissionProps) {
+export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId, feePerTask, serviceUrl }: TaskSubmissionProps) {
   const [input, setInput] = useState('');
   const [nonce] = useState(() => BigInt(Date.now()));
   const [paymentStep, setPaymentStep] = useState<PaymentStep>('input');
@@ -258,7 +259,7 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
   useEffect(() => {
     if (paymentStep === 'paid' && input.trim() && !isSubmitting && !result) {
       setPaymentStep('submitting');
-      submitTask(agentId, input, payHash, currentTaskRef);
+      submitTask(agentId, input, payHash, currentTaskRef, serviceUrl);
     }
   }, [paymentStep, input, isSubmitting, result, agentId, payHash, currentTaskRef, submitTask]);
 
@@ -282,7 +283,7 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
     } else {
       // Free agent - submit directly
       setPaymentStep('submitting');
-      await submitTask(agentId, input);
+      await submitTask(agentId, input, undefined, undefined, serviceUrl);
     }
   };
 

@@ -30,7 +30,7 @@ import { useDeregisterAgent } from '@/hooks/useDeregisterAgent';
 import { useFeedbackCount, useClientList, useFeedbacks } from '@/hooks/useReputation';
 import { FeedbackList } from '@/components/FeedbackList';
 import { useAgentValidations, useValidationStats } from '@/hooks/useValidation';
-import { useRuntimeAgent, useSubmitTask } from '@/hooks/useAgentRuntime';
+import { useRuntimeAgent } from '@/hooks/useAgentRuntime';
 import { useAgentMetadata } from '@/hooks/useAgentMetadata';
 import { useAgentFee } from '@/hooks/useTaskFee';
 import { useL2Config } from '@/hooks/useL2Config';
@@ -80,17 +80,31 @@ export default function AgentDetailPage() {
   const [customTaskResult, setCustomTaskResult] = useState<{ output: string; status: string; taskId: string } | null>(null);
   const [useBasicInterface, setUseBasicInterface] = useState(false);
 
-  const { submitTask: submitCustomTask } = useSubmitTask();
-
   const handleCustomTaskSubmit = async (input: string) => {
     setCustomTaskResult(null);
+    const a2aUrl = metaServices?.A2A;
+    if (!a2aUrl) {
+      setCustomTaskResult({ output: 'No A2A service endpoint configured for this agent. The agent owner must add an A2A service URL during registration.', status: 'failed', taskId: '' });
+      return;
+    }
     try {
-      const result = await submitCustomTask(agentId!.toString(), input);
-      if (result) {
-        setCustomTaskResult({ output: result.output || '', status: result.status, taskId: result.taskId });
+      const res = await fetch(a2aUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: input,
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(errData.error || `HTTP ${res.status}`);
       }
+      const data = await res.json();
+      setCustomTaskResult({
+        output: JSON.stringify(data),
+        status: 'completed',
+        taskId: data.strategy?.id || data.taskId || crypto.randomUUID(),
+      });
     } catch (err) {
-      setCustomTaskResult({ output: '', status: 'failed', taskId: '' });
+      setCustomTaskResult({ output: err instanceof Error ? err.message : 'Request failed', status: 'failed', taskId: '' });
     }
   };
 
@@ -129,7 +143,7 @@ export default function AgentDetailPage() {
   const zeroAddr = '0x0000000000000000000000000000000000000000';
 
   const isOwner = address && agent?.owner && address.toLowerCase() === agent.owner.toLowerCase();
-  const hasRuntime = !!runtimeAgent || !!metaServices?.A2A;
+  const hasRuntime = !!runtimeAgent || !!metaServices?.A2A || !!metaCustomUI?.html;
   const agentDisplayName = metaName || runtimeAgent?.name || `Agent #${agentId?.toString()}`;
   const placeholder =
     metaTalCapabilities?.[0]?.placeholder ||
@@ -600,6 +614,7 @@ export default function AgentDetailPage() {
                 placeholder={placeholder}
                 onChainAgentId={agentId}
                 feePerTask={onChainFee}
+                serviceUrl={metaServices?.A2A}
               />
             </>
           )}
