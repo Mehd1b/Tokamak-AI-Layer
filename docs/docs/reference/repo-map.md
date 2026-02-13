@@ -61,17 +61,18 @@ Tokamak-AI-Layer/
 │       ├── hooks/                  # Custom React hooks (10 files)
 │       └── lib/                    # Contract addresses, utilities
 │
-├── agent-runtime/                  # Express.js agent execution server
-│   └── src/
-│       ├── routes/                 # Task submission, validation endpoints
-│       └── agents/                 # Agent implementations
-│
-├── tal-yield-agent/                # TAL Yield Agent (monorepo)
-│   └── packages/
-│       ├── agent-server/           # Agent server implementation
-│       ├── agent-worker/           # Background worker
-│       ├── shared/                 # Shared types and ABIs
-│       └── tal-sdk/                # Agent-specific SDK wrapper
+├── agent-examples/                 # Example AI agent implementations
+│   ├── solidity-auditor/           # Express.js Solidity audit agent
+│   │   └── src/
+│   │       ├── routes/             # Task submission, validation endpoints
+│   │       └── agents/             # Agent implementations
+│   │
+│   └── yield-agent/                # TAL Yield Agent (monorepo)
+│       └── packages/
+│           ├── agent-server/       # Agent server implementation
+│           ├── agent-worker/       # Background worker
+│           ├── shared/             # Shared types and ABIs
+│           └── tal-sdk/            # Agent-specific SDK wrapper
 │
 ├── docs/                           # Docusaurus documentation site
 │   └── docs/                       # Documentation pages

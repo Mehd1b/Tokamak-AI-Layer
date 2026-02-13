@@ -161,7 +161,7 @@ Hybrid = StakeSecured validator selection + TEE attestation proof
 
 **Purpose**: A backend service that watches for pending TEE validation requests and fulfills them.
 
-**Location**: `agent-runtime/src/services/tee-provider.ts` (new file)
+**Location**: `agent-examples/solidity-auditor/src/services/tee-provider.ts` (new file)
 
 **Responsibilities**:
 1. Watch `ValidationRequested` events where `model == TEEAttested`
@@ -316,7 +316,7 @@ const ENCLAVE_HASH = '0x' + '0'.repeat(62) + 'ff'; // Fake enclave hash
 
 ### Task 3: Agent Runtime Integration
 
-**File**: `agent-runtime/src/services/validation.ts`
+**File**: `agent-examples/solidity-auditor/src/services/validation.ts`
 
 **Changes needed**:
 

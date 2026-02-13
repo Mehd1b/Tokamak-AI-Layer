@@ -8,8 +8,8 @@ contracts/broadcast/
 sdk/dist/
 frontend/.next/
 frontend/out/
-agent-runtime/dist/
-agent-runtime/data/
+agent-examples/solidity-auditor/dist/
+agent-examples/solidity-auditor/data/
 
 # Local configuration
 .omc/

@@ -35,7 +35,7 @@ export const config = {
   PORT: parseInt(optional('PORT', '3001'), 10),
   HOST: optional('HOST', '0.0.0.0'),
   // Public base URL (used in registration files / A2A service URLs).
-  // Set to your Railway public URL in production (e.g. https://agent-runtime-production.up.railway.app).
+  // Set to your Railway public URL in production (e.g. https://solidity-auditor-production.up.railway.app).
   PUBLIC_URL: process.env.PUBLIC_URL || '',
 
   // Blockchain (Thanos Sepolia)

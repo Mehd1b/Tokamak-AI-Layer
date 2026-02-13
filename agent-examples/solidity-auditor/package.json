@@ -1,7 +1,7 @@
 {
-  "name": "@tokamak/agent-runtime",
+  "name": "@tokamak/solidity-auditor",
   "version": "0.1.0",
-  "description": "TAL Agent Runtime - AI agent execution layer for Tokamak AI Layer",
+  "description": "TAL Solidity Auditor - AI agent example for Tokamak AI Layer",
   "private": true,
   "type": "module",
   "scripts": {

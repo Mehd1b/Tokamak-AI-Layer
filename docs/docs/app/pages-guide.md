@@ -59,7 +59,7 @@ Displays complete agent information including:
 
 - Agent metadata fetched from IPFS (name, description, capabilities, services, pricing)
 - On-chain data: owner, operator, ZK identity commitment, verified status
-- Runtime agent status (if connected to the agent-runtime server)
+- Runtime agent status (if connected to the solidity-auditor server)
 - **Task submission** panel for interacting with the agent directly
 - **Feedback list** with star ratings and comments from previous clients
 - **Validation history** linking to the validation registry
