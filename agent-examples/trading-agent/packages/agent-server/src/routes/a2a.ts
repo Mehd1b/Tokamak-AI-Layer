@@ -1,8 +1,9 @@
 import type { FastifyInstance } from "fastify";
-import { isAddress, type Address } from "viem";
+import { isAddress, type Address, type Hex } from "viem";
 import type { AppContext } from "../context.js";
 import { TOKENS } from "@tal-trading-agent/shared";
 import type { TradeRequest, TradingStrategy } from "@tal-trading-agent/shared";
+import { inferHorizonFromPrompt } from "./horizonParser.js";
 
 // ── A2A Protocol Types ──────────────────────────────────
 
@@ -216,12 +217,15 @@ async function handleTasksSend(
       ? tradeParams.budgetToken
       : TOKENS.WETH) as Address;
 
+    // Infer horizon from the natural language prompt if not explicitly provided
+    const inferredHorizon = tradeParams.horizon ?? inferHorizonFromPrompt(tradeParams.prompt ?? "");
+
     const request: TradeRequest = {
       prompt: tradeParams.prompt,
       budget: BigInt(tradeParams.budget ?? "1000000000000000000"), // default 1 ETH
       budgetToken,
       walletAddress,
-      horizon: tradeParams.horizon ?? "1w",
+      horizon: inferredHorizon ?? "1w",
       riskTolerance: tradeParams.riskTolerance ?? "moderate",
       chainId: 1,
     };
@@ -301,10 +305,33 @@ async function handleTasksSend(
     task.messages.push(task.status.message!);
     a2aTasks.set(taskId, task);
 
+    // Confirm task on escrow if a taskRef was provided (paid task)
+    const taskRef = params.metadata?.taskRef as string | undefined;
+    let confirmTxHash: string | undefined;
+    if (taskRef) {
+      try {
+        const txHash = await ctx.talIntegration.confirmTask(taskRef as Hex);
+        confirmTxHash = txHash;
+        ctx.logger.info({ taskId, taskRef, txHash }, "Escrow confirmed for A2A task");
+      } catch (escrowErr) {
+        // Log but don't fail the response — the analysis was delivered
+        ctx.logger.warn(
+          { taskId, taskRef, error: escrowErr },
+          "Failed to confirm escrow (analysis was still delivered)",
+        );
+      }
+    }
+
     ctx.logger.info(
       { taskId, strategyId: finalStrategy.id, trades: finalStrategy.trades.length },
       "A2A task completed",
     );
+
+    // Include confirmTxHash in task metadata so callers can verify
+    if (confirmTxHash) {
+      task.metadata = { ...task.metadata, feeConfirmed: true, confirmTxHash };
+      a2aTasks.set(taskId, task);
+    }
 
     return reply.send({ jsonrpc: "2.0", id: rpc.id, result: task });
   } catch (error) {

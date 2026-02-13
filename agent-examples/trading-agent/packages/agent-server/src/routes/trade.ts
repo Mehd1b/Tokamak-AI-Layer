@@ -5,6 +5,7 @@ import type { AppContext } from "../context.js";
 import { siwaAuthMiddleware } from "@tal-trading-agent/siwa-auth";
 import { TOKENS } from "@tal-trading-agent/shared";
 import type { TradeRequest } from "@tal-trading-agent/shared";
+import { inferHorizonFromPrompt } from "./horizonParser.js";
 
 // ── Request schemas ─────────────────────────────────────
 
@@ -28,6 +29,7 @@ const AnalyzeBody = Type.Object({
     Type.Literal("moderate"),
     Type.Literal("aggressive"),
   ])),
+  taskRef: Type.Optional(Type.String({ description: "On-chain task reference (bytes32 hex) for escrow confirmation" })),
 });
 
 const ExecuteBody = Type.Object({
@@ -54,12 +56,15 @@ export async function tradeRoutes(app: FastifyInstance, ctx: AppContext) {
         ? body.budgetToken
         : TOKENS.WETH) as Address;
 
+      // Infer horizon from the natural language prompt if not explicitly provided
+      const inferredHorizon = body.horizon ?? inferHorizonFromPrompt(body.prompt);
+
       const request: TradeRequest = {
         prompt: body.prompt,
         budget: BigInt(body.budget),
         budgetToken,
         walletAddress: body.walletAddress as Address,
-        horizon: body.horizon ?? "1w",
+        horizon: inferredHorizon ?? "1w",
         riskTolerance: body.riskTolerance ?? "moderate",
         chainId: 1,
       };
@@ -84,10 +89,23 @@ export async function tradeRoutes(app: FastifyInstance, ctx: AppContext) {
         ctx.logger.warn({ errors: validation.errors }, "Strategy failed risk check, adjusting");
         const adjusted = ctx.riskManager.adjustForRisk(strategy);
         ctx.strategyCache.set(adjusted.id, adjusted);
+
+        // Confirm escrow even for risk-adjusted strategies (analysis was still delivered)
+        let adjustedConfirmTxHash: string | undefined;
+        if (body.taskRef) {
+          try {
+            const txHash = await ctx.talIntegration.confirmTask(body.taskRef as Hex);
+            adjustedConfirmTxHash = txHash;
+          } catch (escrowErr) {
+            ctx.logger.warn({ taskRef: body.taskRef, error: escrowErr }, "Failed to confirm escrow for adjusted strategy");
+          }
+        }
+
         return reply.send({
           strategy: serializeStrategy(adjusted),
           riskWarnings: validation.warnings,
           riskAdjusted: true,
+          ...(adjustedConfirmTxHash ? { feeConfirmed: true, confirmTxHash: adjustedConfirmTxHash } : {}),
         });
       }
 
@@ -97,6 +115,21 @@ export async function tradeRoutes(app: FastifyInstance, ctx: AppContext) {
       );
 
       ctx.strategyCache.set(strategy.id, strategy);
+
+      // Confirm escrow if a taskRef was provided (paid analysis)
+      let confirmTxHash: string | undefined;
+      if (body.taskRef) {
+        try {
+          const txHash = await ctx.talIntegration.confirmTask(body.taskRef as Hex);
+          confirmTxHash = txHash;
+          ctx.logger.info({ strategyId: strategy.id, taskRef: body.taskRef, txHash }, "Escrow confirmed");
+        } catch (escrowErr) {
+          ctx.logger.warn(
+            { strategyId: strategy.id, taskRef: body.taskRef, error: escrowErr },
+            "Failed to confirm escrow (analysis was still delivered)",
+          );
+        }
+      }
 
       return reply.send({
         strategy: serializeStrategy(strategy),
@@ -109,6 +142,7 @@ export async function tradeRoutes(app: FastifyInstance, ctx: AppContext) {
         })),
         riskWarnings: validation.warnings,
         riskAdjusted: false,
+        ...(confirmTxHash ? { feeConfirmed: true, confirmTxHash } : {}),
       });
     },
   );

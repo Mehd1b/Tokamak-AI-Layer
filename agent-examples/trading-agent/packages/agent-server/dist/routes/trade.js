@@ -2,6 +2,7 @@ import { Type } from "@sinclair/typebox";
 import { isAddress } from "viem";
 import { siwaAuthMiddleware } from "@tal-trading-agent/siwa-auth";
 import { TOKENS } from "@tal-trading-agent/shared";
+import { inferHorizonFromPrompt } from "./horizonParser.js";
 // ── Request schemas ─────────────────────────────────────
 const AnalyzeBody = Type.Object({
     prompt: Type.String({ minLength: 10 }),
@@ -23,6 +24,7 @@ const AnalyzeBody = Type.Object({
         Type.Literal("moderate"),
         Type.Literal("aggressive"),
     ])),
+    taskRef: Type.Optional(Type.String({ description: "On-chain task reference (bytes32 hex) for escrow confirmation" })),
 });
 const ExecuteBody = Type.Object({
     strategyId: Type.String(),
@@ -40,12 +42,14 @@ export async function tradeRoutes(app, ctx) {
         const budgetToken = (body.budgetToken && isAddress(body.budgetToken)
             ? body.budgetToken
             : TOKENS.WETH);
+        // Infer horizon from the natural language prompt if not explicitly provided
+        const inferredHorizon = body.horizon ?? inferHorizonFromPrompt(body.prompt);
         const request = {
             prompt: body.prompt,
             budget: BigInt(body.budget),
             budgetToken,
             walletAddress: body.walletAddress,
-            horizon: body.horizon ?? "1w",
+            horizon: inferredHorizon ?? "1w",
             riskTolerance: body.riskTolerance ?? "moderate",
             chainId: 1,
         };
@@ -62,15 +66,39 @@ export async function tradeRoutes(app, ctx) {
             ctx.logger.warn({ errors: validation.errors }, "Strategy failed risk check, adjusting");
             const adjusted = ctx.riskManager.adjustForRisk(strategy);
             ctx.strategyCache.set(adjusted.id, adjusted);
+            // Confirm escrow even for risk-adjusted strategies (analysis was still delivered)
+            let adjustedConfirmTxHash;
+            if (body.taskRef) {
+                try {
+                    const txHash = await ctx.talIntegration.confirmTask(body.taskRef);
+                    adjustedConfirmTxHash = txHash;
+                }
+                catch (escrowErr) {
+                    ctx.logger.warn({ taskRef: body.taskRef, error: escrowErr }, "Failed to confirm escrow for adjusted strategy");
+                }
+            }
             return reply.send({
                 strategy: serializeStrategy(adjusted),
                 riskWarnings: validation.warnings,
                 riskAdjusted: true,
+                ...(adjustedConfirmTxHash ? { feeConfirmed: true, confirmTxHash: adjustedConfirmTxHash } : {}),
             });
         }
         // 5. Build unsigned swap calldata for each trade
         const unsignedSwaps = strategy.trades.map((trade) => ctx.swapBuilder.buildFromTradeAction(trade, request.walletAddress));
         ctx.strategyCache.set(strategy.id, strategy);
+        // Confirm escrow if a taskRef was provided (paid analysis)
+        let confirmTxHash;
+        if (body.taskRef) {
+            try {
+                const txHash = await ctx.talIntegration.confirmTask(body.taskRef);
+                confirmTxHash = txHash;
+                ctx.logger.info({ strategyId: strategy.id, taskRef: body.taskRef, txHash }, "Escrow confirmed");
+            }
+            catch (escrowErr) {
+                ctx.logger.warn({ strategyId: strategy.id, taskRef: body.taskRef, error: escrowErr }, "Failed to confirm escrow (analysis was still delivered)");
+            }
+        }
         return reply.send({
             strategy: serializeStrategy(strategy),
             unsignedSwaps: unsignedSwaps.map((s) => ({
@@ -82,6 +110,7 @@ export async function tradeRoutes(app, ctx) {
             })),
             riskWarnings: validation.warnings,
             riskAdjusted: false,
+            ...(confirmTxHash ? { feeConfirmed: true, confirmTxHash } : {}),
         });
     });
     // ── POST /api/v1/trade/execute (requires SIWA auth) ────
