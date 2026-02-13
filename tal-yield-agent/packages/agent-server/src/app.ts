@@ -21,12 +21,34 @@ export async function buildApp(ctx: AppContext) {
   // CORS
   await app.register(cors, { origin: true });
 
-  // Rate limiting
+  // Global rate limiting: 100 requests per minute per IP/API-key
   await app.register(rateLimit, {
     max: 100,
     timeWindow: "1 minute",
     keyGenerator: (req) => (req.headers["x-api-key"] as string) ?? req.ip,
     errorResponseBuilder: () => ({ error: "rate_limit_exceeded", message: "Rate limit exceeded", statusCode: 429 }),
+  });
+
+  // Tighter rate limit for task submission endpoints (10 POST per minute)
+  app.addHook("onRequest", async (req, reply) => {
+    const taskPaths = ["/api/tasks", "/api/v1/strategy/request"];
+    if (req.method === "POST" && taskPaths.includes(req.url)) {
+      // Use the built-in rate limit with a group key to apply a separate bucket
+      const key = `task:${(req.headers["x-api-key"] as string) ?? req.ip}`;
+      const now = Date.now();
+
+      // Simple sliding window counter stored on the app instance
+      const counters = (app as any).__taskRateLimits ??= new Map<string, { count: number; resetAt: number }>();
+      let entry = counters.get(key);
+      if (!entry || now > entry.resetAt) {
+        entry = { count: 0, resetAt: now + 60_000 };
+        counters.set(key, entry);
+      }
+      entry.count++;
+      if (entry.count > 10) {
+        return reply.code(429).send({ error: "rate_limit_exceeded", message: "Too many task submissions, please try again later", statusCode: 429 });
+      }
+    }
   });
 
   // API key auth hook (optional — skipped if no keys configured)

@@ -97,25 +97,47 @@ export default function AgentFeesPage() {
   const totalBalance = agents.reduce((sum, a) => sum + a.balance, 0n);
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-3xl px-6 pt-28 pb-16 lg:px-12">
       <Link
         href="/agents"
-        className="mb-6 inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-white"
+        className="mb-6 inline-flex items-center gap-1 text-sm text-white/30 hover:text-white transition-colors duration-300"
       >
         <ArrowLeft className="h-4 w-4" /> Back to Agents
       </Link>
 
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-10 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Agent Fees</h1>
-          <p className="mt-1 text-sm text-zinc-400">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm mb-6">
+            <div className="w-2 h-2 rounded-full bg-[#38BDF8] animate-pulse" />
+            <span
+              className="text-xs tracking-widest text-gray-400 uppercase"
+              style={{ fontFamily: 'var(--font-mono), monospace' }}
+            >
+              Earnings
+            </span>
+          </div>
+          <h1
+            className="text-4xl font-light mb-2"
+            style={{ fontFamily: 'var(--font-serif), serif' }}
+          >
+            <span className="italic text-[#38BDF8]">Agent</span>{' '}
+            <span className="text-white">Fees</span>
+          </h1>
+          <p
+            className="text-lg text-white/50 leading-relaxed"
+            style={{ fontFamily: 'var(--font-mono), monospace' }}
+          >
             View and claim accumulated task fees for your agents.
           </p>
         </div>
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#38BDF8]/20">
-          <Wallet className="h-6 w-6 text-[#38BDF8]" />
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#38BDF8]/10 border border-[#38BDF8]/20">
+          <Wallet className="h-7 w-7 text-[#38BDF8]" />
         </div>
       </div>
+      <div
+        className="w-full h-px mb-10"
+        style={{ background: 'linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.3), transparent)' }}
+      />
 
       {!isConnected && (
         <div className="card border-amber-500/20 bg-amber-500/10">
@@ -136,11 +158,11 @@ export default function AgentFeesPage() {
       {isConnected && isL2 && (
         <>
           {/* Total Balance */}
-          <div className="card mb-6 border-[#38BDF8]/20 bg-[#38BDF8]/5">
+          <div className="rounded-2xl border border-[#38BDF8]/20 bg-[#38BDF8]/5 p-6 mb-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-zinc-400">Total Unclaimed Fees</p>
-                <p className="text-3xl font-bold text-[#38BDF8]">
+                <p className="text-sm text-white/40" style={{ fontFamily: 'var(--font-mono), monospace' }}>Total Unclaimed Fees</p>
+                <p className="text-3xl font-light text-[#38BDF8]" style={{ fontFamily: 'var(--font-mono), monospace', filter: 'drop-shadow(0 0 8px rgba(56,189,248,0.3))' }}>
                   {feesLoading ? '...' : `${formatEther(totalBalance)} ${nativeCurrency}`}
                 </p>
               </div>
@@ -161,23 +183,23 @@ export default function AgentFeesPage() {
               </Link>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {agents.map((agent) => (
-                <div key={agent.id.toString()} className="card">
+                <div key={agent.id.toString()} className="group rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 transition-all duration-300 hover:border-[#38BDF8]/20">
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#38BDF8]/20 text-[#38BDF8] font-bold">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#38BDF8]/10 border border-[#38BDF8]/20 text-[#38BDF8] font-bold text-sm" style={{ fontFamily: 'var(--font-mono), monospace' }}>
                           #{agent.id.toString()}
                         </div>
                         <div>
                           <Link
                             href={`/agents/${agent.id.toString()}`}
-                            className="font-medium text-white hover:text-[#38BDF8]"
+                            className="font-medium text-white hover:text-[#38BDF8] transition-colors duration-300"
                           >
                             Agent #{agent.id.toString()}
                           </Link>
-                          <p className="text-xs text-zinc-500">
+                          <p className="text-xs text-white/30" style={{ fontFamily: 'var(--font-mono), monospace' }}>
                             Fee: {agent.feePerTask > 0n ? `${formatEther(agent.feePerTask)} ${nativeCurrency}/task` : 'Free (no fee set)'}
                           </p>
                         </div>
@@ -185,10 +207,10 @@ export default function AgentFeesPage() {
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <p className="text-lg font-bold text-[#38BDF8]">
+                        <p className="text-lg font-medium text-[#38BDF8]" style={{ fontFamily: 'var(--font-mono), monospace' }}>
                           {formatEther(agent.balance)} {nativeCurrency}
                         </p>
-                        <p className="text-xs text-zinc-500">unclaimed</p>
+                        <p className="text-xs text-white/30">unclaimed</p>
                       </div>
                       <ClaimButton agentId={agent.id} balance={agent.balance} />
                     </div>

@@ -49,7 +49,7 @@ const SERVICE_TYPE_CONFIG: Record<string, { icon: typeof Globe; color: string; l
 };
 
 function getServiceConfig(type: string) {
-  return SERVICE_TYPE_CONFIG[type] || { icon: Globe, color: 'text-zinc-400', label: type };
+  return SERVICE_TYPE_CONFIG[type] || { icon: Globe, color: 'text-white/40', label: type };
 }
 
 export default function AgentDetailPage() {
@@ -84,23 +84,23 @@ export default function AgentDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        <p className="text-zinc-500">Loading agent details...</p>
+      <div className="mx-auto max-w-4xl px-6 pt-28 pb-16 lg:px-12">
+        <p className="text-white/30">Loading agent details...</p>
       </div>
     );
   }
 
   if (!agent?.owner) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-4xl px-6 pt-28 pb-16 lg:px-12">
         <Link
           href="/agents"
-          className="mb-4 inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-white"
+          className="mb-4 inline-flex items-center gap-1 text-sm text-white/40 hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" /> Back to Agents
         </Link>
-        <div className="card text-center py-12">
-          <p className="text-zinc-500">Agent not found.</p>
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm text-center py-12">
+          <p className="text-white/30">Agent not found.</p>
         </div>
       </div>
     );
@@ -119,32 +119,32 @@ export default function AgentDetailPage() {
     'Describe your request...';
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-4xl px-6 pt-28 pb-16 lg:px-12">
       <Link
         href="/agents"
-        className="mb-6 inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-white"
+        className="mb-6 inline-flex items-center gap-1 text-sm text-white/40 hover:text-white"
       >
         <ArrowLeft className="h-4 w-4" /> Back to Agents
       </Link>
 
       {/* Header */}
-      <div className="card mb-6">
+      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm transition-all duration-300 mb-6">
         <div className="flex items-start justify-between">
           <div className="flex min-w-0 flex-1 items-center gap-4">
-            <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-[#38BDF8]/20 text-[#38BDF8] text-2xl font-bold">
+            <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-[#38BDF8]/20 text-[#38BDF8] text-2xl font-bold" style={{ fontFamily: 'var(--font-mono), monospace' }}>
               #{agentId?.toString()}
             </div>
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold text-white">
+              <h1 className="text-3xl font-light text-white" style={{ fontFamily: 'var(--font-serif), serif' }}>
                 {metaName || runtimeAgent?.name || `Agent #${agentId?.toString()}`}
               </h1>
               {(metaDescription || runtimeAgent?.description) && (
-                <p className="mt-0.5 text-sm text-zinc-400 break-words">
+                <p className="mt-0.5 text-sm text-white/40 break-words">
                   {metaDescription || runtimeAgent?.description}
                 </p>
               )}
               <div className="mt-1 flex items-center gap-2">
-                <span className="text-sm text-zinc-500">
+                <span className="text-sm text-white/30">
                   Owner: {shortenAddress(agent.owner)}
                 </span>
                 <button
@@ -190,6 +190,9 @@ export default function AgentDetailPage() {
         </div>
       </div>
 
+      {/* Gradient Line */}
+      <div className="w-full h-px my-8" style={{ background: 'linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.3), transparent)' }} />
+
       {/* Reactivation Banner */}
       {agent.status === 1 && isOwner && (
         <div className="mb-6 card border-amber-500/20 bg-amber-500/10">
@@ -220,13 +223,13 @@ export default function AgentDetailPage() {
       {/* Details Grid */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* Info */}
-        <div className="card">
-          <h2 className="mb-4 text-lg font-semibold text-white">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm transition-all duration-300">
+          <h2 className="mb-4 text-lg font-medium text-white">
             Agent Information
           </h2>
           <dl className="space-y-3">
             <div>
-              <dt className="text-sm text-zinc-500">Agent URI</dt>
+              <dt className="text-sm text-white/30">Agent URI</dt>
               <dd className="mt-1 flex items-center gap-2">
                 <span className="truncate text-sm font-mono text-white">
                   {agent.agentURI || 'Not set'}
@@ -244,7 +247,7 @@ export default function AgentDetailPage() {
               </dd>
             </div>
             <div>
-              <dt className="text-sm text-zinc-500">Validation Model</dt>
+              <dt className="text-sm text-white/30">Validation Model</dt>
               <dd className="mt-1 text-sm text-white">
                 {agent.validationModel !== undefined
                   ? getValidationModelLabel(agent.validationModel)
@@ -252,7 +255,7 @@ export default function AgentDetailPage() {
               </dd>
             </div>
             <div>
-              <dt className="text-sm text-zinc-500">Operator (V1)</dt>
+              <dt className="text-sm text-white/30">Operator (V1)</dt>
               <dd className="mt-1 text-sm font-mono text-white">
                 {agent.operator && agent.operator !== zeroAddr
                   ? shortenAddress(agent.operator)
@@ -260,7 +263,7 @@ export default function AgentDetailPage() {
               </dd>
             </div>
             <div>
-              <dt className="text-sm text-zinc-500">ZK Identity</dt>
+              <dt className="text-sm text-white/30">ZK Identity</dt>
               <dd className="mt-1 text-sm text-white">
                 {agent.zkIdentity && agent.zkIdentity !== zeroBytes
                   ? shortenAddress(agent.zkIdentity)
@@ -269,7 +272,7 @@ export default function AgentDetailPage() {
             </div>
             {runtimeAgent && (
               <div>
-                <dt className="text-sm text-zinc-500">Version</dt>
+                <dt className="text-sm text-white/30">Version</dt>
                 <dd className="mt-1 text-sm text-white">
                   {runtimeAgent.version}
                 </dd>
@@ -279,34 +282,34 @@ export default function AgentDetailPage() {
         </div>
 
         {/* Stats */}
-        <div className="card">
-          <h2 className="mb-4 text-lg font-semibold text-white">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm transition-all duration-300">
+          <h2 className="mb-4 text-lg font-medium text-white">
             Statistics
           </h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-2xl font-bold text-[#38BDF8]">
+              <p className="text-2xl font-bold text-[#38BDF8]" style={{ fontFamily: 'var(--font-mono), monospace' }}>
                 {feedbackCount?.toString() ?? '0'}
               </p>
-              <p className="text-sm text-zinc-500">Feedback Entries</p>
+              <p className="text-sm text-white/30">Feedback Entries</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-[#38BDF8]">
+              <p className="text-2xl font-bold text-[#38BDF8]" style={{ fontFamily: 'var(--font-mono), monospace' }}>
                 {clients?.length ?? 0}
               </p>
-              <p className="text-sm text-zinc-500">Unique Clients</p>
+              <p className="text-sm text-white/30">Unique Clients</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-[#38BDF8]">
+              <p className="text-2xl font-bold text-[#38BDF8]" style={{ fontFamily: 'var(--font-mono), monospace' }}>
                 {validationHashes?.length ?? 0}
               </p>
-              <p className="text-sm text-zinc-500">Validations</p>
+              <p className="text-sm text-white/30">Validations</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-[#38BDF8]">
+              <p className="text-2xl font-bold text-[#38BDF8]" style={{ fontFamily: 'var(--font-mono), monospace' }}>
                 {agent.isVerifiedOperator ? 'Yes' : 'No'}
               </p>
-              <p className="text-sm text-zinc-500">Verified Operator</p>
+              <p className="text-sm text-white/30">Verified Operator</p>
             </div>
           </div>
         </div>
@@ -314,26 +317,26 @@ export default function AgentDetailPage() {
 
       {/* Validation Stats (V2) */}
       {!valStatsLoading && valTotal > 0 && (
-        <div className="mt-6 card">
-          <h2 className="mb-4 text-lg font-semibold text-white">
+        <div className="mt-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm transition-all duration-300">
+          <h2 className="mb-4 text-lg font-medium text-white">
             Validation Stats (30-day window)
           </h2>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <p className="text-2xl font-bold text-[#38BDF8]">{valTotal}</p>
-              <p className="text-sm text-zinc-500">Total Validations</p>
+              <p className="text-2xl font-bold text-[#38BDF8]" style={{ fontFamily: 'var(--font-mono), monospace' }}>{valTotal}</p>
+              <p className="text-sm text-white/30">Total Validations</p>
             </div>
             <div>
-              <p className={`text-2xl font-bold ${valFailed > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+              <p className={`text-2xl font-bold ${valFailed > 0 ? 'text-red-400' : 'text-emerald-400'}`} style={{ fontFamily: 'var(--font-mono), monospace' }}>
                 {valFailed}
               </p>
-              <p className="text-sm text-zinc-500">Failed</p>
+              <p className="text-sm text-white/30">Failed</p>
             </div>
             <div>
-              <p className={`text-2xl font-bold ${valFailureRate > 30 ? 'text-red-400' : valFailureRate > 10 ? 'text-amber-400' : 'text-emerald-400'}`}>
+              <p className={`text-2xl font-bold ${valFailureRate > 30 ? 'text-red-400' : valFailureRate > 10 ? 'text-amber-400' : 'text-emerald-400'}`} style={{ fontFamily: 'var(--font-mono), monospace' }}>
                 {valFailureRate.toFixed(1)}%
               </p>
-              <p className="text-sm text-zinc-500">Failure Rate</p>
+              <p className="text-sm text-white/30">Failure Rate</p>
             </div>
           </div>
           {valFailureRate > 30 && (
@@ -346,9 +349,9 @@ export default function AgentDetailPage() {
 
       {/* Operators (V2) */}
       {agent.operators && agent.operators.length > 0 && (
-        <div className="mt-6 card">
+        <div className="mt-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm transition-all duration-300">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">
+            <h2 className="text-lg font-medium text-white">
               Operators ({agent.operators.length})
             </h2>
             {isOwner && (
@@ -364,7 +367,7 @@ export default function AgentDetailPage() {
           {/* Add Operator Form */}
           {showAddOperator && isOwner && (
             <div className="mb-4 rounded-lg border border-white/10 bg-white/5 p-3">
-              <p className="mb-2 text-xs text-zinc-400">
+              <p className="mb-2 text-xs text-white/40">
                 External operators must sign an EIP-712 consent separately (via SDK). Enter the operator address to register.
               </p>
               <div className="flex gap-2">
@@ -394,7 +397,7 @@ export default function AgentDetailPage() {
                   className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-zinc-500">#{idx + 1}</span>
+                    <span className="text-xs text-white/30">#{idx + 1}</span>
                     <span className="text-sm font-mono text-white">
                       {shortenAddress(op)}
                     </span>
@@ -439,8 +442,8 @@ export default function AgentDetailPage() {
 
       {/* Capabilities */}
       {((runtimeAgent && runtimeAgent.capabilities.length > 0) || (metaCapabilities && metaCapabilities.length > 0)) && (
-        <div className="mt-6 card">
-          <h2 className="mb-4 text-lg font-semibold text-white">
+        <div className="mt-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm transition-all duration-300">
+          <h2 className="mb-4 text-lg font-medium text-white">
             Capabilities
           </h2>
           <div className="space-y-3">
@@ -456,7 +459,7 @@ export default function AgentDetailPage() {
                     {cap.id}
                   </span>
                 </div>
-                <p className="mt-1 text-sm text-zinc-400">{cap.description}</p>
+                <p className="mt-1 text-sm text-white/40">{cap.description}</p>
               </div>
             ))}
           </div>
@@ -465,8 +468,8 @@ export default function AgentDetailPage() {
 
       {/* Service Endpoints */}
       {metaServices && Object.keys(metaServices).length > 0 && (
-        <div className="mt-6 card">
-          <h2 className="mb-4 text-lg font-semibold text-white">
+        <div className="mt-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm transition-all duration-300">
+          <h2 className="mb-4 text-lg font-medium text-white">
             Service Endpoints
           </h2>
           <div className="space-y-2">
@@ -480,9 +483,9 @@ export default function AgentDetailPage() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className={`text-sm font-medium ${config.color}`}>{type}</span>
-                        <span className="text-[10px] text-zinc-600">{config.label}</span>
+                        <span className="text-[10px] text-white/30">{config.label}</span>
                       </div>
-                      <span className="text-sm text-zinc-400 break-all">{url}</span>
+                      <span className="text-sm text-white/40 break-all">{url}</span>
                     </div>
                   </div>
                   <a href={url} target="_blank" rel="noopener noreferrer" className="ml-2 text-[#38BDF8] hover:text-[#38BDF8] flex-shrink-0">
@@ -501,13 +504,13 @@ export default function AgentDetailPage() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold text-white">Task Fee</h2>
-              <p className="text-sm text-zinc-400">This agent charges a fee per task execution</p>
+              <p className="text-sm text-white/40">This agent charges a fee per task execution</p>
             </div>
             <div className="text-right">
-              <p className="text-2xl font-bold text-[#38BDF8]">
+              <p className="text-2xl font-bold text-[#38BDF8]" style={{ fontFamily: 'var(--font-mono), monospace' }}>
                 {formatEther(onChainFee)} {nativeCurrency}
               </p>
-              <p className="text-xs text-zinc-500">per task</p>
+              <p className="text-xs text-white/30">per task</p>
             </div>
           </div>
         </div>
@@ -515,17 +518,17 @@ export default function AgentDetailPage() {
 
       {/* Use Agent */}
       {hasRuntime && (
-        <div className="mt-6 card">
+        <div className="mt-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm transition-all duration-300">
           <div className="mb-4 flex items-center gap-2">
             <Play className="h-5 w-5 text-[#38BDF8]" />
-            <h2 className="text-lg font-semibold text-white">
+            <h2 className="text-lg font-medium text-white">
               Use {agentDisplayName}
             </h2>
           </div>
           {metaRequestExample && (
             <div className="mb-4 rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-              <p className="mb-1 text-xs font-medium text-zinc-500">Example request</p>
-              <p className="text-sm text-zinc-300 italic">{metaRequestExample}</p>
+              <p className="mb-1 text-xs font-medium text-white/30">Example request</p>
+              <p className="text-sm text-white/50 italic">{metaRequestExample}</p>
             </div>
           )}
           <TaskSubmission
@@ -540,9 +543,9 @@ export default function AgentDetailPage() {
 
       {/* Recent Feedback */}
       {feedbacks.length > 0 && (
-        <div className="mt-6 card">
+        <div className="mt-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm transition-all duration-300">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Recent Feedback</h2>
+            <h2 className="text-lg font-medium text-white">Recent Feedback</h2>
             <Link
               href={`/reputation/${agentId}`}
               className="text-sm text-[#38BDF8] hover:underline"
@@ -613,13 +616,13 @@ export default function AgentDetailPage() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-white">Delete Agent</h3>
-                <p className="text-sm text-zinc-400">This action is irreversible</p>
+                <p className="text-sm text-white/40">This action is irreversible</p>
               </div>
             </div>
-            <p className="mb-2 text-sm text-zinc-300">
+            <p className="mb-2 text-sm text-white/50">
               Are you sure you want to permanently delete <strong>{agentDisplayName}</strong> (ID: {agentId?.toString()})?
             </p>
-            <ul className="mb-6 space-y-1 text-sm text-zinc-400">
+            <ul className="mb-6 space-y-1 text-sm text-white/40">
               <li>- The agent NFT will be burned</li>
               <li>- All operators will be removed</li>
               <li>- Agent data will be cleared on-chain</li>

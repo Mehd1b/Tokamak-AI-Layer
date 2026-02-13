@@ -15,6 +15,7 @@ export const StrategyRequestBody = Type.Object({
   chainPreferences: Type.Optional(Type.Array(Type.Number())),
   excludeProtocols: Type.Optional(Type.Array(Type.String())),
   maxSinglePoolAllocation: Type.Optional(Type.Number({ minimum: 0.05, maximum: 1.0 })),
+  taskRef: Type.Optional(Type.String()),
 });
 export type StrategyRequestBody = Static<typeof StrategyRequestBody>;
 

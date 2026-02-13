@@ -185,6 +185,24 @@ export interface ValidationStats {
 }
 
 // ============================================
+// ESCROW TYPES
+// ============================================
+
+export enum TaskStatus {
+  Escrowed = 0,
+  Confirmed = 1,
+  Refunded = 2,
+}
+
+export interface TaskEscrowData {
+  payer: Address;
+  agentId: bigint;
+  amount: bigint;
+  paidAt: bigint;
+  status: TaskStatus;
+}
+
+// ============================================
 // VALIDATION TYPES
 // ============================================
 

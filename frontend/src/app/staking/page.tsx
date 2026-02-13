@@ -320,22 +320,33 @@ export default function StakingPage() {
   const isAnyVaultLockPending = isApprovingL2WSTON || isApproveL2WSTONConfirming || isLocking || isLockConfirming;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white">WSTON Staking</h1>
-        <p className="mt-2 text-zinc-400">
+    <div className="mx-auto max-w-7xl px-6 pt-28 pb-16 lg:px-12">
+      <div className="mb-10">
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm mb-6">
+          <div className="w-2 h-2 rounded-full bg-[#38BDF8] animate-pulse" />
+          <span className="text-xs tracking-widest text-gray-400 uppercase" style={{ fontFamily: 'var(--font-mono), monospace' }}>
+            Economic Security
+          </span>
+        </div>
+        <h1 className="text-4xl md:text-5xl font-light mb-3" style={{ fontFamily: 'var(--font-serif), serif' }}>
+          <span className="text-white">WSTON </span>
+          <span className="italic text-[#38BDF8]">Staking</span>
+        </h1>
+        <p className="text-lg text-white/50 leading-relaxed" style={{ fontFamily: 'var(--font-mono), monospace' }}>
           Wrap your TON/WTON into WSTON on L1 Sepolia, then bridge to L2 and lock
           in the vault to secure agent validations.
         </p>
       </div>
 
+      <div className="w-full h-px mb-8" style={{ background: 'linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.3), transparent)' }} />
+
       {/* L1 / L2 Tab Toggle */}
-      <div className="mb-6 flex items-center rounded-lg border border-white/10 bg-white/5 p-1 w-fit">
+      <div className="mb-8 flex items-center rounded-xl border border-white/10 bg-white/5 p-1 w-fit">
         <button
           onClick={() => setActiveTab('l1')}
           className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
             activeTab === 'l1'
-              ? 'bg-white/10 text-[#38BDF8] shadow-sm'
+              ? 'bg-[#38BDF8]/10 text-[#38BDF8] border border-[#38BDF8]/20 shadow-sm'
               : 'text-zinc-500 hover:text-zinc-300'
           }`}
         >
@@ -345,7 +356,7 @@ export default function StakingPage() {
           onClick={() => setActiveTab('bridge')}
           className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
             activeTab === 'bridge'
-              ? 'bg-white/10 text-[#38BDF8] shadow-sm'
+              ? 'bg-[#38BDF8]/10 text-[#38BDF8] border border-[#38BDF8]/20 shadow-sm'
               : 'text-zinc-500 hover:text-zinc-300'
           }`}
         >
@@ -355,7 +366,7 @@ export default function StakingPage() {
           onClick={() => setActiveTab('l2')}
           className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
             activeTab === 'l2'
-              ? 'bg-white/10 text-[#38BDF8] shadow-sm'
+              ? 'bg-[#38BDF8]/10 text-[#38BDF8] border border-[#38BDF8]/20 shadow-sm'
               : 'text-zinc-500 hover:text-zinc-300'
           }`}
         >
@@ -413,44 +424,44 @@ export default function StakingPage() {
       {activeTab === 'l1' && <>
       {/* Stats Bar */}
       <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
-        <div className="card text-center">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-center transition-all duration-300 hover:border-[#38BDF8]/20">
           <Coins className="mx-auto h-8 w-8 text-[#38BDF8]" />
-          <p className="mt-2 text-2xl font-bold text-white">
+          <p className="mt-2 text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-mono), monospace' }}>
             {formatBalance(tonBalance)}
           </p>
-          <p className="text-sm text-zinc-500">TON Balance</p>
+          <p className="text-sm text-white/30">TON Balance</p>
         </div>
-        <div className="card text-center">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-center transition-all duration-300 hover:border-[#38BDF8]/20">
           <TrendingUp className="mx-auto h-8 w-8 text-green-500" />
-          <p className="mt-2 text-2xl font-bold text-white">
+          <p className="mt-2 text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-mono), monospace' }}>
             {formatWTON(wtonBalance)}
           </p>
-          <p className="text-sm text-zinc-500">WTON Balance</p>
+          <p className="text-sm text-white/30">WTON Balance</p>
         </div>
-        <div className="card text-center">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-center transition-all duration-300 hover:border-[#38BDF8]/20">
           <Shield className="mx-auto h-8 w-8 text-purple-500" />
-          <p className="mt-2 text-2xl font-bold text-white">
+          <p className="mt-2 text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-mono), monospace' }}>
             {formatWTON(wstonBalance)}
           </p>
-          <p className="text-sm text-zinc-500">WSTON Balance</p>
+          <p className="text-sm text-white/30">WSTON Balance</p>
         </div>
-        <div className="card text-center">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-center transition-all duration-300 hover:border-[#38BDF8]/20">
           <Lock className="mx-auto h-8 w-8 text-amber-500" />
-          <p className="mt-2 text-2xl font-bold text-white">
+          <p className="mt-2 text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-mono), monospace' }}>
             {formatIndex(stakingIndex)}
           </p>
-          <p className="text-sm text-zinc-500">Staking Index</p>
+          <p className="text-sm text-white/30">Staking Index</p>
         </div>
       </div>
 
       {/* Deposit & Withdrawal Cards */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* Deposit Card */}
-        <div className="card">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ArrowUpRight className="h-5 w-5 text-green-500" />
-              <h2 className="text-lg font-semibold text-white">
+              <h2 className="text-lg font-medium text-white">
                 Deposit {tokenMode} \u2192 WSTON
               </h2>
             </div>
@@ -477,14 +488,14 @@ export default function StakingPage() {
               </button>
             </div>
           </div>
-          <p className="mb-4 text-sm text-zinc-400">
+          <p className="mb-4 text-sm text-white/40">
             {isWTONMode
               ? 'Deposit WTON directly into the WSTON contract (2 steps: approve + deposit).'
               : 'Deposit TON \u2192 automatically swapped to WTON \u2192 deposited as WSTON (4 steps).'}
           </p>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-300">
+              <label className="block text-sm font-medium text-white/60">
                 Amount (in {tokenMode})
               </label>
               <div className="mt-1 flex gap-2">
@@ -515,7 +526,7 @@ export default function StakingPage() {
                   {tokenMode}
                 </span>
               </div>
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="mt-1 text-xs text-white/30">
                 Available: {isWTONMode
                   ? `${formatWTON(wtonBalance)} WTON`
                   : `${formatBalance(tonBalance)} TON`}
@@ -525,7 +536,7 @@ export default function StakingPage() {
             {/* WSTON estimate */}
             {rawAmount && estimatedWSTON > 0n && (
               <div className="rounded-lg bg-white/5 p-3">
-                <p className="text-xs text-zinc-400">
+                <p className="text-xs text-white/40">
                   Estimated WSTON received:{' '}
                   <span className="font-semibold text-white">
                     {formatWTON(estimatedWSTON)}
@@ -537,7 +548,7 @@ export default function StakingPage() {
             {/* Step progress */}
             {rawAmount && (
               <div className="space-y-1 rounded-lg bg-white/5 p-3">
-                <p className="text-xs font-medium text-zinc-400">Deposit steps ({totalSteps} total):</p>
+                <p className="text-xs font-medium text-white/40">Deposit steps ({totalSteps} total):</p>
                 {isWTONMode ? (
                   <>
                     <StepLine label="1. Approve WTON" done={currentStep > 1 || isApproveWTONSuccess} active={currentStep === 1} />
@@ -587,20 +598,20 @@ export default function StakingPage() {
         </div>
 
         {/* Withdrawal Card */}
-        <div className="card">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
           <div className="mb-4 flex items-center gap-2">
             <ArrowDownRight className="h-5 w-5 text-red-500" />
-            <h2 className="text-lg font-semibold text-white">
+            <h2 className="text-lg font-medium text-white">
               Withdraw WSTON
             </h2>
           </div>
-          <p className="mb-4 text-sm text-zinc-400">
+          <p className="mb-4 text-sm text-white/40">
             Request withdrawal of WSTON to receive WTON back. Minimum 100 WSTON.
             Withdrawals have a processing delay.
           </p>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-300">
+              <label className="block text-sm font-medium text-white/60">
                 Amount (in WSTON)
               </label>
               <div className="mt-1 flex gap-2">
@@ -629,7 +640,7 @@ export default function StakingPage() {
                   WSTON
                 </span>
               </div>
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="mt-1 text-xs text-white/30">
                 Available: {formatWTON(wstonBalance)} WSTON
               </p>
             </div>
@@ -641,7 +652,7 @@ export default function StakingPage() {
               </div>
             )}
 
-            <div className="rounded-lg bg-white/5 p-3 text-xs text-zinc-400">
+            <div className="rounded-lg bg-white/5 p-3 text-xs text-white/40">
               <p>Withdrawal requests are subject to a processing delay. After requesting,
               use &quot;Claim&quot; once the withdrawal is ready.</p>
             </div>
@@ -682,11 +693,11 @@ export default function StakingPage() {
             <div className="mt-4 border-t border-white/10 pt-4">
               <div className="mb-3 flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-zinc-300">Claimable WTON</p>
+                  <p className="text-sm font-medium text-white/60">Claimable WTON</p>
                   <p className="text-lg font-bold text-white">{formatWTON(claimable)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-medium text-zinc-300">Pending Requests</p>
+                  <p className="text-sm font-medium text-white/60">Pending Requests</p>
                   <p className="text-lg font-bold text-white">
                     {withdrawalCount !== undefined ? withdrawalCount.toString() : '-'}
                   </p>
@@ -762,12 +773,12 @@ export default function StakingPage() {
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* Bridge Portal Card */}
-        <div className="card">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
           {/* Direction toggle */}
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ArrowRight className="h-5 w-5 text-[#38BDF8]" />
-              <h2 className="text-lg font-semibold text-white">Bridge WSTON</h2>
+              <h2 className="text-lg font-medium text-white">Bridge WSTON</h2>
             </div>
             <div className="flex items-center rounded-lg border border-white/10 bg-white/5 p-0.5">
               <button
@@ -793,7 +804,7 @@ export default function StakingPage() {
             </div>
           </div>
 
-          <p className="mb-4 text-sm text-zinc-400">
+          <p className="mb-4 text-sm text-white/40">
             {bridgeDirection === 'l1-to-l2'
               ? 'Send L1 WSTON to Thanos Sepolia. Tokens arrive within ~1-3 minutes.'
               : 'Withdraw L2 WSTON back to Ethereum Sepolia. Subject to ~24 min fault-proof period.'}
@@ -801,7 +812,7 @@ export default function StakingPage() {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-300">Amount (WSTON)</label>
+              <label className="block text-sm font-medium text-white/60">Amount (WSTON)</label>
               <div className="mt-1 flex gap-2">
                 <input
                   type="number"
@@ -827,7 +838,7 @@ export default function StakingPage() {
                   MAX
                 </button>
               </div>
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="mt-1 text-xs text-white/30">
                 Available: {bridgeDirection === 'l1-to-l2'
                   ? `${formatWTON(wstonBalance)} WSTON (L1)`
                   : `${formatWTON(l2WstonBalance)} WSTON (L2)`}
@@ -838,28 +849,28 @@ export default function StakingPage() {
             <div className="rounded-lg bg-white/5 p-4">
               <div className="flex items-center justify-between">
                 <div className="text-center">
-                  <p className="text-xs font-medium text-zinc-500">From</p>
+                  <p className="text-xs font-medium text-white/30">From</p>
                   <p className="text-sm font-bold text-white">
                     {bridgeDirection === 'l1-to-l2' ? 'L1 Sepolia' : 'L2 Thanos'}
                   </p>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-white/30">
                     {bridgeDirection === 'l1-to-l2' ? 'Ethereum' : 'Tokamak'}
                   </p>
                 </div>
                 <div className="flex flex-col items-center">
                   <ArrowRight className="h-5 w-5 text-[#38BDF8]" />
-                  <p className="mt-1 text-xs text-zinc-500">
+                  <p className="mt-1 text-xs text-white/30">
                     {bridgeAmount && parseFloat(bridgeAmount) > 0
                       ? `${parseFloat(bridgeAmount).toLocaleString(undefined, { maximumFractionDigits: 4 })} WSTON`
                       : '\u2014'}
                   </p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xs font-medium text-zinc-500">To</p>
+                  <p className="text-xs font-medium text-white/30">To</p>
                   <p className="text-sm font-bold text-white">
                     {bridgeDirection === 'l1-to-l2' ? 'L2 Thanos' : 'L1 Sepolia'}
                   </p>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-white/30">
                     {bridgeDirection === 'l1-to-l2' ? 'Tokamak' : 'Ethereum'}
                   </p>
                 </div>
@@ -875,7 +886,7 @@ export default function StakingPage() {
                 wstonBridgeAllowance < bridgeBigInt;
               return (
                 <div className="space-y-1 rounded-lg bg-white/5 p-3">
-                  <p className="text-xs font-medium text-zinc-400">Bridge steps:</p>
+                  <p className="text-xs font-medium text-white/40">Bridge steps:</p>
                   <StepLine label="1. Approve WSTON for bridge" done={!needsApproval || isApproveBridgeSuccess} active={needsApproval && !isApproveBridgeSuccess} />
                   <StepLine label="2. Bridge to L2" done={isBridgeSuccess} active={!needsApproval && !isBridgeSuccess} />
                 </div>
@@ -891,7 +902,7 @@ export default function StakingPage() {
                 l2WstonBridgeAllowance < bridgeBigInt;
               return (
                 <div className="space-y-1 rounded-lg bg-white/5 p-3">
-                  <p className="text-xs font-medium text-zinc-400">Withdraw steps:</p>
+                  <p className="text-xs font-medium text-white/40">Withdraw steps:</p>
                   <StepLine label="1. Approve WSTON for bridge" done={!needsApproval || isApproveL2BridgeSuccess} active={needsApproval && !isApproveL2BridgeSuccess} />
                   <StepLine label="2. Initiate withdrawal" done={isWithdrawToL1Success} active={!needsApproval && !isWithdrawToL1Success} />
                 </div>
@@ -1004,45 +1015,45 @@ export default function StakingPage() {
 
         {/* Bridge Info & Balances */}
         <div className="space-y-6">
-          <div className="card border-[#38BDF8]/20 bg-[#38BDF8]/5">
+          <div className="rounded-2xl border border-[#38BDF8]/20 bg-[#38BDF8]/5 p-6">
             <div className="flex items-start gap-3">
               <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#38BDF8]" />
               <div>
-                <h3 className="font-semibold text-white">How Bridging Works</h3>
-                <ul className="mt-2 space-y-2 text-sm text-zinc-400">
+                <h3 className="font-medium text-white">How Bridging Works</h3>
+                <ul className="mt-2 space-y-2 text-sm text-white/40">
                   <li className="flex items-start gap-2">
                     <span className="mt-0.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#38BDF8]" />
-                    <b className="text-zinc-300">L1 → L2:</b>&nbsp;WSTON is locked in the L1StandardBridge. Equivalent WSTON is minted on L2. Arrives in ~1-3 minutes.
+                    <b className="text-white/60">L1 → L2:</b>&nbsp;WSTON is locked in the L1StandardBridge. Equivalent WSTON is minted on L2. Arrives in ~1-3 minutes.
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="mt-0.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#38BDF8]" />
-                    <b className="text-zinc-300">L2 → L1:</b>&nbsp;L2 WSTON is burned. After a ~24 minute fault-proof period, WSTON is released on L1.
+                    <b className="text-white/60">L2 → L1:</b>&nbsp;L2 WSTON is burned. After a ~24 minute fault-proof period, WSTON is released on L1.
                   </li>
                 </ul>
               </div>
             </div>
           </div>
 
-          <div className="card">
-            <h3 className="font-semibold text-white mb-3">Balances</h3>
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
+            <h3 className="font-medium text-white mb-3">Balances</h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between rounded-lg bg-white/5 p-3">
                 <div>
-                  <p className="text-xs text-zinc-500">L1 WSTON</p>
+                  <p className="text-xs text-white/30">L1 WSTON</p>
                   <p className="text-sm font-bold text-white">{formatWTON(wstonBalance)}</p>
                 </div>
                 <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-xs text-blue-400">Sepolia</span>
               </div>
               <div className="flex items-center justify-between rounded-lg bg-white/5 p-3">
                 <div>
-                  <p className="text-xs text-zinc-500">L2 WSTON</p>
+                  <p className="text-xs text-white/30">L2 WSTON</p>
                   <p className="text-sm font-bold text-white">{formatWTON(l2WstonBalance)}</p>
                 </div>
                 <span className="rounded-full bg-purple-500/10 px-2 py-0.5 text-xs text-purple-400">Thanos</span>
               </div>
               <div className="flex items-center justify-between rounded-lg bg-white/5 p-3">
                 <div>
-                  <p className="text-xs text-zinc-500">Locked in Vault</p>
+                  <p className="text-xs text-white/30">Locked in Vault</p>
                   <p className="text-sm font-bold text-white">{formatWTON(lockedBalance)}</p>
                 </div>
                 <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-400">Vault</span>
@@ -1050,12 +1061,12 @@ export default function StakingPage() {
             </div>
           </div>
 
-          <div className="card border-amber-500/20 bg-amber-500/5">
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-6">
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-400" />
               <div>
-                <h3 className="font-semibold text-white">Important</h3>
-                <p className="mt-1 text-sm text-zinc-400">
+                <h3 className="font-medium text-white">Important</h3>
+                <p className="mt-1 text-sm text-white/40">
                   {bridgeDirection === 'l1-to-l2'
                     ? 'You need ETH on Sepolia to pay L1 gas fees for bridging.'
                     : 'You need TON on Thanos Sepolia to pay L2 gas fees. L2 → L1 withdrawals have a ~24 min fault-proof period before tokens can be claimed on L1.'}
@@ -1071,51 +1082,51 @@ export default function StakingPage() {
       {activeTab === 'l2' && <>
       {/* Vault Stats */}
       <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
-        <div className="card text-center">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-center transition-all duration-300 hover:border-[#38BDF8]/20">
           <Lock className="mx-auto h-8 w-8 text-purple-500" />
-          <p className="mt-2 text-2xl font-bold text-white">
+          <p className="mt-2 text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-mono), monospace' }}>
             {formatWTON(lockedBalance)}
           </p>
-          <p className="text-sm text-zinc-500">Locked WSTON</p>
+          <p className="text-sm text-white/30">Locked WSTON</p>
         </div>
-        <div className="card text-center">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-center transition-all duration-300 hover:border-[#38BDF8]/20">
           <Shield className="mx-auto h-8 w-8 text-[#38BDF8]" />
-          <p className="mt-2 text-2xl font-bold text-white">
+          <p className="mt-2 text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-mono), monospace' }}>
             {vaultTier !== undefined ? tierLabel(vaultTier) : '-'}
           </p>
-          <p className="text-sm text-zinc-500">Operator Tier</p>
+          <p className="text-sm text-white/30">Operator Tier</p>
         </div>
-        <div className="card text-center">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-center transition-all duration-300 hover:border-[#38BDF8]/20">
           <Coins className="mx-auto h-8 w-8 text-green-500" />
-          <p className="mt-2 text-2xl font-bold text-white">
+          <p className="mt-2 text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-mono), monospace' }}>
             {formatWTON(l2WstonBalance)}
           </p>
-          <p className="text-sm text-zinc-500">L2 WSTON Balance</p>
+          <p className="text-sm text-white/30">L2 WSTON Balance</p>
         </div>
-        <div className="card text-center">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-center transition-all duration-300 hover:border-[#38BDF8]/20">
           <TrendingUp className="mx-auto h-8 w-8 text-amber-500" />
-          <p className="mt-2 text-2xl font-bold text-white">
+          <p className="mt-2 text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-mono), monospace' }}>
             {vaultPendingCount !== undefined ? vaultPendingCount.toString() : '-'}
           </p>
-          <p className="text-sm text-zinc-500">Pending Unlocks</p>
+          <p className="text-sm text-white/30">Pending Unlocks</p>
         </div>
       </div>
 
       {/* Vault Lock / Unlock */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* Lock Card */}
-        <div className="card">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
           <div className="mb-4 flex items-center gap-2">
             <ArrowUpRight className="h-5 w-5 text-green-500" />
-            <h2 className="text-lg font-semibold text-white">Lock WSTON</h2>
+            <h2 className="text-lg font-medium text-white">Lock WSTON</h2>
           </div>
-          <p className="mb-4 text-sm text-zinc-400">
+          <p className="mb-4 text-sm text-white/40">
             Lock bridged WSTON in the vault to participate in agent validation.
             Higher locks = higher tier = more validation opportunities.
           </p>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-300">Amount (WSTON)</label>
+              <label className="block text-sm font-medium text-white/60">Amount (WSTON)</label>
               <div className="mt-1 flex gap-2">
                 <input
                   type="number"
@@ -1139,7 +1150,7 @@ export default function StakingPage() {
                   MAX
                 </button>
               </div>
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="mt-1 text-xs text-white/30">
                 Available: {formatWTON(l2WstonBalance)} WSTON
               </p>
             </div>
@@ -1183,18 +1194,18 @@ export default function StakingPage() {
         </div>
 
         {/* Unlock Card */}
-        <div className="card">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
           <div className="mb-4 flex items-center gap-2">
             <ArrowDownRight className="h-5 w-5 text-red-500" />
-            <h2 className="text-lg font-semibold text-white">Unlock WSTON</h2>
+            <h2 className="text-lg font-medium text-white">Unlock WSTON</h2>
           </div>
-          <p className="mb-4 text-sm text-zinc-400">
+          <p className="mb-4 text-sm text-white/40">
             Request to unlock WSTON from the vault. Subject to a withdrawal delay
             for network security.
           </p>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-300">Amount (WSTON)</label>
+              <label className="block text-sm font-medium text-white/60">Amount (WSTON)</label>
               <div className="mt-1 flex gap-2">
                 <input
                   type="number"
@@ -1218,7 +1229,7 @@ export default function StakingPage() {
                   MAX
                 </button>
               </div>
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="mt-1 text-xs text-white/30">
                 Locked: {formatWTON(lockedBalance)} WSTON
               </p>
             </div>
@@ -1259,11 +1270,11 @@ export default function StakingPage() {
             <div className="mt-4 border-t border-white/10 pt-4">
               <div className="mb-3 flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-zinc-300">Ready to Claim</p>
+                  <p className="text-sm font-medium text-white/60">Ready to Claim</p>
                   <p className="text-lg font-bold text-white">{formatWTON(vaultReadyAmount)} WSTON</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-medium text-zinc-300">Pending</p>
+                  <p className="text-sm font-medium text-white/60">Pending</p>
                   <p className="text-lg font-bold text-white">
                     {vaultPendingCount !== undefined ? vaultPendingCount.toString() : '-'}
                   </p>
@@ -1301,30 +1312,30 @@ export default function StakingPage() {
       </div>
 
       {/* Tier Info */}
-      <div className="mt-8 card border-purple-500/20 bg-purple-500/5">
+      <div className="mt-8 rounded-2xl border border-purple-500/20 bg-purple-500/5 p-6">
         <div className="flex items-start gap-3">
           <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-purple-400" />
           <div>
-            <h3 className="font-semibold text-white">Operator Tiers</h3>
-            <p className="mt-1 text-sm text-zinc-400">
+            <h3 className="font-medium text-white">Operator Tiers</h3>
+            <p className="mt-1 text-sm text-white/40">
               Your locked WSTON determines your operator tier, which affects
               your eligibility for validation tasks and bounty distribution.
             </p>
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="rounded-lg bg-white/5 p-3">
-                <p className="text-xs font-medium text-zinc-500">Unverified</p>
+                <p className="text-xs font-medium text-white/30">Unverified</p>
                 <p className="text-sm font-bold text-white">&lt; 1,000 WSTON</p>
-                <p className="text-xs text-zinc-500">Cannot validate</p>
+                <p className="text-xs text-white/30">Cannot validate</p>
               </div>
               <div className="rounded-lg bg-white/5 p-3">
                 <p className="text-xs font-medium text-[#38BDF8]">Verified</p>
                 <p className="text-sm font-bold text-white">&ge; 1,000 WSTON</p>
-                <p className="text-xs text-zinc-500">Standard validation</p>
+                <p className="text-xs text-white/30">Standard validation</p>
               </div>
               <div className="rounded-lg bg-white/5 p-3">
                 <p className="text-xs font-medium text-purple-400">Premium</p>
                 <p className="text-sm font-bold text-white">&ge; 10,000 WSTON</p>
-                <p className="text-xs text-zinc-500">Priority validation</p>
+                <p className="text-xs text-white/30">Priority validation</p>
               </div>
             </div>
           </div>

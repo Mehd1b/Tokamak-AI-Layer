@@ -52,25 +52,31 @@ export default function ValidationPage() {
   });
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="mx-auto max-w-7xl px-6 pt-28 pb-16 lg:px-12">
+      <div className="mb-12 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
         <div>
-          <h1 className="text-3xl font-bold text-white">
-            Validation Registry
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm mb-6">
+            <div className="w-2 h-2 rounded-full bg-[#38BDF8] animate-pulse" />
+            <span className="text-xs tracking-widest text-gray-400 uppercase" style={{ fontFamily: 'var(--font-mono), monospace' }}>
+              Trust Engine
+            </span>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-light mb-3" style={{ fontFamily: 'var(--font-serif), serif' }}>
+            <span className="italic text-[#38BDF8]">Validation</span>{' '}
+            <span className="text-white">Registry</span>
           </h1>
-          <p className="mt-2 text-zinc-400">
-            Browse and request agent capability validations using multiple trust
-            models.
+          <p className="text-lg text-white/50 leading-relaxed" style={{ fontFamily: 'var(--font-mono), monospace' }}>
+            Browse and request agent capability validations using multiple trust models.
           </p>
         </div>
-        <Link
-          href="/validation/request"
-          className="btn-primary flex items-center gap-2"
-        >
-          <Shield className="h-4 w-4" />
-          Request Validation
+        <Link href="/validation/request" className="shiny-cta text-sm !px-6 !py-3">
+          <span className="shiny-cta-text flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            Request Validation
+          </span>
         </Link>
       </div>
+      <div className="w-full h-px mb-10" style={{ background: 'linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.3), transparent)' }} />
 
       {/* Trust Model Overview */}
       <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-4">
@@ -104,12 +110,12 @@ export default function ValidationPage() {
             desc: 'Combines multiple trust models',
           },
         ].map(({ model, icon: Icon, color, bg, desc }) => (
-          <div key={model} className={`card ${bg} border-0`}>
+          <div key={model} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 transition-all duration-300 hover:border-[#38BDF8]/20">
             <Icon className={`h-6 w-6 ${color}`} />
-            <h3 className="mt-2 font-semibold text-white">
+            <h3 className="mt-2 font-medium text-white">
               {getValidationModelLabel(model)}
             </h3>
-            <p className="mt-1 text-xs text-zinc-400">{desc}</p>
+            <p className="mt-1 text-xs text-white/40">{desc}</p>
           </div>
         ))}
       </div>
@@ -195,24 +201,24 @@ export default function ValidationPage() {
       {/* Validation List */}
       <div className="space-y-4">
         {isLoading && (
-          <div className="card py-12 text-center">
-            <p className="text-zinc-500">Loading validations...</p>
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] py-12 text-center">
+            <p className="text-white/30">Loading validations...</p>
           </div>
         )}
 
         {!isLoading && filteredValidations.length === 0 && (
-          <div className="card py-12 text-center">
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] py-12 text-center">
             <Shield className="mx-auto h-12 w-12 text-zinc-600" />
             <h3 className="mt-4 text-lg font-semibold text-white">
               {searchQuery ? 'No Matching Validations' : 'No Validations Yet'}
             </h3>
-            <p className="mt-2 text-sm text-zinc-500">
+            <p className="mt-2 text-sm text-white/30">
               {searchQuery
                 ? 'Try a different search query or clear the filter.'
                 : 'Validation requests will appear here once agents begin requesting capability validations.'}
             </p>
             {!searchQuery && isConnected && (
-              <p className="mt-4 text-xs text-zinc-600">
+              <p className="mt-4 text-xs text-white/20">
                 To request a validation, visit an agent&apos;s detail page and
                 select a trust model.
               </p>
@@ -229,7 +235,7 @@ export default function ValidationPage() {
 
             return (
               <Link key={v.hash} href={`/validation/${v.hash}`}>
-                <div className="card hover:border-[#38BDF8] transition-colors cursor-pointer">
+                <div className="group rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 transition-all duration-300 hover:border-[#38BDF8]/30 hover:-translate-y-0.5 cursor-pointer">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
@@ -240,7 +246,7 @@ export default function ValidationPage() {
                       </div>
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
-                          <span className="text-zinc-500">Agent ID:</span>{' '}
+                          <span className="text-white/30">Agent ID:</span>{' '}
                           <Link
                             href={`/agents/${v.request.agentId}`}
                             className="text-[#38BDF8] hover:underline"
@@ -250,18 +256,18 @@ export default function ValidationPage() {
                           </Link>
                         </div>
                         <div>
-                          <span className="text-zinc-500">Trust Model:</span>{' '}
+                          <span className="text-white/30">Trust Model:</span>{' '}
                           <span className="font-medium">{modelLabel}</span>
                         </div>
                         {isCompleted && v.response.score > 0 && (
                           <div>
-                            <span className="text-zinc-500">Score:</span>{' '}
+                            <span className="text-white/30">Score:</span>{' '}
                             <span className="font-medium">{v.response.score}/100</span>
                           </div>
                         )}
                         {v.request.bounty > 0n && (
                           <div>
-                            <span className="text-zinc-500">Bounty:</span>{' '}
+                            <span className="text-white/30">Bounty:</span>{' '}
                             <span className="font-medium">
                               {formatBigInt(v.request.bounty)} {nativeCurrency}
                             </span>
@@ -277,7 +283,7 @@ export default function ValidationPage() {
       </div>
 
       {/* Status Legend */}
-      <div className="mt-8 card">
+      <div className="mt-8 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
         <h2 className="mb-4 text-lg font-semibold text-white">
           Validation Statuses
         </h2>
@@ -286,28 +292,28 @@ export default function ValidationPage() {
             <Clock className="h-4 w-4 text-amber-500" />
             <div>
               <p className="text-sm font-medium text-white">Pending</p>
-              <p className="text-xs text-zinc-500">Awaiting validator</p>
+              <p className="text-xs text-white/30">Awaiting validator</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <CheckCircle className="h-4 w-4 text-green-500" />
             <div>
               <p className="text-sm font-medium text-white">Completed</p>
-              <p className="text-xs text-zinc-500">Successfully validated</p>
+              <p className="text-xs text-white/30">Successfully validated</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <XCircle className="h-4 w-4 text-red-500" />
             <div>
               <p className="text-sm font-medium text-white">Expired</p>
-              <p className="text-xs text-zinc-500">Timed out</p>
+              <p className="text-xs text-white/30">Timed out</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-red-500" />
             <div>
               <p className="text-sm font-medium text-white">Disputed</p>
-              <p className="text-xs text-zinc-500">Under review</p>
+              <p className="text-xs text-white/30">Under review</p>
             </div>
           </div>
         </div>

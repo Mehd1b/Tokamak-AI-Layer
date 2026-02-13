@@ -128,14 +128,14 @@ export default function ValidationDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        <p className="text-zinc-500">Loading validation details...</p>
+      <div className="mx-auto max-w-4xl px-6 pt-28 pb-16 lg:px-12">
+        <p className="text-white/30">Loading validation details...</p>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-4xl px-6 pt-28 pb-16 lg:px-12">
       <Link
         href="/validation"
         className="mb-6 inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-white"
@@ -144,19 +144,19 @@ export default function ValidationDetailPage() {
       </Link>
 
       {/* Header */}
-      <div className="card mb-6">
+      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm mb-6">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white">
+            <h1 className="text-3xl font-light text-white" style={{ fontFamily: 'var(--font-serif), serif' }}>
               Validation Request
             </h1>
             <div className="mt-2 flex items-center gap-2">
-              <span className="font-mono text-sm text-zinc-500">
+              <span className="font-mono text-sm text-white/30">
                 {hash ? shortenAddress(hash, 8) : 'Unknown'}
               </span>
               <button
                 onClick={copyHash}
-                className="text-zinc-600 hover:text-zinc-400"
+                className="text-white/20 hover:text-zinc-400"
               >
                 {copied ? (
                   <Check className="h-3.5 w-3.5 text-emerald-400" />
@@ -175,12 +175,12 @@ export default function ValidationDetailPage() {
       </div>
 
       {!validation ? (
-        <div className="card py-12 text-center">
-          <Shield className="mx-auto h-12 w-12 text-zinc-600" />
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] py-12 text-center">
+          <Shield className="mx-auto h-12 w-12 text-white/20" />
           <h3 className="mt-4 text-lg font-semibold text-white">
             Validation Not Found
           </h3>
-          <p className="mt-2 text-sm text-zinc-500">
+          <p className="mt-2 text-sm text-white/30">
             This validation request hash does not exist on-chain or has not been
             indexed yet.
           </p>
@@ -188,19 +188,19 @@ export default function ValidationDetailPage() {
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {/* Request Details */}
-          <div className="card">
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
             <h2 className="mb-4 text-lg font-semibold text-white">
               Request Details
             </h2>
             <dl className="space-y-3">
               <div>
-                <dt className="text-sm text-zinc-500">Request Hash</dt>
+                <dt className="text-sm text-white/30">Request Hash</dt>
                 <dd className="mt-1 truncate font-mono text-sm text-white">
                   {hash}
                 </dd>
               </div>
               <div>
-                <dt className="text-sm text-zinc-500">Agent ID</dt>
+                <dt className="text-sm text-white/30">Agent ID</dt>
                 <dd className="mt-1 text-sm text-white">
                   <Link
                     href={`/agents/${validation[0].agentId}`}
@@ -211,31 +211,31 @@ export default function ValidationDetailPage() {
                 </dd>
               </div>
               <div>
-                <dt className="text-sm text-zinc-500">Requester</dt>
+                <dt className="text-sm text-white/30">Requester</dt>
                 <dd className="mt-1 font-mono text-sm text-white">
                   {shortenAddress(validation[0].requester)}
                 </dd>
               </div>
               <div>
-                <dt className="text-sm text-zinc-500">Task Hash</dt>
+                <dt className="text-sm text-white/30">Task Hash</dt>
                 <dd className="mt-1 truncate font-mono text-sm text-white">
                   {shortenAddress(validation[0].taskHash)}
                 </dd>
               </div>
               <div>
-                <dt className="text-sm text-zinc-500">Output Hash</dt>
+                <dt className="text-sm text-white/30">Output Hash</dt>
                 <dd className="mt-1 truncate font-mono text-sm text-white">
                   {shortenAddress(validation[0].outputHash)}
                 </dd>
               </div>
               <div>
-                <dt className="text-sm text-zinc-500">Trust Model</dt>
+                <dt className="text-sm text-white/30">Trust Model</dt>
                 <dd className="mt-1 text-sm text-white">
                   {getValidationModelLabel(validation[0].model)}
                 </dd>
               </div>
               <div>
-                <dt className="text-sm text-zinc-500">Bounty</dt>
+                <dt className="text-sm text-white/30">Bounty</dt>
                 <dd className="mt-1 text-sm text-white">
                   {validation[0].bounty > 0n
                     ? `${formatBigInt(validation[0].bounty)} ${nativeCurrency}`
@@ -243,7 +243,7 @@ export default function ValidationDetailPage() {
                 </dd>
               </div>
               <div>
-                <dt className="text-sm text-zinc-500">Deadline</dt>
+                <dt className="text-sm text-white/30">Deadline</dt>
                 <dd className="mt-1 text-sm text-white">
                   {validation[0].deadline > 0n
                     ? new Date(Number(validation[0].deadline) * 1000).toLocaleString()
@@ -256,7 +256,7 @@ export default function ValidationDetailPage() {
                 )}
               </div>
               <div>
-                <dt className="text-sm text-zinc-500">Status</dt>
+                <dt className="text-sm text-white/30">Status</dt>
                 <dd className="mt-1">
                   <span className={getStatusColor(validation[0].status)}>
                     {getValidationStatusLabel(validation[0].status)}
@@ -264,7 +264,7 @@ export default function ValidationDetailPage() {
                 </dd>
               </div>
               <div>
-                <dt className="text-sm text-zinc-500">Disputed</dt>
+                <dt className="text-sm text-white/30">Disputed</dt>
                 <dd className="mt-1 text-sm text-white">
                   {isDisputed ? 'Yes' : 'No'}
                 </dd>
@@ -273,7 +273,7 @@ export default function ValidationDetailPage() {
           </div>
 
           {/* Validation Result */}
-          <div className="card">
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
             <h2 className="mb-4 text-lg font-semibold text-white">
               Validation Result
             </h2>
@@ -283,7 +283,7 @@ export default function ValidationDetailPage() {
                 {!execResult && !execError && (
                   <div className="rounded-lg bg-white/5 p-6 text-center">
                     <Play className="mx-auto h-8 w-8 text-[#38BDF8]" />
-                    <p className="mt-2 text-sm text-zinc-500">
+                    <p className="mt-2 text-sm text-white/30">
                       This validation is pending. Trigger agent runtime validation below.
                     </p>
                     <button
@@ -369,7 +369,7 @@ export default function ValidationDetailPage() {
               <dl className="space-y-3">
                 {/* Score with visual progress bar */}
                 <div>
-                  <dt className="text-sm text-zinc-500">Score</dt>
+                  <dt className="text-sm text-white/30">Score</dt>
                   <dd className="mt-1">
                     <div className="relative h-4 w-full rounded-full bg-white/10">
                       <div
@@ -384,7 +384,7 @@ export default function ValidationDetailPage() {
                 </div>
                 {validation[1].validator !== '0x0000000000000000000000000000000000000000' && (
                   <div>
-                    <dt className="text-sm text-zinc-500">Validator</dt>
+                    <dt className="text-sm text-white/30">Validator</dt>
                     <dd className="mt-1 font-mono text-sm text-white">
                       {shortenAddress(validation[1].validator)}
                     </dd>
@@ -392,7 +392,7 @@ export default function ValidationDetailPage() {
                 )}
                 {validation[1].timestamp > 0n && (
                   <div>
-                    <dt className="text-sm text-zinc-500">Validated At</dt>
+                    <dt className="text-sm text-white/30">Validated At</dt>
                     <dd className="mt-1 text-sm text-white">
                       {new Date(Number(validation[1].timestamp) * 1000).toLocaleString()}
                     </dd>
@@ -400,7 +400,7 @@ export default function ValidationDetailPage() {
                 )}
                 {validation[1].detailsURI && (
                   <div>
-                    <dt className="text-sm text-zinc-500">Details URI</dt>
+                    <dt className="text-sm text-white/30">Details URI</dt>
                     <dd className="mt-1">
                       <a
                         href={validation[1].detailsURI}
@@ -419,7 +419,7 @@ export default function ValidationDetailPage() {
 
           {/* Bounty Distribution (for Completed validations) */}
           {validation[0].status === 1 && validation[0].bounty > 0n && (
-            <div className="card">
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
               <h2 className="mb-4 text-lg font-semibold text-white">
                 Bounty Distribution
               </h2>
@@ -437,21 +437,21 @@ export default function ValidationDetailPage() {
                         {formatBigInt(protocolFee)} {nativeCurrency}
                       </dd>
                     </div>
-                    <div className="text-xs text-zinc-600 pl-3">Treasury</div>
+                    <div className="text-xs text-white/20 pl-3">Treasury</div>
                     <div className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2">
                       <dt className="text-sm text-zinc-400">Agent Reward (10%)</dt>
                       <dd className="font-mono text-sm font-medium text-white">
                         {formatBigInt(agentReward)} {nativeCurrency}
                       </dd>
                     </div>
-                    <div className="text-xs text-zinc-600 pl-3">Agent Owner</div>
+                    <div className="text-xs text-white/20 pl-3">Agent Owner</div>
                     <div className="flex items-center justify-between rounded-lg bg-[#38BDF8]/10 px-3 py-2">
                       <dt className="text-sm font-medium text-[#38BDF8]">Validator Reward (80%)</dt>
                       <dd className="font-mono text-sm font-bold text-[#38BDF8]">
                         {formatBigInt(validatorReward)} {nativeCurrency}
                       </dd>
                     </div>
-                    <div className="text-xs text-zinc-600 pl-3">Validator</div>
+                    <div className="text-xs text-white/20 pl-3">Validator</div>
                     <div className="mt-2 border-t border-white/10 pt-3">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-white">Total Bounty</span>
@@ -467,7 +467,7 @@ export default function ValidationDetailPage() {
           )}
 
           {/* Timeline */}
-          <div className="card md:col-span-2">
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm md:col-span-2">
             <h2 className="mb-4 text-lg font-semibold text-white">
               Timeline
             </h2>
@@ -480,7 +480,7 @@ export default function ValidationDetailPage() {
                   <p className="text-sm font-medium text-white">
                     Validation Requested
                   </p>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-white/30">
                     Request submitted on-chain
                   </p>
                 </div>
@@ -493,21 +493,21 @@ export default function ValidationDetailPage() {
                 >
                   <Clock
                     className={`h-3.5 w-3.5 ${
-                      validation[0].status >= 1 ? 'text-emerald-400' : 'text-zinc-600'
+                      validation[0].status >= 1 ? 'text-emerald-400' : 'text-white/20'
                     }`}
                   />
                 </div>
                 <div>
                   <p
                     className={`text-sm font-medium ${
-                      validation[0].status >= 1 ? 'text-white' : 'text-zinc-500'
+                      validation[0].status >= 1 ? 'text-white' : 'text-white/30'
                     }`}
                   >
                     {validation[0].status >= 1
                       ? 'Validator Selected'
                       : 'Awaiting Validator'}
                   </p>
-                  <p className="text-xs text-zinc-600">
+                  <p className="text-xs text-white/20">
                     DRB selects a validator via commit-reveal
                   </p>
                 </div>
@@ -520,14 +520,14 @@ export default function ValidationDetailPage() {
                 >
                   <Shield
                     className={`h-3.5 w-3.5 ${
-                      validation[0].status === 1 ? 'text-emerald-400' : 'text-zinc-600'
+                      validation[0].status === 1 ? 'text-emerald-400' : 'text-white/20'
                     }`}
                   />
                 </div>
                 <div>
                   <p
                     className={`text-sm font-medium ${
-                      validation[0].status === 1 ? 'text-white' : 'text-zinc-500'
+                      validation[0].status === 1 ? 'text-white' : 'text-white/30'
                     }`}
                   >
                     {validation[0].status === 1
@@ -538,7 +538,7 @@ export default function ValidationDetailPage() {
                           ? 'Validation Disputed'
                           : 'Awaiting Completion'}
                   </p>
-                  <p className="text-xs text-zinc-600">
+                  <p className="text-xs text-white/20">
                     {validation[0].status === 1
                       ? 'Result submitted and verified'
                       : validation[0].status === 2

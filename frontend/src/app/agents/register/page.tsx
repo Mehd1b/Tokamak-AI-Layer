@@ -222,19 +222,41 @@ export default function RegisterAgentPage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-2xl px-6 pt-28 pb-16 lg:px-12">
       <Link
         href="/agents"
-        className="mb-6 inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-white"
+        className="mb-6 inline-flex items-center gap-1 text-sm text-white/30 hover:text-white transition-colors duration-300"
       >
         <ArrowLeft className="h-4 w-4" /> Back to Agents
       </Link>
 
-      <h1 className="mb-2 text-3xl font-bold text-white">Register Agent</h1>
-      <p className="mb-8 text-zinc-400">
+      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm mb-6">
+        <div className="w-2 h-2 rounded-full bg-[#38BDF8] animate-pulse" />
+        <span
+          className="text-xs tracking-widest text-gray-400 uppercase"
+          style={{ fontFamily: 'var(--font-mono), monospace' }}
+        >
+          New Agent
+        </span>
+      </div>
+      <h1
+        className="text-4xl md:text-5xl font-light mb-3"
+        style={{ fontFamily: 'var(--font-serif), serif' }}
+      >
+        <span className="italic text-[#38BDF8]">Register</span>{' '}
+        <span className="text-white">Agent</span>
+      </h1>
+      <p
+        className="mb-8 text-lg text-white/50 leading-relaxed"
+        style={{ fontFamily: 'var(--font-mono), monospace' }}
+      >
         Register your AI agent on the Tokamak Agent Layer. Your agent will
         receive an ERC-721 token representing its on-chain identity.
       </p>
+      <div
+        className="w-full h-px mb-10"
+        style={{ background: 'linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.3), transparent)' }}
+      />
 
       {!isConnected && (
         <div className="card mb-6 border-amber-500/20 bg-amber-500/10">
@@ -254,14 +276,14 @@ export default function RegisterAgentPage() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Basic Info */}
-        <div className="card">
-          <h2 className="mb-4 text-lg font-semibold text-white">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
+          <h2 className="mb-4 text-lg font-medium text-white">
             Basic Information
           </h2>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-300">
+              <label className="block text-sm font-medium text-white/60">
                 Agent Name *
               </label>
               <input
@@ -273,13 +295,13 @@ export default function RegisterAgentPage() {
                 placeholder="My AI Agent"
                 className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"
               />
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="mt-1 text-xs text-white/30">
                 {name.length}/100
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-300">
+              <label className="block text-sm font-medium text-white/60">
                 Description *
               </label>
               <textarea
@@ -291,13 +313,13 @@ export default function RegisterAgentPage() {
                 placeholder="Describe what your agent does..."
                 className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"
               />
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="mt-1 text-xs text-white/30">
                 {description.length}/1000
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-300">
+              <label className="block text-sm font-medium text-white/60">
                 Request Example
               </label>
               <textarea
@@ -308,13 +330,13 @@ export default function RegisterAgentPage() {
                 placeholder="e.g. I have $10,000 to invest with a conservative risk profile..."
                 className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"
               />
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="mt-1 text-xs text-white/30">
                 Shown to users as a sample request to help them get started.
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-300">
+              <label className="block text-sm font-medium text-white/60">
                 Image URL
               </label>
               <input
@@ -329,8 +351,8 @@ export default function RegisterAgentPage() {
         </div>
 
         {/* Validation Model */}
-        <div className="card">
-          <h2 className="mb-4 text-lg font-semibold text-white">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
+          <h2 className="mb-4 text-lg font-medium text-white">
             Validation Model
           </h2>
           <div className="space-y-3">
@@ -365,7 +387,7 @@ export default function RegisterAgentPage() {
                         </span>
                       )}
                     </div>
-                    <p className="mt-0.5 text-xs text-zinc-500">{m.description}</p>
+                    <p className="mt-0.5 text-xs text-white/30">{m.description}</p>
                   </div>
                 </label>
               );
@@ -375,11 +397,11 @@ export default function RegisterAgentPage() {
 
         {/* Operators — visible for StakeSecured / Hybrid */}
         {validationModel > 0 && (
-          <div className="card">
-            <h2 className="mb-4 text-lg font-semibold text-white">
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
+            <h2 className="mb-4 text-lg font-medium text-white">
               Operators
             </h2>
-            <p className="mb-4 text-sm text-zinc-400">
+            <p className="mb-4 text-sm text-white/40">
               Stake Secured and Hybrid agents require at least one operator backing the agent with staked TON.
               Each operator must sign an EIP-712 consent message.
             </p>
@@ -401,7 +423,7 @@ export default function RegisterAgentPage() {
                   <Shield className="h-4 w-4 text-[#38BDF8]" />
                   <span className="text-sm font-medium text-white">Register yourself as operator</span>
                 </div>
-                <p className="mt-0.5 text-xs text-zinc-500">
+                <p className="mt-0.5 text-xs text-white/30">
                   Your connected wallet ({address ? shortenAddress(address) : '...'}) will sign an EIP-712 consent
                   and be registered as an operator for this agent.
                 </p>
@@ -440,12 +462,12 @@ export default function RegisterAgentPage() {
         )}
 
         {/* Fee Configuration */}
-        <div className="card">
-          <h2 className="mb-4 text-lg font-semibold text-white">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
+          <h2 className="mb-4 text-lg font-medium text-white">
             Fee Configuration
           </h2>
           <div>
-            <label className="block text-sm font-medium text-zinc-300">
+            <label className="block text-sm font-medium text-white/60">
               Fee per Task ({nativeCurrency})
             </label>
             <input
@@ -457,7 +479,7 @@ export default function RegisterAgentPage() {
               placeholder="0.0 (free)"
               className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"
             />
-            <p className="mt-1 text-xs text-zinc-500">
+            <p className="mt-1 text-xs text-white/30">
               Leave empty or 0 for free agents. Fee is paid in native {nativeCurrency} on {l2Name}.
               You can set or update the fee later from the agent detail page.
             </p>
@@ -465,8 +487,8 @@ export default function RegisterAgentPage() {
         </div>
 
         {/* Service Endpoints */}
-        <div className="card">
-          <h2 className="mb-4 text-lg font-semibold text-white">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
+          <h2 className="mb-4 text-lg font-medium text-white">
             Service Endpoints
           </h2>
 
@@ -481,7 +503,7 @@ export default function RegisterAgentPage() {
                     <span className="text-sm font-medium text-zinc-300">
                       {type}:
                     </span>{' '}
-                    <span className="text-sm text-zinc-400">{url}</span>
+                    <span className="text-sm text-white/40">{url}</span>
                   </div>
                   <button
                     type="button"
@@ -552,9 +574,9 @@ export default function RegisterAgentPage() {
         </div>
 
         {/* Capabilities */}
-        <div className="card">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">
+            <h2 className="text-lg font-medium text-white">
               Capabilities
             </h2>
             <button

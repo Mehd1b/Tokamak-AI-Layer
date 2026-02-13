@@ -40,7 +40,7 @@ export default function ReputationPage() {
   const isLoading = agentLoading || feedbackLoading || clientsLoading || standardLoading || verifiedLoading;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-4xl px-6 pt-28 pb-16 lg:px-12">
       <Link
         href={agentId ? `/agents/${agentId}` : '/agents'}
         className="mb-6 inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-white"
@@ -48,100 +48,108 @@ export default function ReputationPage() {
         <ArrowLeft className="h-4 w-4" /> Back to Agent
       </Link>
 
-      <h1 className="mb-2 text-3xl font-bold text-white">
-        Reputation for Agent #{agentId?.toString()}
+      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm mb-6">
+        <div className="w-2 h-2 rounded-full bg-[#38BDF8] animate-pulse" />
+        <span className="text-xs tracking-widest text-gray-400 uppercase" style={{ fontFamily: 'var(--font-mono), monospace' }}>
+          Reputation
+        </span>
+      </div>
+      <h1 className="text-4xl md:text-5xl font-light mb-3" style={{ fontFamily: 'var(--font-serif), serif' }}>
+        <span className="italic text-[#38BDF8]">Reputation</span>{' '}
+        <span className="text-white">for Agent #{agentId?.toString()}</span>
       </h1>
-      <p className="mb-8 text-zinc-400">
+      <p className="mb-8 text-lg text-white/50 leading-relaxed" style={{ fontFamily: 'var(--font-mono), monospace' }}>
         On-chain reputation data from verified client interactions.
       </p>
+      <div className="w-full h-px mb-10" style={{ background: 'linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.3), transparent)' }} />
 
       {isLoading ? (
-        <div className="card text-center py-12">
-          <p className="text-zinc-500">Loading reputation data...</p>
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] text-center py-12">
+          <p className="text-white/40">Loading reputation data...</p>
         </div>
       ) : (
         <>
           {/* Summary Cards */}
           <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
-            <div className="card text-center">
-              <Star className="mx-auto h-8 w-8 text-amber-500" />
-              <p className="mt-2 text-2xl font-bold text-white">{formatAverage(standardSummary)}</p>
-              <p className="text-sm text-zinc-500">Average Score</p>
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-center transition-all duration-300 hover:border-[#38BDF8]/20">
+              <Star className="mx-auto h-8 w-8 text-[#38BDF8]" />
+              <p className="mt-2 text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-mono), monospace' }}>{formatAverage(standardSummary)}</p>
+              <p className="text-sm text-white/40">Average Score</p>
             </div>
-            <div className="card text-center">
-              <TrendingUp className="mx-auto h-8 w-8 text-green-500" />
-              <p className="mt-2 text-2xl font-bold text-white">
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-center transition-all duration-300 hover:border-[#38BDF8]/20">
+              <TrendingUp className="mx-auto h-8 w-8 text-emerald-400" />
+              <p className="mt-2 text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-mono), monospace' }}>
                 {feedbackCount?.toString() ?? '0'}
               </p>
-              <p className="text-sm text-zinc-500">Total Feedback</p>
+              <p className="text-sm text-white/40">Total Feedback</p>
             </div>
-            <div className="card text-center">
-              <Users className="mx-auto h-8 w-8 text-blue-500" />
-              <p className="mt-2 text-2xl font-bold text-white">
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-center transition-all duration-300 hover:border-[#38BDF8]/20">
+              <Users className="mx-auto h-8 w-8 text-[#38BDF8]/70" />
+              <p className="mt-2 text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-mono), monospace' }}>
                 {clients?.length ?? 0}
               </p>
-              <p className="text-sm text-zinc-500">Unique Clients</p>
+              <p className="text-sm text-white/40">Unique Clients</p>
             </div>
-            <div className="card text-center">
-              <Shield className="mx-auto h-8 w-8 text-purple-500" />
-              <p className="mt-2 text-2xl font-bold text-white">{formatAverage(verifiedSummary)}</p>
-              <p className="text-sm text-zinc-500">Verified Score</p>
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-center transition-all duration-300 hover:border-[#38BDF8]/20">
+              <Shield className="mx-auto h-8 w-8 text-purple-400" />
+              <p className="mt-2 text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-mono), monospace' }}>{formatAverage(verifiedSummary)}</p>
+              <p className="text-sm text-white/40">Verified Score</p>
             </div>
           </div>
 
           {/* Reputation Types */}
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <div className="card">
-              <h3 className="mb-2 font-semibold text-white">
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
+              <h3 className="mb-2 font-medium text-white">
                 Standard Reputation
               </h3>
-              <p className="text-sm text-zinc-400">
+              <p className="text-sm text-white/40">
                 Aggregated from all client feedback. Client filtering
                 (ERC-8004) prevents Sybil attacks.
               </p>
               <div className="mt-4 rounded-lg bg-white/5 p-3 text-center">
                 <p className="text-xl font-bold text-white">{formatAverage(standardSummary)}</p>
-                <p className="text-xs text-zinc-500">Score</p>
-                <p className="text-xs text-zinc-600 mt-1">Range: {formatRange(standardSummary)}</p>
+                <p className="text-xs text-white/40">Score</p>
+                <p className="text-xs text-white/30 mt-1">Range: {formatRange(standardSummary)}</p>
               </div>
             </div>
 
-            <div className="card">
-              <h3 className="mb-2 font-semibold text-white">
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
+              <h3 className="mb-2 font-medium text-white">
                 Stake-Weighted
               </h3>
-              <p className="text-sm text-zinc-400">
+              <p className="text-sm text-white/40">
                 Weighted by sqrt(reviewerStake). Feedback from stakers counts
                 more.
               </p>
               <div className="mt-4 rounded-lg bg-white/5 p-3 text-center">
                 <p className="text-xl font-bold text-white">{formatAverage(standardSummary)}</p>
-                <p className="text-xs text-zinc-500">Weighted Score</p>
-                <p className="text-xs text-zinc-600 mt-1">Range: {formatRange(standardSummary)}</p>
-                <p className="text-[10px] text-zinc-700 mt-2">
+                <p className="text-xs text-white/40">Weighted Score</p>
+                <p className="text-xs text-white/30 mt-1">Range: {formatRange(standardSummary)}</p>
+                <p className="text-[10px] text-white/20 mt-2">
                   Uses standard summary as proxy (stake-weighted API not yet available)
                 </p>
               </div>
             </div>
 
-            <div className="card">
-              <h3 className="mb-2 font-semibold text-white">
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
+              <h3 className="mb-2 font-medium text-white">
                 Verified Only
               </h3>
-              <p className="text-sm text-zinc-400">
+              <p className="text-sm text-white/40">
                 Only feedback linked to validated tasks. Highest trust level.
               </p>
               <div className="mt-4 rounded-lg bg-white/5 p-3 text-center">
                 <p className="text-xl font-bold text-white">{formatAverage(verifiedSummary)}</p>
-                <p className="text-xs text-zinc-500">Verified Score</p>
-                <p className="text-xs text-zinc-600 mt-1">Range: {formatRange(verifiedSummary)}</p>
+                <p className="text-xs text-white/40">Verified Score</p>
+                <p className="text-xs text-white/30 mt-1">Range: {formatRange(verifiedSummary)}</p>
               </div>
             </div>
           </div>
 
           {/* Feedback List */}
-          <div className="mt-8 card">
-            <h2 className="mb-4 text-lg font-semibold text-white">
+          <div className="mt-8 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
+            <h2 className="mb-4 text-lg font-medium text-white">
               Recent Feedback
             </h2>
             <FeedbackList feedbacks={feedbacks} isLoading={feedbacksLoading} />

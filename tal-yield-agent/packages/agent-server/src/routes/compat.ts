@@ -2,6 +2,7 @@ import { keccak256, toHex, type Hash } from "viem";
 import type { FastifyInstance } from "fastify";
 import { DEFAULT_RISK_PROFILES } from "@tal-yield-agent/agent-core";
 import type { RiskLevel, RiskProfile } from "@tal-yield-agent/agent-core";
+import { TaskStatus } from "@tal-yield-agent/tal-sdk";
 import type { AppContext, TaskRecord } from "../context.js";
 import { saveTask, loadTask, loadAllTasks, saveSnapshot, loadSnapshot } from "../storage.js";
 
@@ -46,6 +47,23 @@ function taskRecordToResult(task: TaskRecord, inputText?: string) {
 // In-memory secondary index: inputHash → taskId
 const inputHashToTaskId = new Map<string, string>();
 
+// Agent fee cache (avoids RPC call per request)
+const agentFeeCache = new Map<string, { fee: bigint; expiry: number }>();
+const FEE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function getAgentFeeWithCache(ctx: AppContext, agentId: bigint): Promise<bigint> {
+  const key = agentId.toString();
+  const cached = agentFeeCache.get(key);
+  if (cached && Date.now() < cached.expiry) return cached.fee;
+
+  const fee = await ctx.talClient.escrow.getAgentFee(agentId);
+  agentFeeCache.set(key, { fee, expiry: Date.now() + FEE_CACHE_TTL });
+  return fee;
+}
+
+// In-memory set of consumed taskRefs (defense-in-depth against concurrent replay)
+const consumedTaskRefs = new Set<string>();
+
 // ---------------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------------
@@ -80,19 +98,106 @@ export async function compatRoutes(app: FastifyInstance, ctx: AppContext) {
   /**
    * POST /api/tasks — Submit a task (frontend generic protocol)
    *
-   * Accepts { input: { text }, agentId?, paymentTxHash?, taskRef? }
+   * Accepts { input: { text }, agentId?, taskRef? }
    * Translates free-text into a strategy request.
+   * Payment enforcement: if AGENT_ID is configured and has a non-zero fee,
+   * taskRef is mandatory and must be in Escrowed status (prevents replay).
    */
   app.post<{
     Body: {
       input: { text: string };
       agentId?: string;
-      paymentTxHash?: string;
       taskRef?: string;
     };
   }>("/api/tasks", {
     handler: async (req, reply) => {
       const inputText = req.body?.input?.text ?? "";
+      const taskRef = req.body.taskRef;
+      const agentId = ctx.config.AGENT_ID;
+      const escrowAddress = ctx.config.TASK_FEE_ESCROW;
+
+      // ── Payment enforcement ──────────────────────────────────
+      let paymentRequired = false;
+
+      if (agentId != null && escrowAddress) {
+        try {
+          const fee = await getAgentFeeWithCache(ctx, agentId);
+          paymentRequired = fee > 0n;
+        } catch (err) {
+          // Fail-closed: if we can't check the fee, assume payment is required
+          ctx.logger.error({ error: err instanceof Error ? err.message : String(err) }, "Fee check failed (fail-closed)");
+          paymentRequired = true;
+        }
+      }
+
+      if (paymentRequired) {
+        if (!taskRef) {
+          return reply.code(402).send({
+            error: "payment_required",
+            message: "Payment required: taskRef must be provided for this agent",
+            debug: { escrow: escrowAddress, agentId: agentId!.toString() },
+          });
+        }
+
+        // In-memory replay check (defense-in-depth)
+        if (consumedTaskRefs.has(taskRef)) {
+          return reply.code(409).send({
+            error: "replay_rejected",
+            message: "Task reference already consumed (concurrent replay rejected)",
+            debug: { taskRef },
+          });
+        }
+
+        // On-chain escrow status verification
+        try {
+          const escrowData = await ctx.talClient.getTaskEscrow(taskRef as Hash);
+
+          if (escrowData.status === TaskStatus.Confirmed) {
+            return reply.code(402).send({
+              error: "replay_rejected",
+              message: "Task has already been completed (replay rejected)",
+              debug: { taskRef, escrow: escrowAddress },
+            });
+          }
+          if (escrowData.status === TaskStatus.Refunded) {
+            return reply.code(402).send({
+              error: "payment_refunded",
+              message: "Task has been refunded",
+              debug: { taskRef, escrow: escrowAddress },
+            });
+          }
+          if (escrowData.status !== TaskStatus.Escrowed) {
+            return reply.code(402).send({
+              error: "payment_required",
+              message: "Task fee has not been paid on-chain",
+              debug: { taskRef, escrow: escrowAddress },
+            });
+          }
+
+          // Verify the escrow is for the correct agent
+          if (escrowData.agentId !== agentId) {
+            return reply.code(400).send({
+              error: "agent_mismatch",
+              message: `Task escrow agent mismatch: escrow is for agent ${escrowData.agentId}, but this agent is ${agentId}`,
+              debug: { taskRef, expectedAgentId: agentId!.toString(), actualAgentId: escrowData.agentId.toString() },
+            });
+          }
+
+          ctx.logger.info({ taskRef: taskRef.slice(0, 18) }, "Escrow verified");
+        } catch (verifyErr) {
+          const errMsg = verifyErr instanceof Error ? verifyErr.message : String(verifyErr);
+          ctx.logger.error({ taskRef, error: errMsg }, "Escrow verification failed");
+          return reply.code(502).send({
+            error: "verification_failed",
+            message: `Payment verification failed: ${errMsg}`,
+          });
+        }
+
+        // Mark taskRef as consumed before execution
+        consumedTaskRefs.add(taskRef);
+      }
+
+      // ── Strategy execution ───────────────────────────────────
       const riskLevel = parseRiskLevel(inputText);
       const capitalUSD = parseCapitalUSD(inputText);
 
@@ -155,14 +260,15 @@ export async function compatRoutes(app: FastifyInstance, ctx: AppContext) {
         ctx.logger.error({ taskId, error: task.error }, "Strategy generation failed (compat)");
       }
 
-      // On-chain escrow settlement (confirm or refund)
-      const taskRef = req.body.taskRef;
+      // ── On-chain escrow settlement ───────────────────────────
       if (taskRef) {
         try {
           if (task.status === "completed") {
             const txHash = await ctx.talClient.confirmTask(taskRef as Hash);
             ctx.logger.info({ taskRef, txHash }, "Escrow confirmed on-chain");
           } else if (task.status === "failed") {
+            // Remove from consumed set so a new attempt can succeed after refund
+            consumedTaskRefs.delete(taskRef);
             const txHash = await ctx.talClient.escrow.refundTask(taskRef as Hash);
             ctx.logger.info({ taskRef, txHash }, "Escrow refunded on-chain");
           }

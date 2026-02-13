@@ -35,56 +35,60 @@ function AgentCard({ agentId, owner, agentURI, averageScore, feedbackCount, stat
   return (
     <Link
       href={`/agents/${agentId}`}
-      className={`card flex items-center justify-between transition-all hover:border-[#38BDF8]/30 hover:-translate-y-1 ${isDegraded ? 'opacity-60' : ''}`}
+      className={`group relative rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 flex items-center justify-between transition-all duration-300 hover:border-[#38BDF8]/30 hover:-translate-y-0.5 hover:bg-white/[0.04] ${isDegraded ? 'opacity-60' : ''}`}
     >
-      <div className="flex flex-1 min-w-0 items-center gap-4">
-        <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-[#38BDF8]/20 text-[#38BDF8] font-bold">
+      {/* Spotlight hover */}
+      <div className="pointer-events-none absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+        style={{ background: 'radial-gradient(600px circle at 50% 50%, rgba(56, 189, 248, 0.04), transparent 40%)' }}
+      />
+      <div className="relative z-10 flex flex-1 min-w-0 items-center gap-4">
+        <div className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-[#38BDF8]/10 border border-[#38BDF8]/20 text-[#38BDF8] font-bold text-sm" style={{ fontFamily: 'var(--font-mono), monospace' }}>
           #{agentId}
-          <span className={`absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ${statusDotColor} ring-2 ring-zinc-900`} title={getAgentStatusLabel(status)} />
+          <span className={`absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ${statusDotColor} ring-2 ring-[#0a0a0f]`} title={getAgentStatusLabel(status)} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-white truncate">
+            <h3 className="font-medium text-white truncate group-hover:text-[#38BDF8] transition-colors duration-300">
               {isLoading ? 'Loading...' : name || `Agent #${agentId}`}
             </h3>
-            <span className={`hidden sm:inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium ${getValidationModelColor(validationModel)}`}>
+            <span className={`hidden sm:inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${getValidationModelColor(validationModel)}`}>
               {getValidationModelLabel(validationModel)}
             </span>
             {hasNoMetadata && (
-              <span className="hidden sm:inline-flex rounded bg-zinc-700 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400">
+              <span className="hidden sm:inline-flex rounded-md bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-500">
                 No Metadata
               </span>
             )}
             {metadataFailed && (
-              <span className="hidden sm:inline-flex rounded bg-zinc-700 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400">
+              <span className="hidden sm:inline-flex rounded-md bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-500">
                 Metadata Unavailable
               </span>
             )}
             {isInactive && (
-              <span className="hidden sm:inline-flex rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">
+              <span className="hidden sm:inline-flex rounded-md bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-400">
                 Inactive
               </span>
             )}
           </div>
-          <p className="text-sm text-zinc-500 truncate">
+          <p className="text-sm text-white/40 truncate mt-0.5" style={{ fontFamily: 'var(--font-mono), monospace' }}>
             {isLoading
               ? 'Fetching metadata...'
               : description || `Owner: ${shortenAddress(owner)}`}
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="relative z-10 flex items-center gap-4">
         {averageScore !== null && (
-          <div className="hidden sm:flex items-center gap-1 text-sm">
-            <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+          <div className="hidden sm:flex items-center gap-1.5 text-sm">
+            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
             <span className="text-white font-medium">{averageScore.toFixed(1)}</span>
-            <span className="text-zinc-600">({feedbackCount})</span>
+            <span className="text-white/30" style={{ fontFamily: 'var(--font-mono), monospace' }}>({feedbackCount})</span>
           </div>
         )}
-        <div className="hidden md:block text-xs text-zinc-500">
+        <div className="hidden md:block text-xs text-white/30 font-mono">
           {shortenAddress(owner)}
         </div>
-        <ChevronRight className="h-5 w-5 text-zinc-600 flex-shrink-0" />
+        <ChevronRight className="h-5 w-5 text-white/20 group-hover:text-[#38BDF8] group-hover:translate-x-0.5 transition-all duration-300 flex-shrink-0" />
       </div>
     </Link>
   );
@@ -151,25 +155,50 @@ export default function AgentsPage() {
   const isLoading = countLoading || agentsLoading;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="mx-auto max-w-7xl px-6 pt-28 pb-16 lg:px-12">
+      {/* Page Header */}
+      <div className="mb-12 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
         <div>
-          <h1 className="text-3xl font-bold text-white">Agent Discovery</h1>
-          <p className="mt-2 text-zinc-400">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm mb-6">
+            <div className="w-2 h-2 rounded-full bg-[#38BDF8] animate-pulse" />
+            <span
+              className="text-xs tracking-widest text-gray-400 uppercase"
+              style={{ fontFamily: 'var(--font-mono), monospace' }}
+            >
+              Registry
+            </span>
+          </div>
+          <h1
+            className="text-4xl md:text-5xl font-light mb-3"
+            style={{ fontFamily: 'var(--font-serif), serif' }}
+          >
+            <span className="italic text-[#38BDF8]">Agent</span>{' '}
+            <span className="text-white">Discovery</span>
+          </h1>
+          <p
+            className="text-lg text-white/50 leading-relaxed"
+            style={{ fontFamily: 'var(--font-mono), monospace' }}
+          >
             {isLoading
               ? 'Loading...'
-              : `${agentCount} registered agent${agentCount !== 1 ? 's' : ''}`}
+              : `${agentCount} registered agent${agentCount !== 1 ? 's' : ''} on the Tokamak Agent Layer`}
           </p>
         </div>
         <div className="flex gap-3">
           <Link href="/agents/fees" className="btn-secondary">
             My Fees
           </Link>
-          <Link href="/agents/register" className="btn-primary">
-            Register Agent
+          <Link href="/agents/register" className="shiny-cta text-sm !px-6 !py-3">
+            <span className="shiny-cta-text">Register Agent</span>
           </Link>
         </div>
       </div>
+
+      {/* Gradient line */}
+      <div
+        className="w-full h-px mb-10"
+        style={{ background: 'linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.3), transparent)' }}
+      />
 
       {/* Search + Sort + Filters */}
       <div className="card mb-8">
@@ -268,25 +297,29 @@ export default function AgentsPage() {
       </div>
 
       {/* Agent List */}
-      <div className="space-y-4">
+      <div className="space-y-3">
         {agentCount === 0 && !isLoading && (
-          <div className="card text-center py-12">
-            <p className="text-zinc-500">No agents registered yet.</p>
-            <Link href="/agents/register" className="mt-4 inline-block btn-primary">
-              Be the first to register
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] text-center py-16">
+            <div className="mx-auto w-16 h-16 rounded-2xl bg-[#38BDF8]/10 border border-[#38BDF8]/20 flex items-center justify-center mb-4">
+              <Search className="h-7 w-7 text-[#38BDF8]/60" />
+            </div>
+            <p className="text-white/40 mb-4" style={{ fontFamily: 'var(--font-mono), monospace' }}>No agents registered yet.</p>
+            <Link href="/agents/register" className="shiny-cta text-sm !px-6 !py-3">
+              <span className="shiny-cta-text">Be the first to register</span>
             </Link>
           </div>
         )}
 
         {isLoading && (
-          <div className="card text-center py-12">
-            <p className="text-zinc-500">Loading agents...</p>
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] text-center py-16">
+            <div className="mx-auto w-12 h-12 rounded-full border-2 border-[#38BDF8]/20 border-t-[#38BDF8] animate-spin mb-4" />
+            <p className="text-white/40" style={{ fontFamily: 'var(--font-mono), monospace' }}>Loading agents...</p>
           </div>
         )}
 
         {!isLoading && filteredAndSortedAgents.length === 0 && agentCount > 0 && (
-          <div className="card text-center py-12">
-            <p className="text-zinc-500">No agents match your search.</p>
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] text-center py-16">
+            <p className="text-white/40" style={{ fontFamily: 'var(--font-mono), monospace' }}>No agents match your search.</p>
           </div>
         )}
 
