@@ -7,7 +7,7 @@ import { TaskStatus, ValidationModel, ValidationStatus } from "../types.js";
 
 export const MOCK_ADDRESSES = {
   identityRegistry: "0x3f89CD27fD877827E7665A9883b3c0180E22A525" as Address,
-  taskFeeEscrow: "0x43f9E59b6bFCacD70fcba4f3F6234a6a9F064b8C" as Address,
+  taskFeeEscrow: "0x6D68Cd8fD89BF1746A1948783C92A00E591d1227" as Address,
   reputationRegistry: "0x0052258E517835081c94c0B685409f2EfC4D502b" as Address,
   validationRegistry: "0x09447147C6E75a60A449f38532F06E19F5F632F3" as Address,
   stakingIntegrationModule: "0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30" as Address,

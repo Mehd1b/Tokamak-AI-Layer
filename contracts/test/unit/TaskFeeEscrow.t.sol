@@ -829,7 +829,17 @@ contract TaskFeeEscrowTest is Test {
         assertTrue(escrow.hasUsedAgent(AGENT_ID, user));
     }
 
-    function test_HasUsedAgent_FalseAfterRefund() public {
+    function test_HasUsedAgent_TrueAfterPayment() public {
+        vm.prank(agentOwner);
+        escrow.setAgentFee(AGENT_ID, FEE);
+
+        _payForTask(AGENT_ID, user, 1);
+
+        // hasUsedAgent is set on payment, not just on confirm
+        assertTrue(escrow.hasUsedAgent(AGENT_ID, user));
+    }
+
+    function test_HasUsedAgent_TrueAfterRefund() public {
         vm.prank(agentOwner);
         escrow.setAgentFee(AGENT_ID, FEE);
 
@@ -838,16 +848,8 @@ contract TaskFeeEscrowTest is Test {
         vm.prank(agentOwner);
         escrow.refundTask(taskRef);
 
-        assertFalse(escrow.hasUsedAgent(AGENT_ID, user));
-    }
-
-    function test_HasUsedAgent_FalseWhileEscrowed() public {
-        vm.prank(agentOwner);
-        escrow.setAgentFee(AGENT_ID, FEE);
-
-        _payForTask(AGENT_ID, user, 1);
-
-        assertFalse(escrow.hasUsedAgent(AGENT_ID, user));
+        // Still true — user attempted to use the agent (paid fee)
+        assertTrue(escrow.hasUsedAgent(AGENT_ID, user));
     }
 
     function test_HasUsedAgent_DifferentAgents() public {

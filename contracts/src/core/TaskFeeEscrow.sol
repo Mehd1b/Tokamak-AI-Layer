@@ -118,6 +118,10 @@ contract TaskFeeEscrow is ITaskFeeEscrow, ReentrancyGuard {
             status: TaskStatus.Escrowed
         });
 
+        // Mark user as having used the agent immediately on payment.
+        // This enables feedback submission even if confirmTask fails.
+        _hasUsedAgent[agentId][msg.sender] = true;
+
         emit TaskPaid(agentId, msg.sender, taskRef, fee);
     }
 

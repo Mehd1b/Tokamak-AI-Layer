@@ -17,7 +17,7 @@ The core TAL protocol contracts are deployed on Thanos Sepolia, a Tokamak Networ
 | TALReputationRegistry | [`0x0052258E517835081c94c0B685409f2EfC4D502b`](https://explorer.thanos-sepolia.tokamak.network/address/0x0052258E517835081c94c0B685409f2EfC4D502b) | Stake-weighted feedback aggregation, payment proofs |
 | TALValidationRegistry | [`0x09447147C6E75a60A449f38532F06E19F5F632F3`](https://explorer.thanos-sepolia.tokamak.network/address/0x09447147C6E75a60A449f38532F06E19F5F632F3) | Multi-model validation, TEE attestation, bounty distribution |
 | StakingIntegrationModule | [`0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30`](https://explorer.thanos-sepolia.tokamak.network/address/0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30) | Stake queries, slashing, seigniorage routing |
-| TaskFeeEscrow | [`0x43f9E59b6bFCacD70fcba4f3F6234a6a9F064b8C`](https://explorer.thanos-sepolia.tokamak.network/address/0x43f9E59b6bFCacD70fcba4f3F6234a6a9F064b8C) | Native TON task fee escrow with refund support |
+| TaskFeeEscrow | [`0x6D68Cd8fD89BF1746A1948783C92A00E591d1227`](https://explorer.thanos-sepolia.tokamak.network/address/0x6D68Cd8fD89BF1746A1948783C92A00E591d1227) | Native TON task fee escrow with refund support |
 
 ## Ethereum Sepolia L1
 

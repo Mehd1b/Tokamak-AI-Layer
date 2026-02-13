@@ -46,7 +46,7 @@ export const config = {
   ),
   TASK_FEE_ESCROW: optional(
     'TASK_FEE_ESCROW',
-    '0x43f9E59b6bFCacD70fcba4f3F6234a6a9F064b8C',
+    '0x6D68Cd8fD89BF1746A1948783C92A00E591d1227',
   ),
 
   // Storage

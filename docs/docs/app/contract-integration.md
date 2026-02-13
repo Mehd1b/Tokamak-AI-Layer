@@ -20,7 +20,7 @@ export const CONTRACTS = {
   reputationRegistry: '0x0052258E517835081c94c0B685409f2EfC4D502b' as Address,
   validationRegistry: '0x09447147C6E75a60A449f38532F06E19F5F632F3' as Address,
   stakingIntegrationModule: '0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30' as Address,
-  taskFeeEscrow: '0x43f9E59b6bFCacD70fcba4f3F6234a6a9F064b8C' as Address,
+  taskFeeEscrow: '0x6D68Cd8fD89BF1746A1948783C92A00E591d1227' as Address,
 } as const;
 
 // L1 Sepolia contracts
