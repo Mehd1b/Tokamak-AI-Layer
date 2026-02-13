@@ -39,6 +39,11 @@ export declare const CHAIN_IDS: {
     readonly thanosSepolia: 111551119090;
 };
 export declare const HORIZON_MS: Record<TradeRequest["horizon"], number>;
+export declare const HORIZON_TO_LLAMA_CHART: Record<TradeRequest["horizon"], {
+    period: string;
+    span: number;
+}>;
+/** @deprecated Use HORIZON_TO_LLAMA_CHART instead */
 export declare const HORIZON_TO_LLAMA_PERIOD: Record<TradeRequest["horizon"], string>;
 export declare const MIN_DATA_POINTS: Record<TradeRequest["horizon"], number>;
 export declare const RISK_PRESETS: Record<TradeRequest["riskTolerance"], RiskParams>;

@@ -3,7 +3,7 @@ import { isAddress, type Address, type Hex } from "viem";
 import type { AppContext } from "../context.js";
 import { TOKENS } from "@tal-trading-agent/shared";
 import type { TradeRequest, TradingStrategy } from "@tal-trading-agent/shared";
-import { inferHorizonFromPrompt } from "./horizonParser.js";
+import { inferHorizonFromPrompt, inferRiskToleranceFromPrompt } from "./horizonParser.js";
 import { inferBudgetFromPrompt } from "./budgetParser.js";
 
 // ── A2A Protocol Types ──────────────────────────────────
@@ -248,7 +248,7 @@ async function handleTasksSend(
       budgetToken,
       walletAddress,
       horizon: inferredHorizon ?? "1w",
-      riskTolerance: tradeParams.riskTolerance ?? "moderate",
+      riskTolerance: tradeParams.riskTolerance ?? inferRiskToleranceFromPrompt(tradeParams.prompt ?? "") ?? "moderate",
       chainId: 1,
     };
 

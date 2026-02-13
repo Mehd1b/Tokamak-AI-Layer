@@ -106,4 +106,29 @@ function mapShorthand(num, unit) {
             return undefined;
     }
 }
+/**
+ * Infer the risk tolerance from a natural language prompt.
+ * Returns undefined if no recognizable risk preference is found.
+ *
+ * Examples:
+ *   "invest aggressively"          → "aggressive"
+ *   "safe low-risk investment"     → "conservative"
+ *   "moderate risk"                → "moderate"
+ */
+export function inferRiskToleranceFromPrompt(prompt) {
+    const text = prompt.toLowerCase();
+    // Aggressive keywords
+    if (/\b(aggressive|aggresive|high[\s-]?risk|risky|yolo|degen|max[\s-]?risk|maximum[\s-]?risk)\b/.test(text)) {
+        return "aggressive";
+    }
+    // Conservative keywords
+    if (/\b(conservative|conservat|low[\s-]?risk|safe|cautious|minimal[\s-]?risk|low[\s-]?volatility|risk[\s-]?averse)\b/.test(text)) {
+        return "conservative";
+    }
+    // Moderate keywords (explicit only — don't default to moderate here)
+    if (/\b(moderate|medium[\s-]?risk|balanced|middle[\s-]?ground)\b/.test(text)) {
+        return "moderate";
+    }
+    return undefined;
+}
 //# sourceMappingURL=horizonParser.js.map

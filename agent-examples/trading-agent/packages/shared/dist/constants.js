@@ -54,16 +54,29 @@ export const HORIZON_MS = {
     "6m": 180 * 24 * 60 * 60 * 1000,
     "1y": 365 * 24 * 60 * 60 * 1000,
 };
-// ── Horizon to DeFiLlama chart period ───────────────────
+// ── Horizon to DeFiLlama chart params ───────────────────
+// Valid DeFiLlama periods: "1d", "7d", "30d", "90d", "180d", "365d"
+// `span` = interval between data points in hours
+export const HORIZON_TO_LLAMA_CHART = {
+    "1h": { period: "1d", span: 1 }, // ~24 points
+    "4h": { period: "1d", span: 1 }, // ~24 points
+    "1d": { period: "7d", span: 4 }, // ~42 points
+    "1w": { period: "7d", span: 4 }, // ~42 points
+    "1m": { period: "30d", span: 12 }, // ~60 points
+    "3m": { period: "90d", span: 24 }, // ~90 points
+    "6m": { period: "180d", span: 48 }, // ~90 points
+    "1y": { period: "365d", span: 72 }, // ~122 points
+};
+/** @deprecated Use HORIZON_TO_LLAMA_CHART instead */
 export const HORIZON_TO_LLAMA_PERIOD = {
-    "1h": "1w",
-    "4h": "1w",
-    "1d": "1w",
-    "1w": "2w",
-    "1m": "3m",
-    "3m": "6m",
-    "6m": "1y",
-    "1y": "1y",
+    "1h": "1d",
+    "4h": "1d",
+    "1d": "7d",
+    "1w": "7d",
+    "1m": "30d",
+    "3m": "90d",
+    "6m": "180d",
+    "1y": "365d",
 };
 // ── Minimum data points per horizon for reliable indicators ─
 export const MIN_DATA_POINTS = {

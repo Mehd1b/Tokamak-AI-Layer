@@ -1,6 +1,6 @@
 import { isAddress } from "viem";
 import { TOKENS } from "@tal-trading-agent/shared";
-import { inferHorizonFromPrompt } from "./horizonParser.js";
+import { inferHorizonFromPrompt, inferRiskToleranceFromPrompt } from "./horizonParser.js";
 import { inferBudgetFromPrompt } from "./budgetParser.js";
 // ── In-memory task store ────────────────────────────────
 const a2aTasks = new Map();
@@ -167,7 +167,7 @@ async function handleTasksSend(rpc, ctx, reply) {
             budgetToken,
             walletAddress,
             horizon: inferredHorizon ?? "1w",
-            riskTolerance: tradeParams.riskTolerance ?? "moderate",
+            riskTolerance: tradeParams.riskTolerance ?? inferRiskToleranceFromPrompt(tradeParams.prompt ?? "") ?? "moderate",
             chainId: 1,
         };
         ctx.logger.info({ taskId, prompt: request.prompt, horizon: request.horizon }, "A2A task received — starting trade analysis");

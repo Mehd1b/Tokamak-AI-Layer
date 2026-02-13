@@ -1,6 +1,6 @@
 import type { Address } from "viem";
 import pino from "pino";
-import { DEFILLAMA, HORIZON_TO_LLAMA_PERIOD, MIN_DATA_POINTS } from "@tal-trading-agent/shared";
+import { DEFILLAMA, HORIZON_TO_LLAMA_CHART, MIN_DATA_POINTS } from "@tal-trading-agent/shared";
 import type { PoolData, QuantScore, DataQuality, TradeRequest } from "@tal-trading-agent/shared";
 
 const logger = pino({ name: "quant-analysis" });
@@ -78,11 +78,11 @@ export class QuantAnalysis {
   ): Promise<number[]> {
     try {
       const coinId = `ethereum:${tokenAddress}`;
-      const period = HORIZON_TO_LLAMA_PERIOD[horizon];
-      const url = `${DEFILLAMA.chartUrl}/${encodeURIComponent(coinId)}?period=${period}`;
+      const chartParams = HORIZON_TO_LLAMA_CHART[horizon];
+      const url = `${DEFILLAMA.chartUrl}/${encodeURIComponent(coinId)}?period=${chartParams.period}&span=${chartParams.span}`;
       const response = await fetch(url);
       if (!response.ok) {
-        logger.warn({ tokenAddress, status: response.status, period }, "DeFiLlama chart request failed");
+        logger.warn({ tokenAddress, status: response.status, period: chartParams.period }, "DeFiLlama chart request failed");
         return [];
       }
 
