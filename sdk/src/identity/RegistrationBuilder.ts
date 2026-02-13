@@ -1,4 +1,6 @@
+import { keccak256, encodePacked, toHex } from 'viem';
 import type { AgentRegistrationFile } from '../types';
+import type { Bytes32 } from '../types';
 
 export class RegistrationBuilder {
   private data: Partial<AgentRegistrationFile> = {
@@ -192,6 +194,49 @@ export class RegistrationBuilder {
     }
 
     return { valid: errors.length === 0, errors };
+  }
+
+  /**
+   * Compute the content hash of the registration file (keccak256 of canonical JSON).
+   * Canonical JSON = sorted keys, no whitespace.
+   */
+  computeContentHash(): Bytes32 {
+    const file = this.build();
+    const canonical = JSON.stringify(file, Object.keys(file).sort());
+    return keccak256(toHex(canonical)) as Bytes32;
+  }
+
+  /**
+   * Compute the critical fields hash covering security-critical subset.
+   * Covers: services, capabilities, enclaveHash, operator address, customUI.
+   * Uses keccak256(abi.encodePacked(servicesHash, capabilitiesHash, enclaveHash, operatorAddr, customUIHash)).
+   */
+  computeCriticalFieldsHash(): Bytes32 {
+    const file = this.build();
+
+    const servicesStr = file.services ? JSON.stringify(file.services, Object.keys(file.services).sort()) : '';
+    const servicesHash = keccak256(toHex(servicesStr));
+
+    const capsStr = file.tal?.capabilities ? JSON.stringify(file.tal.capabilities) : '';
+    const capabilitiesHash = keccak256(toHex(capsStr));
+
+    const enclaveHash = file.tal?.teeConfig?.enclaveHash
+      ? keccak256(toHex(file.tal.teeConfig.enclaveHash))
+      : ('0x0000000000000000000000000000000000000000000000000000000000000000' as Bytes32);
+
+    const operatorAddr = file.tal?.operator?.address
+      ? (file.tal.operator.address as `0x${string}`)
+      : '0x0000000000000000000000000000000000000000';
+
+    const customUIStr = file.tal?.customUI ? JSON.stringify(file.tal.customUI) : '';
+    const customUIHash = keccak256(toHex(customUIStr));
+
+    return keccak256(
+      encodePacked(
+        ['bytes32', 'bytes32', 'bytes32', 'address', 'bytes32'],
+        [servicesHash, capabilitiesHash, enclaveHash, operatorAddr as `0x${string}`, customUIHash],
+      ),
+    ) as Bytes32;
   }
 
   toJSON(): string {

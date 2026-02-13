@@ -31,6 +31,8 @@ const client = createPublicClient({
 export interface ResolvedAgent {
   runtimeBaseUrl: string;
   runtimeAgentId: string;
+  /** Full A2A service URL when resolved from IPFS metadata */
+  a2aUrl?: string;
 }
 
 interface CacheEntry {
@@ -167,24 +169,25 @@ async function resolveViaOnChain(
   }
   console.log(`[resolve] Metadata keys: ${Object.keys(metadata).join(', ')}`, metadata.services);
 
-  // 4. Extract services.A2A
+  // 4. Extract services.A2A (optional — not all agents expose A2A)
   const a2aUrl: string | undefined = metadata.services?.A2A;
-  if (!a2aUrl) {
-    throw new Error(
-      `Agent ${onChainAgentId} has no A2A service URL in metadata`,
-    );
+  console.log(`[resolve] A2A URL: ${a2aUrl ?? '(none)'}`);
+
+  if (a2aUrl) {
+    // 5. Parse: runtimeBaseUrl = origin, runtimeAgentId = last path segment
+    const parsed = new URL(a2aUrl);
+    const runtimeBaseUrl = parsed.origin;
+    const segments = parsed.pathname.split('/').filter(Boolean);
+    const runtimeAgentId = segments[segments.length - 1];
+
+    const data: ResolvedAgent = { runtimeBaseUrl, runtimeAgentId, a2aUrl };
+    console.log(`[resolve] Resolved: base=${runtimeBaseUrl}, agentId=${runtimeAgentId}, a2aUrl=${a2aUrl}`);
+    return data;
   }
-  console.log(`[resolve] A2A URL: ${a2aUrl}`);
 
-  // 5. Parse: runtimeBaseUrl = origin, runtimeAgentId = last path segment
-  const parsed = new URL(a2aUrl);
-  const runtimeBaseUrl = parsed.origin;
-  const segments = parsed.pathname.split('/').filter(Boolean);
-  const runtimeAgentId = segments[segments.length - 1];
-
-  const data: ResolvedAgent = { runtimeBaseUrl, runtimeAgentId };
-  console.log(`[resolve] Resolved: base=${runtimeBaseUrl}, agentId=${runtimeAgentId}`);
-
+  // No A2A URL — return partial resolution so callers can show a helpful error
+  const data: ResolvedAgent = { runtimeBaseUrl: '', runtimeAgentId: onChainAgentId };
+  console.log(`[resolve] Agent ${onChainAgentId} has metadata but no A2A service URL`);
   return data;
 }
 

@@ -1,6 +1,23 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { keccak256, toHex } from 'viem';
+
+/** Extract a plain-text error string from an A2A status message (which is {role, parts}) */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractA2AErrorText(message: any): string {
+  if (!message) return 'Task failed';
+  if (typeof message === 'string') return message;
+  // A2A message: { role: string, parts: [{type: "text", text: "..."}, ...] }
+  if (Array.isArray(message.parts)) {
+    const text = message.parts
+      .filter((p: { type: string }) => p.type === 'text')
+      .map((p: { text: string }) => p.text)
+      .join('\n');
+    if (text) return text;
+  }
+  return 'Task failed';
+}
 
 export interface RuntimeAgent {
   id: string;
@@ -91,33 +108,67 @@ export function useSubmitTask() {
       try {
         let data: TaskResult;
 
-        if (serviceUrl) {
-          // Direct submission to the agent's A2A service endpoint
+        if (serviceUrl && !paymentTxHash) {
+          // Direct A2A JSON-RPC 2.0 submission (free tasks only).
+          // Paid tasks always go through the proxy so the server can call confirmTask.
+          const rpcId = crypto.randomUUID();
+          const a2aRequest = {
+            jsonrpc: '2.0',
+            id: rpcId,
+            method: 'tasks/send',
+            params: {
+              message: {
+                role: 'user',
+                parts: [{ type: 'text', text }],
+              },
+              ...(paymentTxHash ? { metadata: { paymentTxHash, taskRef } } : {}),
+            },
+          };
+
           const res = await fetch(serviceUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ input: { text }, paymentTxHash, taskRef }),
+            body: JSON.stringify(a2aRequest),
           });
 
           if (!res.ok) {
             const errBody = await res.json().catch(() => ({ error: res.statusText }));
-            throw new Error(errBody.error || `Request failed: ${res.status}`);
+            throw new Error(errBody.error?.message || errBody.error || `Request failed: ${res.status}`);
           }
 
-          const raw = await res.json();
-          // Normalize: agent may return a TaskResult or a raw response
-          data = raw.taskId ? raw : {
-            taskId: raw.strategy?.id || raw.id || crypto.randomUUID(),
+          const rpcResponse = await res.json();
+          if (rpcResponse.error) {
+            throw new Error(rpcResponse.error.message || 'A2A request failed');
+          }
+
+          // Extract output from A2A task result
+          const a2aTask = rpcResponse.result;
+          let output = '';
+          if (a2aTask?.artifacts?.length) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const dataParts = a2aTask.artifacts.flatMap((a: any) => a.parts || []).filter((p: any) => p.type === 'data').map((p: any) => p.data);
+            output = dataParts.length === 1 ? JSON.stringify(dataParts[0]) : JSON.stringify(dataParts);
+          } else if (a2aTask?.messages?.length) {
+            const lastMsg = a2aTask.messages[a2aTask.messages.length - 1];
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const textParts = (lastMsg?.parts || []).filter((p: any) => p.type === 'text').map((p: any) => p.text);
+            output = textParts.join('\n');
+          } else {
+            output = JSON.stringify(rpcResponse);
+          }
+
+          data = {
+            taskId: a2aTask?.id || rpcId,
             agentId: onChainAgentId,
-            status: 'completed' as const,
+            status: a2aTask?.status?.state === 'failed' ? 'failed' as const : 'completed' as const,
             input: { text },
-            output: JSON.stringify(raw),
-            outputHash: null,
-            inputHash: null,
+            output,
+            outputHash: output ? keccak256(toHex(output)) : null,
+            inputHash: keccak256(toHex(text)),
             createdAt: new Date().toISOString(),
             completedAt: new Date().toISOString(),
-            error: null,
-            metadata: {},
+            error: a2aTask?.status?.state === 'failed' ? extractA2AErrorText(a2aTask?.status?.message) : null,
+            metadata: a2aTask?.metadata || {},
           };
         } else {
           // Proxy submission via Next.js API route

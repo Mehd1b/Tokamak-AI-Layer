@@ -6,11 +6,14 @@ import {
 } from 'viem';
 import { TALIdentityRegistryABI } from '../abi/TALIdentityRegistry';
 import { TALIdentityRegistryV2ABI } from '../abi/TALIdentityRegistryV2';
+import { TALIdentityRegistryV3ABI } from '../abi/TALIdentityRegistryV3';
 import type {
   Address,
   Bytes32,
   AgentDetails,
   AgentV2Details,
+  AgentV3Details,
+  ContentHashInfo,
   RegistrationParams,
   RegisterV2Params,
   OperatorConsentData,
@@ -618,6 +621,118 @@ export class IdentityClient {
       args: [operator],
     });
     return result as bigint;
+  }
+
+  // ==========================================
+  // V3 METHODS — Content Hash Commitment
+  // ==========================================
+
+  /**
+   * Register an agent with a content hash commitment
+   */
+  async registerAgentWithContentHash(params: {
+    agentURI: string;
+    contentHash: Bytes32;
+    criticalFieldsHash: Bytes32;
+  }): Promise<{ agentId: bigint; tx: TransactionResult }> {
+    this.requireWallet();
+
+    const hash = await this.walletClient!.writeContract({
+      address: this.contractAddress,
+      abi: TALIdentityRegistryV3ABI,
+      functionName: 'registerWithContentHash',
+      args: [params.agentURI, params.contentHash, params.criticalFieldsHash],
+      chain: this.walletClient!.chain,
+      account: this.walletClient!.account!,
+    });
+
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+    const agentId = this.parseAgentIdFromReceipt(receipt);
+
+    return {
+      agentId,
+      tx: {
+        hash,
+        blockNumber: receipt.blockNumber,
+        status: receipt.status === 'success' ? 'success' : 'reverted',
+      },
+    };
+  }
+
+  /**
+   * Update agent URI with new content hashes (required for agents with content commitment)
+   */
+  async updateAgentURIWithHash(
+    agentId: bigint,
+    newURI: string,
+    contentHash: Bytes32,
+    criticalFieldsHash: Bytes32,
+  ): Promise<TransactionResult> {
+    this.requireWallet();
+
+    const hash = await this.walletClient!.writeContract({
+      address: this.contractAddress,
+      abi: TALIdentityRegistryV3ABI,
+      functionName: 'updateAgentURIWithHash',
+      args: [agentId, newURI, contentHash, criticalFieldsHash],
+      chain: this.walletClient!.chain,
+      account: this.walletClient!.account!,
+    });
+
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+    return {
+      hash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 'success' ? 'success' : 'reverted',
+    };
+  }
+
+  /**
+   * Get content hash info for an agent
+   */
+  async getContentHash(agentId: bigint): Promise<ContentHashInfo> {
+    const result = await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALIdentityRegistryV3ABI,
+      functionName: 'getContentHash',
+      args: [agentId],
+    });
+
+    const [contentHash, criticalFieldsHash, version] = result as [Bytes32, Bytes32, bigint];
+    return { contentHash, criticalFieldsHash, version };
+  }
+
+  /**
+   * Check if an agent has a content hash commitment
+   */
+  async hasContentCommitment(agentId: bigint): Promise<boolean> {
+    const result = await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALIdentityRegistryV3ABI,
+      functionName: 'hasContentCommitment',
+      args: [agentId],
+    });
+    return result as boolean;
+  }
+
+  /**
+   * Get agent details including V3 content hash fields
+   */
+  async getAgentV3(agentId: bigint): Promise<AgentV3Details> {
+    const [v2Details, contentInfo] = await Promise.all([
+      this.getAgentV2(agentId),
+      this.getContentHash(agentId),
+    ]);
+
+    const zeroBytes32 =
+      '0x0000000000000000000000000000000000000000000000000000000000000000' as Bytes32;
+
+    return {
+      ...v2Details,
+      contentHash: contentInfo.contentHash === zeroBytes32 ? null : contentInfo.contentHash,
+      criticalFieldsHash: contentInfo.criticalFieldsHash === zeroBytes32 ? null : contentInfo.criticalFieldsHash,
+      contentVersion: contentInfo.version,
+    };
   }
 
   // ==========================================

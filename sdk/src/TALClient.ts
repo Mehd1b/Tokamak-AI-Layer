@@ -17,6 +17,8 @@ import type {
   TALClientConfig,
   AgentDetails,
   AgentV2Details,
+  AgentV3Details,
+  ContentHashInfo,
   RegistrationParams,
   RegisterV2Params,
   OperatorConsentData,
@@ -397,6 +399,39 @@ export class TALClient {
     operator: Address,
   ): Promise<TransactionResult> {
     return this.identity.removeOperator(agentId, operator);
+  }
+
+  // ==========================================
+  // V3 IDENTITY CONVENIENCE METHODS
+  // ==========================================
+
+  async registerAgentWithContentHash(params: {
+    agentURI: string;
+    contentHash: Bytes32;
+    criticalFieldsHash: Bytes32;
+  }): Promise<{ agentId: bigint; tx: TransactionResult }> {
+    return this.identity.registerAgentWithContentHash(params);
+  }
+
+  async updateAgentURIWithHash(
+    agentId: bigint,
+    newURI: string,
+    contentHash: Bytes32,
+    criticalFieldsHash: Bytes32,
+  ): Promise<TransactionResult> {
+    return this.identity.updateAgentURIWithHash(agentId, newURI, contentHash, criticalFieldsHash);
+  }
+
+  async getContentHash(agentId: bigint): Promise<ContentHashInfo> {
+    return this.identity.getContentHash(agentId);
+  }
+
+  async hasContentCommitment(agentId: bigint): Promise<boolean> {
+    return this.identity.hasContentCommitment(agentId);
+  }
+
+  async getAgentV3(agentId: bigint): Promise<AgentV3Details> {
+    return this.identity.getAgentV3(agentId);
   }
 
   // ==========================================

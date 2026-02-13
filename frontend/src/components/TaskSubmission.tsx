@@ -5,7 +5,7 @@ import { Send, Loader2, AlertCircle, CheckCircle, FileCode, FileText, Shield, Ch
 import { useSubmitTask } from '@/hooks/useAgentRuntime';
 import { useRequestValidation, useRequestValidationOnChain } from '@/hooks/useValidation';
 import { StrategyReportView, isStrategyReport } from './StrategyReportView';
-import { usePayForTask, useTONBalanceL2, generateTaskRef, useRefundTask, useConfirmTask } from '@/hooks/useTaskFee';
+import { usePayForTask, useTONBalanceL2, generateTaskRef, useRefundTask } from '@/hooks/useTaskFee';
 import { useAccount } from 'wagmi';
 import { formatEther } from 'viem';
 import { useL2Config } from '@/hooks/useL2Config';
@@ -35,7 +35,7 @@ async function downloadZip(strategyId: string, agentBaseUrl: string) {
   URL.revokeObjectURL(blobUrl);
 }
 
-function TradingStrategyView({ data }: { data: { strategy: { id: string; analysis: { marketCondition: string; confidence: number; reasoning: string }; trades: Array<{ action: string; tokenIn: string; tokenOut: string; amountIn: string; poolFee: number; priceImpact: number }>; estimatedReturn?: { optimistic: number; expected: number; pessimistic: number } }; riskWarnings?: string[]; unsignedSwaps?: unknown[] } }) {
+function TradingStrategyView({ data, serviceUrl }: { data: { strategy: { id: string; analysis: { marketCondition: string; confidence: number; reasoning: string }; trades: Array<{ action: string; tokenIn: string; tokenOut: string; amountIn: string; poolFee: number; priceImpact: number }>; estimatedReturn?: { optimistic: number; expected: number; pessimistic: number } }; riskWarnings?: string[]; unsignedSwaps?: unknown[] }; serviceUrl?: string }) {
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const { strategy, riskWarnings } = data;
@@ -44,12 +44,13 @@ function TradingStrategyView({ data }: { data: { strategy: { id: string; analysi
     setDownloading(true);
     setDownloadError(null);
     try {
-      // Try to get agent base URL from current page context or fall back to a known URL
-      const agentBaseUrl = (window as { __TRADING_AGENT_URL__?: string }).__TRADING_AGENT_URL__ || '';
+      // Derive the agent base URL from the A2A service URL origin
+      let agentBaseUrl = '';
+      if (serviceUrl) {
+        try { agentBaseUrl = new URL(serviceUrl).origin; } catch { /* invalid URL */ }
+      }
       if (!agentBaseUrl) {
-        // Fallback: build the zip client-side by fetching from relative path
-        // or provide it from the API response
-        throw new Error('Agent URL not configured. Set window.__TRADING_AGENT_URL__');
+        throw new Error('Agent service URL not available. Cannot download bot package.');
       }
       await downloadZip(strategy.id, agentBaseUrl);
     } catch (err) {
@@ -165,7 +166,7 @@ function TradingStrategyView({ data }: { data: { strategy: { id: string; analysi
   );
 }
 
-function FormattedOutput({ output }: { output: string | null }) {
+function FormattedOutput({ output, serviceUrl }: { output: string | null; serviceUrl?: string }) {
   if (!output) return <p className="text-sm text-zinc-500">No output</p>;
 
   // Try to parse as JSON and check if it's a strategy report
@@ -174,7 +175,7 @@ function FormattedOutput({ output }: { output: string | null }) {
 
     // Check for trading strategy first
     if (isTradingStrategy(parsed)) {
-      return <TradingStrategyView data={parsed as Parameters<typeof TradingStrategyView>[0]['data']} />;
+      return <TradingStrategyView data={parsed as Parameters<typeof TradingStrategyView>[0]['data']} serviceUrl={serviceUrl} />;
     }
 
     if (isStrategyReport(parsed)) {
@@ -219,7 +220,8 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
   const { explorerUrl, nativeCurrency } = useL2Config();
   const { data: balance } = useTONBalanceL2(address);
   const { submitTask, result, isSubmitting, error, reset } = useSubmitTask();
-  const { pay, hash: payHash, isPending: isPayPending, isConfirming: isPayConfirming, isSuccess: isPaySuccess, error: payError } = usePayForTask();
+  const { pay, hash: payHash_, isPending: isPayPending, isConfirming: isPayConfirming, isSuccess: isPaySuccess, error: payError } = usePayForTask();
+  const payHash = payHash_ as `0x${string}` | undefined;
   const {
     validate,
     result: validationResult,
@@ -261,7 +263,7 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
       setPaymentStep('submitting');
       submitTask(agentId, input, payHash, currentTaskRef, serviceUrl);
     }
-  }, [paymentStep, input, isSubmitting, result, agentId, payHash, currentTaskRef, submitTask]);
+  }, [paymentStep, input, isSubmitting, result, agentId, payHash, currentTaskRef, submitTask, serviceUrl]);
 
   // Auto-trigger off-chain validation after on-chain requestValidation confirms
   useEffect(() => {
@@ -428,7 +430,7 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
           </div>
 
           {/* Payment confirmation */}
-          {payHash && (
+          {payHash ? (
             <div className="mb-3 rounded bg-white/5 px-2 py-1">
               <p className="text-xs text-zinc-400">Payment Tx</p>
               <a
@@ -439,6 +441,26 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
               >
                 {payHash.slice(0, 18)}...
               </a>
+            </div>
+          ) : null}
+
+          {/* Fee escrow status */}
+          {hasFee && currentTaskRef && result?.metadata?.feeConfirmed && (
+            <div className="mb-3 rounded bg-white/5 px-2 py-1">
+              <p className="text-xs text-zinc-400">Fee Escrow</p>
+              <p className="text-xs text-emerald-400 flex items-center gap-1">
+                <CheckCircle className="h-3 w-3" /> Fees released to agent
+                {result.metadata.confirmTxHash && (
+                  <a
+                    href={`${explorerUrl}/tx/${result.metadata.confirmTxHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-1 font-mono underline"
+                  >
+                    {String(result.metadata.confirmTxHash).slice(0, 14)}...
+                  </a>
+                )}
+              </p>
             </div>
           )}
 
@@ -460,7 +482,7 @@ export function TaskSubmission({ agentId, agentName, placeholder, onChainAgentId
 
           {/* Output */}
           <div className="rounded-lg border border-white/10 bg-[#0d0d12] p-4">
-            <FormattedOutput output={result.output} />
+            <FormattedOutput output={result.output} serviceUrl={serviceUrl} />
           </div>
 
           {/* Validation */}

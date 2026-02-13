@@ -88,20 +88,56 @@ export default function AgentDetailPage() {
       return;
     }
     try {
+      // Wrap input in A2A JSON-RPC 2.0 envelope
+      const rpcId = crypto.randomUUID();
+      const a2aRequest = {
+        jsonrpc: '2.0',
+        id: rpcId,
+        method: 'tasks/send',
+        params: {
+          message: {
+            role: 'user',
+            parts: [{ type: 'text', text: input }],
+          },
+        },
+      };
+
       const res = await fetch(a2aUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: input,
+        body: JSON.stringify(a2aRequest),
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(errData.error || `HTTP ${res.status}`);
+        throw new Error(errData.error?.message || errData.error || `HTTP ${res.status}`);
       }
-      const data = await res.json();
+      const rpcResponse = await res.json();
+
+      // Handle JSON-RPC error response
+      if (rpcResponse.error) {
+        throw new Error(rpcResponse.error.message || 'A2A request failed');
+      }
+
+      // Extract output from A2A task artifacts or messages
+      const a2aTask = rpcResponse.result;
+      let output = '';
+      if (a2aTask?.artifacts?.length) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const dataParts = a2aTask.artifacts.flatMap((a: any) => a.parts || []).filter((p: any) => p.type === 'data').map((p: any) => p.data);
+        output = dataParts.length === 1 ? JSON.stringify(dataParts[0]) : JSON.stringify(dataParts);
+      } else if (a2aTask?.messages?.length) {
+        const lastMsg = a2aTask.messages[a2aTask.messages.length - 1];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const textParts = (lastMsg?.parts || []).filter((p: any) => p.type === 'text').map((p: any) => p.text);
+        output = textParts.join('\n');
+      } else {
+        output = JSON.stringify(rpcResponse);
+      }
+
       setCustomTaskResult({
-        output: JSON.stringify(data),
-        status: 'completed',
-        taskId: data.strategy?.id || data.taskId || crypto.randomUUID(),
+        output,
+        status: a2aTask?.status?.state === 'failed' ? 'failed' : 'completed',
+        taskId: a2aTask?.id || rpcId,
       });
     } catch (err) {
       setCustomTaskResult({ output: err instanceof Error ? err.message : 'Request failed', status: 'failed', taskId: '' });
@@ -473,13 +509,13 @@ export default function AgentDetailPage() {
       )}
 
       {/* Capabilities */}
-      {((runtimeAgent && runtimeAgent.capabilities.length > 0) || (metaCapabilities && metaCapabilities.length > 0)) && (
+      {((runtimeAgent && Array.isArray(runtimeAgent.capabilities) && runtimeAgent.capabilities.length > 0) || (metaCapabilities && metaCapabilities.length > 0)) && (
         <div className="mt-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm transition-all duration-300">
           <h2 className="mb-4 text-lg font-medium text-white">
             Capabilities
           </h2>
           <div className="space-y-3">
-            {(runtimeAgent?.capabilities || (metaCapabilities || []).map((c, i) => ({ id: `cap-${i}`, name: c, description: '' }))).map((cap) => (
+            {((Array.isArray(runtimeAgent?.capabilities) && runtimeAgent.capabilities.length > 0 ? runtimeAgent.capabilities : null) || (metaCapabilities || []).map((c, i) => ({ id: `cap-${i}`, name: c, description: '' }))).map((cap) => (
               <div
                 key={cap.id}
                 className="rounded-lg border border-white/10 bg-white/5 p-3"

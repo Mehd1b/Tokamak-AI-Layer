@@ -188,6 +188,22 @@ export interface AgentV2Details extends AgentDetails {
   canReactivate: boolean;
 }
 
+// ============================================
+// IDENTITY V3 TYPES — Content Hash Commitment
+// ============================================
+
+export interface ContentHashInfo {
+  contentHash: Bytes32;
+  criticalFieldsHash: Bytes32;
+  version: bigint;
+}
+
+export interface AgentV3Details extends AgentV2Details {
+  contentHash: Bytes32 | null;
+  criticalFieldsHash: Bytes32 | null;
+  contentVersion: bigint;
+}
+
 export interface ValidationStats {
   total: bigint;
   failed: bigint;

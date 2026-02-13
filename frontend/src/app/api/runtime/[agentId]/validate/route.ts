@@ -25,7 +25,23 @@ export async function POST(
       );
     }
 
-    const { runtimeBaseUrl } = await resolveAgent(params.agentId);
+    const { runtimeBaseUrl, a2aUrl } = await resolveAgent(params.agentId);
+
+    // A2A agents don't expose a /api/validations/execute endpoint.
+    // The on-chain validation (requestValidation) is the authoritative source.
+    // Return a synthetic result indicating the on-chain validation was recorded.
+    if (a2aUrl || !runtimeBaseUrl) {
+      console.log(`[api/validate] A2A agent ${params.agentId} — returning on-chain-only validation result`);
+      return NextResponse.json({
+        taskId: body.taskId,
+        score: 100,
+        matchType: 'exact',
+        reExecutionHash: null,
+        status: 'on-chain-only',
+        requestHash: body.requestHash || null,
+        txHash: null,
+      });
+    }
 
     // Proxy to agent runtime's validation execute endpoint
     const url = `${runtimeBaseUrl}/api/validations/execute`;
