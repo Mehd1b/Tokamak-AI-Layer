@@ -7,6 +7,7 @@ import { tradeRoutes } from "./routes/trade.js";
 import { strategyRoutes } from "./routes/strategy.js";
 import { agentRoutes } from "./routes/agent.js";
 import { authRoutes } from "./routes/auth.js";
+import { a2aRoutes } from "./routes/a2a.js";
 
 export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
   const app = Fastify({
@@ -30,8 +31,8 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
   // Optional API key auth
   if (ctx.config.apiKeys.size > 0) {
     app.addHook("onRequest", async (req, reply) => {
-      // Skip health check
-      if (req.url === "/health") return;
+      // Skip health check and A2A agent card discovery
+      if (req.url === "/health" || (req.method === "GET" && req.url === "/api/agents/trader")) return;
 
       const key = req.headers["x-api-key"];
       if (typeof key !== "string" || !ctx.config.apiKeys.has(key)) {
@@ -46,6 +47,7 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
   await strategyRoutes(app, ctx);
   await agentRoutes(app, ctx);
   await authRoutes(app, ctx);
+  await a2aRoutes(app, ctx);
 
   return app;
 }
