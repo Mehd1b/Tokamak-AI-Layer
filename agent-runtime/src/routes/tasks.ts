@@ -39,98 +39,53 @@ const ESCROW_ABI = [
 ] as const;
 
 // ================================================================
-// Multi-chain configuration
+// Chain configuration (Thanos Sepolia)
 // ================================================================
 
-interface ChainConfig {
-  name: string;
-  rpcUrl: string;
-  escrowAddress: `0x${string}`;
-  chain: {
-    id: number;
-    name: string;
-    nativeCurrency: { name: string; symbol: string; decimals: number };
-    rpcUrls: { default: { http: string[] } };
-  };
-}
-
-const OPTIMISM_SEPOLIA_ID = 11155420;
-const THANOS_SEPOLIA_ID = 111551119090;
-
-const chainConfigs: Record<number, ChainConfig> = {
-  [OPTIMISM_SEPOLIA_ID]: {
-    name: 'Optimism Sepolia',
-    rpcUrl: config.RPC_URL,
-    escrowAddress: config.TASK_FEE_ESCROW as `0x${string}`,
-    chain: {
-      id: OPTIMISM_SEPOLIA_ID,
-      name: 'Optimism Sepolia',
-      nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-      rpcUrls: { default: { http: [config.RPC_URL] } },
-    },
-  },
-  [THANOS_SEPOLIA_ID]: {
-    name: 'Thanos Sepolia',
-    rpcUrl: config.THANOS_RPC_URL,
-    escrowAddress: config.THANOS_TASK_FEE_ESCROW as `0x${string}`,
-    chain: {
-      id: THANOS_SEPOLIA_ID,
-      name: 'Thanos Sepolia',
-      nativeCurrency: { name: 'TON', symbol: 'TON', decimals: 18 },
-      rpcUrls: { default: { http: [config.THANOS_RPC_URL] } },
-    },
-  },
+const thanosSepolia = {
+  id: config.CHAIN_ID,
+  name: 'Thanos Sepolia',
+  nativeCurrency: { name: 'TON', symbol: 'TON', decimals: 18 },
+  rpcUrls: { default: { http: [config.RPC_URL] } },
 };
 
-// Lazily-created clients per chain (avoids creating unused connections)
-const publicClients = new Map<number, PublicClient>();
+const escrowAddress = config.TASK_FEE_ESCROW as `0x${string}`;
+
+// Lazily-created clients
+let _publicClient: PublicClient | null = null;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const walletClients = new Map<number, any>();
+let _walletClient: any = null;
+let _walletClientInit = false;
 
-function getPublicClient(chainId: number): PublicClient {
-  let client = publicClients.get(chainId);
-  if (!client) {
-    const cc = chainConfigs[chainId];
-    if (!cc) throw new Error(`Unsupported chainId: ${chainId}`);
-    client = createPublicClient({
-      chain: cc.chain,
-      transport: http(cc.rpcUrl),
+function getPublicClientInstance(): PublicClient {
+  if (!_publicClient) {
+    _publicClient = createPublicClient({
+      chain: thanosSepolia,
+      transport: http(config.RPC_URL),
     });
-    publicClients.set(chainId, client);
   }
-  return client;
+  return _publicClient;
 }
 
-function getWalletClientForChain(chainId: number) {
-  if (!config.PRIVATE_KEY) return null;
-  let client = walletClients.get(chainId);
-  if (client === undefined) {
-    const cc = chainConfigs[chainId];
-    if (!cc) return null;
-    const account = privateKeyToAccount(config.PRIVATE_KEY as `0x${string}`);
-    client = createWalletClient({
-      account,
-      chain: cc.chain,
-      transport: http(cc.rpcUrl),
-    });
-    walletClients.set(chainId, client);
+function getWalletClientInstance() {
+  if (!_walletClientInit) {
+    _walletClientInit = true;
+    if (config.PRIVATE_KEY) {
+      const account = privateKeyToAccount(config.PRIVATE_KEY as `0x${string}`);
+      _walletClient = createWalletClient({
+        account,
+        chain: thanosSepolia,
+        transport: http(config.RPC_URL),
+      });
+    }
   }
-  return client;
-}
-
-function resolveChain(requestChainId?: number): { chainId: number; escrowAddress: `0x${string}` } {
-  const chainId = requestChainId && chainConfigs[requestChainId]
-    ? requestChainId
-    : config.CHAIN_ID;
-  const cc = chainConfigs[chainId] ?? chainConfigs[OPTIMISM_SEPOLIA_ID];
-  return { chainId: cc.chain.id, escrowAddress: cc.escrowAddress };
+  return _walletClient;
 }
 
 // ================================================================
 
 async function verifyPaymentWithRetry(
   publicClient: PublicClient,
-  escrowAddress: `0x${string}`,
   taskRef: `0x${string}`,
   maxRetries = 3,
   delayMs = 2000,
@@ -161,14 +116,13 @@ async function verifyPaymentWithRetry(
 }
 
 export function createTaskRoutes(agents: Map<string, BaseAgent>): Router {
-  const supportedChains = Object.values(chainConfigs).map(c => `${c.name}(${c.chain.id})`).join(', ');
-  console.log(`[TASK] Routes initialized — supported chains: ${supportedChains}, default chainId: ${config.CHAIN_ID}`);
+  console.log(`[TASK] Routes initialized — chain: Thanos Sepolia (${config.CHAIN_ID}), escrow: ${escrowAddress}`);
   const router = Router();
 
   // POST /api/tasks - Submit a new task
   router.post('/', async (req, res, next) => {
     try {
-      const { agentId, input, paymentTxHash, taskRef, chainId: requestChainId } = req.body as TaskSubmission;
+      const { agentId, input, paymentTxHash, taskRef } = req.body as TaskSubmission;
 
       if (!agentId) {
         res.status(400).json({ error: 'agentId is required' });
@@ -186,30 +140,27 @@ export function createTaskRoutes(agents: Map<string, BaseAgent>): Router {
         return;
       }
 
-      // Resolve chain-specific config from request chainId
-      const { chainId, escrowAddress } = resolveChain(requestChainId);
-
       // On-chain payment verification (if taskRef is provided)
       if (taskRef && escrowAddress !== '0x0000000000000000000000000000000000000000') {
         try {
-          const publicClient = getPublicClient(chainId);
-          console.log(`[TASK] Verifying payment for taskRef ${taskRef.slice(0, 18)}... on escrow ${escrowAddress} (chain ${chainId})`);
-          const isPaid = await verifyPaymentWithRetry(publicClient, escrowAddress, taskRef as `0x${string}`);
+          const publicClient = getPublicClientInstance();
+          console.log(`[TASK] Verifying payment for taskRef ${taskRef.slice(0, 18)}... on escrow ${escrowAddress}`);
+          const isPaid = await verifyPaymentWithRetry(publicClient, taskRef as `0x${string}`);
 
           if (!isPaid) {
             res.status(402).json({
               error: 'Payment required: task fee has not been paid on-chain',
-              debug: { escrow: escrowAddress, chainId, taskRef, requestChainId: requestChainId ?? 'none' },
+              debug: { escrow: escrowAddress, chainId: config.CHAIN_ID, taskRef },
             });
             return;
           }
 
-          console.log(`[TASK] Payment verified for taskRef ${taskRef.slice(0, 18)}... (chain ${chainId})`);
+          console.log(`[TASK] Payment verified for taskRef ${taskRef.slice(0, 18)}...`);
         } catch (verifyErr) {
           const errMsg = verifyErr instanceof Error ? verifyErr.message : String(verifyErr);
           console.error('[TASK] Payment verification failed:', errMsg);
           res.status(502).json({
-            error: `Payment verification failed [escrow=${escrowAddress}, chainId=${chainId}]: ${errMsg}`,
+            error: `Payment verification failed [escrow=${escrowAddress}]: ${errMsg}`,
           });
           return;
         }
@@ -221,7 +172,7 @@ export function createTaskRoutes(agents: Map<string, BaseAgent>): Router {
 
       // On-chain escrow settlement (confirm or refund based on task result)
       if (taskRef && escrowAddress !== '0x0000000000000000000000000000000000000000') {
-        const walletClient = getWalletClientForChain(chainId);
+        const walletClient = getWalletClientInstance();
         if (walletClient) {
           try {
             if (result.status === 'completed') {
@@ -231,7 +182,7 @@ export function createTaskRoutes(agents: Map<string, BaseAgent>): Router {
                 functionName: 'confirmTask',
                 args: [taskRef as `0x${string}`],
               });
-              console.log(`[ESCROW] Task confirmed on-chain (chain ${chainId}): ${txHash}`);
+              console.log(`[ESCROW] Task confirmed on-chain: ${txHash}`);
             } else if (result.status === 'failed') {
               const txHash = await walletClient.writeContract({
                 address: escrowAddress,
@@ -239,7 +190,7 @@ export function createTaskRoutes(agents: Map<string, BaseAgent>): Router {
                 functionName: 'refundTask',
                 args: [taskRef as `0x${string}`],
               });
-              console.log(`[ESCROW] Task refunded on-chain (chain ${chainId}): ${txHash}`);
+              console.log(`[ESCROW] Task refunded on-chain: ${txHash}`);
             }
           } catch (escrowErr) {
             console.error('[ESCROW] Settlement failed (task result still returned):', escrowErr);

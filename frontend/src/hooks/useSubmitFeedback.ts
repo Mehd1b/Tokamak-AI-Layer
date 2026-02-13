@@ -1,8 +1,8 @@
 'use client';
 
-import { useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi';
+import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { keccak256, toBytes } from 'viem';
-import { CONTRACTS } from '@/lib/contracts';
+import { CONTRACTS, THANOS_CHAIN_ID } from '@/lib/contracts';
 import { TALReputationRegistryABI } from '../../../sdk/src/abi/TALReputationRegistry';
 
 export interface FeedbackParams {
@@ -13,7 +13,6 @@ export interface FeedbackParams {
 }
 
 export function useSubmitFeedback() {
-  const chainId = useChainId();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
@@ -35,7 +34,7 @@ export function useSubmitFeedback() {
       abi: TALReputationRegistryABI,
       functionName: 'submitFeedback',
       args: [params.agentId, value, valueDecimals, tag1, tag2, endpoint, feedbackURI, feedbackHash],
-      chainId,
+      chainId: THANOS_CHAIN_ID,
     });
   };
 

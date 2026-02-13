@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi';
-import { CONTRACTS } from '@/lib/contracts';
+import { useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { CONTRACTS, THANOS_CHAIN_ID } from '@/lib/contracts';
 import { TALValidationRegistryABI } from '../../../sdk/src/abi/TALValidationRegistry';
+
+// All validation reads go to Thanos Sepolia
+const READ_CHAIN_ID = THANOS_CHAIN_ID;
 
 export interface ValidationRequestData {
   agentId: bigint;
@@ -32,6 +35,7 @@ export function useAgentValidations(agentId: bigint | undefined) {
     abi: TALValidationRegistryABI,
     functionName: 'getAgentValidations',
     args: enabled ? [agentId] : undefined,
+    chainId: READ_CHAIN_ID,
     query: { enabled },
   });
 
@@ -49,6 +53,7 @@ export function useValidation(requestHash: `0x${string}` | undefined) {
     abi: TALValidationRegistryABI,
     functionName: 'getValidation',
     args: enabled ? [requestHash!] : undefined,
+    chainId: READ_CHAIN_ID,
     query: { enabled },
   });
 
@@ -66,6 +71,7 @@ export function usePendingValidationCount(agentId: bigint | undefined) {
     abi: TALValidationRegistryABI,
     functionName: 'getPendingValidationCount',
     args: enabled ? [agentId] : undefined,
+    chainId: READ_CHAIN_ID,
     query: { enabled },
   });
 
@@ -83,6 +89,7 @@ export function useIsDisputed(requestHash: `0x${string}` | undefined) {
     abi: TALValidationRegistryABI,
     functionName: 'isDisputed',
     args: enabled ? [requestHash!] : undefined,
+    chainId: READ_CHAIN_ID,
     query: { enabled },
   });
 
@@ -101,6 +108,7 @@ export function useAllValidationHashes(agentCount: number) {
     abi: TALValidationRegistryABI,
     functionName: 'getAgentValidations' as const,
     args: [BigInt(i + 1)],
+    chainId: READ_CHAIN_ID,
   }));
 
   const { data, isLoading } = useReadContracts({
@@ -131,6 +139,7 @@ export function useValidationBatch(hashes: `0x${string}`[]) {
     abi: TALValidationRegistryABI,
     functionName: 'getValidation' as const,
     args: [hash],
+    chainId: READ_CHAIN_ID,
   }));
 
   const { data, isLoading } = useReadContracts({
@@ -235,6 +244,7 @@ export function useValidationStats(agentId: bigint | undefined) {
     abi: TALValidationRegistryV2ABI,
     functionName: 'getAgentValidationStats',
     args: enabled ? [agentId, 2592000n] : undefined, // 30 days in seconds
+    chainId: READ_CHAIN_ID,
     query: { enabled },
   });
 
@@ -263,7 +273,6 @@ export interface RequestValidationOnChainParams {
 }
 
 export function useRequestValidationOnChain() {
-  const chainId = useChainId();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { data: receipt, isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
@@ -274,13 +283,11 @@ export function useRequestValidationOnChain() {
       functionName: 'requestValidation',
       args: [params.agentId, params.taskHash, params.outputHash, params.model, params.deadline],
       value: params.bountyWei,
-      chainId,
+      chainId: READ_CHAIN_ID,
     });
   };
 
   // Parse requestHash from ValidationRequested event
-  // ValidationRequested(bytes32 indexed requestHash, uint256 indexed agentId, uint8 model)
-  // topic0 = keccak256("ValidationRequested(bytes32,uint256,uint8)")
   const VALIDATION_REQUESTED_TOPIC = '0xef181c5da8dadc79c50104e3f3b2e44f4e8a69afbf247a22f5b70c5d45b32cb7';
   let requestHash: `0x${string}` | undefined;
   if (receipt?.logs) {
@@ -305,7 +312,6 @@ export interface SubmitValidationParams {
 }
 
 export function useSubmitValidation() {
-  const chainId = useChainId();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
@@ -315,7 +321,7 @@ export function useSubmitValidation() {
       abi: TALValidationRegistryABI,
       functionName: 'submitValidation',
       args: [params.requestHash, params.score, params.proof, params.detailsURI],
-      chainId,
+      chainId: READ_CHAIN_ID,
     });
   };
 
@@ -328,7 +334,6 @@ export interface DisputeValidationParams {
 }
 
 export function useDisputeValidation() {
-  const chainId = useChainId();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
@@ -338,7 +343,7 @@ export function useDisputeValidation() {
       abi: TALValidationRegistryABI,
       functionName: 'disputeValidation',
       args: [params.requestHash, params.evidence],
-      chainId,
+      chainId: READ_CHAIN_ID,
     });
   };
 

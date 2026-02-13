@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useWriteContract, useWaitForTransactionReceipt, useSignTypedData, usePublicClient, useAccount, useChainId } from 'wagmi';
-import { CONTRACTS } from '@/lib/contracts';
+import { useWriteContract, useWaitForTransactionReceipt, useSignTypedData, usePublicClient, useAccount } from 'wagmi';
+import { CONTRACTS, THANOS_CHAIN_ID } from '@/lib/contracts';
 import { TALIdentityRegistryABI } from '../../../sdk/src/abi/TALIdentityRegistry';
 import { TALIdentityRegistryV2ABI } from '../../../sdk/src/abi/TALIdentityRegistryV2';
 
@@ -22,7 +22,6 @@ function parseAgentIdFromReceipt(receipt: { logs: Array<{ address: string; topic
 }
 
 export function useRegisterAgent() {
-  const chainId = useChainId();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { data: receipt, isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
@@ -32,7 +31,7 @@ export function useRegisterAgent() {
       abi: TALIdentityRegistryABI,
       functionName: 'register',
       args: [agentURI],
-      chainId,
+      chainId: THANOS_CHAIN_ID,
     });
   };
 
@@ -53,7 +52,6 @@ const OPERATOR_CONSENT_TYPES = {
 } as const;
 
 export function useUpdateAgentURI() {
-  const chainId = useChainId();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { data: receipt, isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
@@ -63,7 +61,7 @@ export function useUpdateAgentURI() {
       abi: TALIdentityRegistryABI,
       functionName: 'updateAgentURI',
       args: [agentId, newURI],
-      chainId,
+      chainId: THANOS_CHAIN_ID,
     });
   };
 
@@ -71,7 +69,6 @@ export function useUpdateAgentURI() {
 }
 
 export function useRegisterAgentV2() {
-  const chainId = useChainId();
   const { writeContractAsync, data: hash, isPending, error: writeError } = useWriteContract();
   const { data: receipt, isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
   const { signTypedDataAsync } = useSignTypedData();
@@ -84,7 +81,7 @@ export function useRegisterAgentV2() {
   const operatorConsentDomain = {
     name: 'TAL Identity Registry',
     version: '2',
-    chainId: BigInt(chainId),
+    chainId: BigInt(THANOS_CHAIN_ID),
     verifyingContract: CONTRACTS.identityRegistry,
   } as const;
 
@@ -160,7 +157,7 @@ export function useRegisterAgentV2() {
       abi: TALIdentityRegistryV2ABI,
       functionName: 'registerV2',
       args: [agentURI, validationModel, operatorConsents, operatorSignatures],
-      chainId,
+      chainId: THANOS_CHAIN_ID,
     });
   };
 

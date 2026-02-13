@@ -3,8 +3,8 @@ import type { PublicClient, Log, Address } from "viem";
 import { Queue } from "bullmq";
 import type { ConnectionOptions } from "bullmq";
 import {
-  optimismSepolia,
-  OPTIMISM_SEPOLIA_ADDRESSES,
+  thanosSepolia,
+  THANOS_SEPOLIA_ADDRESSES,
   TaskFeeEscrowABI,
   TALValidationRegistryABI,
   TALReputationRegistryABI,
@@ -52,16 +52,16 @@ export class EventListener {
     this.logger = options.logger;
     this.connection = options.connection;
     this.publicClient = (options.publicClient ?? createPublicClient({
-      chain: optimismSepolia,
+      chain: thanosSepolia,
       transport: http(this.config.RPC_URL),
     })) as PublicClient;
 
     this.escrowAddress =
-      (this.config.TASK_FEE_ESCROW as Address) ?? OPTIMISM_SEPOLIA_ADDRESSES.TaskFeeEscrow;
+      (this.config.TASK_FEE_ESCROW as Address) ?? THANOS_SEPOLIA_ADDRESSES.TaskFeeEscrow;
     this.validationAddress =
-      (this.config.VALIDATION_REGISTRY as Address) ?? OPTIMISM_SEPOLIA_ADDRESSES.TALValidationRegistry;
+      (this.config.VALIDATION_REGISTRY as Address) ?? THANOS_SEPOLIA_ADDRESSES.TALValidationRegistry;
     this.reputationAddress =
-      (this.config.REPUTATION_REGISTRY as Address) ?? OPTIMISM_SEPOLIA_ADDRESSES.TALReputationRegistry;
+      (this.config.REPUTATION_REGISTRY as Address) ?? THANOS_SEPOLIA_ADDRESSES.TALReputationRegistry;
   }
 
   async start(): Promise<void> {

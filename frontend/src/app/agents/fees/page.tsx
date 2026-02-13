@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { ArrowLeft, Coins, Wallet, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
 import { useAgentsByOwner } from '@/hooks/useAgent';
-import { useReadContracts, useChainId } from 'wagmi';
-import { CONTRACTS, CHAIN_ID, getL2Config } from '@/lib/contracts';
+import { useReadContracts } from 'wagmi';
+import { CONTRACTS, THANOS_CHAIN_ID } from '@/lib/contracts';
 import { useL2Config } from '@/hooks/useL2Config';
 import { TaskFeeEscrowABI } from '../../../../../sdk/src/abi/TaskFeeEscrow';
 import { useClaimFees } from '@/hooks/useTaskFee';
@@ -57,28 +57,26 @@ function ClaimButton({ agentId, balance }: { agentId: bigint; balance: bigint })
 export default function AgentFeesPage() {
   const { address, isConnected, isCorrectChain: isL2 } = useWallet();
   const { nativeCurrency, name: l2Name } = useL2Config();
-  const connectedChainId = useChainId();
-  const chainConfig = getL2Config(connectedChainId);
   const { agentIds, isLoading: agentsLoading } = useAgentsByOwner(address as `0x${string}` | undefined);
 
   const ids = agentIds ?? [];
   const hasAgents = ids.length > 0;
 
-  // Batch read: fee balance + per-task fee for each agent
+  // Batch read: fee balance + per-task fee for each agent (always from OP Sepolia)
   const contracts = ids.flatMap((id) => [
     {
-      address: chainConfig.taskFeeEscrow,
+      address: CONTRACTS.taskFeeEscrow,
       abi: TaskFeeEscrowABI,
       functionName: 'getAgentBalance' as const,
       args: [id],
-      chainId: connectedChainId,
+      chainId: THANOS_CHAIN_ID,
     },
     {
-      address: chainConfig.taskFeeEscrow,
+      address: CONTRACTS.taskFeeEscrow,
       abi: TaskFeeEscrowABI,
       functionName: 'getAgentFee' as const,
       args: [id],
-      chainId: connectedChainId,
+      chainId: THANOS_CHAIN_ID,
     },
   ]);
 

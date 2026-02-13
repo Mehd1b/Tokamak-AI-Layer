@@ -1,7 +1,13 @@
-import { createPublicClient, http } from 'viem';
-import { optimismSepolia } from 'viem/chains';
+import { createPublicClient, http, type Chain } from 'viem';
 import { NextResponse } from 'next/server';
-import { OPTIMISM_RPC_URL, IDENTITY_REGISTRY_ADDRESS } from '@/lib/rpc';
+import { THANOS_RPC_URL, IDENTITY_REGISTRY_ADDRESS } from '@/lib/rpc';
+
+const thanosSepolia = {
+  id: 111551119090,
+  name: 'Thanos Sepolia',
+  nativeCurrency: { name: 'TON', symbol: 'TON', decimals: 18 },
+  rpcUrls: { default: { http: ['https://rpc.thanos-sepolia.tokamak.network'] } },
+} as const satisfies Chain;
 
 const AGENT_URI_ABI = [
   {
@@ -14,8 +20,8 @@ const AGENT_URI_ABI = [
 ] as const;
 
 const client = createPublicClient({
-  chain: optimismSepolia,
-  transport: http(OPTIMISM_RPC_URL),
+  chain: thanosSepolia,
+  transport: http(THANOS_RPC_URL),
 });
 
 // ---------------------------------------------------------------------------
@@ -88,7 +94,7 @@ async function resolveViaOnChain(
 ): Promise<ResolvedAgent> {
   // 1. Call agentURI on IdentityRegistry
   const agentIdBigInt = BigInt(onChainAgentId);
-  console.log(`[resolve] Calling agentURI(${onChainAgentId}) on ${IDENTITY_REGISTRY_ADDRESS} via ${OPTIMISM_RPC_URL}`);
+  console.log(`[resolve] Calling agentURI(${onChainAgentId}) on ${IDENTITY_REGISTRY_ADDRESS} via ${THANOS_RPC_URL}`);
   const uri = await client.readContract({
     address: IDENTITY_REGISTRY_ADDRESS,
     abi: AGENT_URI_ABI,

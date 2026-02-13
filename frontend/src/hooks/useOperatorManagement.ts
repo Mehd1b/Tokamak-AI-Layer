@@ -1,7 +1,7 @@
 'use client';
 
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { CONTRACTS } from '@/lib/contracts';
+import { CONTRACTS, THANOS_CHAIN_ID } from '@/lib/contracts';
 import { TALIdentityRegistryV2ABI } from '../../../sdk/src/abi/TALIdentityRegistryV2';
 
 export function useOperatorManagement() {
@@ -25,6 +25,7 @@ export function useOperatorManagement() {
       abi: TALIdentityRegistryV2ABI,
       functionName: 'removeOperator',
       args: [agentId, operator],
+      chainId: THANOS_CHAIN_ID,
     });
   };
 
@@ -34,6 +35,7 @@ export function useOperatorManagement() {
       abi: TALIdentityRegistryV2ABI,
       functionName: 'operatorExit',
       args: [agentId],
+      chainId: THANOS_CHAIN_ID,
     });
   };
 

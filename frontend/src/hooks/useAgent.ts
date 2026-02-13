@@ -1,9 +1,12 @@
 'use client';
 
 import { useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { CONTRACTS } from '@/lib/contracts';
+import { CONTRACTS, THANOS_CHAIN_ID } from '@/lib/contracts';
 import { TALIdentityRegistryABI } from '../../../sdk/src/abi/TALIdentityRegistry';
 import { TALIdentityRegistryV2ABI } from '../../../sdk/src/abi/TALIdentityRegistryV2';
+
+// All identity reads go to Thanos Sepolia
+const READ_CHAIN_ID = THANOS_CHAIN_ID;
 
 export function useAgent(agentId: bigint | undefined) {
   const enabled = agentId !== undefined;
@@ -13,6 +16,7 @@ export function useAgent(agentId: bigint | undefined) {
     abi: TALIdentityRegistryABI,
     functionName: 'ownerOf',
     args: enabled ? [agentId] : undefined,
+    chainId: READ_CHAIN_ID,
     query: { enabled },
   });
 
@@ -21,6 +25,7 @@ export function useAgent(agentId: bigint | undefined) {
     abi: TALIdentityRegistryABI,
     functionName: 'agentURI',
     args: enabled ? [agentId] : undefined,
+    chainId: READ_CHAIN_ID,
     query: { enabled },
   });
 
@@ -29,6 +34,7 @@ export function useAgent(agentId: bigint | undefined) {
     abi: TALIdentityRegistryABI,
     functionName: 'isVerifiedOperator',
     args: enabled ? [agentId] : undefined,
+    chainId: READ_CHAIN_ID,
     query: { enabled },
   });
 
@@ -37,6 +43,7 @@ export function useAgent(agentId: bigint | undefined) {
     abi: TALIdentityRegistryABI,
     functionName: 'getOperator',
     args: enabled ? [agentId] : undefined,
+    chainId: READ_CHAIN_ID,
     query: { enabled },
   });
 
@@ -45,6 +52,7 @@ export function useAgent(agentId: bigint | undefined) {
     abi: TALIdentityRegistryABI,
     functionName: 'getZKIdentity',
     args: enabled ? [agentId] : undefined,
+    chainId: READ_CHAIN_ID,
     query: { enabled },
   });
 
@@ -54,6 +62,7 @@ export function useAgent(agentId: bigint | undefined) {
     abi: TALIdentityRegistryV2ABI,
     functionName: 'getAgentStatus',
     args: enabled ? [agentId] : undefined,
+    chainId: READ_CHAIN_ID,
     query: { enabled },
   });
 
@@ -62,6 +71,7 @@ export function useAgent(agentId: bigint | undefined) {
     abi: TALIdentityRegistryV2ABI,
     functionName: 'getAgentValidationModel',
     args: enabled ? [agentId] : undefined,
+    chainId: READ_CHAIN_ID,
     query: { enabled },
   });
 
@@ -70,6 +80,7 @@ export function useAgent(agentId: bigint | undefined) {
     abi: TALIdentityRegistryV2ABI,
     functionName: 'getAgentOperators',
     args: enabled ? [agentId] : undefined,
+    chainId: READ_CHAIN_ID,
     query: { enabled },
   });
 
@@ -98,6 +109,7 @@ export function useAgentCount() {
     address: CONTRACTS.identityRegistry,
     abi: TALIdentityRegistryABI,
     functionName: 'getAgentCount',
+    chainId: READ_CHAIN_ID,
   });
 
   return {
@@ -112,6 +124,7 @@ export function useAgentsByOwner(owner: `0x${string}` | undefined) {
     abi: TALIdentityRegistryABI,
     functionName: 'getAgentsByOwner',
     args: owner ? [owner] : undefined,
+    chainId: READ_CHAIN_ID,
     query: { enabled: !!owner },
   });
 
@@ -126,6 +139,7 @@ interface ContractCall {
   abi: readonly unknown[];
   functionName: string;
   args: bigint[];
+  chainId?: number;
 }
 
 interface ContractResult {
@@ -144,24 +158,28 @@ export function useAgentList(count: number) {
       abi: TALIdentityRegistryABI,
       functionName: 'ownerOf',
       args: [BigInt(i)],
+      chainId: READ_CHAIN_ID,
     });
     contracts.push({
       address: CONTRACTS.identityRegistry,
       abi: TALIdentityRegistryABI,
       functionName: 'agentURI',
       args: [BigInt(i)],
+      chainId: READ_CHAIN_ID,
     });
     contracts.push({
       address: CONTRACTS.identityRegistry,
       abi: TALIdentityRegistryV2ABI,
       functionName: 'getAgentStatus',
       args: [BigInt(i)],
+      chainId: READ_CHAIN_ID,
     });
     contracts.push({
       address: CONTRACTS.identityRegistry,
       abi: TALIdentityRegistryV2ABI,
       functionName: 'getAgentValidationModel',
       args: [BigInt(i)],
+      chainId: READ_CHAIN_ID,
     });
   }
 
@@ -210,6 +228,7 @@ export function useCanReactivate(agentId: bigint | undefined) {
     abi: TALIdentityRegistryV2ABI,
     functionName: 'canReactivate',
     args: enabled ? [agentId] : undefined,
+    chainId: READ_CHAIN_ID,
     query: { enabled },
   });
 

@@ -2,8 +2,11 @@
 
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useBalance, useChainId } from 'wagmi';
 import { type Address, keccak256, encodePacked } from 'viem';
-import { getL2Config } from '@/lib/contracts';
+import { CONTRACTS, THANOS_CHAIN_ID } from '@/lib/contracts';
 import { TaskFeeEscrowABI } from '../../../sdk/src/abi/TaskFeeEscrow';
+
+// All fee reads/writes go to Thanos Sepolia
+const FEE_CHAIN_ID = THANOS_CHAIN_ID;
 
 // ============ Utility ============
 
@@ -38,14 +41,12 @@ export function useTONBalanceL2(address?: Address) {
  * Get the per-task fee for an agent
  */
 export function useAgentFee(agentId?: bigint) {
-  const chainId = useChainId();
-  const { taskFeeEscrow } = getL2Config(chainId);
   return useReadContract({
-    address: taskFeeEscrow,
+    address: CONTRACTS.taskFeeEscrow,
     abi: TaskFeeEscrowABI,
     functionName: 'getAgentFee',
     args: agentId !== undefined ? [agentId] : undefined,
-    chainId,
+    chainId: FEE_CHAIN_ID,
     query: { enabled: agentId !== undefined },
   });
 }
@@ -54,14 +55,12 @@ export function useAgentFee(agentId?: bigint) {
  * Check if a task has been paid for
  */
 export function useIsTaskPaid(taskRef?: `0x${string}`) {
-  const chainId = useChainId();
-  const { taskFeeEscrow } = getL2Config(chainId);
   return useReadContract({
-    address: taskFeeEscrow,
+    address: CONTRACTS.taskFeeEscrow,
     abi: TaskFeeEscrowABI,
     functionName: 'isTaskPaid',
     args: taskRef ? [taskRef] : undefined,
-    chainId,
+    chainId: FEE_CHAIN_ID,
     query: { enabled: !!taskRef },
   });
 }
@@ -70,14 +69,12 @@ export function useIsTaskPaid(taskRef?: `0x${string}`) {
  * Get the unclaimed fee balance for an agent
  */
 export function useAgentFeeBalance(agentId?: bigint) {
-  const chainId = useChainId();
-  const { taskFeeEscrow } = getL2Config(chainId);
   return useReadContract({
-    address: taskFeeEscrow,
+    address: CONTRACTS.taskFeeEscrow,
     abi: TaskFeeEscrowABI,
     functionName: 'getAgentBalance',
     args: agentId !== undefined ? [agentId] : undefined,
-    chainId,
+    chainId: FEE_CHAIN_ID,
     query: { enabled: agentId !== undefined },
   });
 }
@@ -88,19 +85,17 @@ export function useAgentFeeBalance(agentId?: bigint) {
  * Pay native currency for a task (payable)
  */
 export function usePayForTask() {
-  const chainId = useChainId();
-  const { taskFeeEscrow } = getL2Config(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const pay = (agentId: bigint, taskRef: `0x${string}`, feeWei: bigint) => {
     writeContract({
-      address: taskFeeEscrow,
+      address: CONTRACTS.taskFeeEscrow,
       abi: TaskFeeEscrowABI,
       functionName: 'payForTask',
       args: [agentId, taskRef],
       value: feeWei,
-      chainId,
+      chainId: FEE_CHAIN_ID,
     });
   };
 
@@ -111,18 +106,16 @@ export function usePayForTask() {
  * Set the per-task fee for an agent (agent owner only)
  */
 export function useSetAgentFee() {
-  const chainId = useChainId();
-  const { taskFeeEscrow } = getL2Config(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const setFee = (agentId: bigint, feePerTask: bigint) => {
     writeContract({
-      address: taskFeeEscrow,
+      address: CONTRACTS.taskFeeEscrow,
       abi: TaskFeeEscrowABI,
       functionName: 'setAgentFee',
       args: [agentId, feePerTask],
-      chainId,
+      chainId: FEE_CHAIN_ID,
     });
   };
 
@@ -133,18 +126,16 @@ export function useSetAgentFee() {
  * Claim accumulated fees for an agent (agent owner only)
  */
 export function useClaimFees() {
-  const chainId = useChainId();
-  const { taskFeeEscrow } = getL2Config(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const claim = (agentId: bigint) => {
     writeContract({
-      address: taskFeeEscrow,
+      address: CONTRACTS.taskFeeEscrow,
       abi: TaskFeeEscrowABI,
       functionName: 'claimFees',
       args: [agentId],
-      chainId,
+      chainId: FEE_CHAIN_ID,
     });
   };
 
@@ -158,18 +149,16 @@ export function useClaimFees() {
  * Sets _hasUsedAgent and releases escrowed funds to the agent balance.
  */
 export function useConfirmTask() {
-  const chainId = useChainId();
-  const { taskFeeEscrow } = getL2Config(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const confirm = (taskRef: `0x${string}`) => {
     writeContract({
-      address: taskFeeEscrow,
+      address: CONTRACTS.taskFeeEscrow,
       abi: TaskFeeEscrowABI,
       functionName: 'confirmTask',
       args: [taskRef],
-      chainId,
+      chainId: FEE_CHAIN_ID,
     });
   };
 
@@ -184,14 +173,12 @@ export function useConfirmTask() {
  * Status: 0=None, 1=Escrowed, 2=Completed, 3=Refunded
  */
 export function useTaskEscrow(taskRef?: `0x${string}`) {
-  const chainId = useChainId();
-  const { taskFeeEscrow } = getL2Config(chainId);
   return useReadContract({
-    address: taskFeeEscrow,
+    address: CONTRACTS.taskFeeEscrow,
     abi: TaskFeeEscrowABI,
     functionName: 'getTaskEscrow',
     args: taskRef ? [taskRef] : undefined,
-    chainId,
+    chainId: FEE_CHAIN_ID,
     query: { enabled: !!taskRef },
   });
 }
@@ -200,16 +187,14 @@ export function useTaskEscrow(taskRef?: `0x${string}`) {
  * Check if a user has completed at least one task for an agent
  */
 export function useHasUsedAgent(agentId?: bigint, user?: Address) {
-  const chainId = useChainId();
-  const { taskFeeEscrow } = getL2Config(chainId);
   const enabled = agentId !== undefined && !!user;
 
   return useReadContract({
-    address: taskFeeEscrow,
+    address: CONTRACTS.taskFeeEscrow,
     abi: TaskFeeEscrowABI,
     functionName: 'hasUsedAgent',
     args: enabled ? [agentId!, user!] : undefined,
-    chainId,
+    chainId: FEE_CHAIN_ID,
     query: { enabled },
   });
 }
@@ -219,18 +204,16 @@ export function useHasUsedAgent(agentId?: bigint, user?: Address) {
  * Callable by agent owner/operator at any time, or by payer after REFUND_DEADLINE (1 hour).
  */
 export function useRefundTask() {
-  const chainId = useChainId();
-  const { taskFeeEscrow } = getL2Config(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const refund = (taskRef: `0x${string}`) => {
     writeContract({
-      address: taskFeeEscrow,
+      address: CONTRACTS.taskFeeEscrow,
       abi: TaskFeeEscrowABI,
       functionName: 'refundTask',
       args: [taskRef],
-      chainId,
+      chainId: FEE_CHAIN_ID,
     });
   };
 

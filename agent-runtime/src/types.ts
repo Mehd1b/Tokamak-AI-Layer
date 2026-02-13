@@ -41,7 +41,6 @@ export interface TaskSubmission {
   input: TaskInput;
   paymentTxHash?: string;
   taskRef?: string;
-  chainId?: number;
 }
 
 export interface ValidationRequest {

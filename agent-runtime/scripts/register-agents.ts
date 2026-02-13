@@ -6,15 +6,21 @@
  *   npx tsx scripts/register-agents.ts
  *
  * Prerequisites:
- *   - PRIVATE_KEY set in .env (account with Optimism Sepolia ETH)
+ *   - PRIVATE_KEY set in .env (account with Thanos Sepolia TON)
  *   - Agent runtime running (npm run dev) so registration files are served
  */
 import dotenv from 'dotenv';
 dotenv.config();
 
-import { createWalletClient, createPublicClient, http } from 'viem';
+import { createWalletClient, createPublicClient, http, type Chain } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { optimismSepolia } from 'viem/chains';
+
+const thanosSepolia = {
+  id: 111551119090,
+  name: 'Thanos Sepolia',
+  nativeCurrency: { name: 'TON', symbol: 'TON', decimals: 18 },
+  rpcUrls: { default: { http: ['https://rpc.thanos-sepolia.tokamak.network'] } },
+} as const satisfies Chain;
 import { SummarizerAgent } from '../src/agents/SummarizerAgent.js';
 import { AuditorAgent } from '../src/agents/AuditorAgent.js';
 
@@ -50,7 +56,7 @@ async function main() {
     process.exit(1);
   }
 
-  const rpcUrl = process.env.RPC_URL || 'https://sepolia.optimism.io';
+  const rpcUrl = process.env.RPC_URL || 'https://rpc.thanos-sepolia.tokamak.network';
   const identityRegistry =
     (process.env.IDENTITY_REGISTRY as `0x${string}`) ||
     '0x3f89CD27fD877827E7665A9883b3c0180E22A525';
@@ -60,12 +66,12 @@ async function main() {
   // Create viem clients
   const account = privateKeyToAccount(privateKey as `0x${string}`);
   const publicClient = createPublicClient({
-    chain: optimismSepolia,
+    chain: thanosSepolia,
     transport: http(rpcUrl),
   });
   const walletClient = createWalletClient({
     account,
-    chain: optimismSepolia,
+    chain: thanosSepolia,
     transport: http(rpcUrl),
   });
 

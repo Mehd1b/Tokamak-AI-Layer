@@ -33,7 +33,7 @@ import type {
   ZKProof,
 } from './types';
 import {
-  OPTIMISM_SEPOLIA_ADDRESSES,
+  THANOS_SEPOLIA_ADDRESSES,
   DEFAULT_CHAIN_ID,
 } from './types';
 
@@ -63,13 +63,13 @@ export class TALClient {
     const addresses = {
       identityRegistry:
         config.contracts?.identityRegistry ??
-        OPTIMISM_SEPOLIA_ADDRESSES.identityRegistry,
+        THANOS_SEPOLIA_ADDRESSES.identityRegistry,
       reputationRegistry:
         config.contracts?.reputationRegistry ??
-        OPTIMISM_SEPOLIA_ADDRESSES.reputationRegistry,
+        THANOS_SEPOLIA_ADDRESSES.reputationRegistry,
       validationRegistry:
         config.contracts?.validationRegistry ??
-        OPTIMISM_SEPOLIA_ADDRESSES.validationRegistry,
+        THANOS_SEPOLIA_ADDRESSES.validationRegistry,
     };
 
     // Initialize domain clients

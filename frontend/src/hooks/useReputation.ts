@@ -1,9 +1,12 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useReadContract, useReadContracts, useChainId } from 'wagmi';
-import { CONTRACTS } from '@/lib/contracts';
+import { useReadContract, useReadContracts } from 'wagmi';
+import { CONTRACTS, THANOS_CHAIN_ID } from '@/lib/contracts';
 import { TALReputationRegistryABI } from '../../../sdk/src/abi/TALReputationRegistry';
+
+// All reputation reads go to Thanos Sepolia
+const READ_CHAIN_ID = THANOS_CHAIN_ID;
 
 export function useFeedbackCount(agentId: bigint | undefined) {
   const enabled = agentId !== undefined;
@@ -13,6 +16,7 @@ export function useFeedbackCount(agentId: bigint | undefined) {
     abi: TALReputationRegistryABI,
     functionName: 'getFeedbackCount',
     args: enabled ? [agentId] : undefined,
+    chainId: READ_CHAIN_ID,
     query: { enabled },
   });
 
@@ -30,6 +34,7 @@ export function useClientList(agentId: bigint | undefined) {
     abi: TALReputationRegistryABI,
     functionName: 'getClientList',
     args: enabled ? [agentId] : undefined,
+    chainId: READ_CHAIN_ID,
     query: { enabled },
   });
 
@@ -50,6 +55,7 @@ export function useReputationSummary(
     abi: TALReputationRegistryABI,
     functionName: 'getSummary',
     args: enabled ? [agentId, clients] : undefined,
+    chainId: READ_CHAIN_ID,
     query: { enabled },
   });
 
@@ -70,6 +76,7 @@ export function useVerifiedSummary(
     abi: TALReputationRegistryABI,
     functionName: 'getVerifiedSummary',
     args: enabled ? [agentId, clients] : undefined,
+    chainId: READ_CHAIN_ID,
     query: { enabled },
   });
 
@@ -87,6 +94,7 @@ export function useReviewerReputation(reviewer: `0x${string}` | undefined) {
     abi: TALReputationRegistryABI,
     functionName: 'getReviewerReputation',
     args: enabled ? [reviewer!] : undefined,
+    chainId: READ_CHAIN_ID,
     query: { enabled },
   });
 
@@ -108,7 +116,6 @@ export interface AgentRating {
  * Step 2: getSummary for agents with clients
  */
 export function useAgentRatings(agentIds: number[]) {
-  const chainId = useChainId();
   const enabled = agentIds.length > 0;
 
   // Step 1: Get client lists for all agents
@@ -118,9 +125,9 @@ export function useAgentRatings(agentIds: number[]) {
       abi: TALReputationRegistryABI,
       functionName: 'getClientList' as const,
       args: [BigInt(id)] as const,
-      chainId,
+      chainId: READ_CHAIN_ID,
     }));
-  }, [agentIds, chainId]);
+  }, [agentIds]);
 
   const { data: clientListResults, isLoading: clientsLoading } = useReadContracts({
     contracts: enabled ? clientListContracts : [],
@@ -141,7 +148,7 @@ export function useAgentRatings(agentIds: number[]) {
           abi: TALReputationRegistryABI,
           functionName: 'getSummary' as const,
           args: [BigInt(id), [...clients]] as const,
-          chainId,
+          chainId: READ_CHAIN_ID,
           _agentId: id,
         };
       })
@@ -153,7 +160,7 @@ export function useAgentRatings(agentIds: number[]) {
         chainId: number;
         _agentId: number;
       }>;
-  }, [agentIds, clientListResults, chainId]);
+  }, [agentIds, clientListResults]);
 
   const summaryEnabled = summaryContracts.length > 0;
 
@@ -223,7 +230,6 @@ export interface FeedbackEntry {
 }
 
 export function useFeedbacks(agentId: bigint | undefined, clients: `0x${string}`[] | undefined) {
-  const chainId = useChainId();
   const enabled = agentId !== undefined && !!clients && clients.length > 0;
 
   const contracts = useMemo(() => {
@@ -233,9 +239,9 @@ export function useFeedbacks(agentId: bigint | undefined, clients: `0x${string}`
       abi: TALReputationRegistryABI,
       functionName: 'getFeedback' as const,
       args: [agentId!, client] as const,
-      chainId,
+      chainId: READ_CHAIN_ID,
     }));
-  }, [agentId, clients, enabled, chainId]);
+  }, [agentId, clients, enabled]);
 
   const { data, isLoading } = useReadContracts({
     contracts: enabled ? contracts : [],

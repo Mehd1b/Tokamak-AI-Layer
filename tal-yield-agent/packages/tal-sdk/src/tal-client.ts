@@ -1,5 +1,5 @@
 import type { Address, Hash, PublicClient, WalletClient } from "viem";
-import { OPTIMISM_SEPOLIA_ADDRESSES, optimismSepolia } from "@tal-yield-agent/shared";
+import { THANOS_SEPOLIA_ADDRESSES, thanosSepolia } from "@tal-yield-agent/shared";
 import { IdentityClient } from "./clients/identity-client.js";
 import { EscrowClient } from "./clients/escrow-client.js";
 import { ReputationClient } from "./clients/reputation-client.js";
@@ -34,7 +34,7 @@ export class TALClient {
   readonly reputation: ReputationClient;
   readonly validation: ValidationClient;
   readonly staking: StakingClient;
-  readonly chain = optimismSepolia;
+  readonly chain = thanosSepolia;
 
   constructor(options: TALClientOptions) {
     const config: TALClientConfig = {
@@ -42,15 +42,15 @@ export class TALClient {
       walletClient: options.walletClient,
       addresses: {
         identityRegistry:
-          options.addresses?.identityRegistry ?? OPTIMISM_SEPOLIA_ADDRESSES.TALIdentityRegistry,
+          options.addresses?.identityRegistry ?? THANOS_SEPOLIA_ADDRESSES.TALIdentityRegistry,
         taskFeeEscrow:
-          options.addresses?.taskFeeEscrow ?? OPTIMISM_SEPOLIA_ADDRESSES.TaskFeeEscrow,
+          options.addresses?.taskFeeEscrow ?? THANOS_SEPOLIA_ADDRESSES.TaskFeeEscrow,
         reputationRegistry:
-          options.addresses?.reputationRegistry ?? OPTIMISM_SEPOLIA_ADDRESSES.TALReputationRegistry,
+          options.addresses?.reputationRegistry ?? THANOS_SEPOLIA_ADDRESSES.TALReputationRegistry,
         validationRegistry:
-          options.addresses?.validationRegistry ?? OPTIMISM_SEPOLIA_ADDRESSES.TALValidationRegistry,
+          options.addresses?.validationRegistry ?? THANOS_SEPOLIA_ADDRESSES.TALValidationRegistry,
         stakingIntegrationModule:
-          options.addresses?.stakingIntegrationModule ?? OPTIMISM_SEPOLIA_ADDRESSES.StakingIntegrationModule,
+          options.addresses?.stakingIntegrationModule ?? THANOS_SEPOLIA_ADDRESSES.StakingIntegrationModule,
       },
     };
 

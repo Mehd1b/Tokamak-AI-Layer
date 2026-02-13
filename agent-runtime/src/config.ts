@@ -23,12 +23,12 @@ export const config = {
   PORT: parseInt(optional('PORT', '3001'), 10),
   HOST: optional('HOST', '0.0.0.0'),
 
-  // Blockchain
-  RPC_URL: optional('RPC_URL', 'https://opt-sepolia.g.alchemy.com/v2/N-Gnpjy1WvCfokwj6fiOfuAVL_At6IvE'),
+  // Blockchain (Thanos Sepolia)
+  RPC_URL: optional('RPC_URL', 'https://rpc.thanos-sepolia.tokamak.network'),
   PRIVATE_KEY: process.env.PRIVATE_KEY || '',
-  CHAIN_ID: parseInt(optional('CHAIN_ID', '11155420'), 10),
+  CHAIN_ID: parseInt(optional('CHAIN_ID', '111551119090'), 10),
 
-  // Contract addresses (Optimism Sepolia)
+  // Contract addresses (Thanos Sepolia)
   IDENTITY_REGISTRY: optional(
     'IDENTITY_REGISTRY',
     '0x3f89CD27fD877827E7665A9883b3c0180E22A525',
@@ -43,16 +43,9 @@ export const config = {
   ),
   TASK_FEE_ESCROW: optional(
     'TASK_FEE_ESCROW',
-    '0x8462C8DB2ae0eE76744343c57DCC071AdC43A9E4',
+    '0x43f9E59b6bFCacD70fcba4f3F6234a6a9F064b8C',
   ),
 
   // Storage
   STORAGE_DIR: optional('STORAGE_DIR', './data'),
-
-  // Multi-chain: Thanos Sepolia (used when frontend sends chainId=111551119090)
-  THANOS_RPC_URL: optional('THANOS_RPC_URL', 'https://rpc.thanos-sepolia.tokamak.network'),
-  THANOS_TASK_FEE_ESCROW: optional(
-    'THANOS_TASK_FEE_ESCROW',
-    '0x43f9E59b6bFCacD70fcba4f3F6234a6a9F064b8C',
-  ),
 } as const;
