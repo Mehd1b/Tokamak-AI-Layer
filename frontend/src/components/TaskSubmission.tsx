@@ -267,8 +267,8 @@ function TradingStrategyView({ data, serviceUrl }: { data: { strategy: { id: str
         </div>
       )}
 
-      {/* Download Bot Button */}
-      {strategy.trades.length > 0 && (
+      {/* Download Bot Button — shown for all strategies (including investment/DCA with empty trades) */}
+      {(strategy.trades.length > 0 || isInvestmentMode) && (
         <div className="flex items-center gap-3 pt-2 border-t border-white/10">
           <button
             onClick={handleDownload}
