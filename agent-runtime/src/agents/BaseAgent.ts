@@ -53,8 +53,14 @@ export abstract class BaseAgent {
     return task;
   }
 
+  private getBaseUrl(): string {
+    if (config.PUBLIC_URL) return config.PUBLIC_URL.replace(/\/$/, '');
+    const host = config.HOST === '0.0.0.0' ? 'localhost' : config.HOST;
+    return `http://${host}:${config.PORT}`;
+  }
+
   getInfo(): AgentInfo {
-    const baseUrl = `http://${config.HOST === '0.0.0.0' ? 'localhost' : config.HOST}:${config.PORT}`;
+    const baseUrl = this.getBaseUrl();
     return {
       id: this.id,
       name: this.name,
@@ -68,7 +74,7 @@ export abstract class BaseAgent {
   }
 
   getRegistrationFile() {
-    const baseUrl = `http://${config.HOST === '0.0.0.0' ? 'localhost' : config.HOST}:${config.PORT}`;
+    const baseUrl = this.getBaseUrl();
     return {
       type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1' as const,
       name: this.name,

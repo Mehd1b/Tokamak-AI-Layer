@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useChainId } from 'wagmi';
 
 export interface RuntimeAgent {
   id: string;
@@ -76,7 +75,6 @@ export function useSubmitTask() {
   const [result, setResult] = useState<TaskResult | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const chainId = useChainId();
 
   const submitTask = useCallback(
     async (
@@ -93,7 +91,7 @@ export function useSubmitTask() {
         const res = await fetch(`/api/runtime/${onChainAgentId}/tasks`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ input: { text }, paymentTxHash, taskRef, chainId }),
+          body: JSON.stringify({ input: { text }, paymentTxHash, taskRef }),
         });
 
         if (!res.ok) {
@@ -112,7 +110,7 @@ export function useSubmitTask() {
         setIsSubmitting(false);
       }
     },
-    [chainId],
+    [],
   );
 
   const reset = useCallback(() => {

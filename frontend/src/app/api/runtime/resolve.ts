@@ -51,6 +51,17 @@ const IPFS_GATEWAYS = [
 const AGENT_RUNTIME_URL =
   process.env.AGENT_RUNTIME_URL || process.env.NEXT_PUBLIC_AGENT_RUNTIME_URL || '';
 
+/**
+ * Maps on-chain agent IDs to runtime agent IDs.
+ * Used when on-chain resolution fails and we fall back to AGENT_RUNTIME_URL.
+ * The on-chain ID (e.g. "1") doesn't match the runtime ID (e.g. "summarizer").
+ */
+const ON_CHAIN_TO_RUNTIME_ID: Record<string, string> = {
+  '1': 'summarizer',
+  '2': 'auditor',
+  '3': 'validator',
+};
+
 // ---------------------------------------------------------------------------
 // Resolver
 // ---------------------------------------------------------------------------
@@ -76,10 +87,11 @@ export async function resolveAgent(
 
     // Fallback: use AGENT_RUNTIME_URL env var if configured
     if (AGENT_RUNTIME_URL) {
-      console.log(`[resolve] Falling back to AGENT_RUNTIME_URL: ${AGENT_RUNTIME_URL}`);
+      const runtimeAgentId = ON_CHAIN_TO_RUNTIME_ID[onChainAgentId] ?? onChainAgentId;
+      console.log(`[resolve] Falling back to AGENT_RUNTIME_URL: ${AGENT_RUNTIME_URL}, runtimeAgentId: ${runtimeAgentId}`);
       const data: ResolvedAgent = {
         runtimeBaseUrl: AGENT_RUNTIME_URL.replace(/\/$/, ''),
-        runtimeAgentId: onChainAgentId,
+        runtimeAgentId,
       };
       cache.set(onChainAgentId, { data, expiresAt: Date.now() + CACHE_TTL });
       return data;
@@ -189,7 +201,9 @@ export async function proxyGet(url: string): Promise<NextResponse> {
     const body = await res.json();
     return NextResponse.json(body, { status: res.status });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Proxy request failed';
+    const raw = err instanceof Error ? err.message : 'Proxy request failed';
+    const msg = `Agent runtime unreachable at ${url}: ${raw}. Is the agent-runtime running?`;
+    console.error('[proxyGet]', msg);
     return NextResponse.json({ error: msg }, { status: 502 });
   }
 }
@@ -212,7 +226,9 @@ export async function proxyPost(
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Proxy request failed';
+    const raw = err instanceof Error ? err.message : 'Proxy request failed';
+    const msg = `Agent runtime unreachable at ${url}: ${raw}. Is the agent-runtime running?`;
+    console.error('[proxyPost]', msg);
     return NextResponse.json({ error: msg }, { status: 502 });
   }
 }
