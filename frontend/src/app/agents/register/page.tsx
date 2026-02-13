@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Upload, Plus, X, Info, Shield } from 'lucide-react';
+import { ArrowLeft, Upload, Plus, X, Info, Shield, Globe } from 'lucide-react';
 import { AgentCustomUI } from '@/components/AgentCustomUI';
 import { useWallet } from '@/hooks/useWallet';
 import { useRegisterAgent, useRegisterAgentV2 } from '@/hooks/useRegisterAgent';
@@ -42,6 +42,8 @@ export default function RegisterAgentPage() {
   const [services, setServices] = useState<Record<string, string>>({});
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [requestExample, setRequestExample] = useState('');
+  const [socialX, setSocialX] = useState('');
+  const [socialWebsite, setSocialWebsite] = useState('');
   const [newServiceType, setNewServiceType] = useState('A2A');
   const [newServiceUrl, setNewServiceUrl] = useState('');
   const [customServiceType, setCustomServiceType] = useState('');
@@ -175,12 +177,18 @@ export default function RegisterAgentPage() {
 
     try {
       // Build ERC-8004 registration JSON
+      // Build socials object (only include non-empty values)
+      const socials: Record<string, string> = {};
+      if (socialX.trim()) socials.x = socialX.trim();
+      if (socialWebsite.trim()) socials.website = socialWebsite.trim();
+
       const registration: Record<string, unknown> = {
         type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
         name,
         description,
         image: imageUrl || undefined,
         active: true,
+        ...(Object.keys(socials).length > 0 ? { socials } : {}),
         services: Object.fromEntries(
           Object.entries(services).filter(([, v]) => v.trim() !== ''),
         ),
@@ -362,6 +370,46 @@ export default function RegisterAgentPage() {
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
                 placeholder="https://example.com/agent-avatar.png"
+                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Social Links */}
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-medium text-white">Social Links</h2>
+            <span className="text-xs text-white/30">Optional</span>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-white/60">
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                </svg>
+                X (Twitter)
+              </label>
+              <input
+                type="url"
+                value={socialX}
+                onChange={(e) => setSocialX(e.target.value)}
+                placeholder="https://x.com/youragent"
+                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"
+              />
+            </div>
+
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-white/60">
+                <Globe className="h-4 w-4" />
+                Website
+              </label>
+              <input
+                type="url"
+                value={socialWebsite}
+                onChange={(e) => setSocialWebsite(e.target.value)}
+                placeholder="https://youragent.com"
                 className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"
               />
             </div>

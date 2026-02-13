@@ -59,29 +59,39 @@ export async function agentRoutes(app, ctx) {
     app.get("/api/v1/agent/capabilities", async (_req, reply) => {
         return reply.send({
             name: "TAL Trading Agent",
-            version: "0.1.0",
+            version: "0.2.0",
+            description: "Autonomous quantitative trading agent on the Tokamak AI Layer (ERC-8004). Generates LLM-driven strategies across four modes (scalp, swing, position, investment) with on-chain Uniswap V3 analysis, risk management, fee escrow, and downloadable auto-executing bots.",
             capabilities: [
                 {
                     id: "trade-analysis",
-                    name: "Trade Analysis",
-                    description: "Analyzes DEX pools and generates quantitative trading strategies",
+                    name: "Quantitative Strategy Generation",
+                    description: "Accepts natural-language prompts with automatic horizon inference (1h–1y). Scores tokens across 9 indicators (RSI, MACD, Bollinger Bands, VWAP, momentum, liquidity depth, fee APY, volume trend, TVL stability). Generates strategies via Claude with mode-specific guidance. Investment mode includes portfolio allocation, DCA scheduling, rebalancing, and exit criteria. Returns unsigned swap calldata and risk metrics.",
                     endpoint: "POST /api/v1/trade/analyze",
                 },
                 {
                     id: "trade-execution",
                     name: "Trade Execution",
-                    description: "Executes approved strategies via signed transactions",
+                    description: "Broadcasts user-signed transactions to Ethereum mainnet and monitors to confirmation. Parses Uniswap V3 Swap event logs. Requires SIWA authentication. Agent never holds private keys.",
                     endpoint: "POST /api/v1/trade/execute",
                 },
                 {
                     id: "bot-download",
-                    name: "Bot Download",
-                    description: "Download a self-contained trading bot zip for a strategy",
+                    name: "Downloadable Trading Bot",
+                    description: "Generates a self-contained Node.js bot (.zip) with auto-executing stop-loss/take-profit/trailing-stop listener, ERC-20 approval handling, DCA scheduler, portfolio rebalancer, and pre-configured strategy. Runs via npm start or Docker.",
                     endpoint: "GET /api/v1/trade/:strategyId/download",
+                },
+                {
+                    id: "fee-escrow",
+                    name: "On-Chain Fee Escrow",
+                    description: "Integrates with TaskFeeEscrow contract on Thanos L2. Verifies payment, confirms task completion to release escrowed fees, and supports refunds for failed tasks.",
+                    endpoint: "Automatic (via taskRef in request)",
                 },
             ],
             supportedChains: [1],
             supportedDexes: ["Uniswap V3"],
+            supportedTokens: ["WETH", "USDC", "USDT", "DAI", "WBTC", "UNI", "LINK", "AAVE", "MKR", "SNX"],
+            tradingModes: ["scalp", "swing", "position", "investment"],
+            riskTolerances: ["conservative", "moderate", "aggressive"],
             authMethod: "SIWA (Sign-In With Agent)",
         });
     });

@@ -259,7 +259,7 @@ export class TradingAgentTAL {
         const registrationFile = {
             type: "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
             name: "TAL Trading Agent",
-            description: "AI-powered quantitative trading agent. Analyzes DEX pools, generates strategies, and executes trades via Uniswap V3.",
+            description: "Autonomous quantitative trading agent on the Tokamak AI Layer. Accepts natural-language prompts and infers trading parameters automatically. Analyzes Uniswap V3 pool liquidity and DeFiLlama market data across 9 technical and DeFi indicators, then generates optimized strategies via Claude with extended thinking. Supports four trading modes (scalp, swing, position, investment) with DCA scheduling, portfolio rebalancing, and configurable exit criteria. Produces unsigned swap calldata for trustless execution and downloadable self-executing trading bots. On-chain fee escrow via TaskFeeEscrow.",
             active: true,
             services: {
                 A2A: `${baseUrl}/api/agents/trader`,
@@ -269,23 +269,28 @@ export class TradingAgentTAL {
                 capabilities: [
                     {
                         id: "trade-analysis",
-                        name: "Trade Analysis",
-                        description: "Analyzes DEX pools and generates quantitative trading strategies",
+                        name: "Quantitative Strategy Generation",
+                        description: "Scores tokens across RSI, MACD, Bollinger Bands, VWAP, momentum, liquidity depth, fee APY, volume trend, and TVL stability. Generates mode-specific strategies (scalp/swing/position/investment) with risk validation and auto-adjustment. Investment mode includes portfolio allocation, DCA schedule, rebalancing, and exit criteria.",
                         inputSchema: {
                             type: "object",
                             properties: {
                                 prompt: {
                                     type: "string",
-                                    description: "Natural language trading request",
+                                    description: "Natural language trading request (horizon auto-inferred from text)",
                                 },
                                 budget: { type: "string", description: "Budget in wei" },
                                 horizon: {
                                     type: "string",
-                                    enum: ["1h", "4h", "1d", "1w", "1m"],
+                                    enum: ["1h", "4h", "1d", "1w", "1m", "3m", "6m", "1y"],
+                                    description: "Optional — auto-inferred from prompt if omitted",
                                 },
                                 riskTolerance: {
                                     type: "string",
                                     enum: ["conservative", "moderate", "aggressive"],
+                                },
+                                taskRef: {
+                                    type: "string",
+                                    description: "On-chain task reference (bytes32 hex) for escrow confirmation",
                                 },
                             },
                             required: ["prompt", "budget"],
@@ -293,21 +298,34 @@ export class TradingAgentTAL {
                         outputSchema: {
                             type: "object",
                             properties: {
-                                strategy: { type: "object" },
-                                trades: { type: "array" },
-                                riskMetrics: { type: "object" },
+                                strategy: { type: "object", description: "Full strategy with trades, risk metrics, estimated returns, and optional investment plan" },
+                                unsignedSwaps: { type: "array", description: "Unsigned Uniswap V3 swap calldata for each trade" },
+                                riskWarnings: { type: "array" },
+                                feeConfirmed: { type: "boolean" },
+                                confirmTxHash: { type: "string" },
                             },
                         },
                     },
                     {
                         id: "trade-execution",
                         name: "Trade Execution",
-                        description: "Executes approved trading strategies via Uniswap V3",
+                        description: "Broadcasts user-signed transactions to Ethereum mainnet. Parses Uniswap V3 Swap event logs for actual traded amounts. Requires SIWA authentication.",
                         inputSchema: {
                             type: "object",
                             properties: {
                                 strategyId: { type: "string" },
                                 signedTransaction: { type: "string" },
+                            },
+                        },
+                    },
+                    {
+                        id: "bot-download",
+                        name: "Downloadable Trading Bot",
+                        description: "Generates a self-contained Node.js bot (.zip) with auto-executing stop-loss/take-profit/trailing-stop listener, ERC-20 approval handling, DCA scheduler, portfolio rebalancer, and pre-configured strategy parameters.",
+                        inputSchema: {
+                            type: "object",
+                            properties: {
+                                strategyId: { type: "string" },
                             },
                         },
                     },

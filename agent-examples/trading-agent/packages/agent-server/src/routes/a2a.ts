@@ -67,9 +67,9 @@ export async function a2aRoutes(app: FastifyInstance, ctx: AppContext) {
     return reply.send({
       name: "TAL Trading Agent",
       description:
-        "AI-powered quantitative trading agent on the Tokamak Agent Layer. Analyzes Uniswap V3 pools, generates LLM-driven strategies with risk management, and produces unsigned swap calldata for execution.",
+        "Autonomous quantitative trading agent on the Tokamak AI Layer (ERC-8004). Accepts natural-language trading prompts, analyzes Uniswap V3 pool liquidity and DeFiLlama market data across 9 technical and DeFi indicators, then generates optimized strategies via Claude with extended thinking. Supports four trading modes — scalp, swing, position, and investment — with automatic horizon inference from plain English. Investment-mode strategies include portfolio allocation, DCA scheduling, drift-based rebalancing, and configurable exit criteria. All strategies come with unsigned Uniswap V3 swap calldata, risk validation with auto-adjustment, and a downloadable self-executing trading bot. On-chain fee escrow confirmation via TaskFeeEscrow ensures trustless payment settlement.",
       url: `${baseUrl}/api/agents/trader`,
-      version: "0.1.0",
+      version: "0.2.0",
       provider: {
         organization: "Tokamak Network",
       },
@@ -86,23 +86,43 @@ export async function a2aRoutes(app: FastifyInstance, ctx: AppContext) {
       skills: [
         {
           id: "trade-analysis",
-          name: "Trade Analysis",
+          name: "Quantitative Strategy Generation",
           description:
-            "Accepts a natural-language trading prompt with budget, horizon, and risk tolerance. Scores tokens via on-chain Uniswap V3 pool data and DeFiLlama quant indicators, then generates an optimized trading strategy using Claude. Returns the strategy with unsigned swap calldata ready for wallet signing.",
-          tags: ["defi", "trading", "uniswap", "strategy"],
+            "Accepts a natural-language trading prompt and automatically infers budget, horizon (1h to 1y), and risk tolerance. Scores up to 10 blue-chip tokens (WETH, USDC, USDT, DAI, WBTC, UNI, LINK, AAVE, MKR, SNX) using on-chain Uniswap V3 pool data and DeFiLlama price history across 9 weighted indicators: RSI, MACD, Bollinger Bands, VWAP, momentum, liquidity depth, fee APY, volume trend, TVL stability, and smart money flow. Data quality scoring automatically down-weights unreliable technical signals and redistributes weight to DeFi fundamentals. Generates an optimized strategy via Claude with mode-specific guidance: scalp (hours, technical-first), swing (days, balanced), position (months, DeFi-first), or investment (6m–1y, portfolio allocation with DCA + rebalancing). Returns the strategy with unsigned swap calldata, risk metrics (score 0–100, max drawdown, stop-loss/take-profit), estimated returns (optimistic/expected/pessimistic), and an optional investment plan with allocations, DCA schedule, rebalancing triggers, and exit criteria. If a taskRef is provided, the agent confirms the on-chain fee escrow upon completion.",
+          tags: ["defi", "trading", "uniswap", "strategy", "quantitative", "portfolio", "dca", "rebalancing"],
           examples: [
+            "Invest $100,000 in promising tokens for the next 6 months",
             "Invest 1 ETH in promising DeFi tokens for the next week",
-            "Conservative allocation of 0.5 ETH across blue-chip tokens",
-            "Aggressive short-term trade on high-momentum tokens",
+            "Conservative allocation of 0.5 ETH across blue-chip tokens for 3 months",
+            "Aggressive short-term trade on high-momentum tokens for 4 hours",
+            "Build a long-term DCA portfolio with monthly rebalancing for 1 year",
           ],
           inputModes: ["application/json", "text/plain"],
+          outputModes: ["application/json"],
+        },
+        {
+          id: "bot-download",
+          name: "Downloadable Trading Bot",
+          description:
+            "Generates a self-contained Node.js trading bot as a downloadable .zip for any generated strategy. The bot includes: an auto-executing listener that monitors positions and triggers sell actions on stop-loss, take-profit, or trailing stop conditions; ERC-20 token approval handling for non-ETH swaps; a DCA scheduler for investment-mode strategies that spreads purchases over configurable periods with state persistence; a portfolio rebalancer supporting both drift-threshold and calendar-based rebalancing; and shared helpers for Uniswap V3 quoting, swapping, and balance queries. All configuration is pre-populated from the strategy. Runs via `npm start` or Docker.",
+          tags: ["bot", "download", "automation", "dca", "rebalancing", "listener"],
+          inputModes: ["application/json"],
+          outputModes: ["application/octet-stream"],
+        },
+        {
+          id: "trade-execution",
+          name: "Trade Execution",
+          description:
+            "Broadcasts a user-signed transaction to Ethereum mainnet and monitors it to confirmation. The agent never holds private keys — users sign the unsigned swap calldata from strategy generation with their own wallet. Parses Uniswap V3 Swap event logs to extract actual traded amounts. Requires SIWA (Sign-In With Agent) authentication.",
+          tags: ["execution", "swap", "uniswap"],
+          inputModes: ["application/json"],
           outputModes: ["application/json"],
         },
         {
           id: "task-status",
           name: "Task Status",
           description:
-            "Check the status and results of a previously submitted trade analysis task.",
+            "Check the status and results of a previously submitted trade analysis task. Returns the full strategy, artifacts, and escrow confirmation status.",
           tags: ["status", "query"],
           inputModes: ["application/json"],
           outputModes: ["application/json"],

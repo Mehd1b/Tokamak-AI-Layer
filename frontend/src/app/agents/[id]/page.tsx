@@ -64,7 +64,7 @@ export default function AgentDetailPage() {
   const { validationHashes } = useAgentValidations(agentId);
   const { total: valTotal, failed: valFailed, failureRate: valFailureRate, isLoading: valStatsLoading } = useValidationStats(agentId);
   const { agent: runtimeAgent } = useRuntimeAgent(agentId?.toString());
-  const { name: metaName, description: metaDescription, capabilities: metaCapabilities, talCapabilities: metaTalCapabilities, requestExample: metaRequestExample, services: metaServices, active: metaActive, pricing: metaPricing, customUI: metaCustomUI } = useAgentMetadata(agent?.agentURI);
+  const { name: metaName, description: metaDescription, capabilities: metaCapabilities, talCapabilities: metaTalCapabilities, requestExample: metaRequestExample, services: metaServices, socials: metaSocials, active: metaActive, pricing: metaPricing, customUI: metaCustomUI } = useAgentMetadata(agent?.agentURI);
   const { data: onChainFee } = useAgentFee(agentId);
   const { nativeCurrency } = useL2Config();
   const { address } = useWallet();
@@ -228,7 +228,9 @@ export default function AgentDetailPage() {
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col items-end gap-3">
+            {/* Badges */}
+            <div className="flex flex-wrap gap-2">
             {runtimeAgent && (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400">
                 <Play className="h-3 w-3" /> Live
@@ -253,6 +255,41 @@ export default function AgentDetailPage() {
               <span className="badge-info flex items-center gap-1" title="This agent has a zero-knowledge verified identity commitment on-chain">
                 <Fingerprint className="h-3 w-3" /> ZK-Verified Identity
               </span>
+            )}
+            </div>
+            {/* Social Links */}
+            {metaSocials && (metaSocials.x || metaSocials.website) && (
+              <div className="flex items-center gap-3">
+                {metaSocials.x && (() => {
+                  const xHandle = metaSocials.x!.replace(/\/+$/, '').split('/').pop();
+                  return (
+                    <a
+                      href={metaSocials.x}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-white/40 hover:text-white hover:border-white/20 transition-colors"
+                      title="X (Twitter)"
+                    >
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                      </svg>
+                      <span className="text-xs font-mono">@{xHandle}</span>
+                    </a>
+                  );
+                })()}
+                {metaSocials.website && (
+                  <a
+                    href={metaSocials.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-white/40 hover:text-white hover:border-white/20 transition-colors"
+                    title="Website"
+                  >
+                    <Globe className="h-4 w-4" />
+                    <span className="text-xs">Website</span>
+                  </a>
+                )}
+              </div>
             )}
           </div>
         </div>

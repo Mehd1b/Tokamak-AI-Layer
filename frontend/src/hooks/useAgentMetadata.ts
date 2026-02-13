@@ -20,6 +20,11 @@ export interface CustomUIMeta {
   minHeight?: number;
 }
 
+export interface AgentSocials {
+  x?: string;
+  website?: string;
+}
+
 interface AgentMetadata {
   name?: string;
   description?: string;
@@ -28,6 +33,7 @@ interface AgentMetadata {
   requestExample?: string;
   active?: boolean;
   services?: Record<string, string>;
+  socials?: AgentSocials;
   pricing?: AgentPricing;
   customUI?: CustomUIMeta;
 }
@@ -40,6 +46,7 @@ interface UseAgentMetadataResult {
   requestExample?: string;
   active?: boolean;
   services?: Record<string, string>;
+  socials?: AgentSocials;
   pricing?: AgentPricing;
   customUI?: CustomUIMeta;
   isLoading: boolean;
@@ -113,6 +120,16 @@ export function useAgentMetadata(agentURI: string | undefined): UseAgentMetadata
           // Parse ERC-8004 registration file structure
           const talCaps = data.tal?.capabilities;
           const rawCustomUI = data.tal?.customUI;
+          // Parse socials
+          const rawSocials = data.socials;
+          const socials: AgentSocials | undefined =
+            rawSocials && typeof rawSocials === 'object'
+              ? {
+                  ...(typeof rawSocials.x === 'string' && rawSocials.x ? { x: rawSocials.x } : {}),
+                  ...(typeof rawSocials.website === 'string' && rawSocials.website ? { website: rawSocials.website } : {}),
+                }
+              : undefined;
+
           const parsed: AgentMetadata = {
             name: data.name || data.metadata?.name,
             description: data.description || data.metadata?.description,
@@ -123,6 +140,7 @@ export function useAgentMetadata(agentURI: string | undefined): UseAgentMetadata
             requestExample: data.tal?.requestExample || undefined,
             active: data.active !== undefined ? data.active : true,
             services: data.services || {},
+            socials: socials && Object.keys(socials).length > 0 ? socials : undefined,
             pricing: data.tal?.pricing || undefined,
             customUI: rawCustomUI && typeof rawCustomUI.html === 'string'
               ? {
@@ -169,6 +187,7 @@ export function useAgentMetadata(agentURI: string | undefined): UseAgentMetadata
     requestExample: metadata?.requestExample,
     active: metadata?.active,
     services: metadata?.services,
+    socials: metadata?.socials,
     pricing: metadata?.pricing,
     customUI: metadata?.customUI,
     isLoading,
