@@ -1,4 +1,18 @@
+import { readFileSync, existsSync } from "node:fs";
+import { resolve as pathResolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { UNISWAP_V3, TOKENS } from "@tal-trading-agent/shared";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+/** Resolve bot.env.example from src/ (dev) or dist/ (prod) */
+function envTemplatePath() {
+    // When running from dist/zip/botGenerator.js, the template is in src/zip/
+    const srcPath = pathResolve(__dirname, "..", "..", "src", "zip", "bot.env.example");
+    if (existsSync(srcPath))
+        return srcPath;
+    // When running from src/zip/ via tsx
+    return pathResolve(__dirname, "bot.env.example");
+}
 /**
  * Generates a zip buffer containing a self-contained trading bot repo
  * for the given strategy. The user can unzip, fill in .env, and run.
@@ -66,70 +80,55 @@ export async function generateBotZip(strategy) {
             poolFee: t.poolFee,
             route: t.route,
         })));
-        const envLines = [
-            `# Trading Bot Configuration`,
-            `# Strategy ID: ${strategy.id}`,
-            `# Generated: ${new Date(strategy.generatedAt).toISOString()}`,
-            `# Expires: ${new Date(strategy.expiresAt).toISOString()}`,
-            ``,
-            `# Your Ethereum RPC URL (Alchemy, Infura, etc.)`,
-            `ETHEREUM_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY`,
-            ``,
-            `# Your wallet private key (KEEP SECRET)`,
-            `PRIVATE_KEY=0x...`,
-            ``,
-            `# Strategy parameters (pre-configured)`,
-            `STRATEGY_ID=${strategy.id}`,
-            `STRATEGY_MODE=${strategy.mode}`,
-            `TRADES=${tradesJson}`,
-            `STOP_LOSS_PRICE=${strategy.riskMetrics.stopLossPrice.toString()}`,
-            `TAKE_PROFIT_PRICE=${strategy.riskMetrics.takeProfitPrice.toString()}`,
-            `MAX_SLIPPAGE_BPS=100`,
-            ``,
-            `# Auto-execution (listener)`,
-            `AUTO_EXECUTE=true`,
-            `TRAILING_STOP_PERCENT=${strategy.investmentPlan?.exitCriteria?.trailingStopPercent ?? 10}`,
-            ``,
-            `# Monitoring interval in seconds`,
-            `CHECK_INTERVAL=60`,
-        ];
+        // Read the template and inject strategy-specific values
+        let envContent = readFileSync(envTemplatePath(), "utf-8");
+        envContent = envContent
+            .replace("__STRATEGY_ID__", strategy.id)
+            .replace("__STRATEGY_MODE__", strategy.mode)
+            .replace("__TRADES__", tradesJson)
+            .replace("__STOP_LOSS_PRICE__", strategy.riskMetrics.stopLossPrice.toString())
+            .replace("__TAKE_PROFIT_PRICE__", strategy.riskMetrics.takeProfitPrice.toString())
+            .replace("__TRAILING_STOP_PERCENT__", String(strategy.investmentPlan?.exitCriteria?.trailingStopPercent ?? 10));
+        // For investment mode, uncomment and fill the relevant sections
         if (isInvestment && strategy.investmentPlan) {
             const plan = strategy.investmentPlan;
-            envLines.push(``, `# ── Investment Mode ──────────────────────────────`, `ENTRY_STRATEGY=${plan.entryStrategy}`);
+            const investmentLines = [];
+            investmentLines.push(`ENTRY_STRATEGY=${plan.entryStrategy}`);
             if (plan.allocations.length > 0) {
                 const allocJson = JSON.stringify(plan.allocations.map((a) => ({
                     tokenAddress: a.tokenAddress,
                     symbol: a.symbol,
                     targetPercent: a.targetPercent,
                 })));
-                envLines.push(`ALLOCATIONS=${allocJson}`);
+                investmentLines.push(`ALLOCATIONS=${allocJson}`);
             }
             if (plan.dcaSchedule) {
-                envLines.push(``, `# DCA Schedule`, `DCA_FREQUENCY=${plan.dcaSchedule.frequency}`, `DCA_TOTAL_PERIODS=${plan.dcaSchedule.totalPeriods}`, `DCA_AMOUNT_PER_PERIOD_PERCENT=${plan.dcaSchedule.amountPerPeriodPercent}`);
+                investmentLines.push(`DCA_FREQUENCY=${plan.dcaSchedule.frequency}`, `DCA_TOTAL_PERIODS=${plan.dcaSchedule.totalPeriods}`, `DCA_AMOUNT_PER_PERIOD_PERCENT=${plan.dcaSchedule.amountPerPeriodPercent}`);
             }
             if (plan.rebalancing) {
-                envLines.push(``, `# Rebalancing`, `REBALANCE_TYPE=${plan.rebalancing.type}`);
+                investmentLines.push(`REBALANCE_TYPE=${plan.rebalancing.type}`);
                 if (plan.rebalancing.frequency) {
-                    envLines.push(`REBALANCE_FREQUENCY=${plan.rebalancing.frequency}`);
+                    investmentLines.push(`REBALANCE_FREQUENCY=${plan.rebalancing.frequency}`);
                 }
                 if (plan.rebalancing.driftThresholdPercent != null) {
-                    envLines.push(`DRIFT_THRESHOLD_PERCENT=${plan.rebalancing.driftThresholdPercent}`);
+                    investmentLines.push(`DRIFT_THRESHOLD_PERCENT=${plan.rebalancing.driftThresholdPercent}`);
                 }
             }
             if (plan.exitCriteria) {
-                envLines.push(``, `# Exit Criteria`);
                 if (plan.exitCriteria.takeProfitPercent != null) {
-                    envLines.push(`EXIT_TAKE_PROFIT_PERCENT=${plan.exitCriteria.takeProfitPercent}`);
+                    investmentLines.push(`EXIT_TAKE_PROFIT_PERCENT=${plan.exitCriteria.takeProfitPercent}`);
                 }
                 if (plan.exitCriteria.stopLossPercent != null) {
-                    envLines.push(`EXIT_STOP_LOSS_PERCENT=${plan.exitCriteria.stopLossPercent}`);
+                    investmentLines.push(`EXIT_STOP_LOSS_PERCENT=${plan.exitCriteria.stopLossPercent}`);
                 }
                 if (plan.exitCriteria.timeExitMonths != null) {
-                    envLines.push(`EXIT_TIME_MONTHS=${plan.exitCriteria.timeExitMonths}`);
+                    investmentLines.push(`EXIT_TIME_MONTHS=${plan.exitCriteria.timeExitMonths}`);
                 }
             }
+            // Replace the commented placeholder section with actual values
+            envContent = envContent.replace(/# ── Investment Mode \(optional\)[\s\S]*$/, `# ── Investment Mode ─────────────────────────────────────\n${investmentLines.join("\n")}\n`);
         }
-        archive.append(envLines.join("\n"), { name: `${prefix}/.env.example` });
+        archive.append(envContent, { name: `${prefix}/.env.example` });
         // ── Dockerfile ────────────────────────────────────────
         archive.append([
             `FROM node:20-alpine`,

@@ -1,6 +1,7 @@
 import { isAddress } from "viem";
 import { TOKENS } from "@tal-trading-agent/shared";
 import { inferHorizonFromPrompt } from "./horizonParser.js";
+import { inferBudgetFromPrompt } from "./budgetParser.js";
 // ── In-memory task store ────────────────────────────────
 const a2aTasks = new Map();
 // ── Route Registration ──────────────────────────────────
@@ -51,14 +52,6 @@ export async function a2aRoutes(app, ctx) {
                     tags: ["bot", "download", "automation", "dca", "rebalancing", "listener"],
                     inputModes: ["application/json"],
                     outputModes: ["application/octet-stream"],
-                },
-                {
-                    id: "trade-execution",
-                    name: "Trade Execution",
-                    description: "Broadcasts a user-signed transaction to Ethereum mainnet and monitors it to confirmation. The agent never holds private keys — users sign the unsigned swap calldata from strategy generation with their own wallet. Parses Uniswap V3 Swap event logs to extract actual traded amounts. Requires SIWA (Sign-In With Agent) authentication.",
-                    tags: ["execution", "swap", "uniswap"],
-                    inputModes: ["application/json"],
-                    outputModes: ["application/json"],
                 },
                 {
                     id: "task-status",
@@ -159,9 +152,18 @@ async function handleTasksSend(rpc, ctx, reply) {
             : TOKENS.WETH);
         // Infer horizon from the natural language prompt if not explicitly provided
         const inferredHorizon = tradeParams.horizon ?? inferHorizonFromPrompt(tradeParams.prompt ?? "");
+        // Infer budget from the natural language prompt if not explicitly provided
+        let budget = tradeParams.budget ? BigInt(tradeParams.budget) : undefined;
+        if (!budget) {
+            const parsed = await inferBudgetFromPrompt(tradeParams.prompt ?? "");
+            if (parsed) {
+                budget = parsed.wei;
+                ctx.logger.info({ budget: parsed.description }, "Budget inferred from prompt");
+            }
+        }
         const request = {
             prompt: tradeParams.prompt,
-            budget: BigInt(tradeParams.budget ?? "1000000000000000000"), // default 1 ETH
+            budget: budget ?? BigInt("1000000000000000000"), // default 1 ETH if nothing detected
             budgetToken,
             walletAddress,
             horizon: inferredHorizon ?? "1w",
