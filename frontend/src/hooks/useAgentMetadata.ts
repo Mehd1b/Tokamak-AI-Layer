@@ -13,6 +13,13 @@ export interface CapabilityMeta {
   placeholder?: string;
 }
 
+export interface CustomUIMeta {
+  html: string;
+  cdnLinks?: string[];
+  embedApiVersion: string;
+  minHeight?: number;
+}
+
 interface AgentMetadata {
   name?: string;
   description?: string;
@@ -22,6 +29,7 @@ interface AgentMetadata {
   active?: boolean;
   services?: Record<string, string>;
   pricing?: AgentPricing;
+  customUI?: CustomUIMeta;
 }
 
 interface UseAgentMetadataResult {
@@ -33,6 +41,7 @@ interface UseAgentMetadataResult {
   active?: boolean;
   services?: Record<string, string>;
   pricing?: AgentPricing;
+  customUI?: CustomUIMeta;
   isLoading: boolean;
   error?: string;
 }
@@ -103,6 +112,7 @@ export function useAgentMetadata(agentURI: string | undefined): UseAgentMetadata
 
           // Parse ERC-8004 registration file structure
           const talCaps = data.tal?.capabilities;
+          const rawCustomUI = data.tal?.customUI;
           const parsed: AgentMetadata = {
             name: data.name || data.metadata?.name,
             description: data.description || data.metadata?.description,
@@ -114,6 +124,14 @@ export function useAgentMetadata(agentURI: string | undefined): UseAgentMetadata
             active: data.active !== undefined ? data.active : true,
             services: data.services || {},
             pricing: data.tal?.pricing || undefined,
+            customUI: rawCustomUI && typeof rawCustomUI.html === 'string'
+              ? {
+                  html: rawCustomUI.html,
+                  cdnLinks: Array.isArray(rawCustomUI.cdnLinks) ? rawCustomUI.cdnLinks : undefined,
+                  embedApiVersion: rawCustomUI.embedApiVersion || '1',
+                  minHeight: typeof rawCustomUI.minHeight === 'number' ? rawCustomUI.minHeight : undefined,
+                }
+              : undefined,
           };
 
           metadataCache.set(agentURI, parsed);
@@ -152,6 +170,7 @@ export function useAgentMetadata(agentURI: string | undefined): UseAgentMetadata
     active: metadata?.active,
     services: metadata?.services,
     pricing: metadata?.pricing,
+    customUI: metadata?.customUI,
     isLoading,
     error,
   };

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Upload, Plus, X, Info, Shield } from 'lucide-react';
+import { AgentCustomUI } from '@/components/AgentCustomUI';
 import { useWallet } from '@/hooks/useWallet';
 import { useRegisterAgent, useRegisterAgentV2 } from '@/hooks/useRegisterAgent';
 import { useL2Config } from '@/hooks/useL2Config';
@@ -45,6 +46,10 @@ export default function RegisterAgentPage() {
   const [newServiceUrl, setNewServiceUrl] = useState('');
   const [customServiceType, setCustomServiceType] = useState('');
   const [serviceUrlError, setServiceUrlError] = useState<string | null>(null);
+  const [customUIEnabled, setCustomUIEnabled] = useState(false);
+  const [customUICode, setCustomUICode] = useState('');
+  const [customUICdnLinks, setCustomUICdnLinks] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [ipfsUri, setIpfsUri] = useState<string | null>(null);
@@ -154,6 +159,11 @@ export default function RegisterAgentPage() {
     e.preventDefault();
     if (!name || !description) return;
 
+    if (customUIEnabled && customUICode.length > 51200) {
+      setUploadError('Custom UI code exceeds 50 KB limit');
+      return;
+    }
+
     // For StakeSecured/Hybrid, require at least one operator
     if (validationModel > 0 && !selfAsOperator) {
       setUploadError('Stake Secured, TEE Attested, and Hybrid models require at least one operator. Enable "Register yourself as operator".');
@@ -179,6 +189,14 @@ export default function RegisterAgentPage() {
           validationModel,
           ...(requestExample ? { requestExample } : {}),
           ...(feePerTask ? { pricing: { currency: 'TON', perRequest: feePerTask } } : {}),
+          ...(customUIEnabled && customUICode.trim() ? {
+            customUI: {
+              html: customUICode,
+              cdnLinks: customUICdnLinks.split('\n').map(l => l.trim()).filter(Boolean),
+              embedApiVersion: '1',
+              minHeight: 400,
+            }
+          } : {}),
         },
       };
 
@@ -649,6 +667,118 @@ export default function RegisterAgentPage() {
           </div>
         </div>
 
+        {/* Custom Interface */}
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-medium text-white">Custom Interface</h2>
+            <span className="text-xs text-white/30">Optional</span>
+          </div>
+
+          {/* Toggle */}
+          <label className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+            customUIEnabled
+              ? 'border-[#38BDF8]/50 bg-[#38BDF8]/5'
+              : 'border-white/10 bg-white/5 hover:border-white/20'
+          }`}>
+            <input
+              type="checkbox"
+              checked={customUIEnabled}
+              onChange={(e) => setCustomUIEnabled(e.target.checked)}
+              className="mt-1 accent-[#38BDF8]"
+            />
+            <div>
+              <span className="text-sm font-medium text-white">Enable custom agent interface</span>
+              <p className="mt-0.5 text-xs text-white/30">
+                Provide your own HTML/JS/CSS that will be embedded on your agent's page.
+                Users will interact with your agent through your custom UI instead of the default form.
+              </p>
+            </div>
+          </label>
+
+          {customUIEnabled && (
+            <div className="mt-4 space-y-4">
+              {/* API Info */}
+              <div className="rounded-lg border border-[#38BDF8]/20 bg-[#38BDF8]/5 p-4">
+                <p className="text-xs font-medium text-[#38BDF8] mb-2">TAL Embed Bridge API</p>
+                <div className="grid grid-cols-2 gap-2 text-xs text-[#38BDF8]/80 font-mono">
+                  <div>TAL.submitTask(input)</div>
+                  <div className="text-white/30">Submit a task to the agent</div>
+                  <div>TAL.onResult(callback)</div>
+                  <div className="text-white/30">Receive task results</div>
+                  <div>TAL.onError(callback)</div>
+                  <div className="text-white/30">Handle errors</div>
+                  <div>TAL.wallet.address</div>
+                  <div className="text-white/30">Connected wallet address</div>
+                  <div>TAL.agentId</div>
+                  <div className="text-white/30">Agent&apos;s on-chain ID</div>
+                  <div>TAL.resize(height)</div>
+                  <div className="text-white/30">Resize the iframe height</div>
+                </div>
+              </div>
+
+              {/* Code editor */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-white/60">
+                    HTML / JS / CSS Code
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <span className={`text-xs ${customUICode.length > 30000 ? 'text-amber-400' : customUICode.length > 50000 ? 'text-red-400' : 'text-white/30'}`}>
+                      {(customUICode.length / 1024).toFixed(1)} KB / 50 KB
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowPreview(true)}
+                      disabled={!customUICode.trim()}
+                      className="text-xs text-[#38BDF8] hover:underline disabled:opacity-40 disabled:no-underline"
+                    >
+                      Preview
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  value={customUICode}
+                  onChange={(e) => setCustomUICode(e.target.value)}
+                  rows={16}
+                  maxLength={51200}
+                  spellCheck={false}
+                  placeholder={`<div id="app">\n  <h3 style="color: #38BDF8; margin-bottom: 12px;">My Agent</h3>\n  <textarea id="input" rows="4" placeholder="Describe your request..."></textarea>\n  <button class="primary" onclick="handleSubmit()" style="margin-top: 8px;">Submit</button>\n  <div id="result" style="margin-top: 16px;"></div>\n</div>\n\n<script>\n  function handleSubmit() {\n    const input = document.getElementById('input').value;\n    if (!input.trim()) return;\n    document.getElementById('result').innerHTML = '<div class="loading"></div> Processing...';\n    TAL.submitTask(input);\n  }\n\n  TAL.onResult(function(result) {\n    document.getElementById('result').innerHTML =\n      '<pre style="white-space:pre-wrap; color:#a1a1aa;">' +\n      (typeof result.output === 'string' ? result.output : JSON.stringify(result, null, 2)) +\n      '</pre>';\n  });\n\n  TAL.onError(function(error) {\n    document.getElementById('result').innerHTML =\n      '<p style="color:#f87171;">' + error + '</p>';\n  });\n</script>`}
+                  className="w-full rounded-lg border border-white/10 bg-[#0d0d12] px-4 py-3 text-sm text-emerald-300 placeholder-zinc-700 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50 resize-y"
+                  style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', tabSize: 2 }}
+                />
+                {customUICode.length > 30000 && customUICode.length <= 50000 && (
+                  <p className="mt-1 text-xs text-amber-400">
+                    Code is large ({(customUICode.length / 1024).toFixed(1)} KB). Consider optimizing for faster IPFS loading.
+                  </p>
+                )}
+                {customUICode.length > 50000 && (
+                  <p className="mt-1 text-xs text-red-400">
+                    Code exceeds 50 KB limit. Please reduce the size.
+                  </p>
+                )}
+              </div>
+
+              {/* CDN Links */}
+              <div>
+                <label className="block text-sm font-medium text-white/60">
+                  CDN Links (optional, one per line)
+                </label>
+                <textarea
+                  value={customUICdnLinks}
+                  onChange={(e) => setCustomUICdnLinks(e.target.value)}
+                  rows={3}
+                  placeholder="https://cdn.tailwindcss.com\nhttps://unpkg.com/htmx.org@2.0.0"
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"
+                  style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' }}
+                />
+                <p className="mt-1 text-xs text-white/30">
+                  External CSS or JS libraries to load. Each URL on a separate line.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Submit */}
         <div className="flex justify-end gap-4">
           <Link href="/agents" className="btn-secondary">
@@ -727,6 +857,40 @@ export default function RegisterAgentPage() {
             {!hasFeeToSet && (
               <p className="mt-1 text-sm text-emerald-400">Redirecting to agents list...</p>
             )}
+          </div>
+        )}
+
+        {/* Custom UI Preview Modal */}
+        {showPreview && customUICode && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="mx-4 w-full max-w-3xl rounded-xl border border-white/10 bg-zinc-900 p-6 shadow-xl max-h-[90vh] flex flex-col">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white">Custom UI Preview</h3>
+                <button
+                  onClick={() => setShowPreview(false)}
+                  className="text-zinc-400 hover:text-white"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-auto rounded-lg border border-white/10 bg-[#0d0d12]">
+                <AgentCustomUI
+                  html={customUICode}
+                  cdnLinks={customUICdnLinks.split('\n').filter(l => l.trim())}
+                  agentId="preview"
+                  agentName={name || 'Preview Agent'}
+                  walletAddress={address}
+                  minHeight={400}
+                  onTaskSubmit={(input) => {
+                    alert('Task submitted (preview mode):\n\n' + input);
+                  }}
+                  taskResult={null}
+                />
+              </div>
+              <p className="mt-3 text-xs text-zinc-500">
+                This is a sandboxed preview. Task submissions will show an alert instead of executing.
+              </p>
+            </div>
           </div>
         )}
       </form>

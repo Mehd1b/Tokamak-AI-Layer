@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Send, Loader2, AlertCircle, CheckCircle, FileCode, FileText, Shield, CheckCircle2, XCircle, Coins } from 'lucide-react';
+import { Send, Loader2, AlertCircle, CheckCircle, FileCode, FileText, Shield, CheckCircle2, XCircle, Coins, Download } from 'lucide-react';
 import { useSubmitTask } from '@/hooks/useAgentRuntime';
 import { useRequestValidation, useRequestValidationOnChain } from '@/hooks/useValidation';
 import { StrategyReportView, isStrategyReport } from './StrategyReportView';
@@ -10,12 +10,173 @@ import { useAccount } from 'wagmi';
 import { formatEther } from 'viem';
 import { useL2Config } from '@/hooks/useL2Config';
 
+/** Detect trading strategy output (from trading-agent) */
+function isTradingStrategy(obj: unknown): obj is { strategy: { id: string; analysis: unknown; trades: unknown[] }; unsignedSwaps?: unknown[] } {
+  if (!obj || typeof obj !== 'object') return false;
+  const o = obj as Record<string, unknown>;
+  if (!o.strategy || typeof o.strategy !== 'object') return false;
+  const s = o.strategy as Record<string, unknown>;
+  return typeof s.id === 'string' && !!s.analysis && Array.isArray(s.trades);
+}
+
+/** Download a zip file from a URL */
+async function downloadZip(strategyId: string, agentBaseUrl: string) {
+  const url = `${agentBaseUrl}/api/v1/trade/${strategyId}/download`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Download failed: ${res.statusText}`);
+  const blob = await res.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = `trading-bot-${strategyId}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(blobUrl);
+}
+
+function TradingStrategyView({ data }: { data: { strategy: { id: string; analysis: { marketCondition: string; confidence: number; reasoning: string }; trades: Array<{ action: string; tokenIn: string; tokenOut: string; amountIn: string; poolFee: number; priceImpact: number }>; estimatedReturn?: { optimistic: number; expected: number; pessimistic: number } }; riskWarnings?: string[]; unsignedSwaps?: unknown[] } }) {
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const { strategy, riskWarnings } = data;
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      // Try to get agent base URL from current page context or fall back to a known URL
+      const agentBaseUrl = (window as { __TRADING_AGENT_URL__?: string }).__TRADING_AGENT_URL__ || '';
+      if (!agentBaseUrl) {
+        // Fallback: build the zip client-side by fetching from relative path
+        // or provide it from the API response
+        throw new Error('Agent URL not configured. Set window.__TRADING_AGENT_URL__');
+      }
+      await downloadZip(strategy.id, agentBaseUrl);
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : 'Download failed');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Market Analysis */}
+      <div className="flex items-center gap-3">
+        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+          strategy.analysis.marketCondition === 'bullish'
+            ? 'bg-emerald-500/20 text-emerald-400'
+            : strategy.analysis.marketCondition === 'bearish'
+            ? 'bg-red-500/20 text-red-400'
+            : 'bg-amber-500/20 text-amber-400'
+        }`}>
+          {strategy.analysis.marketCondition.toUpperCase()}
+        </span>
+        <span className="text-sm text-zinc-400">
+          Confidence: <span className="font-mono text-white">{strategy.analysis.confidence}%</span>
+        </span>
+      </div>
+      <p className="text-sm text-zinc-300">{strategy.analysis.reasoning}</p>
+
+      {/* Trades */}
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Trades ({strategy.trades.length})</p>
+        {strategy.trades.map((t, i) => (
+          <div key={i} className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2">
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-bold ${t.action === 'buy' ? 'text-emerald-400' : 'text-red-400'}`}>
+                {t.action.toUpperCase()}
+              </span>
+              <span className="text-xs font-mono text-zinc-300">{t.tokenIn.slice(0, 6)}...{t.tokenIn.slice(-4)}</span>
+              <span className="text-zinc-600">&rarr;</span>
+              <span className="text-xs font-mono text-zinc-300">{t.tokenOut.slice(0, 6)}...{t.tokenOut.slice(-4)}</span>
+            </div>
+            <div className="text-right text-xs">
+              <span className="text-zinc-400">Fee: {t.poolFee / 10000}%</span>
+              {t.priceImpact > 0 && (
+                <span className="ml-2 text-amber-400">Impact: {t.priceImpact.toFixed(2)}%</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Expected Returns */}
+      {strategy.estimatedReturn && (
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-lg bg-white/5 p-2 text-center">
+            <p className="text-[10px] text-zinc-500">Pessimistic</p>
+            <p className="text-sm font-mono text-red-400">{strategy.estimatedReturn.pessimistic}%</p>
+          </div>
+          <div className="rounded-lg bg-white/5 p-2 text-center">
+            <p className="text-[10px] text-zinc-500">Expected</p>
+            <p className="text-sm font-mono text-[#38BDF8]">{strategy.estimatedReturn.expected}%</p>
+          </div>
+          <div className="rounded-lg bg-white/5 p-2 text-center">
+            <p className="text-[10px] text-zinc-500">Optimistic</p>
+            <p className="text-sm font-mono text-emerald-400">{strategy.estimatedReturn.optimistic}%</p>
+          </div>
+        </div>
+      )}
+
+      {/* Risk Warnings */}
+      {riskWarnings && riskWarnings.length > 0 && (
+        <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-2">
+          <p className="text-xs font-medium text-amber-400 mb-1">Risk Warnings</p>
+          {riskWarnings.map((w, i) => (
+            <p key={i} className="text-xs text-amber-300">- {w}</p>
+          ))}
+        </div>
+      )}
+
+      {/* Download Bot Button */}
+      <div className="flex items-center gap-3 pt-2 border-t border-white/10">
+        <button
+          onClick={handleDownload}
+          disabled={downloading}
+          className="btn-primary inline-flex items-center gap-2 text-sm"
+        >
+          {downloading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Generating Bot...
+            </>
+          ) : (
+            <>
+              <Download className="h-4 w-4" />
+              Download Trading Bot (.zip)
+            </>
+          )}
+        </button>
+        <span className="text-xs text-zinc-500">Self-contained Node.js bot for this strategy</span>
+      </div>
+      {downloadError && (
+        <p className="text-xs text-red-400">{downloadError}</p>
+      )}
+
+      {/* Raw JSON toggle */}
+      <details className="mt-2">
+        <summary className="text-xs text-zinc-500 cursor-pointer hover:text-zinc-300">View raw JSON</summary>
+        <pre className="mt-1 whitespace-pre-wrap text-xs text-zinc-400 font-mono leading-relaxed">
+          {JSON.stringify(data, null, 2)}
+        </pre>
+      </details>
+    </div>
+  );
+}
+
 function FormattedOutput({ output }: { output: string | null }) {
   if (!output) return <p className="text-sm text-zinc-500">No output</p>;
 
   // Try to parse as JSON and check if it's a strategy report
   try {
     const parsed = JSON.parse(output);
+
+    // Check for trading strategy first
+    if (isTradingStrategy(parsed)) {
+      return <TradingStrategyView data={parsed as Parameters<typeof TradingStrategyView>[0]['data']} />;
+    }
+
     if (isStrategyReport(parsed)) {
       return <StrategyReportView report={parsed} />;
     }

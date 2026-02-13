@@ -22,6 +22,7 @@ import {
   Cpu,
   Trash2,
   AlertTriangle,
+  Code,
 } from 'lucide-react';
 import { useAgent, useCanReactivate, useReactivate } from '@/hooks/useAgent';
 import { useOperatorManagement } from '@/hooks/useOperatorManagement';
@@ -29,11 +30,12 @@ import { useDeregisterAgent } from '@/hooks/useDeregisterAgent';
 import { useFeedbackCount, useClientList, useFeedbacks } from '@/hooks/useReputation';
 import { FeedbackList } from '@/components/FeedbackList';
 import { useAgentValidations, useValidationStats } from '@/hooks/useValidation';
-import { useRuntimeAgent } from '@/hooks/useAgentRuntime';
+import { useRuntimeAgent, useSubmitTask } from '@/hooks/useAgentRuntime';
 import { useAgentMetadata } from '@/hooks/useAgentMetadata';
 import { useAgentFee } from '@/hooks/useTaskFee';
 import { useL2Config } from '@/hooks/useL2Config';
 import { TaskSubmission } from '@/components/TaskSubmission';
+import { AgentCustomUI } from '@/components/AgentCustomUI';
 import { formatEther } from 'viem';
 import { FeedbackModal } from '@/components/FeedbackModal';
 import { shortenAddress, getAgentStatusLabel, getAgentStatusColor, getValidationModelLabel, getValidationModelColor } from '@/lib/utils';
@@ -62,7 +64,7 @@ export default function AgentDetailPage() {
   const { validationHashes } = useAgentValidations(agentId);
   const { total: valTotal, failed: valFailed, failureRate: valFailureRate, isLoading: valStatsLoading } = useValidationStats(agentId);
   const { agent: runtimeAgent } = useRuntimeAgent(agentId?.toString());
-  const { name: metaName, description: metaDescription, capabilities: metaCapabilities, talCapabilities: metaTalCapabilities, requestExample: metaRequestExample, services: metaServices, active: metaActive, pricing: metaPricing } = useAgentMetadata(agent?.agentURI);
+  const { name: metaName, description: metaDescription, capabilities: metaCapabilities, talCapabilities: metaTalCapabilities, requestExample: metaRequestExample, services: metaServices, active: metaActive, pricing: metaPricing, customUI: metaCustomUI } = useAgentMetadata(agent?.agentURI);
   const { data: onChainFee } = useAgentFee(agentId);
   const { nativeCurrency } = useL2Config();
   const { address } = useWallet();
@@ -75,6 +77,22 @@ export default function AgentDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAddOperator, setShowAddOperator] = useState(false);
   const [newOperatorAddress, setNewOperatorAddress] = useState('');
+  const [customTaskResult, setCustomTaskResult] = useState<{ output: string; status: string; taskId: string } | null>(null);
+  const [useBasicInterface, setUseBasicInterface] = useState(false);
+
+  const { submitTask: submitCustomTask } = useSubmitTask();
+
+  const handleCustomTaskSubmit = async (input: string) => {
+    setCustomTaskResult(null);
+    try {
+      const result = await submitCustomTask(agentId!.toString(), input);
+      if (result) {
+        setCustomTaskResult({ output: result.output || '', status: result.status, taskId: result.taskId });
+      }
+    } catch (err) {
+      setCustomTaskResult({ output: '', status: 'failed', taskId: '' });
+    }
+  };
 
   const copyAddress = (addr: string) => {
     navigator.clipboard.writeText(addr);
@@ -519,25 +537,72 @@ export default function AgentDetailPage() {
       {/* Use Agent */}
       {hasRuntime && (
         <div className="mt-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm transition-all duration-300">
-          <div className="mb-4 flex items-center gap-2">
-            <Play className="h-5 w-5 text-[#38BDF8]" />
-            <h2 className="text-lg font-medium text-white">
-              Use {agentDisplayName}
-            </h2>
-          </div>
-          {metaRequestExample && (
-            <div className="mb-4 rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-              <p className="mb-1 text-xs font-medium text-white/30">Example request</p>
-              <p className="text-sm text-white/50 italic">{metaRequestExample}</p>
-            </div>
+          {metaCustomUI?.html && !useBasicInterface ? (
+            <>
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Play className="h-5 w-5 text-[#38BDF8]" />
+                  <h2 className="text-lg font-medium text-white">
+                    Use {agentDisplayName}
+                  </h2>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center gap-1 text-xs text-zinc-500">
+                    <Code className="h-3 w-3" /> Custom Interface
+                  </span>
+                  <button
+                    onClick={() => setUseBasicInterface(true)}
+                    className="text-xs text-zinc-500 hover:text-white underline"
+                  >
+                    Switch to basic
+                  </button>
+                </div>
+              </div>
+              <AgentCustomUI
+                html={metaCustomUI.html}
+                cdnLinks={metaCustomUI.cdnLinks}
+                agentId={agentId!.toString()}
+                agentName={agentDisplayName}
+                walletAddress={address}
+                minHeight={metaCustomUI.minHeight}
+                onTaskSubmit={handleCustomTaskSubmit}
+                taskResult={customTaskResult}
+                feePerTask={onChainFee}
+              />
+            </>
+          ) : (
+            <>
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Play className="h-5 w-5 text-[#38BDF8]" />
+                  <h2 className="text-lg font-medium text-white">
+                    Use {agentDisplayName}
+                  </h2>
+                </div>
+                {metaCustomUI?.html && useBasicInterface && (
+                  <button
+                    onClick={() => setUseBasicInterface(false)}
+                    className="flex items-center gap-1 text-xs text-[#38BDF8] hover:underline"
+                  >
+                    <Code className="h-3 w-3" /> Use custom interface
+                  </button>
+                )}
+              </div>
+              {metaRequestExample && (
+                <div className="mb-4 rounded-lg border border-white/10 bg-white/5 px-4 py-3">
+                  <p className="mb-1 text-xs font-medium text-white/30">Example request</p>
+                  <p className="text-sm text-white/50 italic">{metaRequestExample}</p>
+                </div>
+              )}
+              <TaskSubmission
+                agentId={agentId!.toString()}
+                agentName={agentDisplayName}
+                placeholder={placeholder}
+                onChainAgentId={agentId}
+                feePerTask={onChainFee}
+              />
+            </>
           )}
-          <TaskSubmission
-            agentId={agentId!.toString()}
-            agentName={agentDisplayName}
-            placeholder={placeholder}
-            onChainAgentId={agentId}
-            feePerTask={onChainFee}
-          />
         </div>
       )}
 

@@ -60,6 +60,16 @@ export interface AgentRegistrationFile {
         yearly?: string;
       };
     };
+    customUI?: {
+      /** Custom HTML/CSS/JS code for the agent's interaction interface */
+      html: string;
+      /** Optional CDN links to inject (CSS frameworks, libraries) */
+      cdnLinks?: string[];
+      /** Version of the TAL Embed Bridge API the UI targets */
+      embedApiVersion: string;
+      /** Minimum iframe height in pixels */
+      minHeight?: number;
+    };
   };
 }
 

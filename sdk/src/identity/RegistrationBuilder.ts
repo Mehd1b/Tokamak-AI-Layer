@@ -115,6 +115,24 @@ export class RegistrationBuilder {
     return this;
   }
 
+  setCustomUI(config: {
+    html: string;
+    cdnLinks?: string[];
+    embedApiVersion?: string;
+    minHeight?: number;
+  }): this {
+    if (!this.data.tal) {
+      this.data.tal = {};
+    }
+    this.data.tal.customUI = {
+      html: config.html,
+      cdnLinks: config.cdnLinks,
+      embedApiVersion: config.embedApiVersion ?? '1',
+      minHeight: config.minHeight ?? 400,
+    };
+    return this;
+  }
+
   build(): AgentRegistrationFile {
     const result = this.validate();
     if (!result.valid) {

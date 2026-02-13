@@ -1,0 +1,27 @@
+{
+  "name": "tal-trading-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-Powered Trading Agent on Tokamak Agent Layer",
+  "packageManager": "pnpm@10.8.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "dev": "cd packages/agent-server && pnpm dev",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean",
+    "register": "tsx scripts/register-agent.ts"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.4",
+    "viem": "^2.21.0"
+  }
+}

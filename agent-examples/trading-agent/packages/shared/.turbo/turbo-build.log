@@ -1,0 +1,4 @@
+
+> @tal-trading-agent/shared@0.1.0 build /Users/mehdiberiane/Documents/tokamak/TAL/Tokamak-AI-Layer/agent-examples/trading-agent/packages/shared
+> tsc --build
+
