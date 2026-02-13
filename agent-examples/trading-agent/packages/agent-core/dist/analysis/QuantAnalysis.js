@@ -1,5 +1,5 @@
 import pino from "pino";
-import { DEFILLAMA, HORIZON_TO_LLAMA_CHART, MIN_DATA_POINTS } from "@tal-trading-agent/shared";
+import { DEFILLAMA, HORIZON_MS, MIN_DATA_POINTS } from "@tal-trading-agent/shared";
 const logger = pino({ name: "quant-analysis" });
 // ── QuantAnalysis ───────────────────────────────────────────
 export class QuantAnalysis {
@@ -24,24 +24,57 @@ export class QuantAnalysis {
         }
     }
     /**
-     * Fetch historical price data from DeFiLlama chart API.
-     * Period is determined by the trading horizon.
+     * Fetch historical price data by sampling individual timestamps via
+     * DeFiLlama's /prices/historical endpoint.
+     *
+     * The chart endpoint returns too few data points for reliable indicators,
+     * so we build the price series ourselves using evenly spaced timestamps.
      */
     async getHistoricalPrices(tokenAddress, horizon = "1w") {
         try {
             const coinId = `ethereum:${tokenAddress}`;
-            const chartParams = HORIZON_TO_LLAMA_CHART[horizon];
-            const url = `${DEFILLAMA.chartUrl}/${encodeURIComponent(coinId)}?period=${chartParams.period}&span=${chartParams.span}`;
-            const response = await fetch(url);
-            if (!response.ok) {
-                logger.warn({ tokenAddress, status: response.status, period: chartParams.period }, "DeFiLlama chart request failed");
+            const periodMs = HORIZON_MS[horizon];
+            const targetPoints = MIN_DATA_POINTS[horizon];
+            // Build evenly spaced timestamps from (now - period) to now
+            const now = Math.floor(Date.now() / 1000);
+            const start = now - Math.floor(periodMs / 1000);
+            const step = Math.floor((now - start) / targetPoints);
+            const timestamps = [];
+            for (let t = start; t <= now; t += step) {
+                timestamps.push(t);
+            }
+            // Fetch prices in parallel batches (max 10 concurrent)
+            const BATCH_SIZE = 10;
+            const prices = [];
+            for (let i = 0; i < timestamps.length; i += BATCH_SIZE) {
+                const batch = timestamps.slice(i, i + BATCH_SIZE);
+                const results = await Promise.all(batch.map(async (ts) => {
+                    try {
+                        const url = `${DEFILLAMA.pricesUrl.replace("/current", `/historical/${ts}`)}/${encodeURIComponent(coinId)}`;
+                        const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+                        if (!response.ok)
+                            return null;
+                        const data = (await response.json());
+                        const price = data.coins[coinId]?.price;
+                        return price && price > 0 ? { ts, price } : null;
+                    }
+                    catch {
+                        return null;
+                    }
+                }));
+                for (const r of results) {
+                    if (r)
+                        prices.push(r);
+                }
+            }
+            if (prices.length === 0) {
+                logger.warn({ tokenAddress, horizon }, "No historical prices fetched");
                 return [];
             }
-            const data = (await response.json());
-            const points = data.coins[coinId]?.prices ?? [];
-            // Sort ascending by timestamp and extract prices
-            points.sort((a, b) => a.timestamp - b.timestamp);
-            return points.map((p) => p.price);
+            // Sort ascending by timestamp and return price values
+            prices.sort((a, b) => a.ts - b.ts);
+            logger.info({ tokenAddress, horizon, dataPoints: prices.length }, "Historical prices fetched");
+            return prices.map((p) => p.price);
         }
         catch (error) {
             logger.error({ tokenAddress, error }, "Failed to fetch historical prices");

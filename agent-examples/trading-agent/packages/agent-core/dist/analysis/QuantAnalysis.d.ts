@@ -28,8 +28,11 @@ export declare class QuantAnalysis {
      */
     getCurrentPrice(tokenAddress: Address): Promise<number>;
     /**
-     * Fetch historical price data from DeFiLlama chart API.
-     * Period is determined by the trading horizon.
+     * Fetch historical price data by sampling individual timestamps via
+     * DeFiLlama's /prices/historical endpoint.
+     *
+     * The chart endpoint returns too few data points for reliable indicators,
+     * so we build the price series ourselves using evenly spaced timestamps.
      */
     getHistoricalPrices(tokenAddress: Address, horizon?: TradeRequest["horizon"]): Promise<number[]>;
     /**

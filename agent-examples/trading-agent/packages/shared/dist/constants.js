@@ -78,16 +78,18 @@ export const HORIZON_TO_LLAMA_PERIOD = {
     "6m": "180d",
     "1y": "365d",
 };
-// ── Minimum data points per horizon for reliable indicators ─
+// ── Target data points per horizon ──────────────────────
+// Used both as the fetch target and the threshold for data quality.
+// RSI needs 15, MACD needs 27, Bollinger needs 20.
 export const MIN_DATA_POINTS = {
-    "1h": 5,
-    "4h": 10,
-    "1d": 15,
-    "1w": 20,
+    "1h": 15,
+    "4h": 20,
+    "1d": 30,
+    "1w": 30,
     "1m": 30,
-    "3m": 50,
-    "6m": 80,
-    "1y": 100,
+    "3m": 45,
+    "6m": 45,
+    "1y": 60,
 };
 // ── Risk Presets per tolerance ───────────────────────────
 export const RISK_PRESETS = {
