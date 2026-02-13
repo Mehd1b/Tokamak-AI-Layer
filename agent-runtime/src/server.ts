@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import { config } from './config.js';
 import { SummarizerAgent } from './agents/SummarizerAgent.js';
 import { AuditorAgent } from './agents/AuditorAgent.js';
@@ -16,12 +17,43 @@ agents.set('summarizer', new SummarizerAgent());
 agents.set('auditor', new AuditorAgent());
 agents.set('validator', new ValidatorAgent());
 
+// Assign on-chain IDs from config
+for (const [name, onChainId] of config.AGENT_ONCHAIN_IDS) {
+  const agent = agents.get(name);
+  if (agent) {
+    agent.onChainId = onChainId;
+    console.log(`[INIT] Agent '${name}' assigned on-chain ID ${onChainId}`);
+  } else {
+    console.warn(`[INIT] AGENT_ONCHAIN_IDS references unknown agent '${name}' — skipped`);
+  }
+}
+
 // Create Express app
 const app = express();
+
+// Global rate limiter: 100 requests per 15 minutes per IP
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 100,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+});
+
+// Task-specific rate limiter: 10 POST requests per minute per IP
+const taskLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  skip: (req) => req.method !== 'POST',
+  message: { error: 'Too many task submissions, please try again later' },
+});
 
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
+app.use(globalLimiter);
 
 // Health check
 app.get('/health', (_req, res) => {
@@ -56,7 +88,7 @@ app.get('/api', (_req, res) => {
 
 // Routes
 app.use('/api/agents', createAgentRoutes(agents));
-app.use('/api/tasks', createTaskRoutes(agents));
+app.use('/api/tasks', taskLimiter, createTaskRoutes(agents));
 app.use('/api/validations', createValidationRoutes(agents));
 
 // Error handler

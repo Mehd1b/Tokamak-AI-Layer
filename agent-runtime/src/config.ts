@@ -13,6 +13,18 @@ function optional(key: string, fallback: string): string {
   return process.env[key] || fallback;
 }
 
+function parseAgentOnChainIds(raw: string): Map<string, bigint> {
+  const map = new Map<string, bigint>();
+  if (!raw.trim()) return map;
+  for (const pair of raw.split(',')) {
+    const [name, id] = pair.trim().split(':');
+    if (name && id) {
+      map.set(name.trim(), BigInt(id.trim()));
+    }
+  }
+  return map;
+}
+
 export const config = {
   // LLM
   OPENAI_API_KEY: required('OPENAI_API_KEY'),
@@ -51,4 +63,7 @@ export const config = {
 
   // Storage
   STORAGE_DIR: optional('STORAGE_DIR', './data'),
-} as const;
+
+  // Agent on-chain ID mapping (format: "summarizer:1,auditor:2,validator:3")
+  AGENT_ONCHAIN_IDS: parseAgentOnChainIds(process.env.AGENT_ONCHAIN_IDS || ''),
+};
