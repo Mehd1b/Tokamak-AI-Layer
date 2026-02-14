@@ -71,7 +71,7 @@ export async function generateBotZip(strategy) {
             `# Trading Bot — Environment Configuration`,
             `# ═══════════════════════════════════════════════════════════`,
             `#`,
-            `# 1. Copy this file:  cp .env.example .env`,
+            `# 1. Copy this file:  cp env.example .env`,
             `# 2. Fill in YOUR_KEY values below`,
             `# 3. Run the bot:     npm start`,
             `#`,
@@ -137,7 +137,7 @@ export async function generateBotZip(strategy) {
                 }
             }
         }
-        archive.append(envLines.join("\n"), { name: `${prefix}/.env.example` });
+        archive.append(envLines.join("\n"), { name: `${prefix}/env.example` });
         // ── Dockerfile ────────────────────────────────────────
         archive.append([
             `FROM node:20-alpine`,
@@ -786,7 +786,7 @@ export async function generateBotZip(strategy) {
             `npm install`,
             ``,
             `# 2. Configure environment`,
-            `cp .env.example .env`,
+            `cp env.example .env`,
             `# Edit .env with your RPC URL and private key`,
             ``,
             `# 3. Run the bot`,
