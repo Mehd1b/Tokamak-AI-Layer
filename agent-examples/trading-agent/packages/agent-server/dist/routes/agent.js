@@ -69,12 +69,6 @@ export async function agentRoutes(app, ctx) {
                     endpoint: "POST /api/v1/trade/analyze",
                 },
                 {
-                    id: "trade-execution",
-                    name: "Trade Execution",
-                    description: "Broadcasts user-signed transactions to Ethereum mainnet and monitors to confirmation. Parses Uniswap V3 Swap event logs. Requires SIWA authentication. Agent never holds private keys.",
-                    endpoint: "POST /api/v1/trade/execute",
-                },
-                {
                     id: "bot-download",
                     name: "Downloadable Trading Bot",
                     description: "Generates a self-contained Node.js bot (.zip) with auto-executing stop-loss/take-profit/trailing-stop listener, ERC-20 approval handling, DCA scheduler, portfolio rebalancer, and pre-configured strategy. Runs via npm start or Docker.",

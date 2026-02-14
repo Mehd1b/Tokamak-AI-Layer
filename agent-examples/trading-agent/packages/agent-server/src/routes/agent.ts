@@ -78,13 +78,6 @@ export async function agentRoutes(app: FastifyInstance, ctx: AppContext) {
           endpoint: "POST /api/v1/trade/analyze",
         },
         {
-          id: "trade-execution",
-          name: "Trade Execution",
-          description:
-            "Broadcasts user-signed transactions to Ethereum mainnet and monitors to confirmation. Parses Uniswap V3 Swap event logs. Requires SIWA authentication. Agent never holds private keys.",
-          endpoint: "POST /api/v1/trade/execute",
-        },
-        {
           id: "bot-download",
           name: "Downloadable Trading Bot",
           description:
