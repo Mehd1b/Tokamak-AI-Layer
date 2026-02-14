@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Upload, Plus, X, Info, Shield, Globe } from 'lucide-react';
+import { ArrowLeft, Upload, X, Info, Shield, Globe } from 'lucide-react';
 import { AgentCustomUI } from '@/components/AgentCustomUI';
 import { useWallet } from '@/hooks/useWallet';
 import { useRegisterAgent, useRegisterAgentV2 } from '@/hooks/useRegisterAgent';
@@ -11,13 +11,6 @@ import { useL2Config } from '@/hooks/useL2Config';
 import { useSetAgentFee } from '@/hooks/useTaskFee';
 import { parseEther } from 'viem';
 import { shortenAddress } from '@/lib/utils';
-
-interface Capability {
-  id: string;
-  name: string;
-  description: string;
-  placeholder: string;
-}
 
 const VALIDATION_MODELS = [
   { value: 0, label: 'Reputation Only', description: 'Lightweight feedback-based trust. No operators required.' },
@@ -40,7 +33,6 @@ export default function RegisterAgentPage() {
   const [validationModel, setValidationModel] = useState(0);
   const [selfAsOperator, setSelfAsOperator] = useState(true);
   const [services, setServices] = useState<Record<string, string>>({});
-  const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [requestExample, setRequestExample] = useState('');
   const [socialX, setSocialX] = useState('');
   const [socialWebsite, setSocialWebsite] = useState('');
@@ -97,27 +89,6 @@ export default function RegisterAgentPage() {
       delete next[key];
       return next;
     });
-  };
-
-  const addCapability = () => {
-    setCapabilities((prev) => [
-      ...prev,
-      { id: `cap-${Date.now()}`, name: '', description: '', placeholder: '' },
-    ]);
-  };
-
-  const updateCapability = (
-    index: number,
-    field: keyof Capability,
-    value: string,
-  ) => {
-    setCapabilities((prev) =>
-      prev.map((cap, i) => (i === index ? { ...cap, [field]: value } : cap)),
-    );
-  };
-
-  const removeCapability = (index: number) => {
-    setCapabilities((prev) => prev.filter((_, i) => i !== index));
   };
 
   const getServicePlaceholder = (type: string): string => {
@@ -193,7 +164,6 @@ export default function RegisterAgentPage() {
           Object.entries(services).filter(([, v]) => v.trim() !== ''),
         ),
         tal: {
-          capabilities: capabilities.filter((c) => c.name && c.description),
           validationModel,
           ...(requestExample ? { requestExample } : {}),
           ...(feePerTask ? { pricing: { currency: 'TON', perRequest: feePerTask } } : {}),
@@ -637,82 +607,6 @@ export default function RegisterAgentPage() {
               </p>
             </div>
           )}
-        </div>
-
-        {/* Capabilities */}
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-medium text-white">
-              Capabilities
-            </h2>
-            <button
-              type="button"
-              onClick={addCapability}
-              className="btn-secondary flex items-center gap-1 text-xs"
-            >
-              <Plus className="h-3 w-3" /> Add Capability
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            {capabilities.map((cap, i) => (
-              <div key={cap.id} className="rounded-lg border border-white/10 p-4">
-                <div className="mb-2 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => removeCapability(i)}
-                    className="text-zinc-600 hover:text-red-500"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    type="text"
-                    list="capability-suggestions"
-                    value={cap.name}
-                    onChange={(e) => updateCapability(i, 'name', e.target.value)}
-                    placeholder="Capability name"
-                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600"
-                  />
-                  <input
-                    type="text"
-                    value={cap.description}
-                    onChange={(e) =>
-                      updateCapability(i, 'description', e.target.value)
-                    }
-                    placeholder="Description"
-                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600"
-                  />
-                </div>
-                <textarea
-                  value={cap.placeholder}
-                  onChange={(e) => updateCapability(i, 'placeholder', e.target.value)}
-                  placeholder="Input hint shown to users (e.g. 'Describe your yield strategy preferences...')"
-                  rows={2}
-                  className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600"
-                />
-              </div>
-            ))}
-
-            {capabilities.length === 0 && (
-              <p className="text-center text-sm text-zinc-500">
-                No capabilities added yet.
-              </p>
-            )}
-            <datalist id="capability-suggestions">
-              <option value="text-summarization" />
-              <option value="code-generation" />
-              <option value="solidity-audit" />
-              <option value="yield-optimization" />
-              <option value="data-analysis" />
-              <option value="translation" />
-              <option value="image-generation" />
-              <option value="sentiment-analysis" />
-              <option value="portfolio-management" />
-              <option value="smart-contract-review" />
-            </datalist>
-          </div>
         </div>
 
         {/* Custom Interface */}
