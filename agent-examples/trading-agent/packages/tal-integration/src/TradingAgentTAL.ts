@@ -371,19 +371,6 @@ export class TradingAgentTAL {
             },
           },
           {
-            id: "trade-execution",
-            name: "Trade Execution",
-            description:
-              "Broadcasts user-signed transactions to Ethereum mainnet. Parses Uniswap V3 Swap event logs for actual traded amounts. Requires SIWA authentication.",
-            inputSchema: {
-              type: "object",
-              properties: {
-                strategyId: { type: "string" },
-                signedTransaction: { type: "string" },
-              },
-            },
-          },
-          {
             id: "bot-download",
             name: "Downloadable Trading Bot",
             description:

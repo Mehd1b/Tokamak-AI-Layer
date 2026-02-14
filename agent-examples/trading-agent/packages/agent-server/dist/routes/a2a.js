@@ -53,14 +53,6 @@ export async function a2aRoutes(app, ctx) {
                     inputModes: ["application/json"],
                     outputModes: ["application/octet-stream"],
                 },
-                {
-                    id: "task-status",
-                    name: "Task Status",
-                    description: "Check the status and results of a previously submitted trade analysis task. Returns the full strategy, artifacts, and escrow confirmation status.",
-                    tags: ["status", "query"],
-                    inputModes: ["application/json"],
-                    outputModes: ["application/json"],
-                },
             ],
         });
     });
