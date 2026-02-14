@@ -56,11 +56,32 @@ export interface QuantScore {
   tokenAddress: Address;
   symbol: string;
   indicators: {
+    // Existing
     rsi: number;
     macd: { value: number; signal: number; histogram: number };
     bollingerBands: { upper: number; middle: number; lower: number };
     vwap: number;
     momentum: number;
+
+    // New — Trend
+    adx: { adx: number; plusDI: number; minusDI: number };
+    aroon: { up: number; down: number; oscillator: number };
+
+    // New — Oscillators
+    stochasticRsi: { k: number; d: number; raw: number };
+    williamsR: number;
+    roc: number;
+
+    // New — Volatility
+    atr: { atr: number; atrPercent: number };
+    historicalVolatility: { dailyVol: number; annualizedVol: number };
+
+    // New — Derived
+    vwapDeviation: number;
+    bollingerPosition: { percentB: number; bandwidth: number };
+
+    // New — Composite
+    trendStrengthComposite: number;
   };
   defiMetrics: {
     liquidityDepth: number;

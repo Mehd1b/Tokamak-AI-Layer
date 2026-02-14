@@ -58,6 +58,37 @@ export interface QuantScore {
         };
         vwap: number;
         momentum: number;
+        adx: {
+            adx: number;
+            plusDI: number;
+            minusDI: number;
+        };
+        aroon: {
+            up: number;
+            down: number;
+            oscillator: number;
+        };
+        stochasticRsi: {
+            k: number;
+            d: number;
+            raw: number;
+        };
+        williamsR: number;
+        roc: number;
+        atr: {
+            atr: number;
+            atrPercent: number;
+        };
+        historicalVolatility: {
+            dailyVol: number;
+            annualizedVol: number;
+        };
+        vwapDeviation: number;
+        bollingerPosition: {
+            percentB: number;
+            bandwidth: number;
+        };
+        trendStrengthComposite: number;
     };
     defiMetrics: {
         liquidityDepth: number;

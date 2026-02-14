@@ -1,7 +1,7 @@
 import type { Address, PublicClient } from "viem";
 import { getAddress } from "viem";
 import pino from "pino";
-import { UNISWAP_V3, FEE_TIERS, TOKENS, DEFILLAMA } from "@tal-trading-agent/shared";
+import { UNISWAP_V3, FEE_TIERS, WETH_ADDRESS, DEFILLAMA } from "@tal-trading-agent/shared";
 import type { PoolData, TokenInfo } from "@tal-trading-agent/shared";
 
 const logger = pino({ name: "pool-analyzer" });
@@ -253,7 +253,7 @@ export class PoolAnalyzer {
     tokens: Address[],
     limit: number = 10,
   ): Promise<PoolData[]> {
-    const quoteToken = TOKENS.WETH;
+    const quoteToken = WETH_ADDRESS;
     const poolPromises: Promise<PoolData | null>[] = [];
 
     for (const token of tokens) {

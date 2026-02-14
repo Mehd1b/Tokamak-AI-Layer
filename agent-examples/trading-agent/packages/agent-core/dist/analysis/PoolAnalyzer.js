@@ -1,6 +1,6 @@
 import { getAddress } from "viem";
 import pino from "pino";
-import { UNISWAP_V3, FEE_TIERS, TOKENS, DEFILLAMA } from "@tal-trading-agent/shared";
+import { UNISWAP_V3, FEE_TIERS, WETH_ADDRESS, DEFILLAMA } from "@tal-trading-agent/shared";
 const logger = pino({ name: "pool-analyzer" });
 // ── Minimal ABIs ────────────────────────────────────────────
 const factoryAbi = [
@@ -211,7 +211,7 @@ export class PoolAnalyzer {
      * pools sorted by liquidity (descending).
      */
     async getTopPools(tokens, limit = 10) {
-        const quoteToken = TOKENS.WETH;
+        const quoteToken = WETH_ADDRESS;
         const poolPromises = [];
         for (const token of tokens) {
             if (getAddress(token) === getAddress(quoteToken))

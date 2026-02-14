@@ -7,6 +7,7 @@ import { loadConfig, type AppConfig, type TradingStrategy, type ExecutionResult 
 import { PoolAnalyzer } from "@tal-trading-agent/agent-core";
 import { QuantAnalysis } from "@tal-trading-agent/agent-core";
 import { TokenScorer } from "@tal-trading-agent/agent-core";
+import { TokenPreFilter } from "@tal-trading-agent/agent-core";
 import { StrategyEngine } from "@tal-trading-agent/agent-core";
 import { RiskManager } from "@tal-trading-agent/agent-core";
 import { TradeExecutor } from "@tal-trading-agent/agent-core";
@@ -22,6 +23,7 @@ export interface AppContext {
   poolAnalyzer: PoolAnalyzer;
   quantAnalysis: QuantAnalysis;
   tokenScorer: TokenScorer;
+  tokenPreFilter: TokenPreFilter;
   strategyEngine: StrategyEngine;
   riskManager: RiskManager;
   tradeExecutor: TradeExecutor;
@@ -70,6 +72,7 @@ export async function buildContext(): Promise<AppContext> {
   const poolAnalyzer = new PoolAnalyzer(ethClient);
   const quantAnalysis = new QuantAnalysis();
   const tokenScorer = new TokenScorer(ethClient);
+  const tokenPreFilter = new TokenPreFilter(ethClient);
   const strategyEngine = new StrategyEngine({
     anthropicApiKey: config.anthropicApiKey,
   });
@@ -97,6 +100,7 @@ export async function buildContext(): Promise<AppContext> {
     poolAnalyzer,
     quantAnalysis,
     tokenScorer,
+    tokenPreFilter,
     strategyEngine,
     riskManager,
     tradeExecutor,

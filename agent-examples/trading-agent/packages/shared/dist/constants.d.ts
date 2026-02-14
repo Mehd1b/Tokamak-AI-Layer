@@ -17,18 +17,8 @@ export declare const UNISWAP_V2: {
     readonly factory: Address;
     readonly router: Address;
 };
-export declare const TOKENS: {
-    readonly WETH: Address;
-    readonly USDC: Address;
-    readonly USDT: Address;
-    readonly DAI: Address;
-    readonly WBTC: Address;
-    readonly UNI: Address;
-    readonly LINK: Address;
-    readonly AAVE: Address;
-    readonly MKR: Address;
-    readonly SNX: Address;
-};
+export { TOKENS, WETH_ADDRESS, TOKEN_REGISTRY } from "./tokens.js";
+export type { TokenMeta, TokenCategory } from "./tokens.js";
 export declare const FEE_TIERS: readonly [100, 500, 3000, 10000];
 export declare const DEFILLAMA: {
     readonly pricesUrl: "https://coins.llama.fi/prices/current";

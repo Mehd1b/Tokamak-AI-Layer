@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import pino from "pino";
-import { TOKENS, HORIZON_MS, RISK_PRESETS } from "@tal-trading-agent/shared";
+import { TOKEN_REGISTRY, HORIZON_MS, RISK_PRESETS } from "@tal-trading-agent/shared";
 const DEFAULT_MODEL = "claude-sonnet-4-5-20250929";
 // ── Mode Resolution ─────────────────────────────────────
 function resolveMode(horizon) {
@@ -31,7 +31,7 @@ export class StrategyEngine {
     async generateStrategy(request, candidates) {
         const mode = resolveMode(request.horizon);
         this.log.info({ horizon: request.horizon, mode, riskTolerance: request.riskTolerance, candidateCount: candidates.length }, "Generating trading strategy via LLM");
-        const systemPrompt = this.buildSystemPrompt(mode, request.riskTolerance);
+        const systemPrompt = this.buildSystemPrompt(mode, request.riskTolerance, candidates);
         const userMessage = this.buildUserMessage(request, candidates, mode);
         let llmResponse;
         let llmReasoning;
@@ -83,9 +83,12 @@ export class StrategyEngine {
         return strategy;
     }
     // ── System Prompt Builder ─────────────────────────────
-    buildSystemPrompt(mode, riskTolerance) {
-        const tokenList = Object.entries(TOKENS)
-            .map(([symbol, address]) => `  - ${symbol}: ${address}`)
+    buildSystemPrompt(mode, riskTolerance, candidates) {
+        // Only include the scored candidate tokens in the prompt, not all 103
+        const candidateSymbols = new Set(candidates.map((c) => c.symbol));
+        const relevantTokens = TOKEN_REGISTRY.filter((t) => candidateSymbols.has(t.symbol));
+        const tokenList = relevantTokens
+            .map((t) => `  - ${t.symbol} (${t.category}): ${t.address}`)
             .join("\n");
         const riskPreset = RISK_PRESETS[riskTolerance];
         const modeGuidance = this.getModeGuidance(mode);

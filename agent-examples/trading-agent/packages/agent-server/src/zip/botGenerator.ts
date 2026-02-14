@@ -1,5 +1,5 @@
 import type { TradingStrategy } from "@tal-trading-agent/shared";
-import { UNISWAP_V3, TOKENS } from "@tal-trading-agent/shared";
+import { UNISWAP_V3, WETH_ADDRESS } from "@tal-trading-agent/shared";
 
 /**
  * Generates a zip buffer containing a self-contained trading bot repo
@@ -20,7 +20,7 @@ export async function generateBotZip(strategy: TradingStrategy): Promise<Buffer>
     const prefix = `trading-bot-${strategy.id}`;
     const swapRouterAddr = UNISWAP_V3.swapRouter;
     const quoterAddr = UNISWAP_V3.quoterV2;
-    const wethAddr = TOKENS.WETH;
+    const wethAddr = WETH_ADDRESS;
     const isInvestment = strategy.mode === "investment";
     const isDCA =
       isInvestment && strategy.investmentPlan?.entryStrategy === "dca";

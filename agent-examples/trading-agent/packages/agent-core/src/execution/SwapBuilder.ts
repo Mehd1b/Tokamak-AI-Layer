@@ -1,7 +1,7 @@
 import type { Address, Hex } from "viem";
 import { encodeFunctionData, encodePacked } from "viem";
 import pino from "pino";
-import { UNISWAP_V3, TOKENS } from "@tal-trading-agent/shared";
+import { UNISWAP_V3, WETH_ADDRESS } from "@tal-trading-agent/shared";
 import type { TradeAction, UnsignedSwap } from "@tal-trading-agent/shared";
 
 const logger = pino({ name: "swap-builder" });
@@ -293,6 +293,6 @@ export class SwapBuilder {
 
   /** Check if the address is WETH (native ETH wrapper) */
   private isWETH(address: Address): boolean {
-    return address.toLowerCase() === TOKENS.WETH.toLowerCase();
+    return address.toLowerCase() === WETH_ADDRESS.toLowerCase();
   }
 }

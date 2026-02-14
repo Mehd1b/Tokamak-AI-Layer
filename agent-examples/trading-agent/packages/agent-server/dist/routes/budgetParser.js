@@ -1,4 +1,4 @@
-import { DEFILLAMA, TOKENS } from "@tal-trading-agent/shared";
+import { DEFILLAMA, WETH_ADDRESS } from "@tal-trading-agent/shared";
 import { parseEther } from "viem";
 /**
  * Fetch the current ETH price in USD via DeFiLlama.
@@ -6,7 +6,7 @@ import { parseEther } from "viem";
  */
 async function fetchEthPriceUsd() {
     try {
-        const coinId = `ethereum:${TOKENS.WETH}`;
+        const coinId = `ethereum:${WETH_ADDRESS}`;
         const url = `${DEFILLAMA.pricesUrl}/${encodeURIComponent(coinId)}`;
         const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
         if (!response.ok)
@@ -41,7 +41,7 @@ export async function inferBudgetFromPrompt(prompt) {
         const wei = parseEther(ethAmount);
         return {
             wei,
-            token: TOKENS.WETH,
+            token: WETH_ADDRESS,
             description: `${ethAmount} ETH`,
         };
     }
@@ -81,7 +81,7 @@ export async function inferBudgetFromPrompt(prompt) {
         return undefined;
     return {
         wei,
-        token: TOKENS.WETH,
+        token: WETH_ADDRESS,
         description: `$${usdAmount} ≈ ${ethAmount.toFixed(6)} ETH (@ $${ethPrice.toFixed(2)}/ETH)`,
     };
 }

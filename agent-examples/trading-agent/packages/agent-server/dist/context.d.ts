@@ -4,6 +4,7 @@ import { type AppConfig, type TradingStrategy, type ExecutionResult } from "@tal
 import { PoolAnalyzer } from "@tal-trading-agent/agent-core";
 import { QuantAnalysis } from "@tal-trading-agent/agent-core";
 import { TokenScorer } from "@tal-trading-agent/agent-core";
+import { TokenPreFilter } from "@tal-trading-agent/agent-core";
 import { StrategyEngine } from "@tal-trading-agent/agent-core";
 import { RiskManager } from "@tal-trading-agent/agent-core";
 import { TradeExecutor } from "@tal-trading-agent/agent-core";
@@ -18,6 +19,7 @@ export interface AppContext {
     poolAnalyzer: PoolAnalyzer;
     quantAnalysis: QuantAnalysis;
     tokenScorer: TokenScorer;
+    tokenPreFilter: TokenPreFilter;
     strategyEngine: StrategyEngine;
     riskManager: RiskManager;
     tradeExecutor: TradeExecutor;

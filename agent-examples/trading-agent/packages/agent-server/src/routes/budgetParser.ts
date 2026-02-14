@@ -1,4 +1,4 @@
-import { DEFILLAMA, TOKENS } from "@tal-trading-agent/shared";
+import { DEFILLAMA, WETH_ADDRESS } from "@tal-trading-agent/shared";
 import { parseEther, type Address } from "viem";
 
 interface ParsedBudget {
@@ -16,7 +16,7 @@ interface ParsedBudget {
  */
 async function fetchEthPriceUsd(): Promise<number> {
   try {
-    const coinId = `ethereum:${TOKENS.WETH}`;
+    const coinId = `ethereum:${WETH_ADDRESS}`;
     const url = `${DEFILLAMA.pricesUrl}/${encodeURIComponent(coinId)}`;
     const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
     if (!response.ok) return 0;
@@ -56,7 +56,7 @@ export async function inferBudgetFromPrompt(
     const wei = parseEther(ethAmount);
     return {
       wei,
-      token: TOKENS.WETH,
+      token: WETH_ADDRESS,
       description: `${ethAmount} ETH`,
     };
   }
@@ -100,7 +100,7 @@ export async function inferBudgetFromPrompt(
 
   return {
     wei,
-    token: TOKENS.WETH,
+    token: WETH_ADDRESS,
     description: `$${usdAmount} ≈ ${ethAmount.toFixed(6)} ETH (@ $${ethPrice.toFixed(2)}/ETH)`,
   };
 }

@@ -1,5 +1,5 @@
 import { isAddress } from "viem";
-import { TOKENS } from "@tal-trading-agent/shared";
+import { TOKEN_REGISTRY, WETH_ADDRESS } from "@tal-trading-agent/shared";
 import { inferHorizonFromPrompt, inferRiskToleranceFromPrompt } from "./horizonParser.js";
 import { inferBudgetFromPrompt } from "./budgetParser.js";
 // ── In-memory task store ────────────────────────────────
@@ -33,7 +33,7 @@ export async function a2aRoutes(app, ctx) {
                 {
                     id: "trade-analysis",
                     name: "Quantitative Strategy Generation",
-                    description: "Accepts a natural-language trading prompt and automatically infers budget, horizon (1h to 1y), and risk tolerance. Scores up to 10 blue-chip tokens (WETH, USDC, USDT, DAI, WBTC, UNI, LINK, AAVE, MKR, SNX) using on-chain Uniswap V3 pool data and DeFiLlama price history across 9 weighted indicators: RSI, MACD, Bollinger Bands, VWAP, momentum, liquidity depth, fee APY, volume trend, TVL stability, and smart money flow. Data quality scoring automatically down-weights unreliable technical signals and redistributes weight to DeFi fundamentals. Generates an optimized strategy via Claude with mode-specific guidance: scalp (hours, technical-first), swing (days, balanced), position (months, DeFi-first), or investment (6m–1y, portfolio allocation with DCA + rebalancing). Returns the strategy with unsigned swap calldata, risk metrics (score 0–100, max drawdown, stop-loss/take-profit), estimated returns (optimistic/expected/pessimistic), and an optional investment plan with allocations, DCA schedule, rebalancing triggers, and exit criteria. If a taskRef is provided, the agent confirms the on-chain fee escrow upon completion.",
+                    description: "Scores 100+ tokens across DeFi, L2, gaming, AI, meme, and RWA categories with intelligent pre-filtering. Accepts a natural-language trading prompt and automatically infers budget, horizon (1h to 1y), and risk tolerance. Uses on-chain Uniswap V3 pool data and DeFiLlama price history across 9 weighted indicators: RSI, MACD, Bollinger Bands, VWAP, momentum, liquidity depth, fee APY, volume trend, TVL stability, and smart money flow. Data quality scoring automatically down-weights unreliable technical signals and redistributes weight to DeFi fundamentals. Generates an optimized strategy via Claude with mode-specific guidance: scalp (hours, technical-first), swing (days, balanced), position (months, DeFi-first), or investment (6m–1y, portfolio allocation with DCA + rebalancing). Returns the strategy with unsigned swap calldata, risk metrics (score 0–100, max drawdown, stop-loss/take-profit), estimated returns (optimistic/expected/pessimistic), and an optional investment plan with allocations, DCA schedule, rebalancing triggers, and exit criteria. If a taskRef is provided, the agent confirms the on-chain fee escrow upon completion.",
                     tags: ["defi", "trading", "uniswap", "strategy", "quantitative", "portfolio", "dca", "rebalancing"],
                     examples: [
                         "Invest $100,000 in promising tokens for the next 6 months",
@@ -141,7 +141,7 @@ async function handleTasksSend(rpc, ctx, reply) {
             : "0x0000000000000000000000000000000000000000");
         const budgetToken = (tradeParams.budgetToken && isAddress(tradeParams.budgetToken)
             ? tradeParams.budgetToken
-            : TOKENS.WETH);
+            : WETH_ADDRESS);
         // Infer horizon from the natural language prompt if not explicitly provided
         const inferredHorizon = tradeParams.horizon ?? inferHorizonFromPrompt(tradeParams.prompt ?? "");
         // Infer budget from the natural language prompt if not explicitly provided
@@ -164,7 +164,7 @@ async function handleTasksSend(rpc, ctx, reply) {
         };
         ctx.logger.info({ taskId, prompt: request.prompt, horizon: request.horizon }, "A2A task received — starting trade analysis");
         // 1. Score tokens
-        const topTokens = Object.values(TOKENS).slice(0, 8);
+        const topTokens = await ctx.tokenPreFilter.preFilter(TOKEN_REGISTRY, budgetToken, { riskTolerance: request.riskTolerance, prompt: request.prompt ?? "", maxCandidates: 20 });
         const candidates = await ctx.tokenScorer.scoreTokens(topTokens, budgetToken, request.horizon);
         // 2. Generate strategy via LLM
         const strategy = await ctx.strategyEngine.generateStrategy(request, candidates);

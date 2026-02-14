@@ -9,7 +9,7 @@ import type {
   StrategyMode,
   InvestmentPlan,
 } from "@tal-trading-agent/shared";
-import { TOKENS, HORIZON_MS, RISK_PRESETS } from "@tal-trading-agent/shared";
+import { TOKEN_REGISTRY, HORIZON_MS, RISK_PRESETS } from "@tal-trading-agent/shared";
 
 // ── LLM response shape (amounts as strings for bigint) ──
 interface LLMStrategyResponse {
@@ -116,7 +116,7 @@ export class StrategyEngine {
       "Generating trading strategy via LLM",
     );
 
-    const systemPrompt = this.buildSystemPrompt(mode, request.riskTolerance);
+    const systemPrompt = this.buildSystemPrompt(mode, request.riskTolerance, candidates);
     const userMessage = this.buildUserMessage(request, candidates, mode);
 
     let llmResponse: string;
@@ -177,9 +177,12 @@ export class StrategyEngine {
 
   // ── System Prompt Builder ─────────────────────────────
 
-  private buildSystemPrompt(mode: StrategyMode, riskTolerance: TradeRequest["riskTolerance"]): string {
-    const tokenList = Object.entries(TOKENS)
-      .map(([symbol, address]) => `  - ${symbol}: ${address}`)
+  private buildSystemPrompt(mode: StrategyMode, riskTolerance: TradeRequest["riskTolerance"], candidates: QuantScore[]): string {
+    // Only include the scored candidate tokens in the prompt, not all 103
+    const candidateSymbols = new Set(candidates.map((c) => c.symbol));
+    const relevantTokens = TOKEN_REGISTRY.filter((t) => candidateSymbols.has(t.symbol));
+    const tokenList = relevantTokens
+      .map((t) => `  - ${t.symbol} (${t.category}): ${t.address}`)
       .join("\n");
 
     const riskPreset = RISK_PRESETS[riskTolerance];

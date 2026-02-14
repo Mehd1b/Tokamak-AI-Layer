@@ -1,7 +1,7 @@
 import { Type } from "@sinclair/typebox";
 import { isAddress } from "viem";
 import { siwaAuthMiddleware } from "@tal-trading-agent/siwa-auth";
-import { TOKENS } from "@tal-trading-agent/shared";
+import { TOKEN_REGISTRY, WETH_ADDRESS } from "@tal-trading-agent/shared";
 import { inferHorizonFromPrompt } from "./horizonParser.js";
 // ── Request schemas ─────────────────────────────────────
 const AnalyzeBody = Type.Object({
@@ -41,7 +41,7 @@ export async function tradeRoutes(app, ctx) {
         }
         const budgetToken = (body.budgetToken && isAddress(body.budgetToken)
             ? body.budgetToken
-            : TOKENS.WETH);
+            : WETH_ADDRESS);
         // Infer horizon from the natural language prompt if not explicitly provided
         const inferredHorizon = body.horizon ?? inferHorizonFromPrompt(body.prompt);
         const request = {
@@ -55,7 +55,7 @@ export async function tradeRoutes(app, ctx) {
         };
         ctx.logger.info({ wallet: request.walletAddress, budget: body.budget, horizon: request.horizon }, "Trade analysis requested");
         // 1. Get top token candidates
-        const topTokens = Object.values(TOKENS).slice(0, 8);
+        const topTokens = await ctx.tokenPreFilter.preFilter(TOKEN_REGISTRY, budgetToken, { riskTolerance: request.riskTolerance, prompt: request.prompt, maxCandidates: 20 });
         // 2. Score tokens via pool analysis + quant
         const candidates = await ctx.tokenScorer.scoreTokens(topTokens, budgetToken, request.horizon);
         // 3. Generate strategy via LLM

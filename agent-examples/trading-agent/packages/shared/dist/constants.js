@@ -18,19 +18,8 @@ export const UNISWAP_V2 = {
     factory: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f",
     router: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
 };
-// ── Common Tokens (Ethereum Mainnet) ─────────────────────
-export const TOKENS = {
-    WETH: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-    USDC: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-    USDT: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-    DAI: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
-    WBTC: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
-    UNI: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
-    LINK: "0x514910771AF9Ca656af840dff83E8264EcF986CA",
-    AAVE: "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9",
-    MKR: "0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2",
-    SNX: "0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F",
-};
+// ── Token Registry (re-exported from tokens.ts) ──────────
+export { TOKENS, WETH_ADDRESS, TOKEN_REGISTRY } from "./tokens.js";
 // ── Fee Tiers ────────────────────────────────────────────
 export const FEE_TIERS = [100, 500, 3000, 10000];
 // ── DeFiLlama API ────────────────────────────────────────
@@ -80,15 +69,15 @@ export const HORIZON_TO_LLAMA_PERIOD = {
 };
 // ── Target data points per horizon ──────────────────────
 // Used both as the fetch target and the threshold for data quality.
-// RSI needs 15, MACD needs 27, Bollinger needs 20.
+// RSI needs 15, MACD needs 27, Bollinger needs 20, ADX needs 28, StochRSI needs 30.
 export const MIN_DATA_POINTS = {
-    "1h": 15,
-    "4h": 20,
+    "1h": 20,
+    "4h": 25,
     "1d": 30,
     "1w": 30,
-    "1m": 30,
-    "3m": 45,
-    "6m": 45,
+    "1m": 35,
+    "3m": 50,
+    "6m": 50,
     "1y": 60,
 };
 // ── Risk Presets per tolerance ───────────────────────────

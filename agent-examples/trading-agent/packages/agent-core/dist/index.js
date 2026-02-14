@@ -5,4 +5,5 @@ export { StrategyEngine } from "./strategy/StrategyEngine.js";
 export { RiskManager } from "./strategy/RiskManager.js";
 export { TradeExecutor } from "./execution/TradeExecutor.js";
 export { SwapBuilder } from "./execution/SwapBuilder.js";
+export { TokenPreFilter } from "./analysis/TokenPreFilter.js";
 //# sourceMappingURL=index.js.map

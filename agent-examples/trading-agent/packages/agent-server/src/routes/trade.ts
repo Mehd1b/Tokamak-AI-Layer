@@ -3,7 +3,7 @@ import { Type } from "@sinclair/typebox";
 import { isAddress, type Address, type Hex } from "viem";
 import type { AppContext } from "../context.js";
 import { siwaAuthMiddleware } from "@tal-trading-agent/siwa-auth";
-import { TOKENS } from "@tal-trading-agent/shared";
+import { TOKEN_REGISTRY, WETH_ADDRESS } from "@tal-trading-agent/shared";
 import type { TradeRequest } from "@tal-trading-agent/shared";
 import { inferHorizonFromPrompt } from "./horizonParser.js";
 
@@ -54,7 +54,7 @@ export async function tradeRoutes(app: FastifyInstance, ctx: AppContext) {
 
       const budgetToken = (body.budgetToken && isAddress(body.budgetToken)
         ? body.budgetToken
-        : TOKENS.WETH) as Address;
+        : WETH_ADDRESS) as Address;
 
       // Infer horizon from the natural language prompt if not explicitly provided
       const inferredHorizon = body.horizon ?? inferHorizonFromPrompt(body.prompt);
@@ -75,7 +75,11 @@ export async function tradeRoutes(app: FastifyInstance, ctx: AppContext) {
       );
 
       // 1. Get top token candidates
-      const topTokens = Object.values(TOKENS).slice(0, 8);
+      const topTokens = await ctx.tokenPreFilter.preFilter(
+        TOKEN_REGISTRY,
+        budgetToken,
+        { riskTolerance: request.riskTolerance, prompt: request.prompt, maxCandidates: 20 },
+      );
 
       // 2. Score tokens via pool analysis + quant
       const candidates = await ctx.tokenScorer.scoreTokens(topTokens, budgetToken, request.horizon);

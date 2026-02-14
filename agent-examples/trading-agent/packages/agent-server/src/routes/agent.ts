@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { AppContext } from "../context.js";
+import { TOKEN_REGISTRY } from "@tal-trading-agent/shared";
 
 export async function agentRoutes(app: FastifyInstance, ctx: AppContext) {
   // ── GET /api/v1/agent/info ─────────────────────────────
@@ -94,7 +95,7 @@ export async function agentRoutes(app: FastifyInstance, ctx: AppContext) {
       ],
       supportedChains: [1],
       supportedDexes: ["Uniswap V3"],
-      supportedTokens: ["WETH", "USDC", "USDT", "DAI", "WBTC", "UNI", "LINK", "AAVE", "MKR", "SNX"],
+      supportedTokens: TOKEN_REGISTRY.map((t) => t.symbol),
       tradingModes: ["scalp", "swing", "position", "investment"],
       riskTolerances: ["conservative", "moderate", "aggressive"],
       authMethod: "SIWA (Sign-In With Agent)",

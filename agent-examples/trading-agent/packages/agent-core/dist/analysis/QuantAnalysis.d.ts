@@ -14,6 +14,37 @@ interface TechnicalIndicators {
     };
     vwap: number;
     momentum: number;
+    adx: {
+        adx: number;
+        plusDI: number;
+        minusDI: number;
+    };
+    aroon: {
+        up: number;
+        down: number;
+        oscillator: number;
+    };
+    stochasticRsi: {
+        k: number;
+        d: number;
+        raw: number;
+    };
+    williamsR: number;
+    roc: number;
+    atr: {
+        atr: number;
+        atrPercent: number;
+    };
+    historicalVolatility: {
+        dailyVol: number;
+        annualizedVol: number;
+    };
+    vwapDeviation: number;
+    bollingerPosition: {
+        percentB: number;
+        bandwidth: number;
+    };
+    trendStrengthComposite: number;
 }
 interface DeFiMetrics {
     liquidityDepth: number;
@@ -38,7 +69,7 @@ export declare class QuantAnalysis {
     /**
      * Compute all technical indicators from price series.
      */
-    computeTechnicalIndicators(prices: number[]): TechnicalIndicators;
+    computeTechnicalIndicators(prices: number[], horizon?: TradeRequest["horizon"]): TechnicalIndicators;
     /**
      * Compute DeFi-specific metrics from pool data.
      */
@@ -80,6 +111,47 @@ export declare class QuantAnalysis {
      * Compute Exponential Moving Average.
      */
     private computeEMA;
+    /**
+     * ADX (Average Directional Index) - measures trend strength.
+     * Approximates high/low from consecutive price pairs.
+     */
+    private computeADX;
+    /**
+     * Aroon indicator - identifies trend changes.
+     * Measures periods since highest high and lowest low.
+     */
+    private computeAroon;
+    /**
+     * Stochastic RSI - applies stochastic formula to RSI values.
+     */
+    private computeStochasticRSI;
+    /**
+     * Williams %R - momentum oscillator, range [-100, 0].
+     * Approximates high/low from consecutive price pairs.
+     */
+    private computeWilliamsR;
+    /**
+     * ROC (Rate of Change) - percentage change over N periods.
+     */
+    private computeROC;
+    /**
+     * ATR (Average True Range) - volatility measure.
+     * Approximates true range from consecutive prices.
+     */
+    private computeATR;
+    /**
+     * Historical volatility from log returns.
+     */
+    private computeHistoricalVolatility;
+    /**
+     * Bollinger Position: %B and bandwidth derived from Bollinger Bands.
+     */
+    private computeBollingerPosition;
+    /**
+     * Trend Strength Composite - weighted blend of multiple trend indicators.
+     * Each input is normalized to [0, 100] before blending.
+     */
+    private computeTSC;
     /**
      * Liquidity depth score (0-100) based on pool liquidity.
      */

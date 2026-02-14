@@ -41,5 +41,43 @@ export declare class TokenScorer {
      * Positive momentum = higher score, capped at reasonable bounds.
      */
     private momentumToSignal;
+    /**
+     * ADX signal: ADX < 20 = no trend (neutral 50); ADX > 20 with +DI > -DI = bullish (high); opposite = bearish (low).
+     */
+    private adxToSignal;
+    /**
+     * Aroon signal: Map oscillator [-100, +100] to [0, 100] linearly.
+     */
+    private aroonToSignal;
+    /**
+     * Stochastic RSI signal: K < 20 = oversold (buy = high score); K > 80 = overbought (low score).
+     */
+    private stochRsiToSignal;
+    /**
+     * Williams %R signal: Map [-100, 0] to [0, 100].
+     * < -80 = oversold (high score), > -20 = overbought (low score).
+     */
+    private williamsRToSignal;
+    /**
+     * ROC signal: Clamp [-30, +30] to [0, 100].
+     */
+    private rocToSignal;
+    /**
+     * ATR signal: Low ATR% = stable (good score ~70); high ATR% = risky (low score ~15).
+     */
+    private atrToSignal;
+    /**
+     * Historical volatility signal: Low annual vol = good (75); extreme vol = bad (10).
+     */
+    private hvToSignal;
+    /**
+     * VWAP deviation signal: Above VWAP = bullish; below = bearish.
+     */
+    private vwapDeviationToSignal;
+    /**
+     * Bollinger Position signal: %B > 1 = overbought (low); %B < 0 = oversold (high).
+     * Low bandwidth = squeeze bonus.
+     */
+    private bollingerPositionToSignal;
 }
 //# sourceMappingURL=TokenScorer.d.ts.map

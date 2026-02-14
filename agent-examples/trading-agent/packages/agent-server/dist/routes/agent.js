@@ -1,3 +1,4 @@
+import { TOKEN_REGISTRY } from "@tal-trading-agent/shared";
 export async function agentRoutes(app, ctx) {
     // ── GET /api/v1/agent/info ─────────────────────────────
     app.get("/api/v1/agent/info", async (_req, reply) => {
@@ -83,7 +84,7 @@ export async function agentRoutes(app, ctx) {
             ],
             supportedChains: [1],
             supportedDexes: ["Uniswap V3"],
-            supportedTokens: ["WETH", "USDC", "USDT", "DAI", "WBTC", "UNI", "LINK", "AAVE", "MKR", "SNX"],
+            supportedTokens: TOKEN_REGISTRY.map((t) => t.symbol),
             tradingModes: ["scalp", "swing", "position", "investment"],
             riskTolerances: ["conservative", "moderate", "aggressive"],
             authMethod: "SIWA (Sign-In With Agent)",
