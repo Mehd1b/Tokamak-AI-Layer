@@ -1,6 +1,7 @@
 import { type PublicClient, type WalletClient } from 'viem';
 import { TALValidationRegistryABI } from '../abi/TALValidationRegistry';
 import { TALValidationRegistryV2ABI } from '../abi/TALValidationRegistryV2';
+import { TALValidationRegistryV3ABI } from '../abi/TALValidationRegistryV3';
 import type {
   Address,
   Bytes32,
@@ -11,22 +12,30 @@ import type {
   ValidationModel,
   ValidationStatus,
   ValidationStats,
+  DualStakingStatus,
   TransactionResult,
 } from '../types';
+import { ValidationModel as VM } from '../types';
 
 export class ValidationClient {
   private readonly publicClient: PublicClient;
   private readonly walletClient: WalletClient | undefined;
   private readonly contractAddress: Address;
+  private readonly identityRegistryAddress: Address | undefined;
+  private readonly stakingBridgeAddress: Address | undefined;
 
   constructor(
     publicClient: PublicClient,
     contractAddress: Address,
     walletClient?: WalletClient,
+    identityRegistryAddress?: Address,
+    stakingBridgeAddress?: Address,
   ) {
     this.publicClient = publicClient;
     this.walletClient = walletClient;
     this.contractAddress = contractAddress;
+    this.identityRegistryAddress = identityRegistryAddress;
+    this.stakingBridgeAddress = stakingBridgeAddress;
   }
 
   /**
@@ -35,6 +44,12 @@ export class ValidationClient {
   async requestValidation(
     params: ValidationRequestParams,
   ): Promise<{ requestHash: Bytes32; tx: TransactionResult }> {
+    if (params.model === VM.ReputationOnly) {
+      throw new Error(
+        'ReputationOnly validation is disabled in V3. ReputationOnly agents are valid by default and do not require validation requests.',
+      );
+    }
+
     this.requireWallet();
 
     const deadlineTimestamp = BigInt(
@@ -305,6 +320,129 @@ export class ValidationClient {
       functionName: 'currentEpoch',
     });
     return epoch as bigint;
+  }
+
+  // ==========================================
+  // V3 METHODS — Deadline Slashing & Dual Staking
+  // ==========================================
+
+  /**
+   * Slash a validator who missed a deadline on a StakeSecured request.
+   * Anyone can call this after the deadline has passed for a pending request
+   * that has a selected validator.
+   */
+  async slashForMissedDeadline(
+    requestHash: Bytes32,
+  ): Promise<TransactionResult> {
+    this.requireWallet();
+    const hash = await this.walletClient!.writeContract({
+      address: this.contractAddress,
+      abi: TALValidationRegistryV3ABI,
+      functionName: 'slashForMissedDeadline',
+      args: [requestHash],
+      chain: this.walletClient!.chain,
+      account: this.walletClient!.account!,
+    });
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+    return {
+      hash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 'success' ? 'success' : 'reverted',
+    };
+  }
+
+  /**
+   * Check dual staking status for an agent (owner + operator stakes).
+   * Requires identityRegistryAddress and stakingBridgeAddress to be configured.
+   */
+  async checkDualStakingStatus(agentId: bigint): Promise<DualStakingStatus> {
+    if (!this.identityRegistryAddress || !this.stakingBridgeAddress) {
+      throw new Error(
+        'identityRegistryAddress and stakingBridgeAddress must be configured to check dual staking status',
+      );
+    }
+
+    // Get agent owner from identity registry
+    const owner = await this.publicClient.readContract({
+      address: this.identityRegistryAddress,
+      abi: [
+        {
+          type: 'function',
+          name: 'ownerOf',
+          inputs: [{ name: 'tokenId', type: 'uint256', internalType: 'uint256' }],
+          outputs: [{ name: '', type: 'address', internalType: 'address' }],
+          stateMutability: 'view',
+        },
+      ],
+      functionName: 'ownerOf',
+      args: [agentId],
+    }) as Address;
+
+    // Get MIN_AGENT_OWNER_STAKE from V3 contract
+    const minOwnerStake = await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALValidationRegistryV3ABI,
+      functionName: 'MIN_AGENT_OWNER_STAKE',
+    }) as bigint;
+
+    // Get owner's stake from staking bridge
+    const ownerStake = await this.publicClient.readContract({
+      address: this.stakingBridgeAddress,
+      abi: [
+        {
+          type: 'function',
+          name: 'getOperatorStake',
+          inputs: [{ name: 'operator', type: 'address', internalType: 'address' }],
+          outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+          stateMutability: 'view',
+        },
+      ],
+      functionName: 'getOperatorStake',
+      args: [owner],
+    }) as bigint;
+
+    // Get operators from identity registry
+    const operators = await this.publicClient.readContract({
+      address: this.identityRegistryAddress,
+      abi: [
+        {
+          type: 'function',
+          name: 'getOperators',
+          inputs: [{ name: 'agentId', type: 'uint256', internalType: 'uint256' }],
+          outputs: [{ name: '', type: 'address[]', internalType: 'address[]' }],
+          stateMutability: 'view',
+        },
+      ],
+      functionName: 'getOperators',
+      args: [agentId],
+    }) as Address[];
+
+    // Sum operator stakes
+    let operatorStake = 0n;
+    for (const op of operators) {
+      const stake = await this.publicClient.readContract({
+        address: this.stakingBridgeAddress,
+        abi: [
+          {
+            type: 'function',
+            name: 'getOperatorStake',
+            inputs: [{ name: 'operator', type: 'address', internalType: 'address' }],
+            outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+            stateMutability: 'view',
+          },
+        ],
+        functionName: 'getOperatorStake',
+        args: [op],
+      }) as bigint;
+      operatorStake += stake;
+    }
+
+    return {
+      ownerStake,
+      ownerMeetsMinimum: ownerStake >= minOwnerStake,
+      operatorStake,
+      operatorMeetsMinimum: operatorStake >= minOwnerStake,
+    };
   }
 
   private requireWallet(): void {

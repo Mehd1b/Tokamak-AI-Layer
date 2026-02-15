@@ -13,7 +13,7 @@ import { parseEther } from 'viem';
 import { shortenAddress } from '@/lib/utils';
 
 const VALIDATION_MODELS = [
-  { value: 0, label: 'Reputation Only', description: 'Lightweight feedback-based trust. No operators required.' },
+  { value: 0, label: 'Reputation Only', description: 'No validation required - outputs are valid by default. No operators required.' },
   { value: 1, label: 'Stake Secured', description: 'DRB-selected validator re-execution with stake collateral. Requires operators with sufficient stake.' },
   { value: 2, label: 'TEE Attested', description: 'Hardware-attested execution verification (SGX, Nitro, TrustZone). Requires operators with sufficient stake.' },
   { value: 3, label: 'Hybrid', description: 'Combines stake security with TEE attestation for maximum trust. Requires operators with sufficient stake.' },
@@ -482,6 +482,20 @@ export default function RegisterAgentPage() {
                 <p className="text-xs text-red-400">
                   At least one operator is required for {validationModel === 1 ? 'Stake Secured' : validationModel === 2 ? 'TEE Attested' : 'Hybrid'} agents.
                   Enable the self-operator option or use the SDK to register with external operators.
+                </p>
+              </div>
+            )}
+
+            {/* Dual Staking Warning */}
+            {(validationModel === 1 || validationModel === 3) && (
+              <div className="mt-3 flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 p-3">
+                <Shield className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-400">
+                  <strong>Dual Staking Requirement:</strong> Both the agent owner and operators must have
+                  at least 1,000 WSTON locked in the L2 vault. If the owner or operators do not
+                  meet this minimum, StakeSecured validation requests will be rejected on-chain.
+                  Visit the <a href="/staking" className="underline hover:text-amber-300">Staking page</a> to
+                  lock WSTON.
                 </p>
               </div>
             )}

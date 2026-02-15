@@ -23,4 +23,5 @@ export { TALIdentityRegistryV3ABI } from './abi/TALIdentityRegistryV3';
 export { TALReputationRegistryABI } from './abi/TALReputationRegistry';
 export { TALValidationRegistryABI } from './abi/TALValidationRegistry';
 export { TALValidationRegistryV2ABI } from './abi/TALValidationRegistryV2';
+export { TALValidationRegistryV3ABI } from './abi/TALValidationRegistryV3';
 export { TaskFeeEscrowABI } from './abi/TaskFeeEscrow';

@@ -28,6 +28,7 @@ import type {
   ValidationRequestParams,
   ValidationDetails,
   ValidationStats,
+  DualStakingStatus,
   AgentSearchQuery,
   AgentSearchResult,
   ProtocolStats,
@@ -91,6 +92,7 @@ export class TALClient {
       this.publicClient,
       addresses.validationRegistry,
       this.walletClient,
+      addresses.identityRegistry,
     );
 
     this.subgraph = new SubgraphClient(config.subgraphUrl);
@@ -443,6 +445,26 @@ export class TALClient {
     windowSeconds?: bigint,
   ): Promise<ValidationStats> {
     return this.validation.getAgentValidationStats(agentId, windowSeconds);
+  }
+
+  // ==========================================
+  // V3 VALIDATION CONVENIENCE METHODS
+  // ==========================================
+
+  /**
+   * Slash a validator who missed a deadline on a StakeSecured request.
+   */
+  async slashForMissedDeadline(
+    requestHash: Bytes32,
+  ): Promise<TransactionResult> {
+    return this.validation.slashForMissedDeadline(requestHash);
+  }
+
+  /**
+   * Check dual staking status (owner + operator stakes) for an agent.
+   */
+  async checkDualStakingStatus(agentId: bigint): Promise<DualStakingStatus> {
+    return this.validation.checkDualStakingStatus(agentId);
   }
 
   // ==========================================

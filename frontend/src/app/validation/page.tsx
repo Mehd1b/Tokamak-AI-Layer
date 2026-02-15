@@ -86,7 +86,7 @@ export default function ValidationPage() {
             icon: CheckCircle,
             color: 'text-emerald-400',
             bg: 'bg-emerald-500/10',
-            desc: 'Based on aggregated reputation scores',
+            desc: 'No Validation Required - Outputs Valid by Default',
           },
           {
             model: 1,

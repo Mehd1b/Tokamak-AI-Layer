@@ -220,7 +220,7 @@ contract TALValidationRegistry is
         bytes32 outputHash,
         ValidationModel model,
         uint256 deadline
-    ) external payable override whenNotPaused nonReentrant returns (bytes32 requestHash) {
+    ) external payable virtual override whenNotPaused nonReentrant returns (bytes32 requestHash) {
         // Validate deadline is in the future
         if (deadline <= block.timestamp) {
             revert DeadlineInPast(deadline);
@@ -748,6 +748,16 @@ contract TALValidationRegistry is
      */
     function getTreasury() external view override returns (address) {
         return treasury;
+    }
+
+    // ============ V3 Placeholder ============
+
+    /**
+     * @inheritdoc ITALValidationRegistry
+     * @dev V1/V2 stub -- reverts. Implemented in V3.
+     */
+    function slashForMissedDeadline(bytes32 /*requestHash*/) external virtual override {
+        revert("Not implemented until V3");
     }
 
     // ============ Admin Functions ============

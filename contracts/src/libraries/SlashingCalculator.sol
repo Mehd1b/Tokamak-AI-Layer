@@ -31,6 +31,12 @@ library SlashingCalculator {
     /// @notice Slash percentage for repeated low reputation
     uint256 internal constant SLASH_LOW_REPUTATION = 25;
 
+    /// @notice Slash percentage for missed validation deadline
+    uint256 internal constant SLASH_MISSED_DEADLINE = 10;
+
+    /// @notice Slash percentage for incorrect computation (score < threshold)
+    uint256 internal constant SLASH_INCORRECT_COMPUTATION = 50;
+
     /// @notice Maximum slash percentage
     uint256 internal constant MAX_SLASH_PERCENTAGE = 100;
 
@@ -47,7 +53,9 @@ library SlashingCalculator {
         FailedTEEAttestation,
         ProvenFraud,
         LowReputation,
-        DAOAdjudicated
+        DAOAdjudicated,
+        MissedDeadline,
+        IncorrectComputation
     }
 
     // ============ Structs ============
@@ -98,6 +106,10 @@ library SlashingCalculator {
             percentage = customPercentage > MAX_SLASH_PERCENTAGE
                 ? MAX_SLASH_PERCENTAGE
                 : customPercentage;
+        } else if (reason == SlashReason.MissedDeadline) {
+            percentage = SLASH_MISSED_DEADLINE;
+        } else if (reason == SlashReason.IncorrectComputation) {
+            percentage = SLASH_INCORRECT_COMPUTATION;
         }
     }
 

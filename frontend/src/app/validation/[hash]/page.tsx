@@ -15,7 +15,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import { useValidation, useIsDisputed, useRequestValidation, useDisputeValidation } from '@/hooks/useValidation';
+import { useValidation, useIsDisputed, useRequestValidation, useDisputeValidation, useSlashForMissedDeadline, useSelectedValidator } from '@/hooks/useValidation';
 import { useL2Config } from '@/hooks/useL2Config';
 import {
   shortenAddress,
@@ -97,6 +97,10 @@ export default function ValidationDetailPage() {
   // Countdown timer for pending validations
   const deadlineValue = validation ? validation[0].deadline : undefined;
   const countdown = useCountdown(validation?.[0].status === 0 ? deadlineValue : undefined);
+
+  // Slash for missed deadline
+  const { slashForMissedDeadline, hash: slashHash, isPending: isSlashPending, isConfirming: isSlashConfirming, isSuccess: isSlashSuccess, error: slashError } = useSlashForMissedDeadline();
+  const { validator: selectedValidator, hasValidator: hasSelectedValidator } = useSelectedValidator(hash);
 
   // Dispute form state
   const { disputeValidation, hash: disputeHash, isPending: isDisputePending, isConfirming: isDisputeConfirming, isSuccess: isDisputeSuccess, error: disputeError } = useDisputeValidation();
@@ -382,6 +386,17 @@ export default function ValidationDetailPage() {
                     </p>
                   </dd>
                 </div>
+                {/* Score warning for incorrect computation */}
+                {validation[0].status === 1 && validation[1].score < 50 && (
+                  <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-400" />
+                      <p className="text-xs text-red-300">
+                        Agent computation flagged as incorrect - owner slashed
+                      </p>
+                    </div>
+                  </div>
+                )}
                 {validation[1].validator !== '0x0000000000000000000000000000000000000000' && (
                   <div>
                     <dt className="text-sm text-white/30">Validator</dt>
@@ -549,6 +564,88 @@ export default function ValidationDetailPage() {
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Slash for Missed Deadline (for expired StakeSecured requests with a selected validator) */}
+      {validation && validation[0].status === 2 && (validation[0].model === 1 || validation[0].model === 3) && hasSelectedValidator && (
+        <div className="mt-6 rounded-2xl border border-red-500/20 bg-red-500/5 p-6 backdrop-blur-sm">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-400" />
+            <div className="flex-1">
+              <h3 className="font-medium text-white">Validator Missed Deadline</h3>
+              <p className="mt-1 text-sm text-white/40">
+                The selected validator ({selectedValidator ? shortenAddress(selectedValidator) : '...'}) failed to submit validation before the deadline.
+                You can slash the validator and get the bounty refunded.
+              </p>
+              <div className="mt-3 flex items-center gap-3">
+                <button
+                  onClick={() => hash && slashForMissedDeadline(hash)}
+                  disabled={isSlashPending || isSlashConfirming}
+                  className="btn-primary inline-flex items-center gap-2 !bg-red-500 hover:!bg-red-600"
+                >
+                  {isSlashPending ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Confirm in Wallet...
+                    </>
+                  ) : isSlashConfirming ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Slashing...
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="h-4 w-4" />
+                      Slash for Missed Deadline
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {isSlashSuccess && slashHash && (
+                <div className="card border-emerald-500/20 bg-emerald-500/10 mt-3">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-400" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-emerald-400">Validator Slashed</h4>
+                      <p className="mt-1 text-xs text-emerald-300">
+                        The validator has been slashed and the bounty has been refunded.
+                      </p>
+                      <a
+                        href={`${explorerUrl}/tx/${slashHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 inline-block text-xs text-[#38BDF8] hover:underline"
+                      >
+                        View transaction
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {slashError && (
+                <div className="card border-red-500/20 bg-red-500/10 mt-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-500" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-red-400">Slash Failed</h4>
+                      <p className="mt-1 text-xs text-red-300">
+                        {slashError.message || 'Transaction failed. Please try again.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

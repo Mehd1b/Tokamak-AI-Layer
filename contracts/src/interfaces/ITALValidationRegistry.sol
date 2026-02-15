@@ -62,6 +62,24 @@ interface ITALValidationRegistry is IERC8004ValidationRegistry {
     /// @notice Raised when agent slashing fails (e.g., insufficient stake)
     error SlashingFailed(uint256 agentId);
 
+    /// @notice Raised when ReputationOnly model is used (no validation needed in V3)
+    error ReputationOnlyNoValidationNeeded();
+
+    /// @notice Raised when agent owner has insufficient stake for dual-staking requirement
+    error InsufficientAgentOwnerStake(address owner, uint256 stake, uint256 required);
+
+    /// @notice Raised when deadline has not yet passed for missed-deadline slashing
+    error DeadlineNotPassed(bytes32 requestHash);
+
+    /// @notice Raised when validation model is not slashable (not StakeSecured or Hybrid)
+    error NotSlashableModel(bytes32 requestHash);
+
+    /// @notice Raised when no validator has been selected for a request
+    error NoValidatorSelected(bytes32 requestHash);
+
+    /// @notice Raised when a request has already been slashed for missed deadline
+    error AlreadySlashedForDeadline(bytes32 requestHash);
+
     // ============ Events ============
 
     /**
@@ -111,6 +129,16 @@ interface ITALValidationRegistry is IERC8004ValidationRegistry {
         bytes32 indexed requestHash,
         uint256 slashAmount,
         uint256 slashPercentage
+    );
+
+    /**
+     * @notice Emitted when an operator (validator) is slashed for missing a validation deadline
+     * @param requestHash The validation request that was missed
+     * @param operator The operator (validator) who missed the deadline
+     */
+    event OperatorSlashedForDeadline(
+        bytes32 indexed requestHash,
+        address indexed operator
     );
 
     /**
@@ -345,6 +373,24 @@ interface ITALValidationRegistry is IERC8004ValidationRegistry {
      * @return The address of the protocol treasury
      */
     function getTreasury() external view returns (address);
+
+    // ============ V3 Slashing ============
+
+    /**
+     * @notice Slash a validator for missing a validation deadline (permissionless)
+     * @dev Can be called by anyone after the deadline has passed. Slashes 10% of the
+     *      selected validator's operator stake and refunds the bounty to the requester.
+     *
+     * Requirements:
+     * - Request must exist and be Pending
+     * - Deadline must have passed
+     * - Model must be StakeSecured or Hybrid
+     * - A validator must have been selected
+     * - Request must not have already been slashed for missed deadline
+     *
+     * @param requestHash The validation request identifier
+     */
+    function slashForMissedDeadline(bytes32 requestHash) external;
 
     // ============ Admin Functions ============
 

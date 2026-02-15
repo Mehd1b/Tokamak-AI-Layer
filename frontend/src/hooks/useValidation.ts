@@ -232,6 +232,50 @@ export function useRequestValidation() {
   return { validate, result, isValidating, error, reset };
 }
 
+// ============ V3: Deadline Slashing ============
+
+import { TALValidationRegistryV3ABI } from '../../../sdk/src/abi/TALValidationRegistryV3';
+
+export function useSlashForMissedDeadline() {
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  const slashForMissedDeadline = (requestHash: `0x${string}`) => {
+    writeContract({
+      address: CONTRACTS.validationRegistry,
+      abi: TALValidationRegistryV3ABI,
+      functionName: 'slashForMissedDeadline',
+      args: [requestHash],
+      chainId: READ_CHAIN_ID,
+    });
+  };
+
+  return { slashForMissedDeadline, hash, isPending, isConfirming, isSuccess, error };
+}
+
+export function useSelectedValidator(requestHash: `0x${string}` | undefined) {
+  const enabled = !!requestHash;
+
+  const { data, isLoading } = useReadContract({
+    address: CONTRACTS.validationRegistry,
+    abi: TALValidationRegistryABI,
+    functionName: 'getSelectedValidator',
+    args: enabled ? [requestHash!] : undefined,
+    chainId: READ_CHAIN_ID,
+    query: { enabled },
+  });
+
+  const zeroAddress = '0x0000000000000000000000000000000000000000';
+  const validator = data as `0x${string}` | undefined;
+  const hasValidator = !!validator && validator !== zeroAddress;
+
+  return {
+    validator,
+    hasValidator,
+    isLoading,
+  };
+}
+
 // ============ V2: Validation Stats ============
 
 import { TALValidationRegistryV2ABI } from '../../../sdk/src/abi/TALValidationRegistryV2';

@@ -1080,6 +1080,22 @@ export default function StakingPage() {
 
       {/* ======================== L2 TAB ======================== */}
       {activeTab === 'l2' && <>
+
+      {/* Agent Owner Staking Requirement */}
+      <div className="mb-8 rounded-2xl border border-[#38BDF8]/20 bg-[#38BDF8]/5 p-6">
+        <div className="flex items-start gap-3">
+          <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#38BDF8]" />
+          <div>
+            <h3 className="font-medium text-white">Agent Owner Staking Requirement</h3>
+            <p className="mt-1 text-sm text-white/40">
+              If you own a StakeSecured or Hybrid agent, you must lock at least <strong className="text-white">1,000 WSTON</strong> in
+              the vault. This dual staking requirement ensures both the agent owner and operators have skin in the game.
+              Validation requests will be rejected on-chain if the owner does not meet this minimum.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Vault Stats */}
       <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-center transition-all duration-300 hover:border-[#38BDF8]/20">

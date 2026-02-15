@@ -211,6 +211,30 @@ export interface ValidationStats {
 }
 
 // ============================================
+// VALIDATION V3 TYPES — Dual Staking & Deadline Slashing
+// ============================================
+
+export interface StakingRequirements {
+  minAgentOwnerStake: bigint;
+  minOperatorStake: bigint;
+}
+
+export interface DeadlineSlashResult {
+  requestHash: Bytes32;
+  operator: Address;
+  slashAmount: bigint;
+  bountyRefunded: bigint;
+  tx: TransactionResult;
+}
+
+export interface DualStakingStatus {
+  ownerStake: bigint;
+  ownerMeetsMinimum: boolean;
+  operatorStake: bigint;
+  operatorMeetsMinimum: boolean;
+}
+
+// ============================================
 // ESCROW TYPES
 // ============================================
 
@@ -233,6 +257,7 @@ export interface TaskEscrowData {
 // ============================================
 
 export enum ValidationModel {
+  /** No validation required - outputs are valid by default */
   ReputationOnly = 0,
   StakeSecured = 1,
   TEEAttested = 2,

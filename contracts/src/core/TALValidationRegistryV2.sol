@@ -70,7 +70,7 @@ contract TALValidationRegistryV2 is TALValidationRegistry {
         uint8 score,
         bytes calldata proof,
         string calldata detailsURI
-    ) external override whenNotPaused nonReentrant {
+    ) external virtual override whenNotPaused nonReentrant {
         ValidationRequest storage request = _requests[requestHash];
 
         // --- V1 validation logic (replicated) ---
