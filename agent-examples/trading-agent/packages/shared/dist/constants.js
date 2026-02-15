@@ -59,16 +59,16 @@ export const HORIZON_MS = {
 };
 // ── Horizon to DeFiLlama chart params ───────────────────
 // Valid DeFiLlama periods: "1d", "7d", "30d", "90d", "180d", "365d"
-// `span` = interval between data points in hours
+// `span` = number of data points returned (NOT interval)
 export const HORIZON_TO_LLAMA_CHART = {
-    "1h": { period: "1d", span: 1 }, // ~24 points
-    "4h": { period: "1d", span: 1 }, // ~24 points
-    "1d": { period: "7d", span: 4 }, // ~42 points
-    "1w": { period: "7d", span: 4 }, // ~42 points
-    "1m": { period: "30d", span: 12 }, // ~60 points
-    "3m": { period: "90d", span: 24 }, // ~90 points
-    "6m": { period: "180d", span: 48 }, // ~90 points
-    "1y": { period: "365d", span: 72 }, // ~122 points
+    "1h": { period: "1d", span: 24 }, // 24 points over 1 day
+    "4h": { period: "1d", span: 30 }, // 30 points over 1 day
+    "1d": { period: "7d", span: 35 }, // 35 points over 7 days
+    "1w": { period: "7d", span: 40 }, // 40 points over 7 days
+    "1m": { period: "30d", span: 60 }, // 60 points over 30 days
+    "3m": { period: "90d", span: 60 }, // 60 points over 90 days
+    "6m": { period: "180d", span: 60 }, // 60 points over 180 days
+    "1y": { period: "365d", span: 75 }, // 75 points over 365 days
 };
 /** @deprecated Use HORIZON_TO_LLAMA_CHART instead */
 export const HORIZON_TO_LLAMA_PERIOD = {
@@ -82,17 +82,18 @@ export const HORIZON_TO_LLAMA_PERIOD = {
     "1y": "365d",
 };
 // ── Target data points per horizon ──────────────────────
-// Used both as the fetch target and the threshold for data quality.
+// Quality threshold: tokens need at least this many points for reliable indicators.
 // RSI needs 15, MACD needs 27, Bollinger needs 20, ADX needs 28, StochRSI needs 30.
+// Values are set below the chart `span` to allow for some API gaps.
 export const MIN_DATA_POINTS = {
-    "1h": 20,
-    "4h": 25,
-    "1d": 30,
+    "1h": 15,
+    "4h": 20,
+    "1d": 25,
     "1w": 30,
     "1m": 35,
-    "3m": 50,
-    "6m": 50,
-    "1y": 60,
+    "3m": 40,
+    "6m": 40,
+    "1y": 50,
 };
 // ── Risk Presets per tolerance ───────────────────────────
 export const RISK_PRESETS = {
