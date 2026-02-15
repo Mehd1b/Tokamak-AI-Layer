@@ -13,6 +13,20 @@ export const UNISWAP_V3 = {
     quoterV2: "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
     nftPositionManager: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
 };
+// ── Aave V3 (Ethereum Mainnet) ──────────────────────────
+export const AAVE_V3 = {
+    pool: "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
+    poolDataProvider: "0x7B4EB56E7CD4b454BA8ff71E4518426c8fBFaef0",
+    oracle: "0x54586bE62E3c3580375aE3723C145253060Ca0C2",
+};
+// ── Aave V3 Common Tokens (Ethereum Mainnet) ────────────
+export const AAVE_TOKENS = {
+    USDC: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    USDT: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+    DAI: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+    WETH: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    WBTC: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+};
 // ── Uniswap V2 (Ethereum Mainnet) ───────────────────────
 export const UNISWAP_V2 = {
     factory: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f",
@@ -88,6 +102,10 @@ export const RISK_PRESETS = {
         minPoolTvlUsd: 500_000,
         maxPriceImpactPercent: 1,
         requireStopLoss: true,
+        maxLeverage: 2,
+        minHealthFactor: 1.5,
+        maxBorrowUtilization: 0.5,
+        allowShorts: false,
     },
     moderate: {
         maxSingleTradePercent: 35,
@@ -95,6 +113,10 @@ export const RISK_PRESETS = {
         minPoolTvlUsd: 100_000,
         maxPriceImpactPercent: 2,
         requireStopLoss: true,
+        maxLeverage: 3,
+        minHealthFactor: 1.3,
+        maxBorrowUtilization: 0.7,
+        allowShorts: true,
     },
     aggressive: {
         maxSingleTradePercent: 50,
@@ -102,6 +124,10 @@ export const RISK_PRESETS = {
         minPoolTvlUsd: 25_000,
         maxPriceImpactPercent: 5,
         requireStopLoss: false,
+        maxLeverage: 5,
+        minHealthFactor: 1.1,
+        maxBorrowUtilization: 0.9,
+        allowShorts: true,
     },
 };
 // ── Default Risk Parameters ──────────────────────────────

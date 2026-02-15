@@ -147,6 +147,49 @@ export class RiskManager {
       }
     }
 
+    // 10. Validate leverage limits
+    for (const trade of strategy.trades) {
+      if (trade.leverageConfig) {
+        const maxLev = params.maxLeverage ?? 1;
+        if (trade.leverageConfig.leverageMultiplier > maxLev) {
+          errors.push(
+            `Trade ${trade.tokenIn} -> ${trade.tokenOut}: leverage ${trade.leverageConfig.leverageMultiplier}x exceeds max (${maxLev}x)`
+          );
+        }
+      }
+
+      // Check if shorts are allowed
+      if (trade.direction === "short" && params.allowShorts === false) {
+        errors.push(
+          `Short position on ${trade.tokenOut} is not allowed for ${strategy.request.riskTolerance} risk tolerance`
+        );
+      }
+    }
+
+    // 11. Validate health factor for leveraged positions
+    if (strategy.riskMetrics.healthFactor !== undefined) {
+      const minHf = params.minHealthFactor ?? 1.0;
+      if (strategy.riskMetrics.healthFactor < minHf) {
+        errors.push(
+          `Health factor ${strategy.riskMetrics.healthFactor.toFixed(2)} below minimum (${minHf})`
+        );
+      }
+    }
+
+    // 12. Total leveraged exposure check
+    const leveragedTrades = strategy.trades.filter(t => t.leverageConfig);
+    if (leveragedTrades.length > 0) {
+      const totalLeveragedAmount = leveragedTrades.reduce(
+        (sum, t) => sum + t.amountIn * BigInt(Math.round((t.leverageConfig?.leverageMultiplier ?? 1) * 100)) / 100n,
+        0n,
+      );
+      if (totalLeveragedAmount > budget * 2n) {
+        warnings.push(
+          `Total leveraged exposure (${totalLeveragedAmount.toString()}) exceeds 2x budget`
+        );
+      }
+    }
+
     const valid = errors.length === 0;
 
     this.log.info(
@@ -231,6 +274,27 @@ export class RiskManager {
         { stopLossPrice: adjustedRiskMetrics.stopLossPrice.toString() },
         "Added default stop-loss (10% below reference)",
       );
+    }
+
+    // 5b. Reduce leverage if it exceeds max allowed
+    for (let i = 0; i < finalTrades.length; i++) {
+      const trade = finalTrades[i]!;
+      if (trade.leverageConfig) {
+        const maxLev = params.maxLeverage ?? 1;
+        if (trade.leverageConfig.leverageMultiplier > maxLev) {
+          this.log.info(
+            { tokenOut: trade.tokenOut, original: trade.leverageConfig.leverageMultiplier, capped: maxLev },
+            "Capping leverage multiplier",
+          );
+          finalTrades[i] = {
+            ...trade,
+            leverageConfig: {
+              ...trade.leverageConfig,
+              leverageMultiplier: maxLev,
+            },
+          };
+        }
+      }
     }
 
     // 5. Recalculate position size percent

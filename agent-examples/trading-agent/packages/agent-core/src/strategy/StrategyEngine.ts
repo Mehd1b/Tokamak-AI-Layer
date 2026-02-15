@@ -8,6 +8,10 @@ import type {
   QuantScore,
   StrategyMode,
   InvestmentPlan,
+  DirectionalScore,
+  PositionDirection,
+  PositionType,
+  LeverageConfig,
 } from "@tal-trading-agent/shared";
 import { TOKEN_REGISTRY, HORIZON_MS, RISK_PRESETS } from "@tal-trading-agent/shared";
 
@@ -27,6 +31,9 @@ interface LLMStrategyResponse {
     poolFee: number;
     priceImpact: number;
     route: string[];
+    direction?: "long" | "short";
+    positionType?: "spot_long" | "leveraged_long" | "spot_short" | "leveraged_short";
+    leverage?: number;
   }>;
   riskMetrics: {
     score: number;
@@ -210,18 +217,24 @@ IMPORTANT: Respond with ONLY the JSON object. No surrounding text, no markdown c
         return `You are a quantitative DeFi SCALP TRADER optimizing for short-term trades (hours).
 Technical indicators (RSI, MACD, momentum) are your PRIMARY signals.
 Focus on tokens with high recent momentum and clear technical setups.
-Prioritize quick entries and exits with tight risk management.`;
+Prioritize quick entries and exits with tight risk management.
+You can recommend LONG or SHORT positions. SHORT = borrow and sell the asset, profit when price drops.
+Use SHORT when: RSI > 70, negative MACD histogram, bearish ADX (-DI > +DI), overbought StochRSI.`;
 
       case "swing":
         return `You are a quantitative DeFi SWING TRADER optimizing for multi-day trades.
 Blend technical indicators with DeFi fundamentals for balanced analysis.
-Look for confluence between technical signals and on-chain metrics.`;
+Look for confluence between technical signals and on-chain metrics.
+Consider both LONG and SHORT positions. Bearish confluence across technical indicators warrants a SHORT recommendation.
+SHORT positions borrow the target token via Aave V3 and sell immediately, profiting from price declines.`;
 
       case "position":
         return `You are a quantitative DeFi POSITION TRADER building medium-term positions.
 DeFi fundamentals (liquidity, TVL stability, smart money flows) OUTWEIGH short-term technical indicators.
 Technical indicators with low data confidence should be treated with skepticism.
-Focus on protocol health and sustainable yield.`;
+Focus on protocol health and sustainable yield.
+Leverage available via Aave V3 (up to 5x depending on risk tolerance). Consider SHORT positions for hedging or when bearish thesis is strong.
+Leveraged positions use Aave V3: supply collateral, borrow, and swap to amplify exposure.`;
 
       case "investment":
         return `You are a DeFi PORTFOLIO MANAGER building a long-term investment allocation.
@@ -229,7 +242,9 @@ Your job is to build an INVESTMENT THESIS, define portfolio ALLOCATIONS, and rec
 Short-term RSI, MACD, and momentum indicators are IRRELEVANT for 6-month to 1-year holds — IGNORE them.
 Focus exclusively on: protocol fundamentals, liquidity depth, TVL stability, ecosystem positioning, and smart money flows.
 You MUST include an investmentPlan with allocations, entry strategy, and thesis.
-Trades array can be empty if recommending pure DCA entry.`;
+Trades array can be empty if recommending pure DCA entry.
+The portfolio may include SHORT hedges for risk management in bearish market conditions.
+Use leverage sparingly and only for high-conviction positions within risk limits.`;
     }
   }
 
@@ -240,21 +255,24 @@ Trades array can be empty if recommending pure DCA entry.`;
 2. ALWAYS include a stop-loss price — stop-loss is REQUIRED.
 3. Prefer high-liquidity blue-chip tokens (minimum TVL: $${(preset.minPoolTvlUsd / 1000).toFixed(0)}k).
 4. Maximum price impact: ${preset.maxPriceImpactPercent}%.
-5. Diversify across at least 3-4 positions.`,
+5. Diversify across at least 3-4 positions.
+Max leverage: 2x. No short positions allowed. Minimum health factor: 1.5.`,
 
       moderate: `## Risk Rules (MODERATE - MANDATORY)
 1. NEVER allocate more than ${preset.maxSingleTradePercent}% of the budget to a single position.
 2. ALWAYS include a stop-loss price — stop-loss is REQUIRED.
 3. Minimum pool TVL: $${(preset.minPoolTvlUsd / 1000).toFixed(0)}k.
 4. Maximum price impact: ${preset.maxPriceImpactPercent}%.
-5. Balance between concentrated and diversified positions.`,
+5. Balance between concentrated and diversified positions.
+Max leverage: 3x. Short positions permitted when bearish signals dominate. Minimum health factor: 1.3.`,
 
       aggressive: `## Risk Rules (AGGRESSIVE - MANDATORY)
 1. NEVER allocate more than ${preset.maxSingleTradePercent}% of the budget to a single position.
 2. Stop-loss is OPTIONAL — wider stops or no stops acceptable for conviction plays.
 3. Higher volatility tokens acceptable (minimum TVL: $${(preset.minPoolTvlUsd / 1000).toFixed(0)}k).
 4. Maximum price impact: ${preset.maxPriceImpactPercent}%.
-5. Concentrated bets on high-conviction tokens are acceptable.`,
+5. Concentrated bets on high-conviction tokens are acceptable.
+Max leverage: 5x. Shorts and leveraged shorts acceptable for high-conviction bearish plays. Minimum health factor: 1.1.`,
     };
 
     return toleranceRules[tolerance] + `
@@ -284,7 +302,10 @@ Respond ONLY with a valid JSON object (no markdown, no explanation). The schema 
       "minAmountOut": "<string, wei value>",
       "poolFee": <number>,
       "priceImpact": <number, percent>,
-      "route": ["<address>", ...]
+      "route": ["<address>", ...],
+      "direction": "long" | "short",
+      "positionType": "spot_long" | "leveraged_long" | "spot_short" | "leveraged_short",
+      "leverage": <number, 1.0 for spot, up to 5.0 for leveraged>
     }
   ],
   "riskMetrics": {
@@ -358,12 +379,20 @@ For these tokens, rely ONLY on DeFi metrics (liquidity, TVL, smart money flows).
 
     // For investment mode, omit short-term indicators entirely
     const candidateSummaries = candidates.map((c) => {
+      const directionalScore = c.directionalScore ? {
+        longScore: c.directionalScore.longScore,
+        shortScore: c.directionalScore.shortScore,
+        preferredDirection: c.directionalScore.preferredDirection,
+        directionConfidence: c.directionalScore.directionConfidence,
+      } : undefined;
+
       if (mode === "investment" || mode === "position") {
         return {
           token: c.symbol,
           address: c.tokenAddress,
           overallScore: c.overallScore,
           reasoning: c.reasoning,
+          directionalScore,
           dataQuality: c.dataQuality ? {
             confidence: c.dataQuality.confidenceScore,
             reliable: c.dataQuality.indicatorsReliable,
@@ -384,6 +413,7 @@ For these tokens, rely ONLY on DeFi metrics (liquidity, TVL, smart money flows).
         address: c.tokenAddress,
         overallScore: c.overallScore,
         reasoning: c.reasoning,
+        directionalScore,
         dataQuality: c.dataQuality ? {
           confidence: c.dataQuality.confidenceScore,
           reliable: c.dataQuality.indicatorsReliable,
@@ -542,6 +572,11 @@ Produce the JSON ${mode === "investment" ? "investment plan" : "strategy"} now.`
       // Validate that amount strings are valid bigint representations
       BigInt(trade.amountIn);
       BigInt(trade.minAmountOut);
+
+      // Apply defaults for new directional fields
+      trade.direction = trade.direction ?? "long";
+      trade.positionType = trade.positionType ?? "spot_long";
+      trade.leverage = trade.leverage ?? 1;
     }
 
     BigInt(parsed.riskMetrics.stopLossPrice);
@@ -551,7 +586,11 @@ Produce the JSON ${mode === "investment" ? "investment plan" : "strategy"} now.`
   }
 
   private toLLMTradeAction(trade: LLMStrategyResponse["trades"][number]): TradeAction {
-    return {
+    const direction = (trade.direction ?? "long") as PositionDirection;
+    const positionType = (trade.positionType ?? "spot_long") as PositionType;
+    const leverage = trade.leverage ?? 1;
+
+    const action: TradeAction = {
       action: trade.action,
       tokenIn: trade.tokenIn as Address,
       tokenOut: trade.tokenOut as Address,
@@ -560,6 +599,20 @@ Produce the JSON ${mode === "investment" ? "investment plan" : "strategy"} now.`
       poolFee: trade.poolFee,
       priceImpact: trade.priceImpact,
       route: trade.route.map((addr) => addr as Address),
+      direction,
+      positionType,
     };
+
+    // Build LeverageConfig if leverage > 1
+    if (leverage > 1) {
+      action.leverageConfig = {
+        collateralToken: trade.tokenIn as Address,
+        debtToken: trade.tokenOut as Address,
+        leverageMultiplier: leverage,
+        protocol: "aave-v3",
+      };
+    }
+
+    return action;
   }
 }

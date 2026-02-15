@@ -7,6 +7,8 @@ import { strategyRoutes } from "./routes/strategy.js";
 import { agentRoutes } from "./routes/agent.js";
 import { authRoutes } from "./routes/auth.js";
 import { a2aRoutes } from "./routes/a2a.js";
+import { positionRoutes } from "./routes/positions.js";
+import { lendingRoutes } from "./routes/lending.js";
 export async function buildApp(ctx) {
     const app = Fastify({
         logger: false, // We use our own pino logger
@@ -43,6 +45,8 @@ export async function buildApp(ctx) {
     await agentRoutes(app, ctx);
     await authRoutes(app, ctx);
     await a2aRoutes(app, ctx);
+    await positionRoutes(app, ctx);
+    await lendingRoutes(app, ctx);
     return app;
 }
 //# sourceMappingURL=app.js.map

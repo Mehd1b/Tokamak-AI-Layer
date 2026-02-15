@@ -1,5 +1,5 @@
 import type { Address, PublicClient } from "viem";
-import type { QuantScore, TradeRequest } from "@tal-trading-agent/shared";
+import type { QuantScore, TradeRequest, DirectionalScore } from "@tal-trading-agent/shared";
 export declare class TokenScorer {
     private readonly poolAnalyzer;
     private readonly quantAnalysis;
@@ -79,5 +79,78 @@ export declare class TokenScorer {
      * Low bandwidth = squeeze bonus.
      */
     private bollingerPositionToSignal;
+    /**
+     * Compute directional score comparing long and short signal strength.
+     * longScore uses existing signal methods (bullish = high).
+     * shortScore uses inverted signal methods (bearish = high).
+     */
+    computeDirectionalScore(score: QuantScore): DirectionalScore;
+    /**
+     * Compute weighted short score — mirrors computeOverallScore but uses
+     * inverted (short) signal methods for directional indicators.
+     */
+    private computeShortScore;
+    /**
+     * RSI short signal: RSI > 80 = strongly overbought = strong short (90).
+     * RSI < 20 = strongly oversold = weak short (10).
+     */
+    private rsiToShortSignal;
+    /**
+     * MACD short signal: Negative histogram = bearish = strong short.
+     * Inverts the long MACD signal.
+     */
+    private macdToShortSignal;
+    /**
+     * Momentum short signal: Negative momentum = strong short.
+     * Inverts the long momentum signal.
+     */
+    private momentumToShortSignal;
+    /**
+     * ADX short signal: -DI > +DI with strong ADX = strong short.
+     * Inverts the long ADX signal.
+     */
+    private adxToShortSignal;
+    /**
+     * Aroon short signal: Invert oscillator. Negative oscillator = bearish = strong short.
+     */
+    private aroonToShortSignal;
+    /**
+     * Stochastic RSI short signal: K > 80 = overbought = strong short.
+     * K < 20 = oversold = weak short.
+     */
+    private stochRsiToShortSignal;
+    /**
+     * Williams %R short signal: WR > -20 = overbought = strong short.
+     * WR < -80 = oversold = weak short.
+     */
+    private williamsRToShortSignal;
+    /**
+     * ROC short signal: Negative ROC = price declining = strong short.
+     * Inverts the long ROC signal.
+     */
+    private rocToShortSignal;
+    /**
+     * ATR short signal: Same as long — volatility is direction-agnostic.
+     */
+    private atrToShortSignal;
+    /**
+     * Historical volatility short signal: Same as long — direction-agnostic.
+     */
+    private hvToShortSignal;
+    /**
+     * VWAP deviation short signal: Above VWAP = overbought = strong short.
+     * Inverts the long VWAP deviation signal.
+     */
+    private vwapDeviationToShortSignal;
+    /**
+     * Bollinger Position short signal: %B > 1 = overbought = strong short (80).
+     * %B < 0 = oversold = weak short (20).
+     */
+    private bollingerPositionToShortSignal;
+    /**
+     * Trend strength short signal: Strong downtrend (negative composite) = high short score.
+     * Inverts the long trend strength signal.
+     */
+    private trendStrengthToShortSignal;
 }
 //# sourceMappingURL=TokenScorer.d.ts.map

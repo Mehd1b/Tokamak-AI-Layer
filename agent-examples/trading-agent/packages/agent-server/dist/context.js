@@ -11,6 +11,9 @@ import { StrategyEngine } from "@tal-trading-agent/agent-core";
 import { RiskManager } from "@tal-trading-agent/agent-core";
 import { TradeExecutor } from "@tal-trading-agent/agent-core";
 import { SwapBuilder } from "@tal-trading-agent/agent-core";
+import { AaveV3Client } from "@tal-trading-agent/agent-core";
+import { LendingBuilder } from "@tal-trading-agent/agent-core";
+import { PositionManager } from "@tal-trading-agent/agent-core";
 import { TradingAgentTAL } from "@tal-trading-agent/tal-integration";
 import { SIWAProvider } from "@tal-trading-agent/siwa-auth";
 export async function buildContext() {
@@ -54,6 +57,9 @@ export async function buildContext() {
     const riskManager = new RiskManager({});
     const tradeExecutor = new TradeExecutor({ publicClient: ethClient });
     const swapBuilder = new SwapBuilder({});
+    const aaveV3Client = new AaveV3Client(ethClient);
+    const lendingBuilder = new LendingBuilder({ swapBuilder });
+    const positionManager = new PositionManager(aaveV3Client, lendingBuilder);
     const talIntegration = new TradingAgentTAL({
         publicClient: thanosPublicClient,
         walletClient: walletClient ?? undefined,
@@ -78,10 +84,14 @@ export async function buildContext() {
         riskManager,
         tradeExecutor,
         swapBuilder,
+        aaveV3Client,
+        lendingBuilder,
+        positionManager,
         talIntegration,
         siwaProvider,
         strategyCache: new Map(),
         executionCache: new Map(),
+        positionCache: new Map(),
     };
 }
 //# sourceMappingURL=context.js.map

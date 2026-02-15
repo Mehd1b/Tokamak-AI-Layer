@@ -13,6 +13,18 @@ export declare const UNISWAP_V3: {
     readonly quoterV2: Address;
     readonly nftPositionManager: Address;
 };
+export declare const AAVE_V3: {
+    readonly pool: Address;
+    readonly poolDataProvider: Address;
+    readonly oracle: Address;
+};
+export declare const AAVE_TOKENS: {
+    readonly USDC: Address;
+    readonly USDT: Address;
+    readonly DAI: Address;
+    readonly WETH: Address;
+    readonly WBTC: Address;
+};
 export declare const UNISWAP_V2: {
     readonly factory: Address;
     readonly router: Address;

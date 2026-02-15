@@ -6,3 +6,6 @@ export { RiskManager } from "./strategy/RiskManager.js";
 export { TradeExecutor } from "./execution/TradeExecutor.js";
 export { SwapBuilder } from "./execution/SwapBuilder.js";
 export { TokenPreFilter } from "./analysis/TokenPreFilter.js";
+export { AaveV3Client } from "./lending/AaveV3Client.js";
+export { LendingBuilder } from "./execution/LendingBuilder.js";
+export { PositionManager } from "./execution/PositionManager.js";

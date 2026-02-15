@@ -113,10 +113,46 @@ export async function tradeRoutes(app: FastifyInstance, ctx: AppContext) {
         });
       }
 
-      // 5. Build unsigned swap calldata for each trade
-      const unsignedSwaps = strategy.trades.map((trade) =>
+      // 5. Build unsigned swap calldata for spot trades
+      const spotTrades = strategy.trades.filter(
+        (t) => !t.positionType || t.positionType === "spot_long",
+      );
+      const unsignedSwaps = spotTrades.map((trade) =>
         ctx.swapBuilder.buildFromTradeAction(trade, request.walletAddress),
       );
+
+      // 6. Build lending transactions for leveraged/short trades
+      const leveragedTrades = strategy.trades.filter(
+        (t) => t.positionType && t.positionType !== "spot_long",
+      );
+      const lendingTransactions = leveragedTrades.map((trade) => {
+        if (trade.positionType === "leveraged_long" && trade.leverageConfig) {
+          return ctx.lendingBuilder.buildLeveragedLong({
+            collateralToken: trade.tokenIn,
+            targetToken: trade.tokenOut,
+            stablecoin: trade.tokenIn, // budget token as stablecoin
+            collateralAmount: trade.amountIn,
+            leverageMultiplier: trade.leverageConfig.leverageMultiplier,
+            recipient: request.walletAddress,
+            poolFee: trade.poolFee,
+          });
+        } else if (trade.positionType === "spot_short" || trade.positionType === "leveraged_short") {
+          return ctx.lendingBuilder.buildSpotShort({
+            targetToken: trade.tokenOut,
+            stablecoin: trade.tokenIn,
+            collateralAmount: trade.amountIn,
+            borrowAmount: trade.minAmountOut > 0n ? trade.minAmountOut : trade.amountIn,
+            recipient: request.walletAddress,
+            poolFee: trade.poolFee,
+          });
+        }
+        return [];
+      });
+
+      // Attach lending transactions to strategy
+      if (lendingTransactions.length > 0) {
+        strategy.lendingTransactions = lendingTransactions;
+      }
 
       ctx.strategyCache.set(strategy.id, strategy);
 
@@ -144,6 +180,18 @@ export async function tradeRoutes(app: FastifyInstance, ctx: AppContext) {
           gasEstimate: s.gasEstimate.toString(),
           description: s.description,
         })),
+        lendingTransactions: lendingTransactions.map((txs) =>
+          txs.map((tx) => ({
+            type: tx.type,
+            to: tx.to,
+            data: tx.data,
+            value: tx.value.toString(),
+            gasEstimate: tx.gasEstimate.toString(),
+            description: tx.description,
+            token: tx.token,
+            amount: tx.amount?.toString(),
+          })),
+        ),
         riskWarnings: validation.warnings,
         riskAdjusted: false,
         ...(confirmTxHash ? { feeConfirmed: true, confirmTxHash } : {}),

@@ -13,9 +13,9 @@ export async function a2aRoutes(app, ctx) {
         const baseUrl = `${protocol}://${host}`;
         return reply.send({
             name: "TAL Trading Agent",
-            description: "Autonomous quantitative trading agent on the Tokamak AI Layer (ERC-8004). Accepts natural-language trading prompts, analyzes Uniswap V3 pool liquidity and DeFiLlama market data across 9 technical and DeFi indicators, then generates optimized strategies via Claude with extended thinking. Supports four trading modes — scalp, swing, position, and investment — with automatic horizon inference from plain English. Investment-mode strategies include portfolio allocation, DCA scheduling, drift-based rebalancing, and configurable exit criteria. All strategies come with unsigned Uniswap V3 swap calldata, risk validation with auto-adjustment, and a downloadable self-executing trading bot. On-chain fee escrow confirmation via TaskFeeEscrow ensures trustless payment settlement.",
+            description: "Autonomous quantitative trading agent on the Tokamak AI Layer (ERC-8004). Accepts natural-language trading prompts, analyzes Uniswap V3 pool liquidity and DeFiLlama market data across 13 technical and DeFi indicators, then generates optimized strategies via Claude with extended thinking. Supports four trading modes — scalp, swing, position, and investment — with automatic horizon inference from plain English. Supports bidirectional trading: LONG (spot buy) and SHORT (borrow-and-sell via Aave V3) positions with optional leverage up to 5x. Leveraged positions use Aave V3 lending protocol for collateral supply, borrowing, and multi-step transaction bundles. Investment-mode strategies include portfolio allocation, DCA scheduling, drift-based rebalancing, configurable exit criteria, and short hedges. All strategies come with unsigned swap calldata and/or lending transaction bundles, risk validation with leverage-aware auto-adjustment, and a downloadable self-executing trading bot. On-chain fee escrow confirmation via TaskFeeEscrow ensures trustless payment settlement.",
             url: `${baseUrl}/api/agents/trader`,
-            version: "0.2.0",
+            version: "0.3.0",
             provider: {
                 organization: "Tokamak Network",
             },
@@ -33,14 +33,17 @@ export async function a2aRoutes(app, ctx) {
                 {
                     id: "trade-analysis",
                     name: "Quantitative Strategy Generation",
-                    description: "Scores 100+ tokens across DeFi, L2, gaming, AI, meme, and RWA categories with intelligent pre-filtering. Accepts a natural-language trading prompt and automatically infers budget, horizon (1h to 1y), and risk tolerance. Uses on-chain Uniswap V3 pool data and DeFiLlama price history across 9 weighted indicators: RSI, MACD, Bollinger Bands, VWAP, momentum, liquidity depth, fee APY, volume trend, TVL stability, and smart money flow. Data quality scoring automatically down-weights unreliable technical signals and redistributes weight to DeFi fundamentals. Generates an optimized strategy via Claude with mode-specific guidance: scalp (hours, technical-first), swing (days, balanced), position (months, DeFi-first), or investment (6m–1y, portfolio allocation with DCA + rebalancing). Returns the strategy with unsigned swap calldata, risk metrics (score 0–100, max drawdown, stop-loss/take-profit), estimated returns (optimistic/expected/pessimistic), and an optional investment plan with allocations, DCA schedule, rebalancing triggers, and exit criteria. If a taskRef is provided, the agent confirms the on-chain fee escrow upon completion.",
-                    tags: ["defi", "trading", "uniswap", "strategy", "quantitative", "portfolio", "dca", "rebalancing"],
+                    description: "Scores 100+ tokens across DeFi, L2, gaming, AI, meme, and RWA categories with intelligent pre-filtering and bidirectional scoring. Accepts a natural-language trading prompt and automatically infers budget, horizon (1h to 1y), and risk tolerance. Uses on-chain Uniswap V3 pool data and DeFiLlama price history across 13 weighted indicators with both long and short signal analysis. Supports LONG positions (spot buy), SHORT positions (borrow via Aave V3 and sell), and LEVERAGED positions (1x–5x via Aave V3 lending). Generates an optimized strategy via Claude with mode-specific guidance including short/leverage awareness. Returns the strategy with unsigned swap calldata for spot trades and multi-step lending transaction bundles for leveraged/short positions. Includes leverage-aware risk metrics (health factor, liquidation price, borrow APY), estimated returns, and position management. If a taskRef is provided, the agent confirms the on-chain fee escrow upon completion.",
+                    tags: ["defi", "trading", "uniswap", "aave", "strategy", "quantitative", "portfolio", "dca", "rebalancing", "short-selling", "leverage"],
                     examples: [
                         "Invest $100,000 in promising tokens for the next 6 months",
                         "Invest 1 ETH in promising DeFi tokens for the next week",
                         "Conservative allocation of 0.5 ETH across blue-chip tokens for 3 months",
                         "Aggressive short-term trade on high-momentum tokens for 4 hours",
                         "Build a long-term DCA portfolio with monthly rebalancing for 1 year",
+                        "Short overvalued tokens with 2x leverage for the next week",
+                        "Open a 3x leveraged long on ETH with 0.5 ETH collateral",
+                        "Hedge my portfolio with short positions on overbought tokens",
                     ],
                     inputModes: ["application/json", "text/plain"],
                     outputModes: ["application/json"],
@@ -177,11 +180,41 @@ async function handleTasksSend(rpc, ctx, reply) {
             finalStrategy = ctx.riskManager.adjustForRisk(strategy);
             riskAdjusted = true;
         }
-        // 4. Build unsigned swaps
-        const unsignedSwaps = finalStrategy.trades.map((trade) => ctx.swapBuilder.buildFromTradeAction(trade, walletAddress));
+        // 4. Build unsigned swaps for spot trades
+        const spotTrades = finalStrategy.trades.filter((t) => !t.positionType || t.positionType === "spot_long");
+        const unsignedSwaps = spotTrades.map((trade) => ctx.swapBuilder.buildFromTradeAction(trade, walletAddress));
+        // 5. Build lending transactions for leveraged/short trades
+        const leveragedTrades = finalStrategy.trades.filter((t) => t.positionType && t.positionType !== "spot_long");
+        const lendingTransactions = leveragedTrades.map((trade) => {
+            if (trade.positionType === "leveraged_long" && trade.leverageConfig) {
+                return ctx.lendingBuilder.buildLeveragedLong({
+                    collateralToken: trade.tokenIn,
+                    targetToken: trade.tokenOut,
+                    stablecoin: trade.tokenIn,
+                    collateralAmount: trade.amountIn,
+                    leverageMultiplier: trade.leverageConfig.leverageMultiplier,
+                    recipient: walletAddress,
+                    poolFee: trade.poolFee,
+                });
+            }
+            else if (trade.positionType === "spot_short" || trade.positionType === "leveraged_short") {
+                return ctx.lendingBuilder.buildSpotShort({
+                    targetToken: trade.tokenOut,
+                    stablecoin: trade.tokenIn,
+                    collateralAmount: trade.amountIn,
+                    borrowAmount: trade.minAmountOut > 0n ? trade.minAmountOut : trade.amountIn,
+                    recipient: walletAddress,
+                    poolFee: trade.poolFee,
+                });
+            }
+            return [];
+        });
+        if (lendingTransactions.length > 0) {
+            finalStrategy.lendingTransactions = lendingTransactions;
+        }
         // Cache the strategy for later retrieval via /api/v1/trade/:id
         ctx.strategyCache.set(finalStrategy.id, finalStrategy);
-        // 5. Build the completed task
+        // 6. Build the completed task
         const serialized = serializeStrategy(finalStrategy);
         task.status = {
             state: "completed",
@@ -212,6 +245,16 @@ async function handleTasksSend(rpc, ctx, reply) {
                                 gasEstimate: s.gasEstimate.toString(),
                                 description: s.description,
                             })),
+                            lendingTransactions: lendingTransactions.map((txs) => txs.map((tx) => ({
+                                type: tx.type,
+                                to: tx.to,
+                                data: tx.data,
+                                value: tx.value.toString(),
+                                gasEstimate: tx.gasEstimate.toString(),
+                                description: tx.description,
+                                token: tx.token,
+                                amount: tx.amount?.toString(),
+                            }))),
                             riskWarnings: validation.warnings,
                             riskAdjusted,
                         },

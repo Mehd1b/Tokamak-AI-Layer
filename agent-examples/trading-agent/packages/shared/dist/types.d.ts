@@ -1,5 +1,7 @@
 import type { Address, Hash, Hex } from "viem";
 export type StrategyMode = "scalp" | "swing" | "position" | "investment";
+export type PositionDirection = "long" | "short";
+export type PositionType = "spot_long" | "leveraged_long" | "spot_short" | "leveraged_short";
 export interface TradeRequest {
     /** Natural language prompt from the user */
     prompt: string;
@@ -100,6 +102,13 @@ export interface QuantScore {
     overallScore: number;
     reasoning: string;
     dataQuality?: DataQuality;
+    directionalScore?: DirectionalScore;
+}
+export interface DirectionalScore {
+    longScore: number;
+    shortScore: number;
+    preferredDirection: PositionDirection;
+    directionConfidence: number;
 }
 export interface PortfolioAllocation {
     tokenAddress: string;
@@ -142,6 +151,8 @@ export interface TradingStrategy {
         topCandidates: QuantScore[];
     };
     trades: TradeAction[];
+    positions?: LeveragedPosition[];
+    lendingTransactions?: LendingTransaction[][];
     investmentPlan?: InvestmentPlan;
     llmReasoning?: string;
     riskMetrics: RiskMetrics;
@@ -162,6 +173,9 @@ export interface TradeAction {
     poolFee: number;
     priceImpact: number;
     route: Address[];
+    direction?: PositionDirection;
+    positionType?: PositionType;
+    leverageConfig?: LeverageConfig;
 }
 export interface RiskMetrics {
     score: number;
@@ -169,6 +183,11 @@ export interface RiskMetrics {
     stopLossPrice: bigint;
     takeProfitPrice: bigint;
     positionSizePercent: number;
+    leverage?: number;
+    liquidationPrice?: bigint;
+    healthFactor?: number;
+    borrowAPY?: number;
+    fundingCostPerDay?: number;
 }
 export interface UnsignedSwap {
     to: Address;
@@ -239,5 +258,56 @@ export interface RiskParams {
     minPoolTvlUsd: number;
     maxPriceImpactPercent: number;
     requireStopLoss: boolean;
+    maxLeverage?: number;
+    minHealthFactor?: number;
+    maxBorrowUtilization?: number;
+    allowShorts?: boolean;
+}
+export interface LeverageConfig {
+    collateralToken: Address;
+    debtToken: Address;
+    leverageMultiplier: number;
+    protocol: "aave-v3";
+    useFlashLoan?: boolean;
+}
+export interface AaveReserveData {
+    ltv: number;
+    liquidationThreshold: number;
+    liquidationBonus: number;
+    variableBorrowRate: bigint;
+    stableBorrowRate: bigint;
+    availableLiquidity: bigint;
+    totalVariableDebt: bigint;
+    totalStableDebt: bigint;
+    usageAsCollateralEnabled: boolean;
+    borrowingEnabled: boolean;
+    isActive: boolean;
+    isFrozen: boolean;
+}
+export interface LeveragedPosition {
+    id: string;
+    direction: PositionDirection;
+    positionType: PositionType;
+    collateralToken: Address;
+    debtToken: Address;
+    collateralAmount: bigint;
+    debtAmount: bigint;
+    leverageMultiplier: number;
+    healthFactor: number;
+    liquidationPrice: bigint;
+    entryPrice: bigint;
+    openedAt: number;
+    status: "open" | "closed" | "liquidated";
+}
+export type LendingTransactionType = "approve" | "supply" | "borrow" | "repay" | "withdraw" | "swap";
+export interface LendingTransaction {
+    type: LendingTransactionType;
+    to: Address;
+    data: Hex;
+    value: bigint;
+    gasEstimate: bigint;
+    description: string;
+    token?: Address;
+    amount?: bigint;
 }
 //# sourceMappingURL=types.d.ts.map

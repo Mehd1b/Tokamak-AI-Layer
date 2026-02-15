@@ -80,6 +80,8 @@ export class TokenScorer {
         const quantScore = await this.quantAnalysis.analyzeToken(tokenAddress, tokenInfo.symbol, pools, horizon);
         // Compute weighted overall score
         quantScore.overallScore = this.computeOverallScore(quantScore);
+        // Compute directional score (long vs short)
+        quantScore.directionalScore = this.computeDirectionalScore(quantScore);
         return quantScore;
     }
     /**
@@ -305,6 +307,223 @@ export class TokenScorer {
             score = Math.min(100, score + 10);
         }
         return score;
+    }
+    // ── Directional Score (Long vs Short) ────────────────
+    /**
+     * Compute directional score comparing long and short signal strength.
+     * longScore uses existing signal methods (bullish = high).
+     * shortScore uses inverted signal methods (bearish = high).
+     */
+    computeDirectionalScore(score) {
+        const longScore = this.computeOverallScore(score);
+        const shortScore = this.computeShortScore(score);
+        const preferredDirection = longScore >= shortScore ? "long" : "short";
+        const directionConfidence = Math.abs(longScore - shortScore) / 100;
+        return {
+            longScore: Math.round(longScore * 10) / 10,
+            shortScore: Math.round(shortScore * 10) / 10,
+            preferredDirection,
+            directionConfidence: Math.round(directionConfidence * 1000) / 1000,
+        };
+    }
+    /**
+     * Compute weighted short score — mirrors computeOverallScore but uses
+     * inverted (short) signal methods for directional indicators.
+     */
+    computeShortScore(score) {
+        const { indicators, defiMetrics, dataQuality } = score;
+        const confidence = dataQuality?.confidenceScore ?? 1;
+        // Short-signal conversions (bearish = high score)
+        const momentumSignal = this.momentumToShortSignal(indicators.momentum);
+        const rsiSignal = this.rsiToShortSignal(indicators.rsi);
+        const macdSignal = this.macdToShortSignal(indicators.macd);
+        const adxSignal = this.adxToShortSignal(indicators.adx);
+        const aroonSignal = this.aroonToShortSignal(indicators.aroon);
+        const stochRsiSignal = this.stochRsiToShortSignal(indicators.stochasticRsi);
+        const wrSignal = this.williamsRToShortSignal(indicators.williamsR);
+        const rocSignal = this.rocToShortSignal(indicators.roc);
+        const atrSignal = this.atrToShortSignal(indicators.atr);
+        const hvSignal = this.hvToShortSignal(indicators.historicalVolatility);
+        const vwapDevSignal = this.vwapDeviationToShortSignal(indicators.vwapDeviation);
+        const bbPosSignal = this.bollingerPositionToShortSignal(indicators.bollingerPosition);
+        const trendSignal = this.trendStrengthToShortSignal(indicators.trendStrengthComposite);
+        const techWeightValues = Object.values(TECHNICAL_WEIGHTS);
+        const rawTechWeight = techWeightValues.reduce((s, w) => s + w, 0);
+        const defiWeightValues = Object.values(DEFI_WEIGHTS);
+        const rawDefiWeight = defiWeightValues.reduce((s, w) => s + w, 0);
+        const effectiveTechWeight = rawTechWeight * confidence;
+        const redistributed = rawTechWeight - effectiveTechWeight;
+        const defiBoost = rawDefiWeight > 0 ? 1 + redistributed / rawDefiWeight : 1;
+        const techScore = momentumSignal * TECHNICAL_WEIGHTS.priceMomentum * confidence +
+            rsiSignal * TECHNICAL_WEIGHTS.rsiSignal * confidence +
+            macdSignal * TECHNICAL_WEIGHTS.macdSignal * confidence +
+            adxSignal * TECHNICAL_WEIGHTS.adxSignal * confidence +
+            aroonSignal * TECHNICAL_WEIGHTS.aroonSignal * confidence +
+            stochRsiSignal * TECHNICAL_WEIGHTS.stochasticRsiSignal * confidence +
+            wrSignal * TECHNICAL_WEIGHTS.williamsRSignal * confidence +
+            rocSignal * TECHNICAL_WEIGHTS.rocSignal * confidence +
+            atrSignal * TECHNICAL_WEIGHTS.atrSignal * confidence +
+            hvSignal * TECHNICAL_WEIGHTS.historicalVolSignal * confidence +
+            vwapDevSignal * TECHNICAL_WEIGHTS.vwapDeviationSignal * confidence +
+            bbPosSignal * TECHNICAL_WEIGHTS.bollingerPositionSignal * confidence +
+            trendSignal * TECHNICAL_WEIGHTS.trendStrengthSignal * confidence;
+        // DeFi component is direction-agnostic (same as long)
+        const defiScore = defiMetrics.liquidityDepth * DEFI_WEIGHTS.liquidityDepth * defiBoost +
+            defiMetrics.volumeTrend * DEFI_WEIGHTS.volumeTrend * defiBoost +
+            defiMetrics.tvlStability * DEFI_WEIGHTS.tvlStability * defiBoost +
+            defiMetrics.feeApy * DEFI_WEIGHTS.feeEfficiency * defiBoost +
+            defiMetrics.smartMoneyFlow * DEFI_WEIGHTS.smartMoneyFlow * defiBoost;
+        const overall = techScore + defiScore;
+        return Math.round(overall * 10) / 10;
+    }
+    // ── Short-Signal Conversion Methods ──────────────────
+    /**
+     * RSI short signal: RSI > 80 = strongly overbought = strong short (90).
+     * RSI < 20 = strongly oversold = weak short (10).
+     */
+    rsiToShortSignal(rsi) {
+        if (rsi >= 80)
+            return 90; // Strongly overbought - strong short
+        if (rsi >= 70)
+            return 75; // Overbought - short signal
+        if (rsi >= 55)
+            return 60; // Slightly above neutral
+        if (rsi >= 45)
+            return 50; // Neutral
+        if (rsi >= 30)
+            return 40; // Slightly below neutral
+        if (rsi >= 20)
+            return 25; // Oversold - weak short
+        return 10; // Strongly oversold - very weak short
+    }
+    /**
+     * MACD short signal: Negative histogram = bearish = strong short.
+     * Inverts the long MACD signal.
+     */
+    macdToShortSignal(macd) {
+        const hist = macd.histogram;
+        // Invert: negative histogram = high short score
+        const normalized = Math.tanh(-hist * 10) * 50 + 50;
+        return Math.min(100, Math.max(0, normalized));
+    }
+    /**
+     * Momentum short signal: Negative momentum = strong short.
+     * Inverts the long momentum signal.
+     */
+    momentumToShortSignal(momentum) {
+        const clamped = Math.min(20, Math.max(-20, momentum));
+        // Invert: -20% -> 100 (strong short), +20% -> 0 (weak short)
+        return ((-clamped + 20) / 40) * 100;
+    }
+    /**
+     * ADX short signal: -DI > +DI with strong ADX = strong short.
+     * Inverts the long ADX signal.
+     */
+    adxToShortSignal(adx) {
+        if (adx.adx < 20)
+            return 50; // No trend - neutral
+        const trendStrength = Math.min(1, (adx.adx - 20) / 30);
+        if (adx.minusDI > adx.plusDI) {
+            // Bearish trend - strong short
+            return 50 + trendStrength * 40; // 50-90
+        }
+        // Bullish trend - weak short
+        return 50 - trendStrength * 40; // 10-50
+    }
+    /**
+     * Aroon short signal: Invert oscillator. Negative oscillator = bearish = strong short.
+     */
+    aroonToShortSignal(aroon) {
+        // Invert: oscillator -100 -> 100 (strong short), +100 -> 0 (weak short)
+        return (-aroon.oscillator + 100) / 2;
+    }
+    /**
+     * Stochastic RSI short signal: K > 80 = overbought = strong short.
+     * K < 20 = oversold = weak short.
+     */
+    stochRsiToShortSignal(stochRsi) {
+        if (stochRsi.k >= 80)
+            return 85; // Overbought - strong short
+        if (stochRsi.k >= 70)
+            return 70; // Mildly overbought
+        if (stochRsi.k >= 30)
+            return 50; // Neutral
+        if (stochRsi.k >= 20)
+            return 30; // Mildly oversold
+        return 15; // Oversold - weak short
+    }
+    /**
+     * Williams %R short signal: WR > -20 = overbought = strong short.
+     * WR < -80 = oversold = weak short.
+     */
+    williamsRToShortSignal(wr) {
+        if (wr >= -20)
+            return 85; // Overbought - strong short
+        if (wr <= -80)
+            return 15; // Oversold - weak short
+        // Linear map [-80, -20] -> [15, 85]
+        return 15 + ((wr + 80) / 60) * 70;
+    }
+    /**
+     * ROC short signal: Negative ROC = price declining = strong short.
+     * Inverts the long ROC signal.
+     */
+    rocToShortSignal(roc) {
+        const clamped = Math.min(30, Math.max(-30, roc));
+        // Invert: -30 -> 100, +30 -> 0
+        return ((-clamped + 30) / 60) * 100;
+    }
+    /**
+     * ATR short signal: Same as long — volatility is direction-agnostic.
+     */
+    atrToShortSignal(atr) {
+        return this.atrToSignal(atr);
+    }
+    /**
+     * Historical volatility short signal: Same as long — direction-agnostic.
+     */
+    hvToShortSignal(hv) {
+        return this.hvToSignal(hv);
+    }
+    /**
+     * VWAP deviation short signal: Above VWAP = overbought = strong short.
+     * Inverts the long VWAP deviation signal.
+     */
+    vwapDeviationToShortSignal(dev) {
+        const clamped = Math.min(10, Math.max(-10, dev));
+        // Invert: +10 -> 100 (strong short, above VWAP), -10 -> 0 (weak short)
+        return ((clamped + 10) / 20) * 100;
+    }
+    /**
+     * Bollinger Position short signal: %B > 1 = overbought = strong short (80).
+     * %B < 0 = oversold = weak short (20).
+     */
+    bollingerPositionToShortSignal(bp) {
+        let score;
+        if (bp.percentB > 1) {
+            score = 80; // Overbought - strong short
+        }
+        else if (bp.percentB < 0) {
+            score = 20; // Oversold - weak short
+        }
+        else {
+            // Map [0, 1] -> [30, 70] (higher %B = more bearish for short)
+            score = 30 + bp.percentB * 40;
+        }
+        // Squeeze bonus: low bandwidth suggests potential breakout
+        if (bp.bandwidth > 0 && bp.bandwidth < 5) {
+            score = Math.min(100, score + 10);
+        }
+        return score;
+    }
+    /**
+     * Trend strength short signal: Strong downtrend (negative composite) = high short score.
+     * Inverts the long trend strength signal.
+     */
+    trendStrengthToShortSignal(trendStrength) {
+        // Invert: -100 -> 100 (strong downtrend = strong short), +100 -> 0
+        const inverted = -trendStrength;
+        return Math.min(100, Math.max(0, inverted));
     }
 }
 //# sourceMappingURL=TokenScorer.js.map
