@@ -1,5 +1,5 @@
 import pino from "pino";
-import { DEFILLAMA, HORIZON_MS, MIN_DATA_POINTS } from "@tal-trading-agent/shared";
+import { DEFILLAMA, HORIZON_MS, HORIZON_TO_LLAMA_CHART, MIN_DATA_POINTS } from "@tal-trading-agent/shared";
 const logger = pino({ name: "quant-analysis" });
 // ── QuantAnalysis ───────────────────────────────────────────
 export class QuantAnalysis {
@@ -24,18 +24,62 @@ export class QuantAnalysis {
         }
     }
     /**
-     * Fetch historical price data by sampling individual timestamps via
-     * DeFiLlama's /prices/historical endpoint.
-     *
-     * The chart endpoint returns too few data points for reliable indicators,
-     * so we build the price series ourselves using evenly spaced timestamps.
+     * Fetch historical price data via DeFiLlama's /chart endpoint (single request).
+     * Falls back to per-timestamp sampling if the chart endpoint fails.
      */
     async getHistoricalPrices(tokenAddress, horizon = "1w") {
+        // Primary: chart endpoint (1 request for all data points)
+        const chartPrices = await this.getHistoricalPricesViaChart(tokenAddress, horizon);
+        if (chartPrices.length > 0)
+            return chartPrices;
+        // Fallback: per-timestamp sampling
+        logger.info({ tokenAddress, horizon }, "Chart endpoint failed, falling back to per-timestamp fetch");
+        return this.getHistoricalPricesViaTimestamps(tokenAddress, horizon);
+    }
+    /**
+     * Primary method: fetch price history via DeFiLlama's /chart endpoint.
+     * Returns all data points in a single HTTP request.
+     */
+    async getHistoricalPricesViaChart(tokenAddress, horizon) {
+        const coinId = `ethereum:${tokenAddress}`;
+        const chartParams = HORIZON_TO_LLAMA_CHART[horizon];
+        const url = `${DEFILLAMA.chartUrl}/${encodeURIComponent(coinId)}?period=${chartParams.period}&span=${chartParams.span}&searchWidth=600`;
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+                if (!response.ok) {
+                    logger.warn({ tokenAddress, status: response.status, attempt }, "DeFiLlama chart request failed");
+                    continue;
+                }
+                const data = (await response.json());
+                const points = data.coins?.[coinId]?.prices;
+                if (!points || points.length === 0) {
+                    logger.warn({ tokenAddress, horizon }, "Chart response empty");
+                    continue;
+                }
+                // Sort by timestamp ascending and extract prices
+                const sorted = [...points].sort((a, b) => a.timestamp - b.timestamp);
+                const prices = sorted.map((p) => p.price).filter((p) => p > 0);
+                if (prices.length > 0) {
+                    logger.info({ tokenAddress, horizon, dataPoints: prices.length }, "Historical prices fetched via chart");
+                    return prices;
+                }
+            }
+            catch (error) {
+                logger.warn({ tokenAddress, attempt, error: error instanceof Error ? error.message : error }, "Chart fetch attempt failed");
+            }
+        }
+        return [];
+    }
+    /**
+     * Fallback method: sample individual timestamps via /prices/historical.
+     * Slower (N requests) but works for tokens not indexed by the chart endpoint.
+     */
+    async getHistoricalPricesViaTimestamps(tokenAddress, horizon) {
         try {
             const coinId = `ethereum:${tokenAddress}`;
             const periodMs = HORIZON_MS[horizon];
             const targetPoints = MIN_DATA_POINTS[horizon];
-            // Build evenly spaced timestamps from (now - period) to now
             const now = Math.floor(Date.now() / 1000);
             const start = now - Math.floor(periodMs / 1000);
             const step = Math.floor((now - start) / targetPoints);
@@ -43,15 +87,14 @@ export class QuantAnalysis {
             for (let t = start; t <= now; t += step) {
                 timestamps.push(t);
             }
-            // Fetch prices in parallel batches (max 10 concurrent)
-            const BATCH_SIZE = 10;
+            const BATCH_SIZE = 5;
             const prices = [];
             for (let i = 0; i < timestamps.length; i += BATCH_SIZE) {
                 const batch = timestamps.slice(i, i + BATCH_SIZE);
                 const results = await Promise.all(batch.map(async (ts) => {
                     try {
-                        const url = `${DEFILLAMA.pricesUrl.replace("/current", `/historical/${ts}`)}/${encodeURIComponent(coinId)}`;
-                        const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+                        const url = `${DEFILLAMA.pricesUrl.replace("/current", `/historical/${ts}`)}/${encodeURIComponent(coinId)}?searchWidth=4h`;
+                        const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
                         if (!response.ok)
                             return null;
                         const data = (await response.json());
@@ -68,16 +111,15 @@ export class QuantAnalysis {
                 }
             }
             if (prices.length === 0) {
-                logger.warn({ tokenAddress, horizon }, "No historical prices fetched");
+                logger.warn({ tokenAddress, horizon }, "No historical prices from timestamp fallback");
                 return [];
             }
-            // Sort ascending by timestamp and return price values
             prices.sort((a, b) => a.ts - b.ts);
-            logger.info({ tokenAddress, horizon, dataPoints: prices.length }, "Historical prices fetched");
+            logger.info({ tokenAddress, horizon, dataPoints: prices.length }, "Historical prices fetched via timestamps");
             return prices.map((p) => p.price);
         }
         catch (error) {
-            logger.error({ tokenAddress, error }, "Failed to fetch historical prices");
+            logger.error({ tokenAddress, error }, "Failed to fetch historical prices via timestamps");
             return [];
         }
     }

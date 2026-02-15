@@ -59,13 +59,20 @@ export declare class QuantAnalysis {
      */
     getCurrentPrice(tokenAddress: Address): Promise<number>;
     /**
-     * Fetch historical price data by sampling individual timestamps via
-     * DeFiLlama's /prices/historical endpoint.
-     *
-     * The chart endpoint returns too few data points for reliable indicators,
-     * so we build the price series ourselves using evenly spaced timestamps.
+     * Fetch historical price data via DeFiLlama's /chart endpoint (single request).
+     * Falls back to per-timestamp sampling if the chart endpoint fails.
      */
     getHistoricalPrices(tokenAddress: Address, horizon?: TradeRequest["horizon"]): Promise<number[]>;
+    /**
+     * Primary method: fetch price history via DeFiLlama's /chart endpoint.
+     * Returns all data points in a single HTTP request.
+     */
+    private getHistoricalPricesViaChart;
+    /**
+     * Fallback method: sample individual timestamps via /prices/historical.
+     * Slower (N requests) but works for tokens not indexed by the chart endpoint.
+     */
+    private getHistoricalPricesViaTimestamps;
     /**
      * Compute all technical indicators from price series.
      */
