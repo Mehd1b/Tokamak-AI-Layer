@@ -2,11 +2,11 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Script.sol";
-import "../src/core/TALValidationRegistryV2.sol";
+import "../src/core/TALValidationRegistry.sol";
 
 /**
  * @title UpgradeValidationRegistry
- * @notice Upgrades TALValidationRegistry proxy to V2 on Thanos Sepolia
+ * @notice Upgrades TALValidationRegistry proxy to latest consolidated implementation on Thanos Sepolia
  *
  * Network: Thanos Sepolia
  * Chain ID: 111551119090
@@ -26,13 +26,12 @@ contract UpgradeValidationRegistry is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
 
-        // Required
         address payable proxyAddress = payable(vm.envOr(
             "VALIDATION_REGISTRY_PROXY",
             address(0x09447147C6E75a60A449f38532F06E19F5F632F3)
         ));
 
-        console.log("=== TALValidationRegistry V2 Upgrade ===");
+        console.log("=== TALValidationRegistry Upgrade (Consolidated) ===");
         console.log("");
         console.log("Network: Thanos Sepolia (Chain ID: 111551119090)");
         console.log("Deployer:", deployer);
@@ -41,44 +40,29 @@ contract UpgradeValidationRegistry is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // 1. Deploy new V2 implementation
-        console.log("Deploying TALValidationRegistryV2 implementation...");
-        TALValidationRegistryV2 v2Implementation = new TALValidationRegistryV2();
-        console.log("  V2 Implementation:", address(v2Implementation));
+        // 1. Deploy new consolidated implementation
+        console.log("Deploying TALValidationRegistry implementation...");
+        TALValidationRegistry newImpl = new TALValidationRegistry();
+        console.log("  Implementation:", address(newImpl));
 
-        // 2. Upgrade proxy to V2 + call initializeV2
-        console.log("Upgrading proxy to V2...");
-        bytes memory initData = abi.encodeWithSelector(
-            TALValidationRegistryV2.initializeV2.selector
-        );
-
-        // UUPS upgrade: call upgradeToAndCall on the proxy
-        TALValidationRegistryV2(proxyAddress).upgradeToAndCall(
-            address(v2Implementation),
-            initData
+        // 2. Upgrade proxy (no re-initialization needed -- V2+V3 already initialized)
+        console.log("Upgrading proxy...");
+        TALValidationRegistry(proxyAddress).upgradeToAndCall(
+            address(newImpl),
+            bytes("")
         );
         console.log("  Upgrade complete");
 
-        // 3. Verify V2 functions are accessible
-        TALValidationRegistryV2 registry = TALValidationRegistryV2(proxyAddress);
+        // 3. Verify functions are accessible
+        TALValidationRegistry registry = TALValidationRegistry(proxyAddress);
         uint256 epoch = registry.currentEpoch();
-        uint256 epochDuration = registry.EPOCH_DURATION();
-        uint8 failureThreshold = registry.FAILURE_SCORE_THRESHOLD();
-
         console.log("  Current epoch:", epoch);
-        console.log("  Epoch duration:", epochDuration);
-        console.log("  Failure score threshold:", uint256(failureThreshold));
 
         vm.stopBroadcast();
 
         console.log("");
         console.log("=== Upgrade Summary ===");
-        console.log("  Proxy:              ", proxyAddress);
-        console.log("  V2 Implementation:  ", address(v2Implementation));
-        console.log("");
-        console.log("Next steps:");
-        console.log("  1. Upgrade IdentityRegistry to V2 (depends on ValidationRegistry being V2)");
-        console.log("  2. Verify contract on explorer");
-        console.log("  3. Test getAgentValidationStats() via cast call");
+        console.log("  Proxy:          ", proxyAddress);
+        console.log("  Implementation: ", address(newImpl));
     }
 }

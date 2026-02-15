@@ -178,19 +178,6 @@ interface ITALIdentityRegistry is IERC8004IdentityRegistry {
      */
     function isCapabilityVerified(uint256 agentId, bytes32 capabilityHash) external view returns (bool);
 
-    /**
-     * @notice Retrieve all verified capabilities for an agent
-     *
-     * Returns a complete list of all capability hashes that have been verified
-     * for a given agent. This allows discovery of an agent's verified capabilities.
-     *
-     * @param agentId The agent's unique identifier
-     * @return Array of verified capability hashes
-     *
-     * @dev This function may be gas-intensive for agents with many verified capabilities
-     */
-    function getVerifiedCapabilities(uint256 agentId) external view returns (bytes32[] memory);
-
     // ============ Operator Management ============
 
     /**
@@ -222,23 +209,6 @@ interface ITALIdentityRegistry is IERC8004IdentityRegistry {
      * @return The operator address (address(0) if not set)
      */
     function getOperator(uint256 agentId) external view returns (address);
-
-    /**
-     * @notice Check if an agent's operator has sufficient stake and is verified
-     *
-     * Verifies that the operator assigned to an agent meets the minimum stake
-     * requirement as determined by the Staking V2 contract. This is critical for
-     * ensuring operator reliability and economic security.
-     *
-     * @param agentId The agent's unique identifier
-     * @return isVerified Whether the operator is verified (meets stake requirement)
-     *
-     * @dev This function queries the Staking V2 contract for the operator's stake
-     * Requirements:
-     * - Agent must exist
-     * - Operator must be set for the agent
-     */
-    function checkOperatorStatus(uint256 agentId) external view returns (bool isVerified);
 
     /**
      * @notice Refresh the cached operator status from the Staking V2 contract

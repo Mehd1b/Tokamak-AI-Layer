@@ -7,6 +7,7 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../interfaces/ITALReputationRegistry.sol";
 import "../libraries/ReputationMath.sol";
+import "./WSTONVault.sol";
 
 /**
  * @title TALReputationRegistry
@@ -70,8 +71,7 @@ contract TALReputationRegistry is
     /// @notice Identity registry address for agent validation
     address public identityRegistry;
 
-    /// @notice Staking bridge contract address for stake-weighted calculations (L2 cache of L1 Staking V3)
-    address public stakingBridge;
+    uint256 private __reserved_slot_1;
 
     /// @notice Validation registry address for verified summaries
     address public validationRegistry;
@@ -103,10 +103,13 @@ contract TALReputationRegistry is
     /// @notice TaskFeeEscrow address for usage validation
     address public taskFeeEscrow;
 
+    /// @notice WSTONVault address for stake-weighted calculations
+    address public wstonVault;
+
     // ============ Storage Gap ============
 
     /// @dev Reserved storage space for future upgrades
-    uint256[39] private __gap;
+    uint256[38] private __gap;
 
     // ============ Initializer ============
 
@@ -120,12 +123,10 @@ contract TALReputationRegistry is
      * @dev Sets up roles and external contract references
      * @param admin The admin address that receives all initial roles
      * @param _identityRegistry The identity registry address for agent validation
-     * @param _stakingBridge The staking bridge contract address (L2 cache of L1 Staking V3)
      */
     function initialize(
         address admin,
-        address _identityRegistry,
-        address _stakingBridge
+        address _identityRegistry
     ) public initializer {
         __AccessControl_init();
         __Pausable_init();
@@ -137,7 +138,6 @@ contract TALReputationRegistry is
         _grantRole(REPUTATION_MANAGER_ROLE, admin);
 
         identityRegistry = _identityRegistry;
-        stakingBridge = _stakingBridge;
     }
 
     // ============ ERC-8004 Reputation Functions ============
@@ -403,15 +403,6 @@ contract TALReputationRegistry is
     }
 
     /**
-     * @notice Set the staking bridge contract address
-     * @dev Only callable by DEFAULT_ADMIN_ROLE
-     * @param _stakingBridge The new staking bridge address (L2 cache of L1 Staking V3)
-     */
-    function setStakingBridge(address _stakingBridge) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        stakingBridge = _stakingBridge;
-    }
-
-    /**
      * @notice Set the validation registry address
      * @dev Only callable by DEFAULT_ADMIN_ROLE
      * @param _validationRegistry The new validation registry address
@@ -428,6 +419,15 @@ contract TALReputationRegistry is
      */
     function setTaskFeeEscrow(address _taskFeeEscrow) external onlyRole(DEFAULT_ADMIN_ROLE) {
         taskFeeEscrow = _taskFeeEscrow;
+    }
+
+    /**
+     * @notice Set the WSTONVault address for stake-weighted calculations
+     * @dev Only callable by DEFAULT_ADMIN_ROLE. Replaces stakingBridge for stake queries.
+     * @param _wstonVault The WSTONVault contract address
+     */
+    function setWSTONVault(address _wstonVault) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        wstonVault = _wstonVault;
     }
 
     // ============ Internal Functions ============
@@ -695,19 +695,17 @@ contract TALReputationRegistry is
     }
 
     /**
-     * @notice Get the stake amount for an account from the staking bridge
-     * @dev Returns a default weight if staking bridge is not set
+     * @notice Get the stake amount for an account
+     * @dev Queries WSTONVault for the locked balance.
+     *      Returns a default weight if wstonVault is not set or balance is zero.
      * @param account The account to query stake for
      * @return The stake amount (or default 1 ether if not available)
      */
     function _getStake(address account) internal view returns (uint256) {
-        if (stakingBridge == address(0)) return 1 ether; // Default weight if no staking bridge
+        if (wstonVault == address(0)) return 1 ether;
 
-        (bool success, bytes memory result) = stakingBridge.staticcall(
-            abi.encodeWithSignature("getStake(address)", account)
-        );
-        if (!success || result.length < 32) return 1 ether;
-        return abi.decode(result, (uint256));
+        uint256 balance = WSTONVault(wstonVault).getLockedBalance(account);
+        return balance > 0 ? balance : 1 ether;
     }
 
     /**

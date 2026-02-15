@@ -9,6 +9,7 @@ import {ITALValidationRegistry} from "../../src/interfaces/ITALValidationRegistr
 import {IERC8004ValidationRegistry} from "../../src/interfaces/IERC8004ValidationRegistry.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MockStakingV3} from "../mocks/MockStakingV3.sol";
+import {MockWSTONVault} from "../mocks/MockWSTONVault.sol";
 import {MockDRB} from "../mocks/MockDRB.sol";
 import {MockZKVerifier} from "../mocks/MockZKVerifier.sol";
 
@@ -23,6 +24,7 @@ contract StakeSecuredValidationTest is Test {
     TALIdentityRegistry public identityRegistry;
     DRBIntegrationModule public drbModule;
     MockStakingV3 public mockStaking;
+    MockWSTONVault public mockVault;
     MockDRB public mockDRB;
     MockZKVerifier public mockZKVerifier;
 
@@ -43,6 +45,7 @@ contract StakeSecuredValidationTest is Test {
     function setUp() public {
         // Deploy mocks
         mockStaking = new MockStakingV3();
+        mockVault = new MockWSTONVault();
         mockDRB = new MockDRB();
         mockZKVerifier = new MockZKVerifier();
 
@@ -51,8 +54,10 @@ contract StakeSecuredValidationTest is Test {
         bytes memory identityData = abi.encodeWithSelector(
             TALIdentityRegistry.initialize.selector,
             admin,
-            address(mockStaking),
-            address(mockZKVerifier)
+            address(mockZKVerifier),
+            address(0), // validationRegistry (set later if needed)
+            1000 ether, // minOperatorStake
+            7 days      // reactivationCooldown
         );
         ERC1967Proxy identityProxy = new ERC1967Proxy(address(identityImpl), identityData);
         identityRegistry = TALIdentityRegistry(address(identityProxy));
@@ -69,14 +74,19 @@ contract StakeSecuredValidationTest is Test {
         ERC1967Proxy validationProxy = new ERC1967Proxy(address(validationImpl), validationData);
         validationRegistry = TALValidationRegistry(payable(address(validationProxy)));
 
-        // Set staking bridge on validation registry
+        // Set WSTONVault on validation registry
         vm.prank(admin);
-        validationRegistry.setStakingBridge(address(mockStaking));
+        validationRegistry.setWSTONVault(address(mockVault));
 
-        // Setup operators with stake
+        // Setup operators with stake (MockStakingV3 for IdentityRegistry)
         mockStaking.setStake(validator1, 5000 ether);
         mockStaking.setStake(validator2, 3000 ether);
         mockStaking.setStake(agentOwner, 1000 ether);
+
+        // Setup locked balances in WSTONVault (for ValidationRegistry)
+        mockVault.setLockedBalance(validator1, 5000 ether);
+        mockVault.setLockedBalance(validator2, 3000 ether);
+        mockVault.setLockedBalance(agentOwner, 1000 ether);
 
         // Fund accounts
         vm.deal(requester, 100 ether);

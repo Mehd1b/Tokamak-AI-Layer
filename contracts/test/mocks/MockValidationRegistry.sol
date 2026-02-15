@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 /**
  * @title MockValidationRegistry
- * @notice Mock for testing TALIdentityRegistryV2 slashing integration
+ * @notice Mock for testing TALIdentityRegistry slashing integration
  * @dev Provides settable validation stats for agents
  */
 contract MockValidationRegistry {

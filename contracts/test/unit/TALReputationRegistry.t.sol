@@ -128,11 +128,14 @@ contract TALReputationRegistryTest is Test {
         bytes memory initData = abi.encodeWithSelector(
             TALReputationRegistry.initialize.selector,
             admin,
-            address(identityRegistry),
-            address(stakingBridge)
+            address(identityRegistry)
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(registryImpl), initData);
         registry = TALReputationRegistry(address(proxy));
+
+        // Set WSTONVault for stake-weighted queries
+        vm.prank(admin);
+        registry.setWSTONVault(address(stakingBridge));
 
         // Setup agent in identity registry
         identityRegistry.setAgent(AGENT_ID, agentOwner);
@@ -798,8 +801,9 @@ contract TALReputationRegistryTest is Test {
 
         ITALReputationRegistry.StakeWeightedSummary memory summary = registry.getStakeWeightedSummary(AGENT_ID, clients);
 
-        // With zero stakes, weights are 0
-        assertEq(summary.totalWeight, 0);
+        // With zero stakes, _getStake returns 1 ether default, so sqrt(1e18) = 1e9 per client
+        // totalWeight = 2 * 1e9 = 2e9
+        assertEq(summary.totalWeight, 2_000_000_000);
     }
 
     function test_respondToFeedback_revertIfFeedbackNotFound() public {
@@ -885,15 +889,6 @@ contract TALReputationRegistryTest is Test {
         assertEq(registry.identityRegistry(), newRegistry);
     }
 
-    function test_setStakingBridge() public {
-        address newStaking = address(0x888);
-
-        vm.prank(admin);
-        registry.setStakingBridge(newStaking);
-
-        assertEq(registry.stakingBridge(), newStaking);
-    }
-
     function test_setValidationRegistry() public {
         address newValidation = address(0x777);
 
@@ -916,8 +911,7 @@ contract TALReputationRegistryTest is Test {
         bytes memory initData = abi.encodeWithSelector(
             TALReputationRegistry.initialize.selector,
             admin,
-            address(0), // No identity registry
-            address(stakingBridge)
+            address(0) // No identity registry
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(registryImpl), initData);
         TALReputationRegistry noIdRegistry = TALReputationRegistry(address(proxy));
@@ -943,8 +937,7 @@ contract TALReputationRegistryTest is Test {
         bytes memory initData = abi.encodeWithSelector(
             TALReputationRegistry.initialize.selector,
             admin,
-            address(0),
-            address(0) // No staking bridge
+            address(0)
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(registryImpl), initData);
         TALReputationRegistry noStakeRegistry = TALReputationRegistry(address(proxy));

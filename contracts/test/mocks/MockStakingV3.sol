@@ -59,6 +59,15 @@ contract MockStakingV3 {
     }
 
     /**
+     * @notice Get the locked balance for an operator (WSTONVault-compatible)
+     * @param operator The operator address
+     * @return The staked amount
+     */
+    function getLockedBalance(address operator) external view returns (uint256) {
+        return stakes[operator];
+    }
+
+    /**
      * @notice Get the stake amount for an operator (bridge-style naming)
      * @param operator The operator address
      * @return The staked amount cached from L1

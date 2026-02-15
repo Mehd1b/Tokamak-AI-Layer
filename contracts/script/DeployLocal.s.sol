@@ -86,8 +86,10 @@ contract DeployLocal is Script {
         bytes memory identityData = abi.encodeWithSelector(
             TALIdentityRegistry.initialize.selector,
             deployer,
-            stakingBridge,
-            zkVerifier
+            zkVerifier,
+            address(0), // validationRegistry (linked after deployment)
+            1000 ether, // minOperatorStake
+            7 days      // reactivationCooldown
         );
         ERC1967Proxy identityProxy = new ERC1967Proxy(identityImpl, identityData);
         identityRegistry = TALIdentityRegistry(address(identityProxy));
@@ -103,8 +105,7 @@ contract DeployLocal is Script {
         bytes memory reputationData = abi.encodeWithSelector(
             TALReputationRegistry.initialize.selector,
             deployer,
-            address(identityRegistry),
-            stakingBridge
+            address(identityRegistry)
         );
         ERC1967Proxy reputationProxy = new ERC1967Proxy(reputationImpl, reputationData);
         reputationRegistry = TALReputationRegistry(address(reputationProxy));
@@ -175,12 +176,6 @@ contract DeployLocal is Script {
         // Link ValidationRegistry -> DRBModule
         validationRegistry.setDRBModule(address(drbModule));
         console.log("  ValidationRegistry -> DRBModule");
-
-        // Link ValidationRegistry -> StakingBridge (if available)
-        if (stakingBridge != address(0)) {
-            validationRegistry.setStakingBridge(stakingBridge);
-            console.log("  ValidationRegistry -> StakingBridge");
-        }
 
         // Grant VALIDATOR_SELECTOR_ROLE to ValidationRegistry on DRBModule
         drbModule.grantRole(drbModule.VALIDATOR_SELECTOR_ROLE(), address(validationRegistry));

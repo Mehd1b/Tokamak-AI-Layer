@@ -57,8 +57,10 @@ contract TEEAttestedValidationTest is Test {
         bytes memory identityData = abi.encodeWithSelector(
             TALIdentityRegistry.initialize.selector,
             admin,
-            address(mockStaking),
-            address(mockZKVerifier)
+            address(mockZKVerifier),
+            address(0), // validationRegistry (set later if needed)
+            1000 ether, // minOperatorStake
+            7 days      // reactivationCooldown
         );
         ERC1967Proxy identityProxy = new ERC1967Proxy(address(identityImpl), identityData);
         identityRegistry = TALIdentityRegistry(address(identityProxy));

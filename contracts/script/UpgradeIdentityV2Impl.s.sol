@@ -2,12 +2,12 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Script.sol";
-import "../src/core/TALIdentityRegistryV2.sol";
+import "../src/core/TALIdentityRegistry.sol";
 
 /**
  * @title UpgradeIdentityV2Impl
- * @notice Deploys a new TALIdentityRegistryV2 implementation and upgrades the proxy.
- *         Use this when V2 is already initialized and you only need to update the bytecode.
+ * @notice Deploys a new TALIdentityRegistry implementation and upgrades the proxy.
+ *         Use this when initializers are already done and you only need to update the bytecode.
  *
  * Usage:
  *   IDENTITY_REGISTRY_PROXY=0x3f89CD27fD877827E7665A9883b3c0180E22A525 \
@@ -23,9 +23,9 @@ contract UpgradeIdentityV2Impl is Script {
             address(0x3f89CD27fD877827E7665A9883b3c0180E22A525)
         );
 
-        TALIdentityRegistryV2 proxy = TALIdentityRegistryV2(proxyAddress);
+        TALIdentityRegistry proxy = TALIdentityRegistry(proxyAddress);
 
-        console.log("=== TALIdentityRegistryV2 Implementation Upgrade ===");
+        console.log("=== TALIdentityRegistry Implementation Upgrade ===");
         console.log("Deployer:", deployer);
         console.log("Proxy:", proxyAddress);
         console.log("Agent count (before):", proxy.getAgentCount());
@@ -33,7 +33,7 @@ contract UpgradeIdentityV2Impl is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         // 1. Deploy new implementation
-        TALIdentityRegistryV2 newImpl = new TALIdentityRegistryV2();
+        TALIdentityRegistry newImpl = new TALIdentityRegistry();
         console.log("New implementation:", address(newImpl));
 
         // 2. Upgrade proxy (no re-initialization needed)
@@ -44,7 +44,6 @@ contract UpgradeIdentityV2Impl is Script {
 
         // 3. Verify
         console.log("Agent count (after):", proxy.getAgentCount());
-        console.log("Protocol treasury:", proxy.protocolTreasury());
         console.log("");
         console.log("Done. New implementation:", address(newImpl));
     }

@@ -2,21 +2,15 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Script.sol";
-import "../src/core/TALValidationRegistryV3.sol";
+import "../src/core/TALValidationRegistry.sol";
 
 /**
  * @title UpgradeValidationRegistryV3
- * @notice Upgrades TALValidationRegistry proxy from V2 to V3 on Thanos Sepolia
+ * @notice Upgrades TALValidationRegistry proxy to consolidated implementation on Thanos Sepolia
  *
  * Network: Thanos Sepolia
  * Chain ID: 111551119090
  * RPC: https://rpc.thanos-sepolia.tokamak.network
- *
- * V3 Changes:
- * - ReputationOnly validation model disabled
- * - Dual-staking: agent owners must stake >= 1000 TON for StakeSecured/Hybrid
- * - Automated slashing for incorrect computation (score < 50 -> slash 50% agent owner stake)
- * - Permissionless slashing for missed deadlines (10% of validator operator stake)
  *
  * Usage:
  *   forge script script/UpgradeValidationRegistryV3.s.sol \
@@ -37,7 +31,7 @@ contract UpgradeValidationRegistryV3 is Script {
             address(0x09447147C6E75a60A449f38532F06E19F5F632F3)
         ));
 
-        console.log("=== TALValidationRegistry V3 Upgrade ===");
+        console.log("=== TALValidationRegistry Upgrade (Consolidated) ===");
         console.log("");
         console.log("Network: Thanos Sepolia (Chain ID: 111551119090)");
         console.log("Deployer:", deployer);
@@ -46,25 +40,21 @@ contract UpgradeValidationRegistryV3 is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // 1. Deploy new V3 implementation
-        console.log("Deploying TALValidationRegistryV3 implementation...");
-        TALValidationRegistryV3 v3Implementation = new TALValidationRegistryV3();
-        console.log("  V3 Implementation:", address(v3Implementation));
+        // 1. Deploy new consolidated implementation
+        console.log("Deploying TALValidationRegistry implementation...");
+        TALValidationRegistry newImpl = new TALValidationRegistry();
+        console.log("  Implementation:", address(newImpl));
 
-        // 2. Upgrade proxy to V3 + call initializeV3 atomically
-        console.log("Upgrading proxy to V3...");
-        bytes memory initData = abi.encodeWithSelector(
-            TALValidationRegistryV3.initializeV3.selector
-        );
-
-        TALValidationRegistryV3(proxyAddress).upgradeToAndCall(
-            address(v3Implementation),
-            initData
+        // 2. Upgrade proxy (no re-initialization needed -- V2+V3 already initialized)
+        console.log("Upgrading proxy...");
+        TALValidationRegistry(proxyAddress).upgradeToAndCall(
+            address(newImpl),
+            bytes("")
         );
         console.log("  Upgrade complete");
 
         // 3. Verify V3 functions are accessible
-        TALValidationRegistryV3 registry = TALValidationRegistryV3(proxyAddress);
+        TALValidationRegistry registry = TALValidationRegistry(proxyAddress);
         uint256 minAgentOwnerStake = registry.MIN_AGENT_OWNER_STAKE();
         uint256 slashMissedPct = registry.SLASH_MISSED_DEADLINE_PCT();
         uint256 slashIncorrectPct = registry.SLASH_INCORRECT_COMPUTATION_PCT();
@@ -77,21 +67,13 @@ contract UpgradeValidationRegistryV3 is Script {
 
         // Verify V2 functions still work
         uint256 epoch = registry.currentEpoch();
-        console.log("  Current epoch (V2):", epoch);
+        console.log("  Current epoch:", epoch);
 
         vm.stopBroadcast();
 
         console.log("");
         console.log("=== Upgrade Summary ===");
-        console.log("  Proxy:              ", proxyAddress);
-        console.log("  V3 Implementation:  ", address(v3Implementation));
-        console.log("");
-        console.log("V3 Features:");
-        console.log("  - ReputationOnly model disabled");
-        console.log("  - Dual-staking enforcement (agent owner >= 1000 TON)");
-        console.log("  - Automated slashing for incorrect computation (50% agent owner stake)");
-        console.log("  - Permissionless slashing for missed deadlines (10% validator stake)");
-        console.log("");
-        console.log("No address changes - proxy remains at:", proxyAddress);
+        console.log("  Proxy:          ", proxyAddress);
+        console.log("  Implementation: ", address(newImpl));
     }
 }
