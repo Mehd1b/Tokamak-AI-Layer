@@ -80,6 +80,14 @@ export function Navbar() {
             </Link>
           ))}
           <a
+            href="https://docs.execution.tokagent.network"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2 rounded-lg border border-dashed transition-all tracking-wider text-sm border-white/30 text-white hover:border-white/60 hover:text-gray-300"
+          >
+            DOCS
+          </a>
+          <a
             href="/"
             onClick={(e) => {
               e.preventDefault();
@@ -154,6 +162,15 @@ export function Navbar() {
                     {link.label}
                   </Link>
                 ))}
+                <a
+                  href="https://docs.execution.tokagent.network"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-md font-light transition-all duration-300 tracking-wider text-white hover:text-[#A855F7]"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  DOCS
+                </a>
                 <a
                   href="https://tokagent.network"
                   target="_blank"
