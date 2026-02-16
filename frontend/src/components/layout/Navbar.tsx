@@ -13,8 +13,8 @@ const navLinks = [
   { href: '/agents', label: 'AGENTS' },
   { href: '/validation', label: 'VALIDATION' },
   { href: '/staking', label: 'STAKING' },
-  { href: 'https://execution-kernel.tokamak.network', label: 'EXECUTION KERNEL', external: true },
-  { href: 'https://tokamak-ai-layer.vercel.app/', label: 'DOCS', external: true },
+  { href: 'https://execution.tokagent.network', label: 'EXECUTION KERNEL', external: true },
+  { href: 'https://docs.tokagent.network/', label: 'DOCS', external: true },
 ];
 
 export function Navbar() {
