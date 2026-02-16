@@ -83,7 +83,9 @@ function RequestValidationContent() {
   const effectiveModel = agentModel ?? 0;
   const modelInfo = MODEL_INFO[effectiveModel] ?? MODEL_INFO[0];
   const minBounty = modelInfo.minBounty;
+  const isReputationOnly = agentModel === 0;
   const isComingSoon = effectiveModel === 2 || effectiveModel === 3;
+  const isUnavailable = isReputationOnly || isComingSoon;
 
   // Redirect after success
   useEffect(() => {
@@ -100,7 +102,7 @@ function RequestValidationContent() {
 
     if (!agentId || !taskHash || !outputHash) return;
     if (!isValidBytes32(taskHash) || !isValidBytes32(outputHash)) return;
-    if (isComingSoon) return;
+    if (isUnavailable) return;
 
     const bounty = bountyAmount || '0';
     if (parseFloat(bounty) < parseFloat(minBounty)) return;
@@ -245,7 +247,7 @@ function RequestValidationContent() {
               </p>
             </div>
           ) : (
-            <div className={`rounded-lg border p-4 ${isComingSoon ? 'border-amber-500/20 bg-amber-500/5' : 'border-[#38BDF8]/30 bg-[#38BDF8]/5'}`}>
+            <div className={`rounded-lg border p-4 ${isUnavailable ? 'border-amber-500/20 bg-amber-500/5' : 'border-[#38BDF8]/30 bg-[#38BDF8]/5'}`}>
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
@@ -257,16 +259,30 @@ function RequestValidationContent() {
                         Coming soon
                       </span>
                     )}
+                    {isReputationOnly && (
+                      <span className="rounded bg-zinc-700 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+                        Not supported
+                      </span>
+                    )}
                   </div>
                   <p className="mt-1 text-xs text-zinc-500">{modelInfo.desc}</p>
                 </div>
-                {effectiveModel > 0 && !isComingSoon && (
+                {effectiveModel > 0 && !isUnavailable && (
                   <div className="text-right">
                     <p className="text-xs text-zinc-500">Min bounty</p>
                     <p className="text-sm font-medium text-amber-400">{minBounty} {nativeCurrency}</p>
                   </div>
                 )}
               </div>
+
+              {isReputationOnly && (
+                <div className="mt-3 flex items-start gap-2">
+                  <Info className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-400">
+                    Reputation Only agents rely on aggregated feedback scores and do not support on-chain validation requests. To request validation, the agent&apos;s operator must upgrade its validation model to Stake Secured or higher.
+                  </p>
+                </div>
+              )}
 
               {isComingSoon && (
                 <div className="mt-3 flex items-start gap-2">
@@ -306,7 +322,7 @@ function RequestValidationContent() {
               value={bountyAmount}
               onChange={(e) => setBountyAmount(e.target.value)}
               required
-              disabled={isComingSoon}
+              disabled={isUnavailable}
               placeholder={`Min: ${minBounty} ${nativeCurrency}`}
               className="mt-1 w-full bg-white/5 border-white/10 text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:ring-1 focus:ring-[#38BDF8]/50 rounded-lg border px-3 py-2 text-sm focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             />
@@ -352,7 +368,7 @@ function RequestValidationContent() {
                 key={opt.seconds}
                 type="button"
                 onClick={() => setDeadlineSeconds(opt.seconds)}
-                disabled={isComingSoon}
+                disabled={isUnavailable}
                 className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
                   deadlineSeconds === opt.seconds
                     ? 'border-[#38BDF8]/50 bg-[#38BDF8]/10 font-medium text-[#38BDF8]'
@@ -388,7 +404,7 @@ function RequestValidationContent() {
               parseFloat(bountyAmount) < parseFloat(minBounty) ||
               isPending ||
               isConfirming ||
-              isComingSoon
+              isUnavailable
             }
             className="btn-primary flex items-center gap-2"
           >

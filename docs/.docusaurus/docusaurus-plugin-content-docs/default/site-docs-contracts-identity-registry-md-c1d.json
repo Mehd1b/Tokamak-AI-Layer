@@ -5,7 +5,7 @@
   "source": "@site/docs/contracts/identity-registry.md",
   "sourceDirName": "contracts",
   "slug": "/contracts/identity-registry",
-  "permalink": "/tal/contracts/identity-registry",
+  "permalink": "/contracts/identity-registry",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/contracts/identity-registry.md",
@@ -19,10 +19,10 @@
   "sidebar": "docsSidebar",
   "previous": {
     "title": "Cross-Layer Bridge",
-    "permalink": "/tal/architecture/cross-layer-bridge"
+    "permalink": "/architecture/cross-layer-bridge"
   },
   "next": {
     "title": "Reputation Registry",
-    "permalink": "/tal/contracts/reputation-registry"
+    "permalink": "/contracts/reputation-registry"
   }
 }

@@ -1,4 +1,4 @@
-import { UNISWAP_V3, WETH_ADDRESS } from "@tal-trading-agent/shared";
+import { UNISWAP_V3, WETH_ADDRESS, getTokenMeta } from "@tal-trading-agent/shared";
 /**
  * Generates a zip buffer containing a self-contained trading bot repo
  * for the given strategy. The user can unzip, fill in .env, and run.
@@ -802,7 +802,13 @@ export async function generateBotZip(strategy) {
             ``,
             `## Trades`,
             ``,
-            ...strategy.trades.map((t, i) => `${i + 1}. **${t.action.toUpperCase()}**: ${t.tokenIn} -> ${t.tokenOut} (amount: ${t.amountIn}, fee: ${t.poolFee})`),
+            ...strategy.trades.map((t, i) => {
+                const inMeta = getTokenMeta(t.tokenIn);
+                const outMeta = getTokenMeta(t.tokenOut);
+                const inLabel = inMeta ? `${inMeta.symbol} (${t.tokenIn})` : t.tokenIn;
+                const outLabel = outMeta ? `${outMeta.symbol} (${t.tokenOut})` : t.tokenOut;
+                return `${i + 1}. **${t.action.toUpperCase()}**: ${inLabel} -> ${outLabel} (amount: ${t.amountIn}, fee: ${t.poolFee})`;
+            }),
             ``,
             `## Auto-Execution Listener`,
             ``,

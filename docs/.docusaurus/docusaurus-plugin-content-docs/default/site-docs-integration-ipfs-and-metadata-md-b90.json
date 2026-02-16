@@ -5,7 +5,7 @@
   "source": "@site/docs/integration/ipfs-and-metadata.md",
   "sourceDirName": "integration",
   "slug": "/integration/ipfs-and-metadata",
-  "permalink": "/tal/integration/ipfs-and-metadata",
+  "permalink": "/integration/ipfs-and-metadata",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/integration/ipfs-and-metadata.md",
@@ -19,10 +19,10 @@
   "sidebar": "docsSidebar",
   "previous": {
     "title": "DRB Integration",
-    "permalink": "/tal/integration/drb-integration"
+    "permalink": "/integration/drb-integration"
   },
   "next": {
     "title": "Glossary",
-    "permalink": "/tal/reference/glossary"
+    "permalink": "/reference/glossary"
   }
 }

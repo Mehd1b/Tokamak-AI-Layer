@@ -13,8 +13,8 @@
       "calendar": "gregory",
       "path": "en",
       "translate": false,
-      "url": "https://docs.tokamak.network",
-      "baseUrl": "/tal/"
+      "url": "https://tokamak-ai-layer.vercel.app",
+      "baseUrl": "/"
     }
   }
 }

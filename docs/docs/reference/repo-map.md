@@ -13,11 +13,12 @@ A complete guide to the Tokamak AI Layer repository structure, key files, build 
 Tokamak-AI-Layer/
 ├── contracts/                      # Foundry project - Solidity smart contracts
 │   ├── src/
-│   │   ├── core/                   # Core protocol registries
-│   │   │   ├── TALIdentityRegistry.sol       # ERC-721 agent identity (602 lines)
-│   │   │   ├── TALReputationRegistry.sol     # Feedback aggregation (687 lines)
-│   │   │   ├── TALValidationRegistry.sol     # Multi-model validation (1052 lines)
-│   │   │   └── TaskFeeEscrow.sol             # Non-upgradeable task fee escrow (189 lines)
+│   │   ├── core/                   # Core protocol contracts
+│   │   │   ├── TALIdentityRegistry.sol       # ERC-721 agent identity (905 lines)
+│   │   │   ├── TALReputationRegistry.sol     # Feedback aggregation (717 lines)
+│   │   │   ├── TALValidationRegistry.sol     # Multi-model validation + V3 features (1112 lines)
+│   │   │   ├── WSTONVault.sol               # L2 WSTON locking + slashing (280 lines)
+│   │   │   └── TaskFeeEscrow.sol             # Non-upgradeable task fee escrow (193 lines)
 │   │   ├── bridge/                 # L1 <-> L2 cross-layer bridge
 │   │   │   ├── TALStakingBridgeL2.sol        # L2 stake cache, tier management
 │   │   │   ├── TALStakingBridgeL1.sol        # L1 stake queries, relay
@@ -37,13 +38,13 @@ Tokamak-AI-Layer/
 │
 ├── sdk/                            # TypeScript SDK
 │   └── src/
-│       ├── TALClient.ts            # Main facade (471 lines)
+│       ├── TALClient.ts            # Main facade (580 lines)
 │       ├── identity/               # IdentityClient, RegistrationBuilder
 │       ├── reputation/             # ReputationClient
 │       ├── validation/             # ValidationClient
 │       ├── zk/                     # ProofGenerator (STUBBED)
 │       ├── subgraph/               # SubgraphClient (STUBBED)
-│       ├── abi/                    # Manually maintained contract ABIs
+│       ├── abi/                    # Contract ABIs (8 files, including V2/V3 ABIs)
 │       ├── types/                  # TypeScript type definitions
 │       └── __tests__/              # SDK tests
 │
@@ -58,7 +59,7 @@ Tokamak-AI-Layer/
 │       │   ├── staking/            # /staking
 │       │   └── api/                # API routes (IPFS upload, runtime proxy)
 │       ├── components/             # Shared UI components
-│       ├── hooks/                  # Custom React hooks (10 files)
+│       ├── hooks/                  # Custom React hooks (14 files)
 │       └── lib/                    # Contract addresses, utilities
 │
 ├── agent-examples/                 # Example AI agent implementations
@@ -67,8 +68,17 @@ Tokamak-AI-Layer/
 │   │       ├── routes/             # Task submission, validation endpoints
 │   │       └── agents/             # Agent implementations
 │   │
+│   ├── trading-agent/              # DeFi trading agent (pnpm monorepo)
+│   │   └── packages/
+│   │       ├── agent-core/         # Core logic: analysis, execution, lending, strategy
+│   │       ├── agent-server/       # Agent server
+│   │       ├── shared/             # Shared types and ABIs
+│   │       ├── siwa-auth/          # Sign-In With Agent authentication
+│   │       └── tal-integration/    # TAL protocol integration
+│   │
 │   └── yield-agent/                # TAL Yield Agent (monorepo)
 │       └── packages/
+│           ├── agent-core/         # Core yield agent logic
 │           ├── agent-server/       # Agent server implementation
 │           ├── agent-worker/       # Background worker
 │           ├── shared/             # Shared types and ABIs
@@ -93,28 +103,36 @@ Tokamak-AI-Layer/
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `contracts/src/core/TALIdentityRegistry.sol` | Agent identity NFTs, ZK commitments, operators | 602 |
-| `contracts/src/core/TALReputationRegistry.sol` | Feedback aggregation, payment proofs, Merkle trees | 687 |
-| `contracts/src/core/TALValidationRegistry.sol` | Validation requests, validator selection, bounties | 1,052 |
+| `contracts/src/core/TALIdentityRegistry.sol` | Agent identity NFTs, ZK commitments, operators | 905 |
+| `contracts/src/core/TALReputationRegistry.sol` | Feedback aggregation, payment proofs, Merkle trees | 717 |
+| `contracts/src/core/TALValidationRegistry.sol` | Multi-model validation, epoch stats, dual-staking, automated slashing | 1,112 |
+| `contracts/src/core/WSTONVault.sol` | L2 WSTON locking, operator tiers, slashing execution | 280 |
+| `contracts/src/core/TaskFeeEscrow.sol` | Non-upgradeable native TON task fee escrow | 193 |
 | `contracts/src/bridge/TALStakingBridgeL2.sol` | L2 cache of L1 stake data | -- |
 | `contracts/src/bridge/TALStakingBridgeL1.sol` | L1 stake queries, cross-domain relay | -- |
 | `contracts/src/modules/DRBIntegrationModule.sol` | Decentralized random beacon for validator selection | -- |
 | `contracts/src/modules/StakingIntegrationModule.sol` | Stake queries, slashing, seigniorage | -- |
 | `contracts/src/libraries/ReputationMath.sol` | Score normalization, weighted averages | -- |
-| `contracts/src/core/TaskFeeEscrow.sol` | Non-upgradeable native TON task fee escrow | 189 |
 | `contracts/src/libraries/SlashingCalculator.sol` | Slashing percentage calculations | -- |
 
 ### SDK
 
 | File | Purpose |
 |------|---------|
-| `sdk/src/TALClient.ts` | Main facade wrapping all domain clients |
+| `sdk/src/TALClient.ts` | Main facade wrapping all domain clients (580 lines) |
 | `sdk/src/identity/IdentityClient.ts` | Identity registration and querying |
 | `sdk/src/identity/RegistrationBuilder.ts` | Fluent builder for ERC-8004 registration files |
 | `sdk/src/reputation/ReputationClient.ts` | Reputation queries and feedback submission |
 | `sdk/src/validation/ValidationClient.ts` | Validation request and response management |
-| `sdk/src/types/index.ts` | All TypeScript type definitions (329 lines) |
-| `sdk/src/abi/*.ts` | Manually maintained contract ABIs |
+| `sdk/src/types/index.ts` | All TypeScript type definitions (444 lines) |
+| `sdk/src/abi/TALIdentityRegistry.ts` | Identity registry ABI |
+| `sdk/src/abi/TALIdentityRegistryV2.ts` | Identity registry V2 ABI |
+| `sdk/src/abi/TALIdentityRegistryV3.ts` | Identity registry V3 ABI |
+| `sdk/src/abi/TALReputationRegistry.ts` | Reputation registry ABI |
+| `sdk/src/abi/TALValidationRegistry.ts` | Validation registry ABI |
+| `sdk/src/abi/TALValidationRegistryV2.ts` | Validation registry V2 ABI |
+| `sdk/src/abi/TALValidationRegistryV3.ts` | Validation registry V3 ABI |
+| `sdk/src/abi/TaskFeeEscrow.ts` | Task fee escrow ABI |
 
 ### Frontend
 
@@ -123,16 +141,19 @@ Tokamak-AI-Layer/
 | `frontend/src/app/providers.tsx` | wagmi, React Query, RainbowKit provider setup |
 | `frontend/src/lib/contracts.ts` | All contract addresses (L1 + L2) and chain IDs |
 | `frontend/src/hooks/useAgent.ts` | Agent read hooks (single, count, list, by-owner) |
-| `frontend/src/hooks/useReputation.ts` | Reputation read hooks (feedback, summary, ratings) |
-| `frontend/src/hooks/useValidation.ts` | Validation read/write hooks |
-| `frontend/src/hooks/useStaking.ts` | L1 staking read/write hooks |
-| `frontend/src/hooks/useTaskFee.ts` | Task fee escrow hooks |
-| `frontend/src/hooks/useWallet.ts` | Wallet state and network switching |
-| `frontend/src/hooks/useRegisterAgent.ts` | Agent registration write hook |
-| `frontend/src/hooks/useSubmitFeedback.ts` | Feedback submission write hook |
 | `frontend/src/hooks/useAgentMetadata.ts` | IPFS metadata fetching with gateway fallback |
 | `frontend/src/hooks/useAgentRuntime.ts` | Agent runtime API communication |
+| `frontend/src/hooks/useDeregisterAgent.ts` | Agent deregistration write hook |
+| `frontend/src/hooks/useL2Config.ts` | L2 chain configuration hook |
 | `frontend/src/hooks/useOperatorManagement.ts` | Operator add/remove/exit hooks |
+| `frontend/src/hooks/useRegisterAgent.ts` | Agent registration write hook |
+| `frontend/src/hooks/useReputation.ts` | Reputation read hooks (feedback, summary, ratings) |
+| `frontend/src/hooks/useStaking.ts` | L1 staking read/write hooks |
+| `frontend/src/hooks/useSubmitFeedback.ts` | Feedback submission write hook |
+| `frontend/src/hooks/useTaskFee.ts` | Task fee escrow hooks |
+| `frontend/src/hooks/useValidation.ts` | Validation read/write hooks |
+| `frontend/src/hooks/useVault.ts` | WSTONVault lock/unlock/slash hooks |
+| `frontend/src/hooks/useWallet.ts` | Wallet state and network switching |
 
 ## Build Commands
 
@@ -154,17 +175,18 @@ Tokamak-AI-Layer/
 
 | Test File | Type | Tests | Status |
 |-----------|------|-------|--------|
-| `TALIdentityRegistry.t.sol` | Unit | 87 | Passing |
-| `TALReputationRegistry.t.sol` | Unit | 59 | Passing |
+| `TALIdentityRegistry.t.sol` | Unit | 83 | Passing |
+| `TALReputationRegistry.t.sol` | Unit | 63 | Passing |
 | `ReputationMath.t.sol` | Unit | 57 | Passing |
+| `TaskFeeEscrow.t.sol` | Unit | 59 | Passing |
+| `WSTONVault.t.sol` | Unit | 44 | Passing |
 | `DRBIntegrationModule.t.sol` | Unit | 27 | Passing |
 | `StakingIntegrationModule.t.sol` | Unit | 28 | Passing |
-| `CrossLayerBridge.t.sol` | Integration | 48 | Passing |
 | `StakeSecuredValidation.t.sol` | Integration | 12 | Passing |
 | `TEEAttestedValidation.t.sol` | Integration | 20 | Passing |
 | `GasBenchmarks.t.sol` | Benchmark | 11 | Passing |
 | SDK tests (4 files) | Unit | 35 | Passing |
-| **Total** | | **384** | **All Passing** |
+| **Total** | | **439** | **All Passing** |
 
 ### Gas Benchmarks
 
@@ -178,11 +200,12 @@ Tokamak-AI-Layer/
 
 | Pattern | Where Used | Purpose |
 |---------|-----------|---------|
-| UUPS Proxy | All core contracts | Upgradeability without redeployment |
-| AccessControl (RBAC) | All core contracts | Role-based permissions (UPGRADER, PAUSER, TEE_MANAGER, DRB) |
-| Storage Gap | All upgradeable contracts | `uint256[40] __gap` for future storage slots |
+| UUPS Proxy | Identity, Reputation, Validation registries | Upgradeability without redeployment (V1 → V2 → V3 chain) |
+| AccessControl (RBAC) | All core contracts | Role-based permissions (UPGRADER, PAUSER, TEE_MANAGER, DRB, SLASH) |
+| Storage Gap | All upgradeable contracts | Versioned gaps (`__gap[40]`, `__gapV2[38]`, `__gapV3[36]`) for future storage slots |
 | ReentrancyGuard | State-changing functions | Prevent reentrancy attacks |
 | Pausable | All core contracts | Emergency pause functionality |
+| Immutable | TaskFeeEscrow, WSTONVault | Non-upgradeable contracts for stronger fund safety |
 
 :::tip Commonly Modified Files
 When making changes to the project, these are the most frequently edited files:

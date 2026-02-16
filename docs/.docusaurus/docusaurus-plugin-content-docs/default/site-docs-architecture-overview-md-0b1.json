@@ -5,7 +5,7 @@
   "source": "@site/docs/architecture/overview.md",
   "sourceDirName": "architecture",
   "slug": "/architecture/overview",
-  "permalink": "/tal/architecture/overview",
+  "permalink": "/architecture/overview",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/architecture/overview.md",
@@ -19,10 +19,10 @@
   "sidebar": "docsSidebar",
   "previous": {
     "title": "Introduction",
-    "permalink": "/tal/"
+    "permalink": "/"
   },
   "next": {
     "title": "Trust Model",
-    "permalink": "/tal/architecture/trust-model"
+    "permalink": "/architecture/trust-model"
   }
 }

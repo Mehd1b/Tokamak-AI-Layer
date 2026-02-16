@@ -1,133 +1,138 @@
 {
   "docusaurus-plugin-content-docs": {
     "default": {
-      "path": "/tal/",
+      "path": "/",
       "versions": [
         {
           "name": "current",
           "label": "Next",
           "isLast": true,
-          "path": "/tal/",
+          "path": "/",
           "mainDocId": "intro",
           "docs": [
             {
               "id": "app/contract-integration",
-              "path": "/tal/app/contract-integration",
+              "path": "/app/contract-integration",
               "sidebar": "docsSidebar"
             },
             {
               "id": "app/hooks-reference",
-              "path": "/tal/app/hooks-reference",
+              "path": "/app/hooks-reference",
               "sidebar": "docsSidebar"
             },
             {
               "id": "app/pages-guide",
-              "path": "/tal/app/pages-guide",
+              "path": "/app/pages-guide",
               "sidebar": "docsSidebar"
             },
             {
               "id": "app/setup",
-              "path": "/tal/app/setup",
+              "path": "/app/setup",
               "sidebar": "docsSidebar"
             },
             {
               "id": "app/wallet-and-chains",
-              "path": "/tal/app/wallet-and-chains",
+              "path": "/app/wallet-and-chains",
               "sidebar": "docsSidebar"
             },
             {
               "id": "architecture/cross-layer-bridge",
-              "path": "/tal/architecture/cross-layer-bridge",
+              "path": "/architecture/cross-layer-bridge",
               "sidebar": "docsSidebar"
             },
             {
               "id": "architecture/overview",
-              "path": "/tal/architecture/overview",
+              "path": "/architecture/overview",
               "sidebar": "docsSidebar"
             },
             {
               "id": "architecture/trust-model",
-              "path": "/tal/architecture/trust-model",
+              "path": "/architecture/trust-model",
               "sidebar": "docsSidebar"
             },
             {
               "id": "contracts/deployment-and-security",
-              "path": "/tal/contracts/deployment-and-security",
+              "path": "/contracts/deployment-and-security",
               "sidebar": "docsSidebar"
             },
             {
               "id": "contracts/identity-registry",
-              "path": "/tal/contracts/identity-registry",
+              "path": "/contracts/identity-registry",
               "sidebar": "docsSidebar"
             },
             {
               "id": "contracts/reputation-registry",
-              "path": "/tal/contracts/reputation-registry",
+              "path": "/contracts/reputation-registry",
               "sidebar": "docsSidebar"
             },
             {
               "id": "contracts/task-fee-escrow",
-              "path": "/tal/contracts/task-fee-escrow",
+              "path": "/contracts/task-fee-escrow",
               "sidebar": "docsSidebar"
             },
             {
               "id": "contracts/validation-registry",
-              "path": "/tal/contracts/validation-registry",
+              "path": "/contracts/validation-registry",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "contracts/wston-vault",
+              "path": "/contracts/wston-vault",
               "sidebar": "docsSidebar"
             },
             {
               "id": "integration/drb-integration",
-              "path": "/tal/integration/drb-integration",
+              "path": "/integration/drb-integration",
               "sidebar": "docsSidebar"
             },
             {
               "id": "integration/ipfs-and-metadata",
-              "path": "/tal/integration/ipfs-and-metadata",
+              "path": "/integration/ipfs-and-metadata",
               "sidebar": "docsSidebar"
             },
             {
               "id": "integration/staking-bridge",
-              "path": "/tal/integration/staking-bridge",
+              "path": "/integration/staking-bridge",
               "sidebar": "docsSidebar"
             },
             {
               "id": "intro",
-              "path": "/tal/",
+              "path": "/",
               "sidebar": "docsSidebar"
             },
             {
               "id": "reference/deployed-contracts",
-              "path": "/tal/reference/deployed-contracts",
+              "path": "/reference/deployed-contracts",
               "sidebar": "docsSidebar"
             },
             {
               "id": "reference/glossary",
-              "path": "/tal/reference/glossary",
+              "path": "/reference/glossary",
               "sidebar": "docsSidebar"
             },
             {
               "id": "reference/repo-map",
-              "path": "/tal/reference/repo-map",
+              "path": "/reference/repo-map",
               "sidebar": "docsSidebar"
             },
             {
               "id": "sdk/identity-client",
-              "path": "/tal/sdk/identity-client",
+              "path": "/sdk/identity-client",
               "sidebar": "docsSidebar"
             },
             {
               "id": "sdk/overview",
-              "path": "/tal/sdk/overview",
+              "path": "/sdk/overview",
               "sidebar": "docsSidebar"
             },
             {
               "id": "sdk/reputation-and-validation",
-              "path": "/tal/sdk/reputation-and-validation",
+              "path": "/sdk/reputation-and-validation",
               "sidebar": "docsSidebar"
             },
             {
               "id": "sdk/types-reference",
-              "path": "/tal/sdk/types-reference",
+              "path": "/sdk/types-reference",
               "sidebar": "docsSidebar"
             }
           ],
@@ -135,7 +140,7 @@
           "sidebars": {
             "docsSidebar": {
               "link": {
-                "path": "/tal/",
+                "path": "/",
                 "label": "intro"
               }
             }

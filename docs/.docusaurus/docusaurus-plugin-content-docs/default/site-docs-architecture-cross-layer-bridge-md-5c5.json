@@ -5,7 +5,7 @@
   "source": "@site/docs/architecture/cross-layer-bridge.md",
   "sourceDirName": "architecture",
   "slug": "/architecture/cross-layer-bridge",
-  "permalink": "/tal/architecture/cross-layer-bridge",
+  "permalink": "/architecture/cross-layer-bridge",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/architecture/cross-layer-bridge.md",
@@ -19,10 +19,10 @@
   "sidebar": "docsSidebar",
   "previous": {
     "title": "Trust Model",
-    "permalink": "/tal/architecture/trust-model"
+    "permalink": "/architecture/trust-model"
   },
   "next": {
     "title": "Identity Registry",
-    "permalink": "/tal/contracts/identity-registry"
+    "permalink": "/contracts/identity-registry"
   }
 }

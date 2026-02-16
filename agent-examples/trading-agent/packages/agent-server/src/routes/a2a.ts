@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { isAddress, type Address, type Hex } from "viem";
 import type { AppContext } from "../context.js";
-import { TOKEN_REGISTRY, WETH_ADDRESS } from "@tal-trading-agent/shared";
+import { TOKEN_REGISTRY, WETH_ADDRESS, getTokenMeta } from "@tal-trading-agent/shared";
 import type { TradeRequest, TradingStrategy } from "@tal-trading-agent/shared";
 import { inferHorizonFromPrompt, inferRiskToleranceFromPrompt } from "./horizonParser.js";
 import { inferBudgetFromPrompt } from "./budgetParser.js";
@@ -599,12 +599,28 @@ function buildSummaryText(
     lines.push(`---`);
   }
 
-  // Trade summary
+  // Trade summary with token names, amounts, and full addresses
   if (strategy.trades.length > 0) {
-    lines.push(
-      ``,
-      `Trades: ${strategy.trades.length}`,
-    );
+    lines.push(``, `Trades: ${strategy.trades.length}`);
+    for (let i = 0; i < strategy.trades.length; i++) {
+      const t = strategy.trades[i]!;
+      const inMeta = getTokenMeta(t.tokenIn);
+      const outMeta = getTokenMeta(t.tokenOut);
+      const inSymbol = inMeta?.symbol ?? "???";
+      const outSymbol = outMeta?.symbol ?? "???";
+      const inDecimals = inMeta?.decimals ?? 18;
+      // Format amount as human-readable
+      const amountWei = t.amountIn;
+      const divisor = 10n ** BigInt(inDecimals);
+      const whole = amountWei / divisor;
+      const frac = (amountWei % divisor).toString().padStart(inDecimals, "0").slice(0, 6).replace(/0+$/, "") || "0";
+      const humanAmount = `${whole}.${frac}`;
+      lines.push(
+        `  ${i + 1}. ${t.action.toUpperCase()} ${humanAmount} ${inSymbol} -> ${outSymbol}`,
+        `     ${t.tokenIn} -> ${t.tokenOut}`,
+        `     Fee: ${t.poolFee / 10000}% | Impact: ${t.priceImpact.toFixed(2)}%`,
+      );
+    }
   }
 
   lines.push(

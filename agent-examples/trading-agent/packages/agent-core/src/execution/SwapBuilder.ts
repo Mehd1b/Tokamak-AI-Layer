@@ -201,7 +201,7 @@ export class SwapBuilder {
       data,
       value: isNativeEth ? amountIn : 0n,
       gasEstimate: BigInt(150_000 + (path.length - 1) * 100_000),
-      description: `Multi-hop swap (${path.length - 1} hops): ${amountIn.toString()} via ${path.map((a) => a.slice(0, 8)).join(" -> ")}`,
+      description: `Multi-hop swap (${path.length - 1} hops): ${amountIn.toString()} via ${path.join(" -> ")}`,
     };
   }
 

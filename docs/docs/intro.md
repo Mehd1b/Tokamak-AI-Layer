@@ -74,6 +74,8 @@ Constants are defined across the core contracts in [`contracts/src/core/`](https
 | TALReputationRegistry | [`0x0052258E517835081c94c0B685409f2EfC4D502b`](https://explorer.thanos-sepolia.tokamak.network/address/0x0052258E517835081c94c0B685409f2EfC4D502b) |
 | TALValidationRegistry | [`0x09447147C6E75a60A449f38532F06E19F5F632F3`](https://explorer.thanos-sepolia.tokamak.network/address/0x09447147C6E75a60A449f38532F06E19F5F632F3) |
 | StakingIntegrationModule | [`0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30`](https://explorer.thanos-sepolia.tokamak.network/address/0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30) |
+| WSTONVault | [`0x6aa6a7B9e51B636417025403053855B788107C27`](https://explorer.thanos-sepolia.tokamak.network/address/0x6aa6a7B9e51B636417025403053855B788107C27) |
+| TaskFeeEscrow | [`0x6D68Cd8fD89BF1746A1948783C92A00E591d1227`](https://explorer.thanos-sepolia.tokamak.network/address/0x6D68Cd8fD89BF1746A1948783C92A00E591d1227) |
 
 See [Deployed Contracts](/reference/deployed-contracts) for all addresses including L1 and Thanos Sepolia.
 

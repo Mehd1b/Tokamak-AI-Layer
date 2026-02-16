@@ -1,0 +1,28 @@
+{
+  "id": "contracts/wston-vault",
+  "title": "WSTON Vault",
+  "description": "The WSTONVault is an L2 vault for locking bridged WSTON tokens with slashing support. Operators lock WSTON on Thanos Sepolia L2 to back agent validations. The vault assigns operator tiers based on locked amounts and enables slashing by authorized contracts (ValidationRegistry, StakingIntegrationModule).",
+  "source": "@site/docs/contracts/wston-vault.md",
+  "sourceDirName": "contracts",
+  "slug": "/contracts/wston-vault",
+  "permalink": "/contracts/wston-vault",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/contracts/wston-vault.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 4,
+  "frontMatter": {
+    "title": "WSTON Vault",
+    "sidebar_position": 4
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Validation Registry",
+    "permalink": "/contracts/validation-registry"
+  },
+  "next": {
+    "title": "Task Fee Escrow",
+    "permalink": "/contracts/task-fee-escrow"
+  }
+}

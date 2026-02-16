@@ -5,7 +5,7 @@
   "source": "@site/docs/app/pages-guide.md",
   "sourceDirName": "app",
   "slug": "/app/pages-guide",
-  "permalink": "/tal/app/pages-guide",
+  "permalink": "/app/pages-guide",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/app/pages-guide.md",
@@ -19,10 +19,10 @@
   "sidebar": "docsSidebar",
   "previous": {
     "title": "Setup",
-    "permalink": "/tal/app/setup"
+    "permalink": "/app/setup"
   },
   "next": {
     "title": "Wallet & Chains",
-    "permalink": "/tal/app/wallet-and-chains"
+    "permalink": "/app/wallet-and-chains"
   }
 }

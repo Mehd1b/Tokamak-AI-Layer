@@ -236,10 +236,14 @@ For a 10 TON bounty:
 
 | Validation Model | Minimum Bounty |
 |-----------------|---------------|
-| ReputationOnly | 0 (no bounty required) |
+| ~~ReputationOnly~~ | **REJECTED** in V3 -- contract reverts with `ReputationOnlyNoValidationNeeded()` |
 | StakeSecured | 10 TON (`MIN_STAKE_SECURED_BOUNTY`) |
 | TEEAttested | 1 TON (`MIN_TEE_BOUNTY`) |
 | Hybrid | 10 TON (uses StakeSecured minimum) |
+
+:::warning
+As of the V3 upgrade, `ReputationOnly` validation requests are explicitly rejected. All validation requests must use StakeSecured, TEEAttested, or Hybrid models. Additionally, StakeSecured and Hybrid models now enforce dual-staking: the agent owner must have >= 1,000 TON locked in the WSTONVault.
+:::
 
 ## Dispute Mechanism
 

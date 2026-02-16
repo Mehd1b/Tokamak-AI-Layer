@@ -15,11 +15,12 @@ The core TAL protocol contracts are deployed on Thanos Sepolia, a Tokamak Networ
 |----------|---------|-------------|
 | TALIdentityRegistry | [`0x3f89CD27fD877827E7665A9883b3c0180E22A525`](https://explorer.thanos-sepolia.tokamak.network/address/0x3f89CD27fD877827E7665A9883b3c0180E22A525) | ERC-721 agent identity NFTs, ZK commitments, operator management |
 | TALReputationRegistry | [`0x0052258E517835081c94c0B685409f2EfC4D502b`](https://explorer.thanos-sepolia.tokamak.network/address/0x0052258E517835081c94c0B685409f2EfC4D502b) | Stake-weighted feedback aggregation, payment proofs |
-| TALValidationRegistry | [`0x09447147C6E75a60A449f38532F06E19F5F632F3`](https://explorer.thanos-sepolia.tokamak.network/address/0x09447147C6E75a60A449f38532F06E19F5F632F3) | Multi-model validation, TEE attestation, bounty distribution |
+| TALValidationRegistry | [`0x09447147C6E75a60A449f38532F06E19F5F632F3`](https://explorer.thanos-sepolia.tokamak.network/address/0x09447147C6E75a60A449f38532F06E19F5F632F3) | Multi-model validation (V3), epoch stats, dual-staking, automated slashing |
 | StakingIntegrationModule | [`0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30`](https://explorer.thanos-sepolia.tokamak.network/address/0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30) | Stake queries, slashing, seigniorage routing |
 | TaskFeeEscrow | [`0x6D68Cd8fD89BF1746A1948783C92A00E591d1227`](https://explorer.thanos-sepolia.tokamak.network/address/0x6D68Cd8fD89BF1746A1948783C92A00E591d1227) | Native TON task fee escrow with refund support |
 | WSTON (L2 Bridged) | [`0x4d7b29213c9ad19a2aaa01e3ccf6f209636a786f`](https://explorer.thanos-sepolia.tokamak.network/address/0x4d7b29213c9ad19a2aaa01e3ccf6f209636a786f) | Bridged WrappedStakedTON (ERC-20, 27 decimals) via OptimismMintableERC20Factory |
 | WSTONVault | [`0x6aa6a7B9e51B636417025403053855B788107C27`](https://explorer.thanos-sepolia.tokamak.network/address/0x6aa6a7B9e51B636417025403053855B788107C27) | L2 vault for locking bridged WSTON with slashing support |
+| L2StandardBridge | [`0x4200000000000000000000000000000000000010`](https://explorer.thanos-sepolia.tokamak.network/address/0x4200000000000000000000000000000000000010) | Optimism L2 Standard Bridge for cross-chain token transfers |
 
 ## Ethereum Sepolia L1
 
@@ -34,6 +35,7 @@ Tokamak Network staking infrastructure on Ethereum Sepolia, used for economic se
 | SeigManager | [`0x2320542ae933FbAdf8f5B97cA348c7CeDA90fAd7`](https://sepolia.etherscan.io/address/0x2320542ae933FbAdf8f5B97cA348c7CeDA90fAd7) | Seigniorage management and stake tracking |
 | Layer2Registry | [`0xA0a9576b437E52114aDA8b0BC4149F2F5c604581`](https://sepolia.etherscan.io/address/0xA0a9576b437E52114aDA8b0BC4149F2F5c604581) | Registry of Layer2 operator contracts |
 | Layer2 (Operator) | [`0xCBeF7Cc221c04AD2E68e623613cc5d33b0fE1599`](https://sepolia.etherscan.io/address/0xCBeF7Cc221c04AD2E68e623613cc5d33b0fE1599) | Registered Layer2 operator for TAL staking |
+| L1StandardBridge | [`0x757EC5b8F81eDdfC31F305F3325Ac6Abf4A63a5D`](https://sepolia.etherscan.io/address/0x757EC5b8F81eDdfC31F305F3325Ac6Abf4A63a5D) | Optimism L1 Standard Bridge for cross-chain token transfers |
 
 ## Optimism Sepolia (Legacy)
 

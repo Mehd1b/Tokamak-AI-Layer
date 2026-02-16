@@ -5,7 +5,7 @@
   "source": "@site/docs/contracts/task-fee-escrow.md",
   "sourceDirName": "contracts",
   "slug": "/contracts/task-fee-escrow",
-  "permalink": "/tal/contracts/task-fee-escrow",
+  "permalink": "/contracts/task-fee-escrow",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/contracts/task-fee-escrow.md",
@@ -18,11 +18,11 @@
   },
   "sidebar": "docsSidebar",
   "previous": {
-    "title": "Validation Registry",
-    "permalink": "/tal/contracts/validation-registry"
+    "title": "WSTON Vault",
+    "permalink": "/contracts/wston-vault"
   },
   "next": {
     "title": "Deployment & Security",
-    "permalink": "/tal/contracts/deployment-and-security"
+    "permalink": "/contracts/deployment-and-security"
   }
 }

@@ -5,7 +5,7 @@
   "source": "@site/docs/reference/glossary.md",
   "sourceDirName": "reference",
   "slug": "/reference/glossary",
-  "permalink": "/tal/reference/glossary",
+  "permalink": "/reference/glossary",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/reference/glossary.md",
@@ -19,10 +19,10 @@
   "sidebar": "docsSidebar",
   "previous": {
     "title": "IPFS & Metadata",
-    "permalink": "/tal/integration/ipfs-and-metadata"
+    "permalink": "/integration/ipfs-and-metadata"
   },
   "next": {
     "title": "Deployed Contracts",
-    "permalink": "/tal/reference/deployed-contracts"
+    "permalink": "/reference/deployed-contracts"
   }
 }

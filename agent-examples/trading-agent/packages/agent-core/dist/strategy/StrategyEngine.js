@@ -35,15 +35,11 @@ export class StrategyEngine {
         const userMessage = this.buildUserMessage(request, candidates, mode);
         let llmResponse;
         let llmReasoning;
-        // Use extended thinking for investment/position modes
-        if (mode === "investment" || mode === "position") {
-            const result = await this.callLLMWithThinking(systemPrompt, userMessage);
-            llmResponse = result.text;
-            llmReasoning = result.thinking;
-        }
-        else {
-            llmResponse = await this.callLLM(systemPrompt, userMessage);
-        }
+        // Use extended thinking for all modes so reasoning is always available
+        const thinkingBudget = (mode === "investment" || mode === "position") ? 8000 : 4000;
+        const result = await this.callLLMWithThinking(systemPrompt, userMessage, thinkingBudget);
+        llmResponse = result.text;
+        llmReasoning = result.thinking;
         // Parse the response - retry once if invalid JSON
         let parsed;
         try {
@@ -340,11 +336,11 @@ Produce the JSON ${mode === "investment" ? "investment plan" : "strategy"} now.`
         }
         return textBlock.text;
     }
-    async callLLMWithThinking(systemPrompt, userMessage) {
+    async callLLMWithThinking(systemPrompt, userMessage, budgetTokens = 8000) {
         const response = await this.client.messages.create({
             model: this.model,
             max_tokens: 16000,
-            thinking: { type: "enabled", budget_tokens: 8000 },
+            thinking: { type: "enabled", budget_tokens: budgetTokens },
             system: systemPrompt,
             messages: [{ role: "user", content: userMessage }],
         });

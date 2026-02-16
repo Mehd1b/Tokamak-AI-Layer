@@ -5,7 +5,7 @@
   "source": "@site/docs/reference/repo-map.md",
   "sourceDirName": "reference",
   "slug": "/reference/repo-map",
-  "permalink": "/tal/reference/repo-map",
+  "permalink": "/reference/repo-map",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/reference/repo-map.md",
@@ -19,6 +19,6 @@
   "sidebar": "docsSidebar",
   "previous": {
     "title": "Deployed Contracts",
-    "permalink": "/tal/reference/deployed-contracts"
+    "permalink": "/reference/deployed-contracts"
   }
 }

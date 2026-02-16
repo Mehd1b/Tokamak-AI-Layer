@@ -352,3 +352,49 @@ Submits a task to an agent runtime via `/api/runtime/[agentId]/tasks`. Supports 
 ### `useRecentTasks(onChainAgentId)`
 
 Fetches recent task results for an agent from the runtime server. Returns `TaskResult[]` with status, input, output, hashes, and timestamps.
+
+---
+
+## Vault Hooks
+
+**File**: `frontend/src/hooks/useVault.ts`
+
+Interact with the **WSTONVault** contract on Thanos Sepolia L2 for WSTON locking, unlocking, and operator tier management.
+
+### Read Hooks
+
+| Hook | Returns | Description |
+|------|---------|-------------|
+| `useLockedBalance(operator)` | `bigint` | Locked WSTON balance for an operator |
+| `useIsVerifiedOperator(operator)` | `boolean` | Whether operator meets VERIFIED threshold (>= 1,000 WSTON) |
+| `useOperatorTier(operator)` | `OperatorTier` | Current tier: UNVERIFIED, VERIFIED, or PREMIUM |
+| `useWithdrawalRequestCount(operator)` | `bigint` | Number of pending withdrawal requests |
+| `useReadyAmount(operator)` | `bigint` | Total WSTON amount ready for processUnlock |
+
+### Write Hooks
+
+| Hook | Action | Description |
+|------|--------|-------------|
+| `useLock()` | `lock(amount)` | Lock WSTON in the vault (requires prior approval) |
+| `useRequestUnlock()` | `requestUnlock(amount)` | Request to unlock WSTON (starts withdrawal delay) |
+| `useProcessUnlock()` | `processUnlock()` | Process all ready withdrawal requests |
+
+---
+
+## Deregistration Hook
+
+**File**: `frontend/src/hooks/useDeregisterAgent.ts`
+
+### `useDeregisterAgent()`
+
+Calls `TALIdentityRegistry.deregister(agentId)` to burn an agent's NFT and remove it from the registry. Only callable by the agent owner.
+
+---
+
+## L2 Configuration Hook
+
+**File**: `frontend/src/hooks/useL2Config.ts`
+
+### `useL2Config()`
+
+Returns L2 chain configuration including contract addresses, chain ID, and RPC URL. Used internally by other hooks for address resolution.

@@ -5,7 +5,7 @@
   "source": "@site/docs/intro.md",
   "sourceDirName": ".",
   "slug": "/",
-  "permalink": "/tal/",
+  "permalink": "/",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/intro.md",
@@ -20,6 +20,6 @@
   "sidebar": "docsSidebar",
   "next": {
     "title": "Architecture Overview",
-    "permalink": "/tal/architecture/overview"
+    "permalink": "/architecture/overview"
   }
 }

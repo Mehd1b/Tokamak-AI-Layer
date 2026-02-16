@@ -64,9 +64,9 @@ UUPS upgrades are powerful but carry significant risk. A malicious or buggy upgr
 - The `_authorizeUpgrade` function is never removed in new implementations
 :::
 
-### Exception: TaskFeeEscrow
+### Exceptions: TaskFeeEscrow and WSTONVault
 
-The `TaskFeeEscrow` contract is intentionally **non-upgradeable**. It handles user funds directly and benefits from the stronger security guarantee of immutable logic. Its `identityRegistry` reference is set at construction time via an `immutable` variable.
+The `TaskFeeEscrow` and `WSTONVault` contracts are intentionally **non-upgradeable**. They handle user funds directly and benefit from the stronger security guarantee of immutable logic. TaskFeeEscrow's `identityRegistry` reference is set at construction time via an `immutable` variable. WSTONVault's `wstonToken` is similarly immutable.
 
 ## Role-Based Access Control
 
@@ -112,8 +112,8 @@ This ensures that when new state variables are added in future implementations, 
 | Contract | Gap Size | Notes |
 |----------|---------|-------|
 | TALIdentityRegistry | `uint256[40]` | Standard gap |
-| TALReputationRegistry | `uint256[39]` | Slightly reduced (extra state variable `taskFeeEscrow` added) |
-| TALValidationRegistry | `uint256[40]` | Standard gap |
+| TALReputationRegistry | `uint256[40]` | Standard gap |
+| TALValidationRegistry | `uint256[40]` + `uint256[38]` + `uint256[36]` | V1 gap + V2 gap (epoch stats) + V3 gap (WSTONVault + deadline slashing) |
 
 ## ReentrancyGuard
 
@@ -150,7 +150,9 @@ The contracts are deployed on Thanos Sepolia (Chain ID: `111551119090`) behind E
 | TALIdentityRegistry | `0x3f89CD27fD877827E7665A9883b3c0180E22A525` | UUPS Proxy |
 | TALReputationRegistry | `0x0052258E517835081c94c0B685409f2EfC4D502b` | UUPS Proxy |
 | TALValidationRegistry | `0x09447147C6E75a60A449f38532F06E19F5F632F3` | UUPS Proxy |
-| StakingIntegrationModule | `0x41FF86643f6d550725177af1ABBF4db9715A74b8` | UUPS Proxy |
+| StakingIntegrationModule | `0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30` | UUPS Proxy |
+| WSTONVault | `0x6aa6a7B9e51B636417025403053855B788107C27` | Non-upgradeable |
+| TaskFeeEscrow | `0x6D68Cd8fD89BF1746A1948783C92A00E591d1227` | Non-upgradeable |
 
 :::info Network Configuration
 - **Network**: Thanos Sepolia (testnet)
@@ -225,16 +227,17 @@ The `-vv` flag displays `console.log` output showing exact gas figures.
 
 ## Test Coverage
 
-The contract suite includes 384 tests across unit, integration, and benchmark categories:
+The contract suite includes 404 Solidity tests across unit, integration, and benchmark categories, plus 35 SDK tests:
 
 | Test Suite | Tests | Type |
 |-----------|-------|------|
-| TALIdentityRegistry.t.sol | 87 | Unit |
-| TALReputationRegistry.t.sol | 59 | Unit |
+| TALIdentityRegistry.t.sol | 83 | Unit |
+| TALReputationRegistry.t.sol | 63 | Unit |
 | ReputationMath.t.sol | 57 | Unit |
+| TaskFeeEscrow.t.sol | 59 | Unit |
+| WSTONVault.t.sol | 44 | Unit |
 | DRBIntegrationModule.t.sol | 27 | Unit |
 | StakingIntegrationModule.t.sol | 28 | Unit |
-| CrossLayerBridge.t.sol | 48 | Integration |
 | StakeSecuredValidation.t.sol | 12 | Integration |
 | TEEAttestedValidation.t.sol | 20 | Integration |
 | GasBenchmarks.t.sol | 11 | Benchmark |

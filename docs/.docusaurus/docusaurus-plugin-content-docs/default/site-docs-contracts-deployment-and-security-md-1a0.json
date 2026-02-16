@@ -5,7 +5,7 @@
   "source": "@site/docs/contracts/deployment-and-security.md",
   "sourceDirName": "contracts",
   "slug": "/contracts/deployment-and-security",
-  "permalink": "/tal/contracts/deployment-and-security",
+  "permalink": "/contracts/deployment-and-security",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/contracts/deployment-and-security.md",
@@ -19,10 +19,10 @@
   "sidebar": "docsSidebar",
   "previous": {
     "title": "Task Fee Escrow",
-    "permalink": "/tal/contracts/task-fee-escrow"
+    "permalink": "/contracts/task-fee-escrow"
   },
   "next": {
     "title": "SDK Overview",
-    "permalink": "/tal/sdk/overview"
+    "permalink": "/sdk/overview"
   }
 }

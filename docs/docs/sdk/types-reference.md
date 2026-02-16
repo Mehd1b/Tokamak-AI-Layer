@@ -456,11 +456,13 @@ export interface TransactionResult {
 ## Default Addresses
 
 ```typescript
-export const OPTIMISM_SEPOLIA_ADDRESSES = {
+export const THANOS_SEPOLIA_ADDRESSES = {
   identityRegistry: "0x3f89CD27fD877827E7665A9883b3c0180E22A525",
   reputationRegistry: "0x0052258E517835081c94c0B685409f2EfC4D502b",
   validationRegistry: "0x09447147C6E75a60A449f38532F06E19F5F632F3",
-  stakingIntegrationModule: "0x41FF86643f6d550725177af1ABBF4db9715A74b8",
+  stakingIntegrationModule: "0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30",
+  taskFeeEscrow: "0x6D68Cd8fD89BF1746A1948783C92A00E591d1227",
+  wstonVault: "0x6aa6a7B9e51B636417025403053855B788107C27",
 } as const;
 
 export const DEFAULT_CHAIN_ID = 111551119090; // Thanos Sepolia

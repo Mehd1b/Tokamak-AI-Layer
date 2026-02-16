@@ -5,7 +5,7 @@
   "source": "@site/docs/architecture/trust-model.md",
   "sourceDirName": "architecture",
   "slug": "/architecture/trust-model",
-  "permalink": "/tal/architecture/trust-model",
+  "permalink": "/architecture/trust-model",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/architecture/trust-model.md",
@@ -19,10 +19,10 @@
   "sidebar": "docsSidebar",
   "previous": {
     "title": "Architecture Overview",
-    "permalink": "/tal/architecture/overview"
+    "permalink": "/architecture/overview"
   },
   "next": {
     "title": "Cross-Layer Bridge",
-    "permalink": "/tal/architecture/cross-layer-bridge"
+    "permalink": "/architecture/cross-layer-bridge"
   }
 }

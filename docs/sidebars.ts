@@ -21,6 +21,7 @@ const sidebars: SidebarsConfig = {
         'contracts/identity-registry',
         'contracts/reputation-registry',
         'contracts/validation-registry',
+        'contracts/wston-vault',
         'contracts/task-fee-escrow',
         'contracts/deployment-and-security',
       ],

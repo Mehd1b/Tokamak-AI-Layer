@@ -23,6 +23,7 @@ flowchart TB
         VR[TALValidationRegistry]
         IR[TALIdentityRegistry]
         RR[TALReputationRegistry]
+        WV[WSTONVault]
         DRB[DRBIntegrationModule]
         SIM[StakingIntegrationModule]
         SBL2[TALStakingBridgeL2]
@@ -38,8 +39,9 @@ flowchart TB
     VR --> IR
     VR --> RR
     VR --> DRB
-    VR --> SBL2
+    VR --> WV
     SIM --> SBL2
+    SIM --> WV
     IR --> SBL2
     RR --> SBL2
 
@@ -51,9 +53,10 @@ flowchart TB
 ```
 
 :::tip Where in the code?
-- `TALValidationRegistry`: [`contracts/src/core/TALValidationRegistry.sol`](/contracts/validation-registry) (1052 lines)
-- `TALIdentityRegistry`: [`contracts/src/core/TALIdentityRegistry.sol`](/contracts/identity-registry) (602 lines)
-- `TALReputationRegistry`: [`contracts/src/core/TALReputationRegistry.sol`](/contracts/reputation-registry) (687 lines)
+- `TALValidationRegistry`: [`contracts/src/core/TALValidationRegistry.sol`](/contracts/validation-registry) (1,112 lines)
+- `TALIdentityRegistry`: [`contracts/src/core/TALIdentityRegistry.sol`](/contracts/identity-registry) (905 lines)
+- `TALReputationRegistry`: [`contracts/src/core/TALReputationRegistry.sol`](/contracts/reputation-registry) (717 lines)
+- `WSTONVault`: [`contracts/src/core/WSTONVault.sol`](/contracts/wston-vault) (280 lines)
 - `DRBIntegrationModule`: [`contracts/src/modules/DRBIntegrationModule.sol`](/integration/drb-integration)
 - `StakingIntegrationModule`: [`contracts/src/modules/StakingIntegrationModule.sol`](/integration/staking-bridge)
 - Bridge contracts: [`contracts/src/bridge/`](/architecture/cross-layer-bridge)
@@ -65,7 +68,7 @@ TAL implements four trust tiers, each providing escalating security guarantees f
 
 | Tier | Enum Value | Description | Security Guarantee |
 |------|------------|-------------|-------------------|
-| **ReputationOnly** | `0` | Lightweight aggregated feedback scores. Any address can submit a validation. No stake or hardware requirement. | Sybil-resistant via stake-weighted reputation math. Feedback values weighted by `sqrt(stake)` to prevent plutocracy. |
+| ~~**ReputationOnly**~~ | `0` | **REJECTED** in V3. The contract reverts with `ReputationOnlyNoValidationNeeded()` if this model is requested. | Previously used for lightweight feedback scoring. Removed to enforce economic security on all validations. |
 | **StakeSecured** | `1` | DRB-selected validator re-executes agent output. Validator must hold >= 1,000 TON on L1. Minimum bounty: 10 TON. | Economic security through slashable stake. Fraudulent validators lose up to 100% of staked collateral. |
 | **TEEAttested** | `2` | Execution verified inside a hardware enclave (SGX, Nitro, TrustZone). TEE provider must be whitelisted. Minimum bounty: 1 TON. | Hardware-backed integrity guarantee. Failed attestation triggers 50% stake slash. |
 | **Hybrid** | `3` | Combines StakeSecured and TEEAttested. Both validator selection via DRB and TEE attestation verification are required. | Maximum security: economic + hardware guarantees. Dual verification path. |
@@ -86,7 +89,7 @@ Clients submit feedback via `TALReputationRegistry.submitFeedback()`, providing 
 
 ### Validation Flow
 
-A requester calls `TALValidationRegistry.requestValidation()` with a bounty, specifying the trust tier. For StakeSecured and Hybrid models, a validator is selected via the DRBIntegrationModule (Commit-Reveal2). The selected validator re-executes the task, submits a score and proof, and the bounty is distributed: 10% to the protocol treasury, 9% to the agent owner, and 81% to the validator.
+A requester calls `TALValidationRegistry.requestValidation()` with a bounty, specifying the trust tier (ReputationOnly is rejected in V3). For StakeSecured and Hybrid models, the agent owner must have >= 1,000 TON locked in WSTONVault (dual-staking). A validator is selected via the DRBIntegrationModule (Commit-Reveal2). The selected validator re-executes the task, submits a score and proof, and the bounty is distributed: 10% to the protocol treasury, 9% to the agent owner, and 81% to the validator. If the score is below 50, the agent owner is automatically slashed 50% via WSTONVault.
 
 ### Cross-Layer Staking Flow
 
@@ -117,6 +120,8 @@ The `UPGRADER_ROLE` has significant power. In production, this role should be he
 | TALReputationRegistry | `0x0052258E517835081c94c0B685409f2EfC4D502b` |
 | TALValidationRegistry | `0x09447147C6E75a60A449f38532F06E19F5F632F3` |
 | StakingIntegrationModule | `0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30` |
+| WSTONVault | `0x6aa6a7B9e51B636417025403053855B788107C27` |
+| TaskFeeEscrow | `0x6D68Cd8fD89BF1746A1948783C92A00E591d1227` |
 
 ## Next Steps
 

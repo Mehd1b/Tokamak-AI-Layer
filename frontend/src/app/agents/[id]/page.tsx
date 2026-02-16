@@ -688,6 +688,7 @@ export default function AgentDetailPage() {
                 onChainAgentId={agentId}
                 feePerTask={onChainFee}
                 serviceUrl={metaServices?.A2A}
+                validationModel={agent.validationModel}
               />
             </>
           )}
@@ -721,12 +722,14 @@ export default function AgentDetailPage() {
         >
           Submit Feedback
         </button>
-        <Link
-          href={`/validation/request?agentId=${agentId}`}
-          className="btn-secondary"
-        >
-          Request Validation
-        </Link>
+        {agent.validationModel !== undefined && agent.validationModel > 0 && (
+          <Link
+            href={`/validation/request?agentId=${agentId}`}
+            className="btn-secondary"
+          >
+            Request Validation
+          </Link>
+        )}
         {isOwner && agent.status !== 2 && (
           <button
             onClick={() => setShowDeleteConfirm(true)}

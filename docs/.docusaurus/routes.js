@@ -3,193 +3,164 @@ import ComponentCreator from '@docusaurus/ComponentCreator';
 
 export default [
   {
-    path: '/tal/__docusaurus/debug',
-    component: ComponentCreator('/tal/__docusaurus/debug', '4f1'),
-    exact: true
-  },
-  {
-    path: '/tal/__docusaurus/debug/config',
-    component: ComponentCreator('/tal/__docusaurus/debug/config', 'ab0'),
-    exact: true
-  },
-  {
-    path: '/tal/__docusaurus/debug/content',
-    component: ComponentCreator('/tal/__docusaurus/debug/content', '58f'),
-    exact: true
-  },
-  {
-    path: '/tal/__docusaurus/debug/globalData',
-    component: ComponentCreator('/tal/__docusaurus/debug/globalData', '052'),
-    exact: true
-  },
-  {
-    path: '/tal/__docusaurus/debug/metadata',
-    component: ComponentCreator('/tal/__docusaurus/debug/metadata', 'd8f'),
-    exact: true
-  },
-  {
-    path: '/tal/__docusaurus/debug/registry',
-    component: ComponentCreator('/tal/__docusaurus/debug/registry', '2b1'),
-    exact: true
-  },
-  {
-    path: '/tal/__docusaurus/debug/routes',
-    component: ComponentCreator('/tal/__docusaurus/debug/routes', 'f6a'),
-    exact: true
-  },
-  {
-    path: '/tal/',
-    component: ComponentCreator('/tal/', 'a18'),
+    path: '/',
+    component: ComponentCreator('/', '570'),
     routes: [
       {
-        path: '/tal/',
-        component: ComponentCreator('/tal/', 'fcb'),
+        path: '/',
+        component: ComponentCreator('/', 'c24'),
         routes: [
           {
-            path: '/tal/',
-            component: ComponentCreator('/tal/', '75c'),
+            path: '/',
+            component: ComponentCreator('/', '65c'),
             routes: [
               {
-                path: '/tal/app/contract-integration',
-                component: ComponentCreator('/tal/app/contract-integration', '533'),
+                path: '/app/contract-integration',
+                component: ComponentCreator('/app/contract-integration', '9c0'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/app/hooks-reference',
-                component: ComponentCreator('/tal/app/hooks-reference', 'e4b'),
+                path: '/app/hooks-reference',
+                component: ComponentCreator('/app/hooks-reference', '49d'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/app/pages-guide',
-                component: ComponentCreator('/tal/app/pages-guide', 'c8b'),
+                path: '/app/pages-guide',
+                component: ComponentCreator('/app/pages-guide', '507'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/app/setup',
-                component: ComponentCreator('/tal/app/setup', '5aa'),
+                path: '/app/setup',
+                component: ComponentCreator('/app/setup', '5ae'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/app/wallet-and-chains',
-                component: ComponentCreator('/tal/app/wallet-and-chains', '3b0'),
+                path: '/app/wallet-and-chains',
+                component: ComponentCreator('/app/wallet-and-chains', 'ae9'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/architecture/cross-layer-bridge',
-                component: ComponentCreator('/tal/architecture/cross-layer-bridge', 'c16'),
+                path: '/architecture/cross-layer-bridge',
+                component: ComponentCreator('/architecture/cross-layer-bridge', '735'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/architecture/overview',
-                component: ComponentCreator('/tal/architecture/overview', '2af'),
+                path: '/architecture/overview',
+                component: ComponentCreator('/architecture/overview', '67c'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/architecture/trust-model',
-                component: ComponentCreator('/tal/architecture/trust-model', '470'),
+                path: '/architecture/trust-model',
+                component: ComponentCreator('/architecture/trust-model', 'c28'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/contracts/deployment-and-security',
-                component: ComponentCreator('/tal/contracts/deployment-and-security', '73f'),
+                path: '/contracts/deployment-and-security',
+                component: ComponentCreator('/contracts/deployment-and-security', '0f5'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/contracts/identity-registry',
-                component: ComponentCreator('/tal/contracts/identity-registry', 'e05'),
+                path: '/contracts/identity-registry',
+                component: ComponentCreator('/contracts/identity-registry', '2c0'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/contracts/reputation-registry',
-                component: ComponentCreator('/tal/contracts/reputation-registry', 'e7a'),
+                path: '/contracts/reputation-registry',
+                component: ComponentCreator('/contracts/reputation-registry', 'be6'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/contracts/task-fee-escrow',
-                component: ComponentCreator('/tal/contracts/task-fee-escrow', 'a0f'),
+                path: '/contracts/task-fee-escrow',
+                component: ComponentCreator('/contracts/task-fee-escrow', 'adb'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/contracts/validation-registry',
-                component: ComponentCreator('/tal/contracts/validation-registry', '37c'),
+                path: '/contracts/validation-registry',
+                component: ComponentCreator('/contracts/validation-registry', '2bd'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/integration/drb-integration',
-                component: ComponentCreator('/tal/integration/drb-integration', 'af8'),
+                path: '/contracts/wston-vault',
+                component: ComponentCreator('/contracts/wston-vault', '568'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/integration/ipfs-and-metadata',
-                component: ComponentCreator('/tal/integration/ipfs-and-metadata', 'a55'),
+                path: '/integration/drb-integration',
+                component: ComponentCreator('/integration/drb-integration', 'f20'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/integration/staking-bridge',
-                component: ComponentCreator('/tal/integration/staking-bridge', 'c92'),
+                path: '/integration/ipfs-and-metadata',
+                component: ComponentCreator('/integration/ipfs-and-metadata', '121'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/reference/deployed-contracts',
-                component: ComponentCreator('/tal/reference/deployed-contracts', 'c03'),
+                path: '/integration/staking-bridge',
+                component: ComponentCreator('/integration/staking-bridge', '9f3'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/reference/glossary',
-                component: ComponentCreator('/tal/reference/glossary', '69f'),
+                path: '/reference/deployed-contracts',
+                component: ComponentCreator('/reference/deployed-contracts', '851'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/reference/repo-map',
-                component: ComponentCreator('/tal/reference/repo-map', '99d'),
+                path: '/reference/glossary',
+                component: ComponentCreator('/reference/glossary', '098'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/sdk/identity-client',
-                component: ComponentCreator('/tal/sdk/identity-client', 'bb7'),
+                path: '/reference/repo-map',
+                component: ComponentCreator('/reference/repo-map', '3c7'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/sdk/overview',
-                component: ComponentCreator('/tal/sdk/overview', 'd99'),
+                path: '/sdk/identity-client',
+                component: ComponentCreator('/sdk/identity-client', '5b7'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/sdk/reputation-and-validation',
-                component: ComponentCreator('/tal/sdk/reputation-and-validation', '1bf'),
+                path: '/sdk/overview',
+                component: ComponentCreator('/sdk/overview', 'fb1'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/sdk/types-reference',
-                component: ComponentCreator('/tal/sdk/types-reference', '52a'),
+                path: '/sdk/reputation-and-validation',
+                component: ComponentCreator('/sdk/reputation-and-validation', '0d8'),
                 exact: true,
                 sidebar: "docsSidebar"
               },
               {
-                path: '/tal/',
-                component: ComponentCreator('/tal/', '59b'),
+                path: '/sdk/types-reference',
+                component: ComponentCreator('/sdk/types-reference', 'a7e'),
+                exact: true,
+                sidebar: "docsSidebar"
+              },
+              {
+                path: '/',
+                component: ComponentCreator('/', 'b56'),
                 exact: true,
                 sidebar: "docsSidebar"
               }

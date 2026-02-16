@@ -5,7 +5,7 @@
   "source": "@site/docs/app/hooks-reference.md",
   "sourceDirName": "app",
   "slug": "/app/hooks-reference",
-  "permalink": "/tal/app/hooks-reference",
+  "permalink": "/app/hooks-reference",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/app/hooks-reference.md",
@@ -19,10 +19,10 @@
   "sidebar": "docsSidebar",
   "previous": {
     "title": "Wallet & Chains",
-    "permalink": "/tal/app/wallet-and-chains"
+    "permalink": "/app/wallet-and-chains"
   },
   "next": {
     "title": "Contract Integration",
-    "permalink": "/tal/app/contract-integration"
+    "permalink": "/app/contract-integration"
   }
 }

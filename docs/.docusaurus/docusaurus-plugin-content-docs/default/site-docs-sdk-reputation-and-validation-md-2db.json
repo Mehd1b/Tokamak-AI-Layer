@@ -5,7 +5,7 @@
   "source": "@site/docs/sdk/reputation-and-validation.md",
   "sourceDirName": "sdk",
   "slug": "/sdk/reputation-and-validation",
-  "permalink": "/tal/sdk/reputation-and-validation",
+  "permalink": "/sdk/reputation-and-validation",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/docs/sdk/reputation-and-validation.md",
@@ -19,10 +19,10 @@
   "sidebar": "docsSidebar",
   "previous": {
     "title": "Identity Client",
-    "permalink": "/tal/sdk/identity-client"
+    "permalink": "/sdk/identity-client"
   },
   "next": {
     "title": "Types Reference",
-    "permalink": "/tal/sdk/types-reference"
+    "permalink": "/sdk/types-reference"
   }
 }

@@ -1,5 +1,6 @@
 import type { TradingStrategy } from "@tal-trading-agent/shared";
-import { UNISWAP_V3, WETH_ADDRESS } from "@tal-trading-agent/shared";
+import { UNISWAP_V3, WETH_ADDRESS, getTokenMeta } from "@tal-trading-agent/shared";
+import type { Address } from "viem";
 
 /**
  * Generates a zip buffer containing a self-contained trading bot repo
@@ -927,8 +928,13 @@ export async function generateBotZip(strategy: TradingStrategy): Promise<Buffer>
       `## Trades`,
       ``,
       ...strategy.trades.map(
-        (t, i) =>
-          `${i + 1}. **${t.action.toUpperCase()}**: ${t.tokenIn} -> ${t.tokenOut} (amount: ${t.amountIn}, fee: ${t.poolFee})`,
+        (t, i) => {
+          const inMeta = getTokenMeta(t.tokenIn as Address);
+          const outMeta = getTokenMeta(t.tokenOut as Address);
+          const inLabel = inMeta ? `${inMeta.symbol} (${t.tokenIn})` : t.tokenIn;
+          const outLabel = outMeta ? `${outMeta.symbol} (${t.tokenOut})` : t.tokenOut;
+          return `${i + 1}. **${t.action.toUpperCase()}**: ${inLabel} -> ${outLabel} (amount: ${t.amountIn}, fee: ${t.poolFee})`;
+        },
       ),
       ``,
       `## Auto-Execution Listener`,

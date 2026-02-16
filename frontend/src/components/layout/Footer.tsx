@@ -57,7 +57,7 @@ export function Footer() {
   }, []);
 
   return (
-    <footer ref={footerRef} className="relative z-10 bg-[#0a0a0f]">
+    <footer ref={footerRef} className="relative bg-[#0a0a0f]">
       {/* Top gradient line */}
       <div className="h-[1px] bg-gradient-to-r from-transparent via-[#38BDF8]/30 to-transparent" />
 
