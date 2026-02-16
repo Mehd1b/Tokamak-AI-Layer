@@ -28,6 +28,7 @@ export interface AgentSocials {
 interface AgentMetadata {
   name?: string;
   description?: string;
+  image?: string;
   capabilities?: string[];
   talCapabilities?: CapabilityMeta[];
   requestExample?: string;
@@ -41,6 +42,7 @@ interface AgentMetadata {
 interface UseAgentMetadataResult {
   name?: string;
   description?: string;
+  image?: string;
   capabilities?: string[];
   talCapabilities?: CapabilityMeta[];
   requestExample?: string;
@@ -54,6 +56,10 @@ interface UseAgentMetadataResult {
 }
 
 const metadataCache = new Map<string, AgentMetadata>();
+
+export function getCachedMetadata(agentURI: string): AgentMetadata | undefined {
+  return metadataCache.get(agentURI);
+}
 
 const IPFS_GATEWAYS = [
   'https://gateway.pinata.cloud/ipfs/',
@@ -133,6 +139,7 @@ export function useAgentMetadata(agentURI: string | undefined): UseAgentMetadata
           const parsed: AgentMetadata = {
             name: data.name || data.metadata?.name,
             description: data.description || data.metadata?.description,
+            image: data.image || data.metadata?.image || undefined,
             capabilities: data.capabilities || data.metadata?.capabilities || [],
             talCapabilities: Array.isArray(talCaps)
               ? talCaps.filter((c: CapabilityMeta) => c && typeof c.name === 'string')
@@ -182,6 +189,7 @@ export function useAgentMetadata(agentURI: string | undefined): UseAgentMetadata
   return {
     name: metadata?.name,
     description: metadata?.description,
+    image: metadata?.image,
     capabilities: metadata?.capabilities,
     talCapabilities: metadata?.talCapabilities,
     requestExample: metadata?.requestExample,

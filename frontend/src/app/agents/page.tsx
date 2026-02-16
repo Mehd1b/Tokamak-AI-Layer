@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Search, ChevronRight, Star, ArrowUpDown, Filter, X } from 'lucide-react';
 import { useAgentCount, useAgentList } from '@/hooks/useAgent';
-import { useAgentMetadata } from '@/hooks/useAgentMetadata';
+import { useAgentMetadata, getCachedMetadata } from '@/hooks/useAgentMetadata';
 import { useAgentRatings } from '@/hooks/useReputation';
 import { shortenAddress, getAgentStatusLabel, getAgentStatusColor, getValidationModelLabel, getValidationModelColor } from '@/lib/utils';
 
@@ -23,7 +23,7 @@ interface AgentCardProps {
 }
 
 function AgentCard({ agentId, owner, agentURI, averageScore, feedbackCount, status, validationModel }: AgentCardProps) {
-  const { name, description, active, services, isLoading, error } = useAgentMetadata(agentURI);
+  const { name, description, image, active, services, isLoading, error } = useAgentMetadata(agentURI);
 
   const hasNoMetadata = !isLoading && !agentURI;
   const metadataFailed = !isLoading && error && !name;
@@ -42,8 +42,12 @@ function AgentCard({ agentId, owner, agentURI, averageScore, feedbackCount, stat
         style={{ background: 'radial-gradient(600px circle at 50% 50%, rgba(56, 189, 248, 0.04), transparent 40%)' }}
       />
       <div className="relative z-10 flex flex-1 min-w-0 items-center gap-4">
-        <div className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-[#38BDF8]/10 border border-[#38BDF8]/20 text-[#38BDF8] font-bold text-sm" style={{ fontFamily: 'var(--font-mono), monospace' }}>
-          #{agentId}
+        <div className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-[#38BDF8]/10 border border-[#38BDF8]/20 overflow-hidden">
+          {image ? (
+            <img src={image} alt={name || `Agent #${agentId}`} className="h-full w-full object-cover" />
+          ) : (
+            <span className="text-[#38BDF8] font-bold text-sm" style={{ fontFamily: 'var(--font-mono), monospace' }}>#{agentId}</span>
+          )}
           <span className={`absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ${statusDotColor} ring-2 ring-[#0a0a0f]`} title={getAgentStatusLabel(status)} />
         </div>
         <div className="flex-1 min-w-0">
@@ -128,6 +132,9 @@ export default function AgentsPage() {
         if (agent.agentId.toString().includes(search)) return true;
         if (agent.owner.toLowerCase().includes(searchLower)) return true;
         if (agent.agentURI.toLowerCase().includes(searchLower)) return true;
+        const meta = getCachedMetadata(agent.agentURI);
+        if (meta?.name?.toLowerCase().includes(searchLower)) return true;
+        if (meta?.description?.toLowerCase().includes(searchLower)) return true;
         return false;
       });
     }
@@ -207,7 +214,7 @@ export default function AgentsPage() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
             <input
               type="text"
-              placeholder="Search agents by ID, owner address, or URI..."
+              placeholder="Search by name, description, ID, or owner..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-4 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"

@@ -64,7 +64,7 @@ export default function AgentDetailPage() {
   const { validationHashes } = useAgentValidations(agentId);
   const { total: valTotal, failed: valFailed, failureRate: valFailureRate, isLoading: valStatsLoading } = useValidationStats(agentId);
   const { agent: runtimeAgent } = useRuntimeAgent(agentId?.toString());
-  const { name: metaName, description: metaDescription, capabilities: metaCapabilities, talCapabilities: metaTalCapabilities, requestExample: metaRequestExample, services: metaServices, socials: metaSocials, active: metaActive, pricing: metaPricing, customUI: metaCustomUI } = useAgentMetadata(agent?.agentURI);
+  const { name: metaName, description: metaDescription, image: metaImage, capabilities: metaCapabilities, talCapabilities: metaTalCapabilities, requestExample: metaRequestExample, services: metaServices, socials: metaSocials, active: metaActive, pricing: metaPricing, customUI: metaCustomUI } = useAgentMetadata(agent?.agentURI);
   const { data: onChainFee } = useAgentFee(agentId);
   const { nativeCurrency } = useL2Config();
   const { address } = useWallet();
@@ -199,8 +199,12 @@ export default function AgentDetailPage() {
       <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm transition-all duration-300 mb-6">
         <div className="flex items-start justify-between">
           <div className="flex min-w-0 flex-1 items-center gap-4">
-            <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-[#38BDF8]/20 text-[#38BDF8] text-2xl font-bold" style={{ fontFamily: 'var(--font-mono), monospace' }}>
-              #{agentId?.toString()}
+            <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-[#38BDF8]/20 overflow-hidden">
+              {metaImage ? (
+                <img src={metaImage} alt={metaName || `Agent #${agentId?.toString()}`} className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-[#38BDF8] text-2xl font-bold" style={{ fontFamily: 'var(--font-mono), monospace' }}>#{agentId?.toString()}</span>
+              )}
             </div>
             <div className="min-w-0">
               <h1 className="text-3xl font-light text-white" style={{ fontFamily: 'var(--font-serif), serif' }}>

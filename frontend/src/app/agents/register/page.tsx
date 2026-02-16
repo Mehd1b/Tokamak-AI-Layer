@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Upload, X, Info, Shield, Globe } from 'lucide-react';
+import { useRef, useCallback } from 'react';
+import { ArrowLeft, Upload, X, Info, Shield, Globe, ImagePlus, Loader2 } from 'lucide-react';
 import { AgentCustomUI } from '@/components/AgentCustomUI';
 import { useWallet } from '@/hooks/useWallet';
 import { useRegisterAgent, useRegisterAgentV2 } from '@/hooks/useRegisterAgent';
@@ -29,6 +30,11 @@ export default function RegisterAgentPage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [feePerTask, setFeePerTask] = useState('');
   const [validationModel, setValidationModel] = useState(0);
   const [selfAsOperator, setSelfAsOperator] = useState(true);
@@ -90,6 +96,56 @@ export default function RegisterAgentPage() {
       return next;
     });
   };
+
+  const handleImageUpload = useCallback(async (file: File) => {
+    setImageError(null);
+
+    if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
+      setImageError('Only PNG and JPG images are allowed.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setImageError('Image must be under 5MB.');
+      return;
+    }
+
+    setImagePreview(URL.createObjectURL(file));
+    setImageUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/ipfs/image', { method: 'POST', body: formData });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Upload failed');
+      }
+
+      setImageUrl(data.gatewayUrl);
+    } catch (err) {
+      setImageError(err instanceof Error ? err.message : 'Upload failed');
+      setImagePreview(null);
+      setImageUrl('');
+    } finally {
+      setImageUploading(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleImageUpload(file);
+  }, [handleImageUpload]);
+
+  const removeImage = useCallback(() => {
+    setImageUrl('');
+    setImagePreview(null);
+    setImageError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, []);
 
   const getServicePlaceholder = (type: string): string => {
     switch (type) {
@@ -332,16 +388,63 @@ export default function RegisterAgentPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white/60">
-                Image URL
+              <label className="block text-sm font-medium text-white/60 mb-1">
+                Agent Image
               </label>
               <input
-                type="url"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://example.com/agent-avatar.png"
-                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#38BDF8] focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/50"
+                ref={fileInputRef}
+                type="file"
+                accept=".png,.jpg,.jpeg"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleImageUpload(file);
+                }}
               />
+              {imagePreview || imageUrl ? (
+                <div className="relative inline-block">
+                  <img
+                    src={imagePreview || imageUrl}
+                    alt="Agent preview"
+                    className="h-24 w-24 rounded-xl border border-white/10 object-cover"
+                  />
+                  {imageUploading && (
+                    <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/60">
+                      <Loader2 className="h-5 w-5 text-[#38BDF8] animate-spin" />
+                    </div>
+                  )}
+                  {!imageUploading && (
+                    <button
+                      type="button"
+                      onClick={removeImage}
+                      className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-400 transition-colors"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed py-8 transition-colors ${
+                    isDragging
+                      ? 'border-[#38BDF8]/50 bg-[#38BDF8]/5'
+                      : 'border-white/10 bg-white/[0.02] hover:border-white/20'
+                  }`}
+                >
+                  <ImagePlus className="h-8 w-8 text-white/20 mb-2" />
+                  <p className="text-sm text-white/40">
+                    Drop an image here or <span className="text-[#38BDF8]">browse</span>
+                  </p>
+                  <p className="mt-1 text-xs text-white/20">PNG or JPG, max 5MB</p>
+                </div>
+              )}
+              {imageError && (
+                <p className="mt-1 text-xs text-red-400">{imageError}</p>
+              )}
             </div>
           </div>
         </div>
