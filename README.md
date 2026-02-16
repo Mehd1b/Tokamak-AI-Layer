@@ -381,6 +381,18 @@ Coming soon
 3. Run tests: `forge test`
 4. Submit a pull request
 
+## Execution Kernel (Companion Protocol)
+
+The `execution-kernel/` directory contains the **Execution Kernel** — a companion protocol for verifiable AI agent execution using RISC Zero zkVM. While TAL provides agent discovery, reputation, and validation infrastructure, the Execution Kernel handles the actual execution layer with zero-knowledge proofs that verify agent computations before settling them on-chain.
+
+**Key components:**
+- **Contracts** (Foundry) — AgentRegistry, KernelVault, VaultFactory, KernelExecutionVerifier
+- **Rust Crates** — kernel-core, kernel-sdk, kernel-guest, agent implementations
+- **TypeScript SDK** — Client library for interacting with EK contracts
+- **Frontend** — Next.js 14 UI for vault management and agent monitoring
+
+See [`execution-kernel/README.md`](execution-kernel/README.md) for full documentation.
+
 ## License
 
 MIT License - see [LICENSE](LICENSE)

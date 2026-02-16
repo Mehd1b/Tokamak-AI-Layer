@@ -43,6 +43,13 @@ Tokamak-AI-Layer/
 │       ├── components/     # UI components
 │       ├── hooks/          # wagmi contract hooks
 │       └── lib/            # Contract addresses, config
+├── execution-kernel/       # RISC Zero zkVM Execution Kernel (independent protocol)
+│   ├── contracts/          # Foundry — AgentRegistry, KernelVault, VaultFactory, Verifier
+│   ├── crates/             # Rust workspace — kernel-core, kernel-sdk, kernel-guest, agents
+│   ├── sdk/                # TypeScript SDK for EK contracts
+│   ├── frontend/           # Next.js 14 UI for vault management
+│   ├── docs/               # Architecture, flows, agent development
+│   └── spec/               # Codec, constraints, SDK specs
 ├── docs/                   # Technical documentation
 │   └── TECHNICAL_SPECIFICATION.md
 ├── PROPOSAL.md             # Project proposal document
@@ -267,6 +274,29 @@ cd frontend && npm run build                  # Production build
 ### Critical Gap
 
 The system is a complete REGISTRY LAYER but has no AGENT EXECUTION LAYER. The contracts register, track reputation, and validate agents, but no actual AI agents exist to use this infrastructure. The MVP must bridge this gap.
+
+---
+
+## EXECUTION KERNEL (Independent Protocol)
+
+The `execution-kernel/` directory contains the RISC Zero zkVM-based Execution Kernel — an independent protocol for verifiable agent execution. It uses zero-knowledge proofs to verify that AI agent actions were computed correctly before settling them on-chain via vaults.
+
+### EK Contracts (Ethereum Sepolia)
+
+| Contract | Address | Purpose |
+|----------|---------|---------|
+| AgentRegistry | `0xBa1DA5f7e12F2c8614696D019A2eb48918E1f2AA` | Permissionless agent registration |
+| VaultFactory | `0x3bB48a146bBC50F8990c86787a41185A6fC474d2` | CREATE2 vault deployment |
+| KernelExecutionVerifier | `0x9Ef5bAB590AFdE8036D57b89ccD2947D4E3b1EFA` | RISC Zero proof verification |
+| RiscZeroVerifierRouter | `0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187` | RISC Zero verifier router |
+
+### EK Build Commands
+
+```bash
+cd execution-kernel/contracts && forge build && forge test
+cd execution-kernel/sdk && npm test
+cd execution-kernel/frontend && npm run build
+```
 
 ---
 

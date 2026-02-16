@@ -66,6 +66,7 @@ contract TALIdentityRegistry is
     uint256 internal constant MAX_OPERATORS_PER_AGENT = 10;
     uint256 internal constant SLASH_FAILURE_THRESHOLD = 30;
     uint256 internal constant SLASH_PERCENTAGE = 25;
+    uint256 internal constant SLASH_EPOCH_DURATION = 30 days;
 
     // ============ Agent Status Enum ============
 
@@ -121,9 +122,12 @@ contract TALIdentityRegistry is
     /// @notice WSTONVault address for stake verification and slashing
     address public wstonVault;
 
+    /// @notice Last epoch in which an agent was slashed (prevents re-slashing in same epoch)
+    mapping(uint256 => uint256) internal _lastSlashEpoch;
+
     // ============ Storage Gap ============
 
-    uint256[24] private __gap;
+    uint256[23] private __gap;
 
     // ============ Events ============
 
@@ -149,6 +153,7 @@ contract TALIdentityRegistry is
     event OperatorAdded(uint256 indexed agentId, address indexed operator);
     event OperatorRemoved(uint256 indexed agentId, address indexed operator);
     event OperatorExited(uint256 indexed agentId, address indexed operator);
+    event SlashingFailed(address indexed operator, uint256 amount);
 
     /// @notice Emitted when a content hash is committed for an agent (registration or update)
     event ContentHashCommitted(
@@ -189,6 +194,9 @@ contract TALIdentityRegistry is
 
     /// @notice Thrown when a zero content hash is provided
     error InvalidContentHash();
+
+    /// @notice Thrown when an agent was already slashed in the current epoch
+    error AlreadySlashedInEpoch(uint256 agentId, uint256 epoch);
 
     // ============ Structs ============
 
@@ -490,6 +498,12 @@ contract TALIdentityRegistry is
         if (!_exists(agentId)) revert AgentNotFound(agentId);
         if (_agentStatus[agentId] != STATUS_ACTIVE) revert AgentNotActive(agentId);
 
+        // H-4 fix: Prevent re-slashing in the same epoch
+        uint256 currentEpochNum = block.timestamp / SLASH_EPOCH_DURATION;
+        if (_lastSlashEpoch[agentId] == currentEpochNum) {
+            revert AlreadySlashedInEpoch(agentId, currentEpochNum);
+        }
+
         uint8 model = _agentValidationModel[agentId];
         if (model != MODEL_STAKE_SECURED && model != MODEL_HYBRID) {
             revert NotSlashableModel(agentId);
@@ -520,6 +534,7 @@ contract TALIdentityRegistry is
 
         _agentStatus[agentId] = STATUS_PAUSED;
         _agentPausedAt[agentId] = block.timestamp;
+        _lastSlashEpoch[agentId] = currentEpochNum;
 
         emit AgentSlashed(agentId, opsCopy, slashPerOperator, failedValidations, totalValidations);
     }
@@ -835,7 +850,11 @@ contract TALIdentityRegistry is
      */
     function _slashOperator(address operator, uint256 amount) internal {
         if (amount == 0 || wstonVault == address(0)) return;
-        try WSTONVault(wstonVault).slash(operator, amount) {} catch {}
+        // H-3 fix: Emit SlashingFailed when slash reverts
+        try WSTONVault(wstonVault).slash(operator, amount) {
+        } catch {
+            emit SlashingFailed(operator, amount);
+        }
     }
 
     function _removeOperatorFromAgent(uint256 agentId, address operator) internal {
@@ -898,6 +917,28 @@ contract TALIdentityRegistry is
 
         if (to != address(0)) {
             _agentsByOwner[to].push(tokenId);
+        }
+
+        // H-2 fix: On transfer (not mint/burn), invalidate operator consent
+        // Operators signed EIP-712 consent for the original owner — transfer breaks that trust
+        if (from != address(0) && to != address(0)) {
+            // Remove all V2 operators (reverse iteration for safe swap-and-pop)
+            address[] storage operators = _agentOperators[tokenId];
+            for (uint256 i = operators.length; i > 0; i--) {
+                _removeOperatorFromAgent(tokenId, operators[i - 1]);
+            }
+
+            // Clear legacy single operator
+            delete _operators[tokenId];
+            verifiedOperators[tokenId] = false;
+
+            // Pause stake-backed agents — new owner must add operators and reactivate
+            uint8 model = _agentValidationModel[tokenId];
+            if (model == MODEL_STAKE_SECURED || model == MODEL_HYBRID) {
+                _agentStatus[tokenId] = STATUS_PAUSED;
+                _agentPausedAt[tokenId] = block.timestamp;
+                emit AgentPausedNoOperators(tokenId);
+            }
         }
 
         return from;

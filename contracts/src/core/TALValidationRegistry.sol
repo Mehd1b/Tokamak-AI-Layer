@@ -198,8 +198,14 @@ contract TALValidationRegistry is
     /// @notice WSTONVault address for stake verification and slashing
     address public wstonVault;
 
-    /// @dev V3 storage gap
-    uint256[36] private __gapV3;
+    /// @notice Pending ETH withdrawals for failed transfers (pull-payment pattern)
+    mapping(address => uint256) public pendingWithdrawals;
+
+    /// @notice Hash of candidates array stored during selectValidator for finalize verification
+    mapping(bytes32 => bytes32) internal _candidatesHash;
+
+    /// @dev V3 storage gap (reduced by 2 for new variables)
+    uint256[34] private __gapV3;
 
     // ============ Events ============
 
@@ -209,6 +215,21 @@ contract TALValidationRegistry is
         uint256 totalInEpoch,
         uint256 failedInEpoch
     );
+
+    /// @notice Emitted when an ETH transfer fails and amount is stored for pull-withdrawal
+    event WithdrawalPending(address indexed recipient, uint256 amount);
+
+    /// @notice Emitted when a recipient withdraws their pending ETH
+    event PendingWithdrawn(address indexed recipient, uint256 amount);
+
+    /// @notice Emitted when a slashing attempt fails (e.g. insufficient locked balance)
+    event SlashAttemptFailed(address indexed target, uint256 attemptedAmount);
+
+    /// @notice Thrown when withdrawPending is called with zero balance
+    error NoPendingWithdrawal();
+
+    /// @notice Thrown when finalizeValidatorSelection candidates don't match original
+    error CandidatesMismatch();
 
     // ============ Initializer ============
 
@@ -492,6 +513,7 @@ contract TALValidationRegistry is
         selectedValidator = candidates[selectedIndex];
 
         _selectedValidators[requestHash] = selectedValidator;
+        _candidatesHash[requestHash] = keccak256(abi.encode(candidates));
 
         emit ValidatorSelected(requestHash, selectedValidator, randomSeed);
 
@@ -513,9 +535,14 @@ contract TALValidationRegistry is
         bytes32 requestHash,
         address[] calldata candidates,
         uint256[] calldata stakes
-    ) external whenNotPaused {
+    ) external onlyRole(DRB_ROLE) whenNotPaused {
         require(_requests[requestHash].status == ValidationStatus.Pending, "Not pending");
         require(drbModule != address(0), "DRB module not set");
+
+        // C-1 fix: Verify candidates match the original selectValidator call
+        if (_candidatesHash[requestHash] != keccak256(abi.encode(candidates))) {
+            revert CandidatesMismatch();
+        }
 
         uint256 drbRound = _drbRequestIds[requestHash];
         require(drbRound > 0, "No DRB request");
@@ -628,13 +655,8 @@ contract TALValidationRegistry is
             }
         }
 
-        if (!isAuthorized) {
-            bytes32[] storage validatorHistory = _validatorValidations[msg.sender];
-            if (validatorHistory.length > 0) {
-                isAuthorized = true;
-            }
-        }
-
+        // H-5 fix: Removed broad "any past validator" authorization.
+        // Only requester, agent owner, and the selected validator for THIS request can dispute.
         if (!isAuthorized) {
             address selectedValidator = _selectedValidators[requestHash];
             if (selectedValidator == msg.sender) {
@@ -682,14 +704,18 @@ contract TALValidationRegistry is
                 uint256 validatorStake = WSTONVault(wstonVault).getLockedBalance(validator);
                 uint256 slashAmount = validatorStake > request.bounty ? request.bounty : validatorStake;
                 if (slashAmount > 0) {
-                    try WSTONVault(wstonVault).slash(validator, slashAmount) {} catch {}
+                    try WSTONVault(wstonVault).slash(validator, slashAmount) {
+                    } catch {
+                        emit SlashAttemptFailed(validator, slashAmount);
+                    }
                 }
             }
 
             request.status = ValidationStatus.Expired;
 
+            // H-1 fix: Use pull-payment for safe refund
             if (request.bounty > 0) {
-                (bool refundSuccess, ) = request.requester.call{value: request.bounty}("");
+                _safeSendETH(request.requester, request.bounty);
             }
         }
     }
@@ -751,13 +777,16 @@ contract TALValidationRegistry is
             uint256 slashAmount = (operatorStake * SLASH_MISSED_DEADLINE_PCT) / 100;
 
             if (slashAmount > 0) {
-                try WSTONVault(wstonVault).slash(operator, slashAmount) {} catch {}
+                try WSTONVault(wstonVault).slash(operator, slashAmount) {
+                } catch {
+                    emit SlashAttemptFailed(operator, slashAmount);
+                }
             }
         }
 
-        // Refund bounty to requester
+        // H-1 fix: Use pull-payment for safe refund
         if (request.bounty > 0) {
-            (bool refundSuccess,) = request.requester.call{value: request.bounty}("");
+            _safeSendETH(request.requester, request.bounty);
         }
 
         emit OperatorSlashedForDeadline(requestHash, operator);
@@ -1029,20 +1058,10 @@ contract TALValidationRegistry is
             }
         }
 
-        if (treasuryAmount > 0 && treasury != address(0)) {
-            (bool treasurySuccess, ) = treasury.call{value: treasuryAmount}("");
-            require(treasurySuccess, "Treasury transfer failed");
-        }
-
-        if (agentAmount > 0 && agentOwner != address(0)) {
-            (bool agentSuccess, ) = agentOwner.call{value: agentAmount}("");
-            require(agentSuccess, "Agent reward transfer failed");
-        }
-
-        if (validatorAmount > 0) {
-            (bool validatorSuccess, ) = validator.call{value: validatorAmount}("");
-            require(validatorSuccess, "Validator reward transfer failed");
-        }
+        // C-2 fix: Use pull-payment pattern to prevent DoS via reverting recipients
+        _safeSendETH(treasury, treasuryAmount);
+        _safeSendETH(agentOwner, agentAmount);
+        _safeSendETH(validator, validatorAmount);
 
         emit BountyDistributed(requestHash, validator, validatorAmount, agentAmount, treasuryAmount);
     }
@@ -1099,12 +1118,45 @@ contract TALValidationRegistry is
         uint256 ownerStake = WSTONVault(wstonVault).getLockedBalance(ownerAddress);
         uint256 slashAmount = (ownerStake * SLASH_INCORRECT_COMPUTATION_PCT) / 100;
         if (slashAmount > 0) {
-            try WSTONVault(wstonVault).slash(ownerAddress, slashAmount) {} catch {}
+            // H-3 fix: Only emit AgentSlashed on successful slash
+            try WSTONVault(wstonVault).slash(ownerAddress, slashAmount) {
+                emit AgentSlashed(agentId, requestHash, slashAmount, SLASH_INCORRECT_COMPUTATION_PCT);
+            } catch {
+                emit SlashAttemptFailed(ownerAddress, slashAmount);
+            }
         }
-        emit AgentSlashed(agentId, requestHash, slashAmount, SLASH_INCORRECT_COMPUTATION_PCT);
+    }
+
+    /**
+     * @notice Send ETH with pull-payment fallback
+     * @dev If direct transfer fails, stores amount in pendingWithdrawals for later claim
+     */
+    function _safeSendETH(address recipient, uint256 amount) internal {
+        if (amount == 0 || recipient == address(0)) return;
+        (bool success, ) = recipient.call{value: amount}("");
+        if (!success) {
+            pendingWithdrawals[recipient] += amount;
+            emit WithdrawalPending(recipient, amount);
+        }
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}
+
+    // ============ Pull-Payment Functions ============
+
+    /**
+     * @notice Withdraw pending ETH from failed transfers
+     * @dev Pull-payment pattern — recipients call this to claim ETH
+     *      that couldn't be sent directly during bounty distribution or refunds
+     */
+    function withdrawPending() external nonReentrant {
+        uint256 amount = pendingWithdrawals[msg.sender];
+        if (amount == 0) revert NoPendingWithdrawal();
+        pendingWithdrawals[msg.sender] = 0;
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Transfer failed");
+        emit PendingWithdrawn(msg.sender, amount);
+    }
 
     // ============ Receive Function ============
 
