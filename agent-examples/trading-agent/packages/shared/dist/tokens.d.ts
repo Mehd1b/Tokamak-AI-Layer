@@ -12,6 +12,8 @@ export declare const TOKEN_REGISTRY: TokenMeta[];
 /** Backward-compatible TOKENS record (symbol -> address) */
 export declare const TOKENS: Record<string, Address>;
 export declare const WETH_ADDRESS: Address;
+export declare const USDT_ADDRESS: Address;
+export declare const USDT_DECIMALS = 6;
 export declare function getTokensByCategory(category: TokenCategory): TokenMeta[];
 export declare function getDefaultTokens(): TokenMeta[];
 export declare function getTokenMeta(address: Address): TokenMeta | undefined;

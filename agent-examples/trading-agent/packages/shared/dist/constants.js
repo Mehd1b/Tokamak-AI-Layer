@@ -33,7 +33,7 @@ export const UNISWAP_V2 = {
     router: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
 };
 // ── Token Registry (re-exported from tokens.ts) ──────────
-export { TOKENS, WETH_ADDRESS, TOKEN_REGISTRY } from "./tokens.js";
+export { TOKENS, WETH_ADDRESS, USDT_ADDRESS, USDT_DECIMALS, TOKEN_REGISTRY } from "./tokens.js";
 // ── Fee Tiers ────────────────────────────────────────────
 export const FEE_TIERS = [100, 500, 3000, 10000];
 // ── DeFiLlama API ────────────────────────────────────────

@@ -1,13 +1,13 @@
 import { Type } from "@sinclair/typebox";
 import { isAddress } from "viem";
 import { siwaAuthMiddleware } from "@tal-trading-agent/siwa-auth";
-import { TOKEN_REGISTRY, WETH_ADDRESS } from "@tal-trading-agent/shared";
+import { TOKEN_REGISTRY, USDT_ADDRESS } from "@tal-trading-agent/shared";
 import { inferHorizonFromPrompt } from "./horizonParser.js";
 // ── Request schemas ─────────────────────────────────────
 const AnalyzeBody = Type.Object({
     prompt: Type.String({ minLength: 10 }),
     budget: Type.String({ description: "Budget in wei as string" }),
-    budgetToken: Type.Optional(Type.String({ description: "ERC-20 address, defaults to WETH" })),
+    budgetToken: Type.Optional(Type.String({ description: "ERC-20 address, defaults to USDT" })),
     walletAddress: Type.String(),
     horizon: Type.Optional(Type.Union([
         Type.Literal("1h"),
@@ -41,7 +41,7 @@ export async function tradeRoutes(app, ctx) {
         }
         const budgetToken = (body.budgetToken && isAddress(body.budgetToken)
             ? body.budgetToken
-            : WETH_ADDRESS);
+            : USDT_ADDRESS);
         // Infer horizon from the natural language prompt if not explicitly provided
         const inferredHorizon = body.horizon ?? inferHorizonFromPrompt(body.prompt);
         const request = {

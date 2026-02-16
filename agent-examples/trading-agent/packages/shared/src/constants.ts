@@ -47,7 +47,7 @@ export const UNISWAP_V2 = {
 } as const;
 
 // ── Token Registry (re-exported from tokens.ts) ──────────
-export { TOKENS, WETH_ADDRESS, TOKEN_REGISTRY } from "./tokens.js";
+export { TOKENS, WETH_ADDRESS, USDT_ADDRESS, USDT_DECIMALS, TOKEN_REGISTRY } from "./tokens.js";
 export type { TokenMeta, TokenCategory } from "./tokens.js";
 
 // ── Fee Tiers ────────────────────────────────────────────

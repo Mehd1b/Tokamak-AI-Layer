@@ -1,6 +1,6 @@
 import { type Address } from "viem";
 interface ParsedBudget {
-    /** Budget in wei (of the budget token) */
+    /** Budget in smallest unit of the budget token */
     wei: bigint;
     /** The token address the budget is denominated in */
     token: Address;
@@ -10,12 +10,13 @@ interface ParsedBudget {
 /**
  * Infer the budget from a natural language prompt.
  *
- * Supported patterns:
- *   - USD amounts:  "$50", "$1,000", "$100k", "$1.5M", "50 dollars", "100 USD"
- *   - ETH amounts:  "0.5 ETH", "1 ETH", "2 WETH", "0.025 ether"
+ * The default budget token is USDT (6 decimals).
  *
- * For USD amounts, fetches the current ETH price from DeFiLlama
- * and converts to wei (WETH).
+ * Supported patterns:
+ *   - USD/USDT amounts:  "$50", "$1,000", "$100k", "$1.5M", "50 dollars",
+ *                        "100 USD", "500 USDT", "1000 USDT"
+ *   - ETH amounts:       "0.5 ETH", "1 ETH", "2 WETH", "0.025 ether"
+ *                        (converted to USDT equivalent via DeFiLlama)
  *
  * Returns undefined if no budget pattern is found in the prompt.
  */

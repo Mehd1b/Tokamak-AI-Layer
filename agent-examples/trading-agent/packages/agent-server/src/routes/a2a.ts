@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { isAddress, type Address, type Hex } from "viem";
 import type { AppContext } from "../context.js";
-import { TOKEN_REGISTRY, WETH_ADDRESS, getTokenMeta } from "@tal-trading-agent/shared";
+import { TOKEN_REGISTRY, USDT_ADDRESS, getTokenMeta } from "@tal-trading-agent/shared";
 import type { TradeRequest, TradingStrategy } from "@tal-trading-agent/shared";
 import { inferHorizonFromPrompt, inferRiskToleranceFromPrompt } from "./horizonParser.js";
 import { inferBudgetFromPrompt } from "./budgetParser.js";
@@ -93,12 +93,12 @@ export async function a2aRoutes(app: FastifyInstance, ctx: AppContext) {
           tags: ["defi", "trading", "uniswap", "aave", "strategy", "quantitative", "portfolio", "dca", "rebalancing", "short-selling", "leverage"],
           examples: [
             "Invest $100,000 in promising tokens for the next 6 months",
-            "Invest 1 ETH in promising DeFi tokens for the next week",
-            "Conservative allocation of 0.5 ETH across blue-chip tokens for 3 months",
+            "Invest 1000 USDT in promising DeFi tokens for the next week",
+            "Conservative allocation of 500 USDT across blue-chip tokens for 3 months",
             "Aggressive short-term trade on high-momentum tokens for 4 hours",
             "Build a long-term DCA portfolio with monthly rebalancing for 1 year",
             "Short overvalued tokens with 2x leverage for the next week",
-            "Open a 3x leveraged long on ETH with 0.5 ETH collateral",
+            "Open a 3x leveraged long on ETH with 500 USDT collateral",
             "Hedge my portfolio with short positions on overbought tokens",
           ],
           inputModes: ["application/json", "text/plain"],
@@ -193,7 +193,7 @@ async function handleTasksSend(
           parts: [
             {
               type: "text",
-              text: "Please provide a trading prompt. You can send a text message like 'Invest 1 ETH in DeFi tokens for a week' or structured JSON with: prompt, budget (wei string), walletAddress, horizon (1h/4h/1d/1w/1m/3m/6m/1y), riskTolerance (conservative/moderate/aggressive).",
+              text: "Please provide a trading prompt. You can send a text message like 'Invest 1000 USDT in DeFi tokens for a week' or structured JSON with: prompt, budget (smallest-unit string, e.g. 6 decimals for USDT), walletAddress, horizon (1h/4h/1d/1w/1m/3m/6m/1y), riskTolerance (conservative/moderate/aggressive).",
             },
           ],
         },
@@ -221,7 +221,7 @@ async function handleTasksSend(
 
     const budgetToken = (tradeParams.budgetToken && isAddress(tradeParams.budgetToken)
       ? tradeParams.budgetToken
-      : WETH_ADDRESS) as Address;
+      : USDT_ADDRESS) as Address;
 
     // Infer horizon from the natural language prompt if not explicitly provided
     const inferredHorizon = tradeParams.horizon ?? inferHorizonFromPrompt(tradeParams.prompt ?? "");
@@ -238,7 +238,7 @@ async function handleTasksSend(
 
     const request: TradeRequest = {
       prompt: tradeParams.prompt,
-      budget: budget ?? BigInt("1000000000000000000"), // default 1 ETH if nothing detected
+      budget: budget ?? BigInt("1000000000"), // default 1000 USDT (6 decimals) if nothing detected
       budgetToken,
       walletAddress,
       horizon: inferredHorizon ?? "1w",

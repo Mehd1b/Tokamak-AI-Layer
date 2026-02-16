@@ -29,7 +29,7 @@ export declare const UNISWAP_V2: {
     readonly factory: Address;
     readonly router: Address;
 };
-export { TOKENS, WETH_ADDRESS, TOKEN_REGISTRY } from "./tokens.js";
+export { TOKENS, WETH_ADDRESS, USDT_ADDRESS, USDT_DECIMALS, TOKEN_REGISTRY } from "./tokens.js";
 export type { TokenMeta, TokenCategory } from "./tokens.js";
 export declare const FEE_TIERS: readonly [100, 500, 3000, 10000];
 export declare const DEFILLAMA: {

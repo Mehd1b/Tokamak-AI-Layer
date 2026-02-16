@@ -883,6 +883,11 @@ export const TOKENS: Record<string, Address> = Object.fromEntries(
 export const WETH_ADDRESS: Address =
   "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
 
+export const USDT_ADDRESS: Address =
+  "0xdAC17F958D2ee523a2206206994597C13D831ec7";
+
+export const USDT_DECIMALS = 6;
+
 export function getTokensByCategory(category: TokenCategory): TokenMeta[] {
   return TOKEN_REGISTRY.filter((t) => t.category === category);
 }

@@ -1,8 +1,8 @@
-import { DEFILLAMA, WETH_ADDRESS } from "@tal-trading-agent/shared";
-import { parseEther, type Address } from "viem";
+import { DEFILLAMA, WETH_ADDRESS, USDT_ADDRESS, USDT_DECIMALS } from "@tal-trading-agent/shared";
+import { parseEther, parseUnits, type Address } from "viem";
 
 interface ParsedBudget {
-  /** Budget in wei (of the budget token) */
+  /** Budget in smallest unit of the budget token */
   wei: bigint;
   /** The token address the budget is denominated in */
   token: Address;
@@ -32,12 +32,13 @@ async function fetchEthPriceUsd(): Promise<number> {
 /**
  * Infer the budget from a natural language prompt.
  *
- * Supported patterns:
- *   - USD amounts:  "$50", "$1,000", "$100k", "$1.5M", "50 dollars", "100 USD"
- *   - ETH amounts:  "0.5 ETH", "1 ETH", "2 WETH", "0.025 ether"
+ * The default budget token is USDT (6 decimals).
  *
- * For USD amounts, fetches the current ETH price from DeFiLlama
- * and converts to wei (WETH).
+ * Supported patterns:
+ *   - USD/USDT amounts:  "$50", "$1,000", "$100k", "$1.5M", "50 dollars",
+ *                        "100 USD", "500 USDT", "1000 USDT"
+ *   - ETH amounts:       "0.5 ETH", "1 ETH", "2 WETH", "0.025 ether"
+ *                        (converted to USDT equivalent via DeFiLlama)
  *
  * Returns undefined if no budget pattern is found in the prompt.
  */
@@ -46,22 +47,49 @@ export async function inferBudgetFromPrompt(
 ): Promise<ParsedBudget | undefined> {
   const text = prompt.toLowerCase();
 
-  // ── Try ETH/WETH amounts first (no price lookup needed) ──
+  // ── Try USDT amounts first (direct, no price lookup) ──
+
+  // Patterns: "500 USDT", "1000 usdt"
+  const usdtRegex = /(\d+(?:\.\d+)?)\s*usdt\b/i;
+  const usdtMatch = usdtRegex.exec(text);
+  if (usdtMatch) {
+    const amount = usdtMatch[1]!;
+    const wei = parseUnits(amount, USDT_DECIMALS);
+    return {
+      wei,
+      token: USDT_ADDRESS,
+      description: `${amount} USDT`,
+    };
+  }
+
+  // ── Try ETH/WETH amounts (convert to USDT via price) ──
 
   // Patterns: "0.5 ETH", "1 eth", "2 WETH", "0.025 ether"
   const ethRegex = /(\d+(?:\.\d+)?)\s*(?:eth|weth|ether)\b/i;
   const ethMatch = ethRegex.exec(text);
   if (ethMatch) {
-    const ethAmount = ethMatch[1]!;
-    const wei = parseEther(ethAmount);
+    const ethAmount = parseFloat(ethMatch[1]!);
+    const ethPrice = await fetchEthPriceUsd();
+    if (ethPrice <= 0) {
+      // Can't convert — fall back to a reasonable USDT equivalent
+      const fallbackUsdt = ethAmount * 2000; // rough estimate
+      const wei = parseUnits(fallbackUsdt.toFixed(USDT_DECIMALS), USDT_DECIMALS);
+      return {
+        wei,
+        token: USDT_ADDRESS,
+        description: `${ethMatch[1]} ETH ≈ ${fallbackUsdt.toFixed(2)} USDT (estimated)`,
+      };
+    }
+    const usdtAmount = ethAmount * ethPrice;
+    const wei = parseUnits(usdtAmount.toFixed(USDT_DECIMALS), USDT_DECIMALS);
     return {
       wei,
-      token: WETH_ADDRESS,
-      description: `${ethAmount} ETH`,
+      token: USDT_ADDRESS,
+      description: `${ethMatch[1]} ETH ≈ ${usdtAmount.toFixed(2)} USDT (@ $${ethPrice.toFixed(2)}/ETH)`,
     };
   }
 
-  // ── Try USD amounts ──
+  // ── Try USD amounts (map directly to USDT) ──
 
   let usdAmount: number | undefined;
 
@@ -87,20 +115,14 @@ export async function inferBudgetFromPrompt(
 
   if (usdAmount === undefined || usdAmount <= 0) return undefined;
 
-  // Fetch ETH price and convert
-  const ethPrice = await fetchEthPriceUsd();
-  if (ethPrice <= 0) return undefined; // can't convert without a price
-
-  const ethAmount = usdAmount / ethPrice;
-  // Convert to wei with 18 decimal precision (cap at 18 decimals)
-  const ethString = ethAmount.toFixed(18);
-  const wei = parseEther(ethString);
+  // Map directly to USDT (1:1 with USD)
+  const wei = parseUnits(usdAmount.toFixed(USDT_DECIMALS), USDT_DECIMALS);
 
   if (wei <= 0n) return undefined;
 
   return {
     wei,
-    token: WETH_ADDRESS,
-    description: `$${usdAmount} ≈ ${ethAmount.toFixed(6)} ETH (@ $${ethPrice.toFixed(2)}/ETH)`,
+    token: USDT_ADDRESS,
+    description: `$${usdAmount} = ${usdAmount} USDT`,
   };
 }

@@ -1,0 +1,12 @@
+
+> @tal-trading-agent/agent-core@0.1.0 test /Users/mehdiberiane/Documents/tokamak/TAL/Tokamak-AI-Layer/agent-examples/trading-agent/packages/agent-core
+> vitest run
+
+
+ RUN  v2.1.9 /Users/mehdiberiane/Documents/tokamak/TAL/Tokamak-AI-Layer/agent-examples/trading-agent/packages/agent-core
+
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/dist/**, **/cypress/**, **/.{idea,git,cache,output,temp}/**, **/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build,eslint,prettier}.config.*
+
+No test files found, exiting with code 1
+ ELIFECYCLE  Test failed. See above for more details.
