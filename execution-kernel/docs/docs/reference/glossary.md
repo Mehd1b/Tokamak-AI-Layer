@@ -1,0 +1,287 @@
+---
+title: Glossary
+sidebar_position: 2
+---
+
+# Glossary
+
+This glossary defines key terms used throughout the Execution Kernel documentation.
+
+## A
+
+### Action
+
+A single instruction produced by an agent for execution on-chain. Actions have a type, target, and payload.
+
+### ActionV1
+
+The versioned action structure:
+```rust
+pub struct ActionV1 {
+    pub action_type: u32,
+    pub target: [u8; 32],
+    pub payload: Vec<u8>,
+}
+```
+
+### Agent
+
+A program that makes capital allocation decisions. Agents are pure functions: given inputs, they produce outputs (actions).
+
+### agent_code_hash
+
+A SHA-256 hash of the agent's source code, computed at build time and embedded in the binary. Used to verify agent identity.
+
+### agent_id
+
+A 32-byte identifier that uniquely identifies an agent within the protocol. Used for on-chain registration and authorization.
+
+### Agent Pack
+
+A portable bundle format for distributing verifiable agents, containing metadata and cryptographic commitments.
+
+### AgentContext
+
+The execution context provided to agents:
+```rust
+pub struct AgentContext<'a> {
+    pub protocol_version: u32,
+    pub kernel_version: u32,
+    pub agent_id: &'a [u8; 32],
+    pub agent_code_hash: &'a [u8; 32],
+    // ...
+}
+```
+
+### AgentEntrypoint
+
+The trait that agents implement to integrate with the kernel:
+```rust
+pub trait AgentEntrypoint {
+    fn code_hash(&self) -> [u8; 32];
+    fn run(&self, ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput;
+}
+```
+
+### AgentOutput
+
+The structure returned by agents containing actions:
+```rust
+pub struct AgentOutput {
+    pub actions: Vec<ActionV1>,
+}
+```
+
+## B
+
+### Basis Points (bps)
+
+A unit of measurement equal to 1/100th of a percent. 10,000 bps = 100%. Used for leverage and percentage calculations.
+
+## C
+
+### Canonicalization
+
+The process of transforming data into a standard form before hashing. Actions are sorted to ensure identical outputs regardless of insertion order.
+
+### Codec
+
+The deterministic binary encoding/decoding system. Uses little-endian integers and length-prefixed byte arrays.
+
+### Commitment
+
+A cryptographic hash that binds data without revealing it. The kernel produces `input_commitment` and `action_commitment`.
+
+### Constraint
+
+A rule that validates agent output. Constraints enforce limits on position size, leverage, etc.
+
+### ConstraintSetV1
+
+The structure defining constraint parameters:
+```rust
+pub struct ConstraintSetV1 {
+    pub max_position_notional: u64,
+    pub max_leverage_bps: u32,
+    // ...
+}
+```
+
+### constraint_set_hash
+
+A SHA-256 hash of the constraint set, included in the journal to verify which constraints were applied.
+
+## D
+
+### Determinism
+
+The property that the same inputs always produce the same outputs. Required for zkVM execution.
+
+## E
+
+### ELF
+
+Executable and Linkable Format. The compiled zkVM guest binary format used by RISC Zero.
+
+### ExecutionStatus
+
+The outcome of kernel execution:
+- `Success` (0x01): Constraints passed
+- `Failure` (0x02): Constraints violated
+
+### execution_nonce
+
+A monotonic counter for replay protection. Must increment with each execution.
+
+## G
+
+### Groth16
+
+A zero-knowledge proof system used by RISC Zero for succinct proofs that can be verified on-chain.
+
+### Guest Program
+
+Code that runs inside the zkVM. The kernel guest decodes inputs, executes agents, and commits the journal.
+
+## H
+
+### Hard Failure
+
+A fundamental error (wrong version, code hash mismatch) that aborts proof generation. No valid proof is produced.
+
+## I
+
+### imageId
+
+A cryptographic hash of the zkVM guest ELF binary. Uniquely identifies the compiled kernel + agent combination. Registered on-chain for verification.
+
+### input_commitment
+
+SHA-256 hash of the encoded KernelInputV1. Binds the proof to specific inputs.
+
+### input_root
+
+An external state root (e.g., market snapshot hash) included in the input for additional verification.
+
+## J
+
+### Journal
+
+The public output of a zkVM execution. Contains commitments, status, and metadata. Fixed size of 209 bytes.
+
+## K
+
+### Kernel
+
+The consensus-critical execution environment. Decodes inputs, runs agents, enforces constraints, and produces journals.
+
+### KernelInputV1
+
+The input structure for kernel execution:
+```rust
+pub struct KernelInputV1 {
+    pub protocol_version: u32,
+    pub kernel_version: u32,
+    pub agent_id: [u8; 32],
+    // ...
+}
+```
+
+### KernelJournalV1
+
+The output journal structure. 209 bytes, contains all commitments and execution status.
+
+### KernelVault
+
+The on-chain contract that holds capital and executes verified agent actions.
+
+## O
+
+### opaque_agent_inputs
+
+Raw bytes passed to the agent. The kernel doesn't interpret these; the agent is responsible for parsing.
+
+## P
+
+### Protocol Version
+
+The wire format version for encoding/decoding. Currently 1.
+
+### Proof
+
+A cryptographic proof (specifically Groth16) that demonstrates correct execution without revealing the computation.
+
+## R
+
+### Receipt
+
+The combination of a zkVM proof (seal) and its journal. Produced by the prover.
+
+### RISC Zero
+
+The zero-knowledge virtual machine platform used by the Execution Kernel.
+
+## S
+
+### Seal
+
+The Groth16 proof component of a receipt. Approximately 260 bytes.
+
+### SHA-256
+
+The cryptographic hash function used for all commitments in the kernel.
+
+### Soft Failure
+
+A constraint violation that produces a valid proof with Failure status. No actions are executed.
+
+### StateSnapshotV1
+
+A 36-byte structure containing equity and timestamp data for cooldown/drawdown constraints.
+
+## V
+
+### Vault
+
+An on-chain contract that holds capital and delegates decision-making to agents.
+
+### ViolationReason
+
+An enum identifying which constraint was violated:
+```rust
+pub enum ViolationReason {
+    InvalidOutputStructure,
+    UnknownActionType,
+    AssetNotWhitelisted,
+    PositionTooLarge,
+    LeverageTooHigh,
+    DrawdownExceeded,
+    CooldownNotElapsed,
+    InvalidStateSnapshot,
+    InvalidConstraintSet,
+    InvalidActionPayload,
+}
+```
+
+## W
+
+### Wrapper Crate
+
+A crate that implements `AgentEntrypoint` by delegating to a specific agent's `agent_main` function.
+
+## Z
+
+### zkVM
+
+Zero-Knowledge Virtual Machine. Executes programs and produces cryptographic proofs of correct execution.
+
+## Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `PROTOCOL_VERSION` | 1 | Wire format version |
+| `KERNEL_VERSION` | 1 | Kernel semantics version |
+| `MAX_AGENT_INPUT_BYTES` | 64,000 | Max input size |
+| `MAX_ACTIONS_PER_OUTPUT` | 64 | Max actions per execution |
+| `MAX_ACTION_PAYLOAD_BYTES` | 16,384 | Max payload per action |
+| `EMPTY_OUTPUT_COMMITMENT` | `df3f61...` | SHA-256 of empty output |

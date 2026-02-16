@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- First diamond -->
+  <path
+    d="M100 20 L150 80 L100 140 L50 80 Z"
+    fill="none"
+    stroke="#A855F7"
+    stroke-width="3"
+    stroke-opacity="0.7"
+  />
+
+  <!-- Second diamond (offset) -->
+  <path
+    d="M100 60 L150 120 L100 180 L50 120 Z"
+    fill="none"
+    stroke="#A855F7"
+    stroke-width="3"
+    stroke-opacity="0.4"
+  />
+
+  <!-- Center dot with glow -->
+  <circle
+    cx="100"
+    cy="100"
+    r="12"
+    fill="#A855F7"
+    filter="url(#glow)"
+  />
+</svg>

@@ -1,0 +1,44 @@
+/**
+ * Any CSS included here will be global. The classic template
+ * bundles Infima by default. Infima is a CSS framework designed to
+ * work well for content-centric websites.
+ */
+
+/* Execution Kernel Color Palette - Purple Theme */
+:root {
+  --ifm-color-primary: #7C3AED;
+  --ifm-color-primary-dark: #6D28D9;
+  --ifm-color-primary-darker: #5B21B6;
+  --ifm-color-primary-darkest: #4C1D95;
+  --ifm-color-primary-light: #8B5CF6;
+  --ifm-color-primary-lighter: #A78BFA;
+  --ifm-color-primary-lightest: #C4B5FD;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+/* Dark mode - primary color #A855F7 */
+[data-theme='dark'] {
+  --ifm-color-primary: #A855F7;
+  --ifm-color-primary-dark: #9333EA;
+  --ifm-color-primary-darker: #7C3AED;
+  --ifm-color-primary-darkest: #6D28D9;
+  --ifm-color-primary-light: #C084FC;
+  --ifm-color-primary-lighter: #D8B4FE;
+  --ifm-color-primary-lightest: #EDE9FE;
+  --docusaurus-highlighted-code-line-bg: rgba(168, 85, 247, 0.1);
+  --ifm-background-color: #0a0a0f;
+  --ifm-navbar-background-color: #0a0a0f;
+  --ifm-footer-background-color: #0a0a0f;
+}
+
+[data-theme='dark'] .navbar {
+  background-color: var(--ifm-background-color);
+  box-shadow: none;
+  border-bottom: 1px solid rgba(168, 85, 247, 0.15);
+}
+
+[data-theme='dark'] .footer {
+  background-color: var(--ifm-background-color);
+  border-top: 1px solid rgba(168, 85, 247, 0.15);
+}

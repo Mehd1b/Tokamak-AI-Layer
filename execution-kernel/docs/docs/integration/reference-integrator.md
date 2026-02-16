@@ -1,12 +1,33 @@
+---
+title: Reference Integrator
+sidebar_position: 1
+---
+
 # Reference Integrator
 
-The `reference-integrator` crate provides a complete reference implementation for integrating with Agent Pack bundles. It demonstrates how external marketplaces, backends, and applications can:
+The `reference-integrator` crate provides a complete reference implementation for integrating with Agent Pack bundles. It demonstrates how external marketplaces, backends, and applications can ingest, verify, prove, and execute agents end-to-end.
 
-1. **Ingest** Agent Pack bundles
-2. **Verify** them offline and on-chain
-3. **Build** kernel inputs for execution
-4. **Prove** execution using RISC Zero zkVM
-5. **Execute** proofs on-chain via the KernelVault
+## What It Does
+
+The reference integrator handles the complete lifecycle of agent execution:
+
+1. **Load Bundle** - Parse the `agent-pack.json` manifest and locate the ELF binary
+2. **Verify Offline** - Check manifest structure, validate ELF hash, compute image ID
+3. **Verify On-Chain** - Query the KernelExecutionVerifier to confirm registration
+4. **Build Input** - Construct the `KernelInputV1` structure with opaque agent inputs
+5. **Generate Proof** - Execute the agent in RISC Zero zkVM and produce a Groth16 proof
+6. **Execute On-Chain** - Submit the proof and agent output to the KernelVault contract
+
+## Overview
+
+```mermaid
+flowchart LR
+    A[Load Bundle] --> B[Verify Offline]
+    B --> C[Verify On-Chain]
+    C --> D[Build Input]
+    D --> E[Generate Proof]
+    E --> F[Execute On-Chain]
+```
 
 ## Installation
 
@@ -44,7 +65,9 @@ use reference_integrator::LoadedBundle;
 let bundle = LoadedBundle::load("./my-agent-bundle")?;
 
 // Access manifest data
-println!("Agent: {} v{}", bundle.manifest.agent_name, bundle.manifest.agent_version);
+println!("Agent: {} v{}",
+    bundle.manifest.agent_name,
+    bundle.manifest.agent_version);
 println!("Agent ID: {}", bundle.manifest.agent_id);
 
 // Read the ELF binary
@@ -88,7 +111,9 @@ let result = verify_onchain(
 ).await?;
 
 match result {
-    OnchainVerificationResult::Match => println!("Image ID matches on-chain registry"),
+    OnchainVerificationResult::Match => {
+        println!("Image ID matches on-chain registry");
+    }
     OnchainVerificationResult::Mismatch { onchain, manifest } => {
         eprintln!("Mismatch: on-chain={}, manifest={}", onchain, manifest);
     }
@@ -157,6 +182,34 @@ let tx_hash = execute_onchain(
 println!("Transaction: {}", tx_hash);
 ```
 
+### Agent Output Reconstruction
+
+For on-chain execution, the vault contract requires the raw agent output bytes (not just the commitment). The kernel only outputs the journal containing the action commitment (`sha256(agent_output_bytes)`), so you need to provide the original agent output.
+
+For the **yield agent**, the reference integrator provides a reconstruction function:
+
+```rust
+use reference_integrator::reconstruct_yield_agent_output;
+
+// Opaque inputs format: vault (20 bytes) + yield_source (20 bytes) + amount (8 bytes LE)
+let opaque_inputs = [
+    vault_address.as_slice(),      // 20 bytes
+    yield_source.as_slice(),       // 20 bytes
+    &amount.to_le_bytes(),         // 8 bytes (u64 little-endian)
+].concat();
+
+// Reconstruct the agent output from inputs
+let agent_output_bytes = reconstruct_yield_agent_output(&opaque_inputs)?;
+
+// The vault will verify: sha256(agent_output_bytes) == action_commitment
+```
+
+The yield agent produces two `CALL` actions:
+1. **Deposit**: `call{value: amount}("")` to the yield source contract
+2. **Withdraw**: `call{value: 0}(withdraw(vault))` to the yield source contract
+
+For other agents, you must implement your own reconstruction logic or capture the output during proof generation.
+
 ## CLI Usage
 
 The `refint` CLI provides command-line access to all functionality.
@@ -200,45 +253,77 @@ refint verify ./my-agent-bundle --onchain \
 Generate a proof of kernel execution (requires `--features prove`).
 
 ```bash
-refint prove ./my-agent-bundle \
-  --agent-input "$(cat input.bin | xxd -p)" \
-  --out-dir ./output
+# Basic usage with hex input
+refint prove --bundle ./my-agent-bundle \
+  --opaque-inputs "0x1234..." \
+  --nonce 1 \
+  --out ./output
+
+# Read opaque inputs from file (prefix with @)
+refint prove --bundle ./my-agent-bundle \
+  --opaque-inputs @./inputs.bin \
+  --nonce 1 \
+  --out ./output
 
 # Development mode (faster, not on-chain verifiable)
-refint prove ./my-agent-bundle \
-  --agent-input "0x1234..." \
-  --out-dir ./output \
+refint prove --bundle ./my-agent-bundle \
+  --opaque-inputs "0x1234..." \
+  --nonce 1 \
+  --out ./output \
   --dev
 
 # With all input parameters
-refint prove ./my-agent-bundle \
+refint prove --bundle ./my-agent-bundle \
   --constraint-set-hash 0x... \
   --input-root 0x... \
-  --out-dir ./output
+  --opaque-inputs "0x..." \
+  --nonce 1 \
+  --out ./output
 ```
 
-Output files:
-- `journal.bin` - The execution journal (209 bytes)
-- `seal.bin` - The proof seal
-- `agent_output.bin` - The agent's output
+**Parameters:**
+- `--opaque-inputs` - Agent-specific input bytes (hex string or `@file_path`)
+- `--nonce` - Execution nonce for replay protection (must be monotonically increasing)
+- `--out` - Output directory for proof artifacts
+- `--dev` - Use development mode (faster but not on-chain verifiable)
+- `--json` - Output results in JSON format
+
+**Output files:**
+- `journal.bin` - The execution journal (209 bytes) containing commitments and status
+- `seal.bin` - The Groth16 proof seal (or dev-mode placeholder)
+- `agent_output.bin` - The reconstructed agent output (for yield agent)
 
 #### execute
 
 Execute a proof on-chain via the KernelVault (requires `--features onchain`).
 
 ```bash
-refint execute ./my-agent-bundle \
+refint execute --bundle ./my-agent-bundle \
   --rpc https://sepolia.infura.io/v3/YOUR_KEY \
   --vault 0xAdeDA97D2D07C7f2e332fD58F40Eb4f7F0192be7 \
-  --private-key env:PRIVATE_KEY \
+  --pk env:PRIVATE_KEY \
   --journal ./output/journal.bin \
   --seal ./output/seal.bin \
   --agent-output ./output/agent_output.bin
 ```
 
-Private key formats:
-- `env:VAR_NAME` - Read from environment variable
-- Raw hex string (not recommended for production)
+**Parameters:**
+- `--bundle` - Path to the Agent Pack bundle directory
+- `--rpc` - Ethereum RPC endpoint URL
+- `--vault` - KernelVault contract address
+- `--pk` - Private key (`env:VAR_NAME` or raw hex)
+- `--journal` - Path to `journal.bin` from proof generation
+- `--seal` - Path to `seal.bin` from proof generation
+- `--agent-output` - Path to `agent_output.bin` containing agent actions
+
+**Private key formats:**
+- `env:PRIVATE_KEY` - Read from environment variable (recommended)
+- `0x...` - Raw hex string (not recommended, appears in shell history)
+
+**What happens on-chain:**
+1. The vault calls the RISC Zero Verifier Router to verify the proof
+2. The vault checks `sha256(agent_output_bytes) == action_commitment` from the journal
+3. If verification passes, the vault executes each action in the agent output
 
 #### status
 
@@ -274,10 +359,14 @@ Here's a complete example of ingesting, verifying, proving, and executing an age
 ```rust
 use reference_integrator::*;
 
-async fn process_agent_bundle(bundle_path: &str) -> Result<String, Box<dyn std::error::Error>> {
+async fn process_agent_bundle(
+    bundle_path: &str
+) -> Result<String, Box<dyn std::error::Error>> {
     // 1. Load the bundle
     let bundle = LoadedBundle::load(bundle_path)?;
-    println!("Loaded: {} v{}", bundle.manifest.agent_name, bundle.manifest.agent_version);
+    println!("Loaded: {} v{}",
+        bundle.manifest.agent_name,
+        bundle.manifest.agent_version);
 
     // 2. Verify offline
     let offline_result = verify_offline(&bundle);
@@ -306,7 +395,11 @@ async fn process_agent_bundle(bundle_path: &str) -> Result<String, Box<dyn std::
 
     // 5. Generate proof
     let elf_bytes = bundle.read_elf()?;
-    let prove_result = prove(&elf_bytes, &input_bytes, ProvingMode::Groth16)?;
+    let prove_result = prove(
+        &elf_bytes,
+        &input_bytes,
+        ProvingMode::Groth16
+    )?;
 
     // 6. Execute on-chain
     let tx_hash = execute_onchain(
@@ -326,19 +419,39 @@ async fn process_agent_bundle(bundle_path: &str) -> Result<String, Box<dyn std::
 
 For marketplaces accepting agent submissions:
 
-1. **Receive** the Agent Pack bundle (directory with `agent-pack.json` + ELF)
-2. **Verify structure** - Quick check that manifest is well-formed
-3. **Verify offline** - Full verification including file hashes
-4. **Verify on-chain** - Confirm the agent is registered in KernelExecutionVerifier
-5. **Store** the bundle for later execution requests
+```mermaid
+sequenceDiagram
+    participant M as Marketplace
+    participant RI as Reference Integrator
+    participant Chain as Blockchain
+
+    M->>RI: LoadedBundle::load()
+    RI-->>M: Bundle loaded
+
+    M->>RI: verify_offline()
+    RI-->>M: Structure + hashes OK
+
+    M->>RI: verify_onchain()
+    RI->>Chain: agentImageIds(agent_id)
+    Chain-->>RI: image_id
+    RI-->>M: Match confirmed
+
+    M->>M: Store bundle for execution
+```
+
+### CI/CD Pipeline
 
 ```bash
-# CI/CD verification pipeline
+#!/bin/bash
+set -e
+
+# Verify bundle completely
 refint verify ./submission --onchain \
   --rpc $RPC_URL \
   --verifier $VERIFIER_ADDRESS
 
 # Exit code 0 = accept, non-zero = reject
+echo "Bundle verified successfully"
 ```
 
 ## Contract Addresses (Sepolia)
@@ -382,3 +495,10 @@ cargo test -p reference-integrator
 # With all features
 cargo test -p reference-integrator --features full
 ```
+
+## Related
+
+- [Golden Path Demo](/integration/golden-path) - End-to-end walkthrough
+- [Agent Pack Format](/agent-pack/format) - Bundle structure
+- [Agent Pack Verification](/agent-pack/verification) - Verification details
+- [On-Chain Verifier](/onchain/verifier-overview) - Contract details
