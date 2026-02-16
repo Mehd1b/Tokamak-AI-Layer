@@ -437,6 +437,17 @@ export function Navbar() {
             </div>
           </div>
 
+          <Link
+            href="/whitepaper"
+            className={clsx(
+              'px-4 py-2 rounded-lg border border-dashed transition-all tracking-wider text-sm',
+              pathname === '/whitepaper'
+                ? 'border-[#A855F7]/60 text-[#A855F7]'
+                : 'border-white/30 text-white hover:border-white/60 hover:text-gray-300',
+            )}
+          >
+            WHITEPAPER
+          </Link>
           <a
             href="https://docs.execution.tokagent.network"
             target="_blank"
@@ -593,6 +604,16 @@ export function Navbar() {
                   </div>
                 </div>
 
+                <Link
+                  href="/whitepaper"
+                  className={clsx(
+                    'block text-md font-light transition-all duration-300 tracking-wider',
+                    pathname === '/whitepaper' ? 'text-[#A855F7]' : 'text-white hover:text-[#A855F7]',
+                  )}
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  WHITEPAPER
+                </Link>
                 <a
                   href="https://docs.execution.tokagent.network"
                   target="_blank"
