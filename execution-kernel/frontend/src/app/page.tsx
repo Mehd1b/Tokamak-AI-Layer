@@ -664,123 +664,169 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Protocol Statistics - Bento Grid */}
+      {/* Trustless by Design */}
       <section className="relative z-10 flex flex-col items-center bg-[#0a0a0f]/50 backdrop-blur-xl border-t border-white/5 px-6 py-32 lg:px-12 overflow-hidden">
         <div className="text-center mb-16 max-w-3xl">
           <h2
             className="text-4xl md:text-5xl font-light mb-6"
             style={{ fontFamily: 'var(--font-serif), serif' }}
           >
-            <span className="italic">Protocol</span> Statistics
+            <span className="italic">Trustless</span> by Design
           </h2>
           <p
             className="text-lg text-white/50 leading-relaxed"
             style={{ fontFamily: 'var(--font-mono), monospace' }}
           >
-            Real-time metrics from the Execution Kernel on Ethereum Sepolia.
+            Every action is cryptographically verified. No trust assumptions beyond math.
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full max-w-7xl">
+          {/* Card 1 — Deploy Verifiable Agents */}
           <StatCard
-            title="Agent Registry"
-            description="Permissionless agent registration with codehash and zkVM image IDs."
+            title="Deploy Verifiable Agents"
+            description="Compile ML models to deterministic RISC-V, generate cryptographic commitments, and register on-chain in minutes."
           >
-            <div className="w-full h-72 rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl overflow-hidden relative flex flex-col items-center justify-center">
-              {/* Gradient mesh background */}
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  background: 'radial-gradient(ellipse at 30% 50%, rgba(168, 85, 247, 0.08) 0%, transparent 60%), radial-gradient(ellipse at 70% 50%, rgba(124, 58, 237, 0.05) 0%, transparent 60%)',
-                }}
-              />
-              <span
-                className="text-5xl font-light text-[#A855F7] relative z-10"
-                style={{
-                  fontFamily: 'var(--font-mono), monospace',
-                  filter: 'drop-shadow(0 0 12px rgba(168, 85, 247, 0.4))',
-                }}
-              >
-                -
-              </span>
-              <span className="text-[10px] font-mono uppercase tracking-wider text-white/40 mt-3 relative z-10">Registered Agents</span>
+            <div className="w-full h-72 rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl overflow-hidden">
+              {/* Terminal header */}
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10">
+                <div className="w-3 h-3 rounded-full bg-red-500/80" />
+                <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+                <div className="w-3 h-3 rounded-full bg-green-500/80" />
+                <span className="ml-2 text-[10px] font-mono text-white/30 uppercase tracking-wider">terminal</span>
+              </div>
+              {/* Terminal content */}
+              <div className="p-4 font-mono text-sm">
+                <div className="flex items-center gap-2 text-white/50">
+                  <span className="text-[#A855F7]">$</span>
+                  <span>ek deploy --agent yield-optimizer</span>
+                </div>
+                <div className="mt-2 text-white/30">
+                  <span className="text-green-400">&#10003;</span> Compiling agent to RISC-V...
+                </div>
+                <div className="mt-1 text-white/30">
+                  <span className="text-green-400">&#10003;</span> Computing image commitment...
+                </div>
+                <div className="mt-1 text-white/30">
+                  <span className="text-green-400">&#10003;</span> Registering on-chain...
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-[#A855F7]">&rarr;</span>
+                  <span className="text-white/70">Agent deployed:</span>
+                  <span className="text-[#A855F7]">0x7a3f...8b2c</span>
+                </div>
+              </div>
             </div>
           </StatCard>
 
+          {/* Card 2 — Decentralized Execution (Featured) */}
           <StatCard
-            title="Execution Engine"
-            description="ZK-verified state transitions with RISC Zero proofs and atomic settlement."
+            title="Decentralized Execution"
+            description="Executors run your agents off-chain and generate zero-knowledge proofs. No single point of failure."
             featured
           >
             <div className="group w-full h-80 rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl overflow-hidden relative flex items-center justify-center">
-              {/* Gradient mesh background */}
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  background: 'radial-gradient(ellipse at 50% 30%, rgba(168, 85, 247, 0.1) 0%, transparent 50%), radial-gradient(ellipse at 50% 70%, rgba(124, 58, 237, 0.06) 0%, transparent 50%)',
-                }}
-              />
-              <div className="relative z-10 flex flex-col items-center justify-center">
-                <div
-                  className="w-24 h-24 border border-white/10 rounded-3xl flex flex-col items-center justify-center bg-[#0a0a0f] group-hover:border-[#A855F7]/40 transition-colors duration-500"
-                  style={{ boxShadow: '0 0 30px rgba(168, 85, 247, 0.1)' }}
-                >
-                  <span
-                    className="text-2xl font-light text-[#A855F7]"
-                    style={{
-                      fontFamily: 'var(--font-mono), monospace',
-                      filter: 'drop-shadow(0 0 8px rgba(168, 85, 247, 0.4))',
-                    }}
-                  >
-                    -
-                  </span>
-                  <span className="text-[8px] font-mono uppercase tracking-wider text-white/40 mt-0.5">Executions</span>
+              {/* Animated beam SVG */}
+              <svg
+                className="absolute inset-0 w-full h-full pointer-events-none overflow-visible z-0"
+                viewBox="0 0 400 320"
+                preserveAspectRatio="xMidYMid slice"
+              >
+                <defs>
+                  <linearGradient id="beam-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="transparent"/>
+                    <stop offset="50%" stopColor="rgba(168, 85, 247, 0.8)"/>
+                    <stop offset="100%" stopColor="transparent"/>
+                  </linearGradient>
+                </defs>
+                {/* Path 1 */}
+                <path d="M420,40 C320,40 280,160 200,160" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1"/>
+                <path d="M420,40 C320,40 280,160 200,160" fill="none" stroke="url(#beam-grad)" strokeWidth="1.5" strokeDasharray="100 1000" strokeLinecap="round">
+                  <animate attributeName="stroke-dashoffset" from="1000" to="0" dur="3s" repeatCount="indefinite" />
+                </path>
+                {/* Path 2 */}
+                <path d="M-20,280 C80,280 120,160 200,160" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1"/>
+                <path d="M-20,280 C80,280 120,160 200,160" fill="none" stroke="url(#beam-grad)" strokeWidth="1.5" strokeDasharray="80 1000" strokeLinecap="round">
+                  <animate attributeName="stroke-dashoffset" from="1000" to="0" dur="4s" repeatCount="indefinite" />
+                </path>
+              </svg>
+
+              {/* Orbital Rings */}
+              <div className="relative w-full h-full flex items-center justify-center">
+                <div className="absolute w-72 h-72 rounded-full border border-[#A855F7]/5 animate-[ping_4s_cubic-bezier(0,0,0.2,1)_infinite] opacity-10" />
+                <div className="absolute w-60 h-60 rounded-full border border-white/5 animate-[ping_3s_cubic-bezier(0,0,0.2,1)_infinite] opacity-20" style={{ animationDelay: '700ms' }} />
+                <div className="absolute w-48 h-48 rounded-full border border-white/5 animate-[spin_40s_linear_infinite]" />
+                <div className="absolute w-44 h-44 rounded-full border border-white/10 animate-[spin_30s_linear_infinite]" />
+                <div className="absolute w-32 h-32 rounded-full border border-white/5 border-dashed animate-[spin_20s_linear_infinite_reverse]" />
+                {/* Center Hub */}
+                <div className="z-10 flex bg-[#0a0a0f] w-20 h-20 border-white/10 border rounded-3xl relative items-center justify-center overflow-hidden shadow-2xl group-hover:border-[#A855F7]/40 transition-colors duration-500">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-white relative z-20 group-hover:text-[#A855F7] transition-colors duration-500">
+                    <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/>
+                    <path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/>
+                    <path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>
+                  </svg>
+                  <div className="animate-[pulse_2s_infinite] bg-gradient-to-tr from-transparent via-[#A855F7]/10 to-transparent absolute inset-0 z-10" />
                 </div>
               </div>
-              <div className="absolute bottom-4 flex items-center gap-6">
+
+              {/* Status Badge */}
+              <div className="absolute bottom-4 flex items-center">
                 <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/5">
                   <span className="relative flex h-1.5 w-1.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#A855F7] opacity-75" />
                     <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#A855F7]" />
                   </span>
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-white/50">
-                    Awaiting Proofs
-                  </span>
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-white/50">Network Active</span>
                 </div>
               </div>
             </div>
           </StatCard>
 
+          {/* Card 3 — On-Chain Verification */}
           <StatCard
-            title="Vault TVL"
-            description="Total value locked across all Execution Kernel vaults on Sepolia."
+            title="On-Chain Verification"
+            description="Proofs are verified on Ethereum for ~250k gas. Only valid, constraint-compliant actions settle."
           >
             <div className="w-full h-72 rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl overflow-hidden relative flex flex-col items-center justify-center p-6">
-              {/* Gradient mesh background */}
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  background: 'radial-gradient(ellipse at 50% 40%, rgba(168, 85, 247, 0.06) 0%, transparent 60%)',
-                }}
-              />
-              <span
-                className="text-5xl font-light text-[#A855F7] relative z-10"
-                style={{
-                  fontFamily: 'var(--font-mono), monospace',
-                  filter: 'drop-shadow(0 0 12px rgba(168, 85, 247, 0.4))',
-                }}
-              >
-                -
-              </span>
-              <span className="text-[10px] font-mono uppercase tracking-wider text-white/40 mt-3 relative z-10">
-                Total Value Locked
-              </span>
-              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/5 mt-4 relative z-10">
+              {/* ZK Proof hexagon visualization */}
+              <div className="relative mb-6">
+                <svg viewBox="0 0 100 100" className="w-24 h-24">
+                  <defs>
+                    <linearGradient id="proof-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#A855F7" stopOpacity="0.8" />
+                      <stop offset="100%" stopColor="#A855F7" stopOpacity="0.2" />
+                    </linearGradient>
+                  </defs>
+                  <polygon
+                    points="50,5 90,25 90,75 50,95 10,75 10,25"
+                    fill="none"
+                    stroke="url(#proof-gradient)"
+                    strokeWidth="2"
+                  />
+                  <polygon
+                    points="50,20 75,35 75,65 50,80 25,65 25,35"
+                    fill="none"
+                    stroke="#A855F7"
+                    strokeWidth="1"
+                    opacity="0.5"
+                  />
+                  <circle cx="50" cy="50" r="8" fill="#A855F7" className="animate-[pulse_2s_infinite]" />
+                </svg>
+              </div>
+
+              {/* Status badge */}
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/5">
                 <div className="relative">
                   <div className="absolute h-2 w-2 rounded-full bg-green-400 animate-ping opacity-75" />
                   <div className="h-2 w-2 rounded-full bg-green-400" />
                 </div>
-                <span className="text-[10px] font-mono text-white/70 uppercase tracking-wider">Sepolia</span>
+                <span className="text-[10px] font-mono text-white/70 uppercase tracking-wider">Verified</span>
+              </div>
+
+              {/* Proof details */}
+              <div className="mt-4 text-center">
+                <div className="text-[10px] font-mono text-white/30 uppercase tracking-wider mb-1">Groth16 Proof</div>
+                <div className="text-sm font-mono text-[#A855F7]">~200 bytes</div>
               </div>
             </div>
           </StatCard>
