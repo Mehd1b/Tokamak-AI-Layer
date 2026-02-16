@@ -1,9 +1,10 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { WagmiProvider, http } from 'wagmi';
+import { WagmiProvider, createConfig, http } from 'wagmi';
 import { sepolia, type Chain } from 'wagmi/chains';
-import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit';
+import { RainbowKitProvider, connectorsForWallets } from '@rainbow-me/rainbowkit';
+import { metaMaskWallet } from '@rainbow-me/rainbowkit/wallets';
 import '@rainbow-me/rainbowkit/styles.css';
 import { useState, type ReactNode } from 'react';
 
@@ -24,14 +25,27 @@ const thanosSepolia = {
   testnet: true,
 } as const satisfies Chain;
 
-const config = getDefaultConfig({
-  appName: 'Tokamak Agent Layer',
-  projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_ID || 'placeholder',
+const connectors = connectorsForWallets(
+  [
+    {
+      groupName: 'Supported',
+      wallets: [metaMaskWallet],
+    },
+  ],
+  {
+    appName: 'Tokamak Agent Layer',
+    projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_ID || 'placeholder',
+  },
+);
+
+const config = createConfig({
+  connectors,
   chains: [thanosSepolia, sepolia],
   transports: {
     [thanosSepolia.id]: http('https://rpc.thanos-sepolia.tokamak.network'),
     [sepolia.id]: http(),
   },
+  multiInjectedProviderDiscovery: false,
   ssr: true,
 });
 
