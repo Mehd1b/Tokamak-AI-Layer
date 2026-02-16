@@ -1,0 +1,410 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #0a0a0f;
+  --background-secondary: #111118;
+  --foreground: #ffffff;
+  --primary: #A855F7;
+  --primary-rgb: 168, 85, 247;
+  --primary-glow: rgba(168, 85, 247, 0.3);
+  --primary-light: #C084FC;
+  --primary-dark: #7C3AED;
+  --accent: #D946EF;
+  --text-primary: #ffffff;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+  --border: rgba(255, 255, 255, 0.1);
+  --card-bg: rgba(255, 255, 255, 0.05);
+  --card-border: rgba(255, 255, 255, 0.1);
+}
+
+@layer base {
+  body {
+    @apply bg-[#0a0a0f] text-white antialiased;
+    font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    overflow-x: hidden;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-white/10 bg-[#1a1a24]/70 p-6 backdrop-blur-sm transition-all duration-300;
+  }
+
+  .card-hover {
+    @apply card hover:border-[#A855F7]/30 hover:-translate-y-1;
+  }
+
+  .glass {
+    @apply bg-[rgba(26,26,36,0.7)] backdrop-blur-xl border border-white/10;
+  }
+
+  .btn-primary {
+    @apply rounded-lg bg-[#A855F7] px-4 py-2 text-sm font-semibold text-white transition-all duration-200 shadow-glow hover:-translate-y-0.5 hover:shadow-glow-lg disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-glow;
+  }
+
+  .btn-secondary {
+    @apply rounded-lg border border-white/10 bg-transparent px-4 py-2 text-sm font-semibold text-white transition-all duration-200 hover:border-[#A855F7]/50 hover:bg-[#A855F7]/10 disabled:opacity-50;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider;
+  }
+
+  .badge-success {
+    @apply badge bg-emerald-500/10 text-emerald-400 border border-emerald-500/20;
+  }
+
+  .badge-warning {
+    @apply badge bg-amber-500/10 text-amber-400 border border-amber-500/20;
+  }
+
+  .badge-error {
+    @apply badge bg-red-500/10 text-red-400 border border-red-500/20;
+  }
+
+  .badge-info {
+    @apply badge bg-[#A855F7]/10 text-[#C084FC] border border-[#A855F7]/20;
+  }
+
+  .gradient-text {
+    background: linear-gradient(90deg, #7C3AED, #A855F7, #D946EF);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .input-dark {
+    @apply w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#A855F7] focus:outline-none focus:ring-1 focus:ring-[#A855F7]/50 disabled:opacity-50;
+  }
+
+  .terminal {
+    @apply rounded-xl border border-white/10 bg-[#0d0d12] p-6 font-mono text-sm shadow-card;
+  }
+
+  .section-eyebrow {
+    @apply text-sm font-semibold uppercase tracking-widest text-[#C084FC] mb-3;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    background: linear-gradient(90deg, #ffffff, #9ca3af);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+/* Aura Grid Pattern */
+.aura-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 100px 200px;
+  animation: grid-flow 30s linear infinite;
+}
+
+/* Aura Dot Pattern */
+.aura-dots {
+  background-image: radial-gradient(white 0.5px, transparent 0.5px);
+  background-size: 18px 18px;
+  opacity: 0.2;
+}
+
+/* ===== NEW ANIMATIONS ===== */
+
+/* Aurora Shift — Slow gradient hue shift */
+@keyframes aurora-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  25% {
+    background-position: 50% 100%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  75% {
+    background-position: 50% 0%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.aurora-bg {
+  background: linear-gradient(135deg, #7C3AED, #A855F7, #D946EF, #A855F7, #7C3AED);
+  background-size: 400% 400%;
+  animation: aurora-shift 20s ease-in-out infinite;
+}
+
+/* Float Up — Upward float with fade */
+@keyframes float-up {
+  0% {
+    transform: translateY(0);
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-30px);
+    opacity: 0;
+  }
+}
+
+/* Morph Blob — Organic shape morphing */
+@keyframes morph-blob {
+  0%, 100% {
+    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+  }
+  25% {
+    border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
+  }
+  50% {
+    border-radius: 50% 60% 30% 60% / 30% 60% 70% 40%;
+  }
+  75% {
+    border-radius: 60% 30% 60% 40% / 70% 40% 50% 60%;
+  }
+}
+
+/* Text Shimmer — Gradient slide across text */
+@keyframes text-shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    #C084FC 0%,
+    #D946EF 25%,
+    #ffffff 50%,
+    #D946EF 75%,
+    #C084FC 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: text-shimmer 3s linear infinite;
+}
+
+/* Slide In Left */
+@keyframes slide-in-left {
+  0% {
+    transform: translateX(-40px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Slide In Right */
+@keyframes slide-in-right {
+  0% {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Glow Pulse — Pulsing ring glow */
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(168, 85, 247, 0.2), 0 0 30px rgba(168, 85, 247, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(168, 85, 247, 0.4), 0 0 50px rgba(168, 85, 247, 0.2);
+  }
+}
+
+/* Orbit — Slow orbital motion */
+@keyframes orbit {
+  0% {
+    transform: rotate(0deg) translateX(60px) rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg) translateX(60px) rotate(-360deg);
+  }
+}
+
+/* Ripple — Expanding concentric rings */
+@keyframes ripple {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.6;
+    border-width: 2px;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+    border-width: 0px;
+  }
+}
+
+.ripple-ring {
+  position: absolute;
+  border-radius: 50%;
+  border-style: solid;
+  border-color: rgba(168, 85, 247, 0.4);
+  animation: ripple 2s ease-out infinite;
+}
+
+/* Grid Flow — Grid lines drifting */
+@keyframes grid-flow {
+  0% {
+    background-position: 0px 0px;
+  }
+  100% {
+    background-position: 100px 200px;
+  }
+}
+
+/* CSS Custom Properties for animated gradients */
+@property --gradient-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* Border Spin for CTA */
+@keyframes border-spin {
+  0% {
+    --gradient-angle: 0deg;
+  }
+  100% {
+    --gradient-angle: 360deg;
+  }
+}
+
+/* Shiny CTA Button — Purple redesign */
+.shiny-cta {
+  --gradient-angle: 0deg;
+  --gradient-shine: #C084FC;
+
+  position: relative;
+  overflow: hidden;
+  border-radius: 9999px;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  line-height: 1.2;
+  font-weight: 500;
+  color: #C084FC;
+  background:
+    linear-gradient(#0a0a0f, #0a0a0f) padding-box,
+    conic-gradient(
+      from var(--gradient-angle),
+      transparent 0%,
+      #7C3AED 5%,
+      var(--gradient-shine) 15%,
+      #D946EF 25%,
+      #7C3AED 35%,
+      transparent 45%,
+      transparent 100%
+    ) border-box;
+  border: 2px solid transparent;
+  box-shadow: rgb(26, 24, 24) 0px 0px 0px 1px inset;
+  cursor: pointer;
+  isolation: isolate;
+  animation: border-spin 2.5s linear infinite;
+  text-decoration: none;
+  display: inline-block;
+  transition: box-shadow 0.3s;
+  font-family: var(--font-mono), monospace;
+}
+
+.shiny-cta:hover {
+  box-shadow: 0 0 30px rgba(168, 85, 247, 0.3);
+}
+
+.shiny-cta:active {
+  transform: translateY(1px);
+}
+
+/* Inner grid pattern with edge fade */
+.shiny-cta::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  z-index: 0;
+  background-image:
+    linear-gradient(to right, rgba(168, 85, 247, 0.15) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(168, 85, 247, 0.15) 1px, transparent 1px);
+  background-size: 8px 8px;
+  border-radius: inherit;
+  opacity: 0.6;
+  pointer-events: none;
+  mask-image: radial-gradient(ellipse 80% 80% at center, black 20%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 80% at center, black 20%, transparent 50%);
+}
+
+/* Shimmer light effect */
+.shiny-cta::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: linear-gradient(-50deg, transparent, rgba(168, 85, 247, 0.4), transparent);
+  mask-image: radial-gradient(circle at center bottom, transparent 40%, black);
+  opacity: 0.6;
+  animation: border-spin 4s linear infinite;
+}
+
+/* Text wrapper */
+.shiny-cta-text {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Social icon glow */
+.social-glow {
+  @apply relative p-3 rounded-full transition-all duration-300;
+}
+
+.social-glow .social-bg {
+  @apply absolute inset-0 rounded-full bg-white/5 border border-white/10 transition-all duration-300;
+}
+
+.social-glow:hover .social-bg {
+  @apply bg-[#A855F7]/10 border-[#A855F7]/30;
+}
+
+.social-glow .social-glow-effect {
+  @apply absolute inset-0 rounded-full opacity-0 transition-opacity duration-300;
+  background: rgba(168, 85, 247, 0.2);
+  filter: blur(12px);
+}
+
+.social-glow:hover .social-glow-effect {
+  @apply opacity-100;
+}
+
+.social-glow .social-icon {
+  @apply relative z-10 text-gray-400 transition-all duration-300;
+}
+
+.social-glow:hover .social-icon {
+  @apply text-[#C084FC] scale-110;
+}

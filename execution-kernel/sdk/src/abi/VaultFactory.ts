@@ -1,0 +1,80 @@
+export const VaultFactoryABI = [
+  {
+    type: 'function',
+    name: 'registry',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'verifier',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'computeVaultAddress',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'agentId', type: 'bytes32' },
+      { name: 'asset', type: 'address' },
+      { name: 'userSalt', type: 'bytes32' },
+    ],
+    outputs: [
+      { name: 'vault', type: 'address' },
+      { name: 'salt', type: 'bytes32' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'deployVault',
+    inputs: [
+      { name: 'agentId', type: 'bytes32' },
+      { name: 'asset', type: 'address' },
+      { name: 'userSalt', type: 'bytes32' },
+    ],
+    outputs: [{ name: 'vault', type: 'address' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'isDeployedVault',
+    inputs: [{ name: 'vault', type: 'address' }],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    name: 'VaultDeployed',
+    inputs: [
+      { name: 'vault', type: 'address', indexed: true },
+      { name: 'owner', type: 'address', indexed: true },
+      { name: 'agentId', type: 'bytes32', indexed: true },
+      { name: 'asset', type: 'address', indexed: false },
+      { name: 'trustedImageId', type: 'bytes32', indexed: false },
+      { name: 'salt', type: 'bytes32', indexed: false },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'AgentNotRegistered',
+    inputs: [{ name: 'agentId', type: 'bytes32' }],
+  },
+  {
+    type: 'error',
+    name: 'NotAgentAuthor',
+    inputs: [
+      { name: 'agentId', type: 'bytes32' },
+      { name: 'caller', type: 'address' },
+      { name: 'author', type: 'address' },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'VaultAlreadyExists',
+    inputs: [{ name: 'vault', type: 'address' }],
+  },
+] as const;

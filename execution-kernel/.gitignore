@@ -1,0 +1,14 @@
+CLAUDE.md
+target/
+*/target/
+/.claude
+/prompts
+/bundles/*
+/run/*
+
+# Generated agent-pack manifests (keep only the example)
+dist/agent-pack.json
+
+# Frontend build artifacts
+frontend/.next/
+frontend/node_modules/

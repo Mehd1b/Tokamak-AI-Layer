@@ -1,0 +1,36 @@
+[workspace]
+resolver = "2"
+members = [
+    # Protocol crates
+    "crates/protocol/kernel-core",
+    "crates/protocol/constraints",
+
+    # SDK crates
+    "crates/sdk/kernel-sdk",
+
+    # Runtime crates
+    "crates/runtime/kernel-guest",
+    "crates/runtime/risc0-methods",
+
+    # Agent crates
+    "crates/agents/examples/example-yield-agent",
+    "crates/agents/wrappers/kernel-guest-binding-yield",
+
+    # Testing crates
+    "crates/testing/kernel-host-tests",
+    "crates/testing/e2e-tests",
+
+    # Tools
+    "crates/agent-pack",
+    "crates/reference-integrator",
+]
+
+[workspace.dependencies]
+sha2 = { version = "0.10", default-features = false, features = [] }
+
+[profile.release]
+debug = 1
+lto = true
+
+[profile.dev]
+opt-level = 1

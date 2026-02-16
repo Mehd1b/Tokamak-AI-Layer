@@ -1,0 +1,48 @@
+'use client';
+
+import { useState } from 'react';
+import { parseEther } from 'viem';
+import { useWithdraw } from '@/hooks/useKernelVault';
+
+export function VaultWithdrawForm({ vaultAddress }: { vaultAddress: `0x${string}` }) {
+  const [shares, setShares] = useState('');
+  const { withdraw, isPending, isConfirming, isSuccess, error } = useWithdraw(vaultAddress);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!shares || parseFloat(shares) <= 0) return;
+    withdraw(parseEther(shares));
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm text-gray-400 mb-1" style={{ fontFamily: 'var(--font-mono), monospace' }}>
+          Shares to Withdraw
+        </label>
+        <input
+          type="number"
+          step="0.001"
+          min="0"
+          value={shares}
+          onChange={(e) => setShares(e.target.value)}
+          placeholder="0.1"
+          className="input-dark font-mono"
+        />
+      </div>
+      <button
+        type="submit"
+        disabled={!shares || parseFloat(shares) <= 0 || isPending || isConfirming}
+        className="btn-secondary w-full"
+      >
+        {isPending ? 'Signing...' : isConfirming ? 'Confirming...' : 'Withdraw'}
+      </button>
+      {isSuccess && (
+        <p className="text-emerald-400 text-sm font-mono">Withdrawal successful!</p>
+      )}
+      {error && (
+        <p className="text-red-400 text-sm font-mono">{error.message.slice(0, 100)}</p>
+      )}
+    </form>
+  );
+}
