@@ -1,19 +1,33 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { WagmiProvider, http } from 'wagmi';
+import { WagmiProvider, createConfig, http } from 'wagmi';
 import { sepolia } from 'wagmi/chains';
-import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit';
+import { RainbowKitProvider, connectorsForWallets } from '@rainbow-me/rainbowkit';
+import { metaMaskWallet } from '@rainbow-me/rainbowkit/wallets';
 import '@rainbow-me/rainbowkit/styles.css';
 import { useState, type ReactNode } from 'react';
 
-const config = getDefaultConfig({
-  appName: 'Execution Kernel',
-  projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_ID || 'placeholder',
+const connectors = connectorsForWallets(
+  [
+    {
+      groupName: 'Supported',
+      wallets: [metaMaskWallet],
+    },
+  ],
+  {
+    appName: 'Execution Kernel',
+    projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_ID || 'placeholder',
+  },
+);
+
+const config = createConfig({
+  connectors,
   chains: [sepolia],
   transports: {
     [sepolia.id]: http(),
   },
+  multiInjectedProviderDiscovery: false,
   ssr: true,
 });
 
