@@ -196,6 +196,15 @@ export default function AuroraBackground() {
           value += Math.max(0, (1 - trDist * 1.5)) * 0.35;
           value += Math.max(0, (1 - blDist * 1.5)) * 0.25;
 
+          // Smooth edge fade — clear header & footer zones, soft side edges
+          const topFade = ny < 0.15 ? ny / 0.15 : 1;
+          const bottomFade = ny > 0.85 ? (1 - ny) / 0.15 : 1;
+          const sideFade = Math.min(
+            nx < 0.08 ? nx / 0.08 : 1,
+            nx > 0.92 ? (1 - nx) / 0.08 : 1,
+          );
+          value *= topFade * topFade * bottomFade * bottomFade * sideFade;
+
           // Threshold
           const threshold = 0.2;
           if (value > threshold) {
@@ -243,7 +252,7 @@ export default function AuroraBackground() {
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 w-full h-full pointer-events-none z-0"
+      className="absolute inset-0 w-full h-full pointer-events-none z-0"
       style={{ background: 'transparent' }}
     />
   );

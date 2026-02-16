@@ -357,16 +357,18 @@ export default function HomePage() {
 
   return (
     <div>
-      {/* Aurora Background - Landing page only */}
-      <AuroraBackground />
-
       {/* Hero Section - Split Layout */}
       <section className="relative min-h-screen flex items-center overflow-hidden">
-        {/* Aurora fade overlay */}
+        {/* Aurora Background - scoped to hero */}
+        <AuroraBackground />
+        {/* Aurora fade overlay — clean header + smooth blend */}
         <div
           className="absolute inset-0 pointer-events-none z-[2]"
           style={{
-            background: 'linear-gradient(to right, transparent 0%, transparent 35%, rgba(10,10,15,0.95) 55%, #0a0a0f 65%)'
+            background: [
+              'linear-gradient(to bottom, #0a0a0f 0%, rgba(10,10,15,0.8) 8%, transparent 18%, transparent 85%, rgba(10,10,15,0.5) 100%)',
+              'linear-gradient(to right, transparent 0%, transparent 40%, rgba(10,10,15,0.6) 60%, rgba(10,10,15,0.92) 75%, #0a0a0f 90%)',
+            ].join(', '),
           }}
         />
 
