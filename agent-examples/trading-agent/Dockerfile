@@ -13,6 +13,7 @@ COPY packages/agent-core/package.json packages/agent-core/
 COPY packages/tal-integration/package.json packages/tal-integration/
 COPY packages/siwa-auth/package.json packages/siwa-auth/
 COPY packages/agent-server/package.json packages/agent-server/
+COPY packages/backtest/package.json packages/backtest/
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile

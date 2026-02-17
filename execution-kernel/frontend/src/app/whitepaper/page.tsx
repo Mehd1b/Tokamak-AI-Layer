@@ -193,9 +193,44 @@ export default function WhitepaperPage() {
               The protocol&apos;s roadmap includes incremental support for increasingly complex AI models, recursive proofs for multi-agent execution, and integration with hardware-based trusted execution environments. Initial deployment focuses on basic ML models, followed by neural network support, advanced constraint enforcement, multi-agent composition, and eventually TEE integration for enhanced security and efficiency.
             </p>
 
-            <h3 className="text-2xl font-semibold text-white mb-6">2.4 Zero-Knowledge Proof System</h3>
+            <h3 className="text-2xl font-semibold text-white mb-6">2.3.10 Proving Economics</h3>
             <p className="text-gray-300 leading-8 mb-6">
-              The proof system is structured as a composition of several logical circuits. One circuit proves correct agent execution with respect to the committed code and model. Another circuit enforces the declared safety and risk constraints. A third circuit verifies the correctness of state transitions and accounting within the vault. A final circuit computes performance metrics and reputation scores. These circuits are recursively aggregated into a single proof that can be verified efficiently on-chain.
+              Verifiable execution is only viable if proving costs remain a fraction of the economic value secured. Under realistic usage, each agent action requires roughly 5–20 million RISC-V cycles, translating to 3–15 seconds of proving time on an A100-class GPU. At bulk GPU pricing ($2–3/hour), this implies a raw proving cost of approximately $0.003–$0.015 per proof, or conservatively $0.01–$0.03 all-in including infrastructure overhead.
+            </p>
+            <p className="text-gray-300 leading-8 mb-6">
+              The protocol only generates proofs for economically meaningful actions—DeFi trades, vault rebalances, position adjustments—where protocol revenue per action is typically an order of magnitude higher than proving cost. This ensures a sustainable margin buffer of 5&times;–100&times; depending on transaction size. The protocol explicitly avoids proving full neural inference inside the zkVM, keeping computation bounded and unit economics viable. Larger models and heavier inference workloads are handled through hybrid architectures (e.g., TEE-backed inference with ZK-verified policy compliance) rather than by scaling proving costs linearly.
+            </p>
+
+            <h3 className="text-2xl font-semibold text-white mb-6">2.4 Verification Model: What ZKP Proves</h3>
+            <p className="text-gray-300 leading-8 mb-6">
+              A critical distinction must be made explicit: the Execution Kernel does not attempt to prove that an AI agent &quot;reasoned correctly&quot; or produced an &quot;intelligent&quot; output. Open-ended problem solving—such as an LLM generating code or a neural network producing a trading signal—is not an NP problem in the classical sense. There is no fixed, static predicate that defines &quot;correct reasoning,&quot; and attempting to encode the full cognitive process of an AI model into a zero-knowledge circuit would be both misguided and infeasible.
+            </p>
+            <p className="text-gray-300 leading-8 mb-6">
+              Zero-knowledge proofs address NP problems: problems where the complexity of finding a solution may be high and dynamic, but the complexity of <em>verifying</em> a solution is fixed and tractable. The Execution Kernel aligns with this model by clearly separating the act of solving a problem (agent inference) from the act of verifying the solution (execution integrity and constraint compliance).
+            </p>
+
+            <h4 className="text-xl font-semibold text-white mb-4">2.4.1 RISC Zero&apos;s Verification Methodology</h4>
+            <p className="text-gray-300 leading-8 mb-6">
+              RISC Zero does not transform arbitrary RISC-V programs into bespoke ZK circuits. Instead, the RISC Zero team defined a <em>static methodology for verifying the execution of RISC-V programs</em>. This methodology checks whether memory data is consistent between steps, whether instructions are processed correctly at each step, and—critically—whether the number of steps required to execute a program does not exceed a predetermined maximum. The execution trace is the witness, and the fixed VM transition rules form the verification predicate. This stays aligned with the NP model: the predicate is static and tractable, even though the computation being verified may be complex.
+            </p>
+            <p className="text-gray-300 leading-8 mb-6">
+              By adopting RISC Zero, the Execution Kernel inherits this predefined verification methodology rather than defining one from scratch. Our contribution is at the application layer: embedding protocol-specific constraint logic inside the guest program whose correct execution RISC Zero already knows how to prove. We extend the verification framework with domain-specific guarantees without redefining the proving model itself.
+            </p>
+
+            <h4 className="text-xl font-semibold text-white mb-4">2.4.2 Two Layers of Verification</h4>
+            <p className="text-gray-300 leading-8 mb-6">
+              The protocol provides two complementary layers of cryptographic verification. The first layer is <strong>execution integrity</strong>: given fixed agent code, fixed model weights, and fixed inputs, inference is deterministic computation that can be compiled to RISC-V instructions and proven as an execution trace. The proof guarantees that the declared program ran correctly over the declared inputs—nothing more, nothing less. This does not require the underlying problem to be NP; it only requires that execution be deterministic and well-defined.
+            </p>
+            <p className="text-gray-300 leading-8 mb-6">
+              The second layer is <strong>constraint compliance</strong>: rather than proving that an agent &quot;correctly reasoned,&quot; the protocol defines explicit, static verification predicates over the agent&apos;s output—risk bounds, position size limits, leverage caps, drawdown thresholds, cooldown periods, and asset whitelists. The agent generates a candidate action; what gets proven is that the action satisfies these predefined rules. This aligns closely with the classical NP verification model: the constraints form a fixed predicate, and the proof demonstrates that the output is a valid witness.
+            </p>
+            <p className="text-gray-300 leading-8 mb-6">
+              In summary: the protocol does not prove intelligence. It proves either that a deterministic program executed correctly (execution integrity) or that an output satisfies predefined safety rules (constraint compliance). The latter is the more scalable and practically meaningful guarantee for DeFi applications.
+            </p>
+
+            <h4 className="text-xl font-semibold text-white mb-4">2.4.3 Proof Composition</h4>
+            <p className="text-gray-300 leading-8 mb-6">
+              The proof system is structured as a composition of several logical stages. The base layer proves correct agent execution with respect to the committed code and model. The constraint engine, running inside the same zkVM execution, enforces the declared safety and risk constraints as an unskippable post-condition. Vault state transitions and accounting correctness are verified through deterministic state root updates. These stages are captured in a single execution trace that is recursively compressed and verified efficiently on-chain.
             </p>
 
             <h3 className="text-2xl font-semibold text-white mb-6">2.5 Constraint Model</h3>
