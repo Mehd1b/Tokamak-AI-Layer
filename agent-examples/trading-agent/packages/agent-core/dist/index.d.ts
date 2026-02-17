@@ -3,6 +3,8 @@ export { QuantAnalysis } from "./analysis/QuantAnalysis.js";
 export { TokenScorer } from "./analysis/TokenScorer.js";
 export { StrategyEngine } from "./strategy/StrategyEngine.js";
 export { RiskManager } from "./strategy/RiskManager.js";
+export { loadBacktestContext, getCachedBacktestContext, clearBacktestCache } from "./strategy/BacktestContext.js";
+export type { BacktestMetrics, BacktestContext, MarketRegime } from "./strategy/BacktestContext.js";
 export { TradeExecutor } from "./execution/TradeExecutor.js";
 export { SwapBuilder } from "./execution/SwapBuilder.js";
 export { TokenPreFilter } from "./analysis/TokenPreFilter.js";

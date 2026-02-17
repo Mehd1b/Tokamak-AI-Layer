@@ -7,6 +7,7 @@ import type {
   RiskParams,
 } from "@tal-trading-agent/shared";
 import { RISK_PRESETS } from "@tal-trading-agent/shared";
+import { getCachedBacktestContext, type BacktestMetrics } from "./BacktestContext.js";
 
 export interface RiskManagerConfig {
   params?: Partial<RiskParams>;
@@ -190,6 +191,27 @@ export class RiskManager {
       }
     }
 
+    // 13. Backtest-informed warnings (uses cached context — non-blocking)
+    const btCtx = getCachedBacktestContext();
+    if (btCtx) {
+      const bt = btCtx.metrics;
+      if (bt.maxDrawdownPct > 15) {
+        warnings.push(
+          `Backtest showed ${bt.maxDrawdownPct.toFixed(1)}% max drawdown — consider tighter position sizing`,
+        );
+      }
+      if (bt.sharpeRatio < 0) {
+        warnings.push(
+          `Backtest Sharpe ratio is negative (${bt.sharpeRatio.toFixed(2)}) — signal pipeline underperformed risk-free rate`,
+        );
+      }
+      if (bt.profitFactor < 1.0) {
+        warnings.push(
+          `Backtest profit factor < 1.0 (${bt.profitFactor.toFixed(2)}) — gross losses exceeded gross profits`,
+        );
+      }
+    }
+
     const valid = errors.length === 0;
 
     this.log.info(
@@ -292,6 +314,42 @@ export class RiskManager {
               ...trade.leverageConfig,
               leverageMultiplier: maxLev,
             },
+          };
+        }
+      }
+    }
+
+    // 6. Backtest-informed position scaling (uses cached context — non-blocking)
+    const btCtx = getCachedBacktestContext();
+    if (btCtx) {
+      const bt = btCtx.metrics;
+      // If backtest Sharpe < 0, reduce each trade by 25% to limit exposure
+      if (bt.sharpeRatio < 0) {
+        this.log.info(
+          { sharpe: bt.sharpeRatio },
+          "Negative backtest Sharpe — scaling down positions by 25%",
+        );
+        for (let i = 0; i < finalTrades.length; i++) {
+          const trade = finalTrades[i]!;
+          finalTrades[i] = {
+            ...trade,
+            amountIn: (trade.amountIn * 75n) / 100n,
+            minAmountOut: (trade.minAmountOut * 75n) / 100n,
+          };
+        }
+      }
+      // If profit factor < 1.0, further reduce by 15% (conservative sizing)
+      if (bt.profitFactor < 1.0) {
+        this.log.info(
+          { profitFactor: bt.profitFactor },
+          "Backtest profit factor < 1.0 — additional 15% position reduction",
+        );
+        for (let i = 0; i < finalTrades.length; i++) {
+          const trade = finalTrades[i]!;
+          finalTrades[i] = {
+            ...trade,
+            amountIn: (trade.amountIn * 85n) / 100n,
+            minAmountOut: (trade.minAmountOut * 85n) / 100n,
           };
         }
       }

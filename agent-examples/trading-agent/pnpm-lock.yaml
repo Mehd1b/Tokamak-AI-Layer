@@ -105,6 +105,34 @@ importers:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@20.19.33)
 
+  packages/backtest:
+    dependencies:
+      '@tal-trading-agent/agent-core':
+        specifier: workspace:*
+        version: link:../agent-core
+      '@tal-trading-agent/shared':
+        specifier: workspace:*
+        version: link:../shared
+      pino:
+        specifier: ^9.6.0
+        version: 9.14.0
+      viem:
+        specifier: ^2.21.0
+        version: 2.45.3(typescript@5.9.3)
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.33
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.33)
+
   packages/shared:
     dependencies:
       viem:

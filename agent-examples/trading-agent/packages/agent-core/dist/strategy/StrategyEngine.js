@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import pino from "pino";
 import { TOKEN_REGISTRY, HORIZON_MS, RISK_PRESETS } from "@tal-trading-agent/shared";
+import { loadBacktestContext } from "./BacktestContext.js";
 const DEFAULT_MODEL = "claude-sonnet-4-5-20250929";
 // ── Mode Resolution ─────────────────────────────────────
 function resolveMode(horizon) {
@@ -31,7 +32,9 @@ export class StrategyEngine {
     async generateStrategy(request, candidates) {
         const mode = resolveMode(request.horizon);
         this.log.info({ horizon: request.horizon, mode, riskTolerance: request.riskTolerance, candidateCount: candidates.length }, "Generating trading strategy via LLM");
-        const systemPrompt = this.buildSystemPrompt(mode, request.riskTolerance, candidates);
+        // Load historical backtest context (optional — gracefully absent)
+        const backtestCtx = await loadBacktestContext();
+        const systemPrompt = this.buildSystemPrompt(mode, request.riskTolerance, candidates, backtestCtx?.promptSection);
         const userMessage = this.buildUserMessage(request, candidates, mode);
         let llmResponse;
         let llmReasoning;
@@ -79,7 +82,7 @@ export class StrategyEngine {
         return strategy;
     }
     // ── System Prompt Builder ─────────────────────────────
-    buildSystemPrompt(mode, riskTolerance, candidates) {
+    buildSystemPrompt(mode, riskTolerance, candidates, backtestSection) {
         // Only include the scored candidate tokens in the prompt, not all 103
         const candidateSymbols = new Set(candidates.map((c) => c.symbol));
         const relevantTokens = TOKEN_REGISTRY.filter((t) => candidateSymbols.has(t.symbol));
@@ -90,11 +93,13 @@ export class StrategyEngine {
         const modeGuidance = this.getModeGuidance(mode);
         const riskRules = this.getRiskRules(riskTolerance, riskPreset);
         const outputSchema = this.getOutputSchema(mode);
+        // Include historical backtest performance if available
+        const backtestBlock = backtestSection ? `\n${backtestSection}\n` : "";
         return `${modeGuidance}
 
 ## Available Tokens (Ethereum Mainnet)
 ${tokenList}
-
+${backtestBlock}
 ${riskRules}
 
 ${outputSchema}

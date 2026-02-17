@@ -14,6 +14,7 @@ import type {
   LeverageConfig,
 } from "@tal-trading-agent/shared";
 import { TOKEN_REGISTRY, HORIZON_MS, RISK_PRESETS } from "@tal-trading-agent/shared";
+import { loadBacktestContext } from "./BacktestContext.js";
 
 // ── LLM response shape (amounts as strings for bigint) ──
 interface LLMStrategyResponse {
@@ -123,7 +124,10 @@ export class StrategyEngine {
       "Generating trading strategy via LLM",
     );
 
-    const systemPrompt = this.buildSystemPrompt(mode, request.riskTolerance, candidates);
+    // Load historical backtest context (optional — gracefully absent)
+    const backtestCtx = await loadBacktestContext();
+
+    const systemPrompt = this.buildSystemPrompt(mode, request.riskTolerance, candidates, backtestCtx?.promptSection);
     const userMessage = this.buildUserMessage(request, candidates, mode);
 
     let llmResponse: string;
@@ -181,7 +185,7 @@ export class StrategyEngine {
 
   // ── System Prompt Builder ─────────────────────────────
 
-  private buildSystemPrompt(mode: StrategyMode, riskTolerance: TradeRequest["riskTolerance"], candidates: QuantScore[]): string {
+  private buildSystemPrompt(mode: StrategyMode, riskTolerance: TradeRequest["riskTolerance"], candidates: QuantScore[], backtestSection?: string): string {
     // Only include the scored candidate tokens in the prompt, not all 103
     const candidateSymbols = new Set(candidates.map((c) => c.symbol));
     const relevantTokens = TOKEN_REGISTRY.filter((t) => candidateSymbols.has(t.symbol));
@@ -195,11 +199,14 @@ export class StrategyEngine {
     const riskRules = this.getRiskRules(riskTolerance, riskPreset);
     const outputSchema = this.getOutputSchema(mode);
 
+    // Include historical backtest performance if available
+    const backtestBlock = backtestSection ? `\n${backtestSection}\n` : "";
+
     return `${modeGuidance}
 
 ## Available Tokens (Ethereum Mainnet)
 ${tokenList}
-
+${backtestBlock}
 ${riskRules}
 
 ${outputSchema}

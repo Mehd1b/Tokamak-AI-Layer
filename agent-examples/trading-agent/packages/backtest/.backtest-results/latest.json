@@ -1,0 +1,4402 @@
+{
+  "config": {
+    "tokens": [
+      "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+      "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
+      "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9",
+      "0x514910771AF9Ca656af840dff83E8264EcF986CA"
+    ],
+    "quoteToken": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "startDate": "2025-02-17T00:00:00.000Z",
+    "endDate": "2026-02-17T00:00:00.000Z",
+    "initialCapital": 10000,
+    "barInterval": "1d",
+    "strategy": {
+      "entryThreshold": 72,
+      "exitThreshold": 40,
+      "maxPositions": 5,
+      "useShorts": true,
+      "shortEntryThreshold": 56,
+      "shortExitThreshold": 40,
+      "lookbackBars": 50,
+      "trendFilter": {
+        "enabled": false,
+        "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "maPeriod": 50
+      }
+    },
+    "execution": {
+      "slippageModel": "fixed",
+      "fixedSlippageBps": 30,
+      "swapFeeBps": 30,
+      "gasPerTradeUsd": 5
+    },
+    "risk": {
+      "maxPositionPct": 20,
+      "stopLossAtrMultiple": 1.5,
+      "takeProfitAtrMultiple": 4,
+      "maxDrawdownPct": 25,
+      "trailingStopPct": 8
+    }
+  },
+  "totalReturnPct": 2.3,
+  "annualizedReturnPct": 2.3,
+  "maxDrawdownPct": 3.09,
+  "maxDrawdownDurationBars": 137,
+  "annualizedVolatility": 4.4,
+  "downsideDeviation": 11.01,
+  "sharpeRatio": 0.52,
+  "sortinoRatio": 0.21,
+  "calmarRatio": 0.74,
+  "totalTrades": 7,
+  "winRate": 42.86,
+  "profitFactor": 1.8,
+  "avgWinPct": 8.71,
+  "avgLossPct": -3.57,
+  "largestWinPct": 13.09,
+  "largestLossPct": -7.49,
+  "avgHoldingBars": 8.43,
+  "buyAndHoldReturnPct": -45.2,
+  "alpha": 47.5,
+  "equityCurve": [
+    {
+      "timestamp": 1739750400,
+      "bar": 0,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1739836800,
+      "bar": 1,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1739923200,
+      "bar": 2,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740009600,
+      "bar": 3,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740096000,
+      "bar": 4,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740182400,
+      "bar": 5,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740355200,
+      "bar": 6,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740441600,
+      "bar": 7,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740528000,
+      "bar": 8,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740614400,
+      "bar": 9,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740700800,
+      "bar": 10,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740787200,
+      "bar": 11,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740873600,
+      "bar": 12,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740960000,
+      "bar": 13,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741046400,
+      "bar": 14,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741132800,
+      "bar": 15,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741219200,
+      "bar": 16,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741305600,
+      "bar": 17,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741392000,
+      "bar": 18,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741478400,
+      "bar": 19,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741564800,
+      "bar": 20,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741651200,
+      "bar": 21,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741737600,
+      "bar": 22,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741824000,
+      "bar": 23,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741910400,
+      "bar": 24,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741996800,
+      "bar": 25,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1742083200,
+      "bar": 26,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1742169600,
+      "bar": 27,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1742256000,
+      "bar": 28,
+      "equity": 10000,
+      "cash": 10000,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1742342400,
+      "bar": 29,
+      "equity": 9954.06025624042,
+      "cash": 8000,
+      "positionsValue": 1954.0602562404192,
+      "drawdownPct": 0.45939743759579865
+    },
+    {
+      "timestamp": 1742428800,
+      "bar": 30,
+      "equity": 9983.015045135406,
+      "cash": 8000,
+      "positionsValue": 1983.0150451354061,
+      "drawdownPct": 0.1698495486459433
+    },
+    {
+      "timestamp": 1742515200,
+      "bar": 31,
+      "equity": 9983.015045135406,
+      "cash": 8000,
+      "positionsValue": 1983.0150451354061,
+      "drawdownPct": 0.1698495486459433
+    },
+    {
+      "timestamp": 1742601600,
+      "bar": 32,
+      "equity": 10011.969834030393,
+      "cash": 8000,
+      "positionsValue": 2011.969834030393,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1742688000,
+      "bar": 33,
+      "equity": 10026.447228477886,
+      "cash": 8000,
+      "positionsValue": 2026.4472284778863,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1742774400,
+      "bar": 34,
+      "equity": 10040.92462292538,
+      "cash": 8000,
+      "positionsValue": 2040.9246229253797,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1742860800,
+      "bar": 35,
+      "equity": 9962.746692908915,
+      "cash": 8000,
+      "positionsValue": 1962.7466929089153,
+      "drawdownPct": 0.778592937924959
+    },
+    {
+      "timestamp": 1742947200,
+      "bar": 36,
+      "equity": 10032.238186256884,
+      "cash": 8000,
+      "positionsValue": 2032.2381862568839,
+      "drawdownPct": 0.08651032643611259
+    },
+    {
+      "timestamp": 1743033600,
+      "bar": 37,
+      "equity": 10032.238186256884,
+      "cash": 8000,
+      "positionsValue": 2032.2381862568839,
+      "drawdownPct": 0.08651032643611259
+    },
+    {
+      "timestamp": 1743120000,
+      "bar": 38,
+      "equity": 10032.238186256884,
+      "cash": 8000,
+      "positionsValue": 2032.2381862568839,
+      "drawdownPct": 0.08651032643611259
+    },
+    {
+      "timestamp": 1743206400,
+      "bar": 39,
+      "equity": 10191.489525179311,
+      "cash": 8000,
+      "positionsValue": 2191.4895251793114,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1743292800,
+      "bar": 40,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1743379200,
+      "bar": 41,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1743465600,
+      "bar": 42,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1743552000,
+      "bar": 43,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1743638400,
+      "bar": 44,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1743724800,
+      "bar": 45,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1743811200,
+      "bar": 46,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1743897600,
+      "bar": 47,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1743984000,
+      "bar": 48,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744070400,
+      "bar": 49,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744156800,
+      "bar": 50,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744243200,
+      "bar": 51,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744329600,
+      "bar": 52,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744416000,
+      "bar": 53,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744502400,
+      "bar": 54,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744588800,
+      "bar": 55,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744675200,
+      "bar": 56,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744761600,
+      "bar": 57,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744848000,
+      "bar": 58,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744934400,
+      "bar": 59,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745020800,
+      "bar": 60,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745107200,
+      "bar": 61,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745193600,
+      "bar": 62,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745280000,
+      "bar": 63,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745366400,
+      "bar": 64,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745452800,
+      "bar": 65,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745539200,
+      "bar": 66,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745625600,
+      "bar": 67,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745712000,
+      "bar": 68,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745798400,
+      "bar": 69,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745884800,
+      "bar": 70,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745971200,
+      "bar": 71,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746057600,
+      "bar": 72,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746144000,
+      "bar": 73,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746230400,
+      "bar": 74,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746316800,
+      "bar": 75,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746403200,
+      "bar": 76,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746489600,
+      "bar": 77,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746576000,
+      "bar": 78,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746662400,
+      "bar": 79,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746748800,
+      "bar": 80,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746835200,
+      "bar": 81,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746921600,
+      "bar": 82,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1747008000,
+      "bar": 83,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1747094400,
+      "bar": 84,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1747180800,
+      "bar": 85,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1747267200,
+      "bar": 86,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1747353600,
+      "bar": 87,
+      "equity": 10261.853201112772,
+      "cash": 10261.853201112772,
+      "positionsValue": 0,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1747440000,
+      "bar": 88,
+      "equity": 10308.960403546826,
+      "cash": 8209.482560890217,
+      "positionsValue": 2099.477842656608,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1747526400,
+      "bar": 89,
+      "equity": 10244.590764581033,
+      "cash": 8209.482560890217,
+      "positionsValue": 2035.1082036908147,
+      "drawdownPct": 0.6244047551453006
+    },
+    {
+      "timestamp": 1747612800,
+      "bar": 90,
+      "equity": 10287.98066936538,
+      "cash": 8209.482560890217,
+      "positionsValue": 2078.498108475164,
+      "drawdownPct": 0.20350969797329438
+    },
+    {
+      "timestamp": 1747699200,
+      "bar": 91,
+      "equity": 10284.64298438197,
+      "cash": 8209.482560890217,
+      "positionsValue": 2075.1604234917527,
+      "drawdownPct": 0.23588624083267815
+    },
+    {
+      "timestamp": 1747785600,
+      "bar": 92,
+      "equity": 10284.64298438197,
+      "cash": 8209.482560890217,
+      "positionsValue": 2075.1604234917527,
+      "drawdownPct": 0.23588624083267815
+    },
+    {
+      "timestamp": 1747872000,
+      "bar": 93,
+      "equity": 10315.685098907492,
+      "cash": 8209.482560890217,
+      "positionsValue": 2106.2025380172745,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1747958400,
+      "bar": 94,
+      "equity": 10286.147408894198,
+      "cash": 8209.482560890217,
+      "positionsValue": 2076.66484800398,
+      "drawdownPct": 0.28633764728260713
+    },
+    {
+      "timestamp": 1748044800,
+      "bar": 95,
+      "equity": 10225.609576596145,
+      "cash": 6151.8486108818615,
+      "positionsValue": 4073.760965714284,
+      "drawdownPct": 0.8731899185337304
+    },
+    {
+      "timestamp": 1748131200,
+      "bar": 96,
+      "equity": 10270.875828107535,
+      "cash": 6151.8486108818615,
+      "positionsValue": 4119.027217225674,
+      "drawdownPct": 0.4343799793258749
+    },
+    {
+      "timestamp": 1748217600,
+      "bar": 97,
+      "equity": 10297.65362409817,
+      "cash": 6151.8486108818615,
+      "positionsValue": 4145.805013216307,
+      "drawdownPct": 0.1747966774522039
+    },
+    {
+      "timestamp": 1748304000,
+      "bar": 98,
+      "equity": 10382.411092519284,
+      "cash": 6151.8486108818615,
+      "positionsValue": 4230.562481637422,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1748390400,
+      "bar": 99,
+      "equity": 10417.677548165593,
+      "cash": 6151.8486108818615,
+      "positionsValue": 4265.828937283733,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1748476800,
+      "bar": 100,
+      "equity": 10324.80812682852,
+      "cash": 6151.8486108818615,
+      "positionsValue": 4172.95951594666,
+      "drawdownPct": 0.891459933441938
+    },
+    {
+      "timestamp": 1748563200,
+      "bar": 101,
+      "equity": 10213.09854946291,
+      "cash": 8055.441404767869,
+      "positionsValue": 2157.6571446950397,
+      "drawdownPct": 1.963767814436791
+    },
+    {
+      "timestamp": 1748649600,
+      "bar": 102,
+      "equity": 10132.500855922597,
+      "cash": 8055.441404767869,
+      "positionsValue": 2077.0594511547283,
+      "drawdownPct": 2.7374305926104583
+    },
+    {
+      "timestamp": 1748736000,
+      "bar": 103,
+      "equity": 10140.97660276471,
+      "cash": 8055.441404767869,
+      "positionsValue": 2085.5351979968395,
+      "drawdownPct": 2.656071318406348
+    },
+    {
+      "timestamp": 1748822400,
+      "bar": 104,
+      "equity": 10204.162432278259,
+      "cash": 8055.441404767869,
+      "positionsValue": 2148.721027510389,
+      "drawdownPct": 2.049546215076806
+    },
+    {
+      "timestamp": 1748908800,
+      "bar": 105,
+      "equity": 10204.162432278259,
+      "cash": 8055.441404767869,
+      "positionsValue": 2148.721027510389,
+      "drawdownPct": 2.049546215076806
+    },
+    {
+      "timestamp": 1748995200,
+      "bar": 106,
+      "equity": 10187.112287806347,
+      "cash": 8055.441404767869,
+      "positionsValue": 2131.6708830384787,
+      "drawdownPct": 2.213211719149874
+    },
+    {
+      "timestamp": 1749081600,
+      "bar": 107,
+      "equity": 10201.605732697368,
+      "cash": 8055.441404767869,
+      "positionsValue": 2146.1643279294994,
+      "drawdownPct": 2.074088149390577
+    },
+    {
+      "timestamp": 1749168000,
+      "bar": 108,
+      "equity": 10095.942518185575,
+      "cash": 8055.441404767869,
+      "positionsValue": 2040.5011134177062,
+      "drawdownPct": 3.088356579405467
+    },
+    {
+      "timestamp": 1749254400,
+      "bar": 109,
+      "equity": 10095.942518185575,
+      "cash": 8055.441404767869,
+      "positionsValue": 2040.5011134177062,
+      "drawdownPct": 3.088356579405467
+    },
+    {
+      "timestamp": 1749340800,
+      "bar": 110,
+      "equity": 10131.810300408788,
+      "cash": 8055.441404767869,
+      "positionsValue": 2076.3688956409187,
+      "drawdownPct": 2.744059282264332
+    },
+    {
+      "timestamp": 1749427200,
+      "bar": 111,
+      "equity": 10261.371668237767,
+      "cash": 8055.441404767869,
+      "positionsValue": 2205.930263469898,
+      "drawdownPct": 1.5003908424421266
+    },
+    {
+      "timestamp": 1749513600,
+      "bar": 112,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1749600000,
+      "bar": 113,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1749686400,
+      "bar": 114,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1749772800,
+      "bar": 115,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1749859200,
+      "bar": 116,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1749945600,
+      "bar": 117,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750032000,
+      "bar": 118,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750118400,
+      "bar": 119,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750204800,
+      "bar": 120,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750291200,
+      "bar": 121,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750377600,
+      "bar": 122,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750464000,
+      "bar": 123,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750550400,
+      "bar": 124,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750636800,
+      "bar": 125,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750723200,
+      "bar": 126,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750809600,
+      "bar": 127,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750896000,
+      "bar": 128,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750982400,
+      "bar": 129,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751068800,
+      "bar": 130,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751155200,
+      "bar": 131,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751241600,
+      "bar": 132,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751328000,
+      "bar": 133,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751414400,
+      "bar": 134,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751500800,
+      "bar": 135,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751587200,
+      "bar": 136,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751673600,
+      "bar": 137,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751760000,
+      "bar": 138,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751846400,
+      "bar": 139,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751932800,
+      "bar": 140,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752019200,
+      "bar": 141,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752105600,
+      "bar": 142,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752192000,
+      "bar": 143,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752278400,
+      "bar": 144,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752364800,
+      "bar": 145,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752451200,
+      "bar": 146,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752537600,
+      "bar": 147,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752624000,
+      "bar": 148,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752710400,
+      "bar": 149,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752796800,
+      "bar": 150,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752883200,
+      "bar": 151,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752969600,
+      "bar": 152,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753056000,
+      "bar": 153,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753142400,
+      "bar": 154,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753228800,
+      "bar": 155,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753315200,
+      "bar": 156,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753401600,
+      "bar": 157,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753488000,
+      "bar": 158,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753574400,
+      "bar": 159,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753660800,
+      "bar": 160,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753747200,
+      "bar": 161,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753833600,
+      "bar": 162,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753920000,
+      "bar": 163,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754006400,
+      "bar": 164,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754092800,
+      "bar": 165,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754179200,
+      "bar": 166,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754265600,
+      "bar": 167,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754352000,
+      "bar": 168,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754438400,
+      "bar": 169,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754524800,
+      "bar": 170,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754611200,
+      "bar": 171,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754697600,
+      "bar": 172,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754784000,
+      "bar": 173,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754870400,
+      "bar": 174,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754956800,
+      "bar": 175,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755043200,
+      "bar": 176,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755129600,
+      "bar": 177,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755216000,
+      "bar": 178,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755302400,
+      "bar": 179,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755388800,
+      "bar": 180,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755475200,
+      "bar": 181,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755561600,
+      "bar": 182,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755648000,
+      "bar": 183,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755734400,
+      "bar": 184,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755820800,
+      "bar": 185,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755907200,
+      "bar": 186,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755993600,
+      "bar": 187,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756080000,
+      "bar": 188,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756166400,
+      "bar": 189,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756252800,
+      "bar": 190,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756339200,
+      "bar": 191,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756425600,
+      "bar": 192,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756512000,
+      "bar": 193,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756598400,
+      "bar": 194,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756684800,
+      "bar": 195,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756771200,
+      "bar": 196,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756857600,
+      "bar": 197,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756944000,
+      "bar": 198,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757116800,
+      "bar": 199,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757203200,
+      "bar": 200,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757289600,
+      "bar": 201,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757376000,
+      "bar": 202,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757462400,
+      "bar": 203,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757548800,
+      "bar": 204,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757635200,
+      "bar": 205,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757721600,
+      "bar": 206,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757808000,
+      "bar": 207,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757894400,
+      "bar": 208,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757980800,
+      "bar": 209,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758067200,
+      "bar": 210,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758153600,
+      "bar": 211,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758240000,
+      "bar": 212,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758326400,
+      "bar": 213,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758412800,
+      "bar": 214,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758499200,
+      "bar": 215,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758585600,
+      "bar": 216,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758672000,
+      "bar": 217,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758758400,
+      "bar": 218,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758844800,
+      "bar": 219,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758931200,
+      "bar": 220,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759104000,
+      "bar": 221,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759190400,
+      "bar": 222,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759276800,
+      "bar": 223,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759363200,
+      "bar": 224,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759449600,
+      "bar": 225,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759536000,
+      "bar": 226,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759622400,
+      "bar": 227,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759708800,
+      "bar": 228,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759795200,
+      "bar": 229,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759881600,
+      "bar": 230,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759968000,
+      "bar": 231,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1760054400,
+      "bar": 232,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1760140800,
+      "bar": 233,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1760227200,
+      "bar": 234,
+      "equity": 10347.07033102194,
+      "cash": 10347.07033102194,
+      "positionsValue": 0,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1760313600,
+      "bar": 235,
+      "equity": 10329.668891760119,
+      "cash": 8277.656264817551,
+      "positionsValue": 2052.0126269425677,
+      "drawdownPct": 0.8448011180857832
+    },
+    {
+      "timestamp": 1760400000,
+      "bar": 236,
+      "equity": 10329.668891760119,
+      "cash": 8277.656264817551,
+      "positionsValue": 2052.0126269425677,
+      "drawdownPct": 0.8448011180857832
+    },
+    {
+      "timestamp": 1760486400,
+      "bar": 237,
+      "equity": 10456.573206130917,
+      "cash": 8277.656264817551,
+      "positionsValue": 2178.916941313365,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1760572800,
+      "bar": 238,
+      "equity": 10501.74734254937,
+      "cash": 8277.656264817551,
+      "positionsValue": 2224.0910777318177,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1760659200,
+      "bar": 239,
+      "equity": 10501.74734254937,
+      "cash": 8277.656264817551,
+      "positionsValue": 2224.0910777318177,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1760745600,
+      "bar": 240,
+      "equity": 10530.772191640372,
+      "cash": 8277.656264817551,
+      "positionsValue": 2253.11592682282,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1760832000,
+      "bar": 241,
+      "equity": 10502.949764685422,
+      "cash": 8277.656264817551,
+      "positionsValue": 2225.2934998678697,
+      "drawdownPct": 0.26420120432418337
+    },
+    {
+      "timestamp": 1760918400,
+      "bar": 242,
+      "equity": 10459.453058884617,
+      "cash": 8277.656264817551,
+      "positionsValue": 2181.796794067066,
+      "drawdownPct": 0.6772450439329551
+    },
+    {
+      "timestamp": 1761091200,
+      "bar": 243,
+      "equity": 10510.183654580089,
+      "cash": 8277.656264817551,
+      "positionsValue": 2232.527389762537,
+      "drawdownPct": 0.19550833201601808
+    },
+    {
+      "timestamp": 1761177600,
+      "bar": 244,
+      "equity": 10542.565140368628,
+      "cash": 8277.656264817551,
+      "positionsValue": 2264.9088755510757,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1761264000,
+      "bar": 245,
+      "equity": 10482.00373647935,
+      "cash": 8277.656264817551,
+      "positionsValue": 2204.347471661799,
+      "drawdownPct": 0.5744465704782032
+    },
+    {
+      "timestamp": 1761350400,
+      "bar": 246,
+      "equity": 10482.00373647935,
+      "cash": 8277.656264817551,
+      "positionsValue": 2204.347471661799,
+      "drawdownPct": 0.5744465704782032
+    },
+    {
+      "timestamp": 1761436800,
+      "bar": 247,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1761523200,
+      "bar": 248,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1761609600,
+      "bar": 249,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1761696000,
+      "bar": 250,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1761782400,
+      "bar": 251,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1761868800,
+      "bar": 252,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1761955200,
+      "bar": 253,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762041600,
+      "bar": 254,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762128000,
+      "bar": 255,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762300800,
+      "bar": 256,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762387200,
+      "bar": 257,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762473600,
+      "bar": 258,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762560000,
+      "bar": 259,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762646400,
+      "bar": 260,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762732800,
+      "bar": 261,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762819200,
+      "bar": 262,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762905600,
+      "bar": 263,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762992000,
+      "bar": 264,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1763078400,
+      "bar": 265,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1763164800,
+      "bar": 266,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1763251200,
+      "bar": 267,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1763337600,
+      "bar": 268,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1763510400,
+      "bar": 269,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1763596800,
+      "bar": 270,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1763769600,
+      "bar": 271,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1763856000,
+      "bar": 272,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1763942400,
+      "bar": 273,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764028800,
+      "bar": 274,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764115200,
+      "bar": 275,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764201600,
+      "bar": 276,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764288000,
+      "bar": 277,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764374400,
+      "bar": 278,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764460800,
+      "bar": 279,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764547200,
+      "bar": 280,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764633600,
+      "bar": 281,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764720000,
+      "bar": 282,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764806400,
+      "bar": 283,
+      "equity": 10375.44548224737,
+      "cash": 10375.44548224737,
+      "positionsValue": 0,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764892800,
+      "bar": 284,
+      "equity": 10290.683357380884,
+      "cash": 8300.356385797897,
+      "positionsValue": 1990.326971582986,
+      "drawdownPct": 2.3891887755406094
+    },
+    {
+      "timestamp": 1764979200,
+      "bar": 285,
+      "equity": 10358.00999280408,
+      "cash": 8300.356385797897,
+      "positionsValue": 2057.6536070061834,
+      "drawdownPct": 1.7505715649587614
+    },
+    {
+      "timestamp": 1765065600,
+      "bar": 286,
+      "equity": 10333.906489061917,
+      "cash": 8300.356385797897,
+      "positionsValue": 2033.55010326402,
+      "drawdownPct": 1.9792019165025956
+    },
+    {
+      "timestamp": 1765152000,
+      "bar": 287,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1765238400,
+      "bar": 288,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1765324800,
+      "bar": 289,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1765411200,
+      "bar": 290,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1765584000,
+      "bar": 291,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1765670400,
+      "bar": 292,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1765756800,
+      "bar": 293,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1765843200,
+      "bar": 294,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1765929600,
+      "bar": 295,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766016000,
+      "bar": 296,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766102400,
+      "bar": 297,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766188800,
+      "bar": 298,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766275200,
+      "bar": 299,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766448000,
+      "bar": 300,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766534400,
+      "bar": 301,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766620800,
+      "bar": 302,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766707200,
+      "bar": 303,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766793600,
+      "bar": 304,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766880000,
+      "bar": 305,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766966400,
+      "bar": 306,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1767052800,
+      "bar": 307,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1767139200,
+      "bar": 308,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1767225600,
+      "bar": 309,
+      "equity": 10328.589359273012,
+      "cash": 10328.589359273012,
+      "positionsValue": 0,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1767312000,
+      "bar": 310,
+      "equity": 10326.378808704483,
+      "cash": 8262.87148741841,
+      "positionsValue": 2063.507321286073,
+      "drawdownPct": 2.050604656321674
+    },
+    {
+      "timestamp": 1767484800,
+      "bar": 311,
+      "equity": 10311.21009717729,
+      "cash": 8262.87148741841,
+      "positionsValue": 2048.338609758881,
+      "drawdownPct": 2.1944853089449134
+    },
+    {
+      "timestamp": 1767571200,
+      "bar": 312,
+      "equity": 10293.021085374503,
+      "cash": 8262.87148741841,
+      "positionsValue": 2030.1495979560927,
+      "drawdownPct": 2.3670145896333485
+    },
+    {
+      "timestamp": 1767657600,
+      "bar": 313,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1767744000,
+      "bar": 314,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1767830400,
+      "bar": 315,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1767916800,
+      "bar": 316,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768003200,
+      "bar": 317,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768089600,
+      "bar": 318,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768176000,
+      "bar": 319,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768262400,
+      "bar": 320,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768348800,
+      "bar": 321,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768435200,
+      "bar": 322,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768521600,
+      "bar": 323,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768608000,
+      "bar": 324,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768694400,
+      "bar": 325,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768780800,
+      "bar": 326,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768867200,
+      "bar": 327,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768953600,
+      "bar": 328,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769040000,
+      "bar": 329,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769126400,
+      "bar": 330,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769212800,
+      "bar": 331,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769385600,
+      "bar": 332,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769472000,
+      "bar": 333,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769558400,
+      "bar": 334,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769644800,
+      "bar": 335,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769731200,
+      "bar": 336,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769817600,
+      "bar": 337,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769904000,
+      "bar": 338,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769990400,
+      "bar": 339,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770076800,
+      "bar": 340,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770163200,
+      "bar": 341,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770249600,
+      "bar": 342,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770336000,
+      "bar": 343,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770422400,
+      "bar": 344,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770508800,
+      "bar": 345,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770595200,
+      "bar": 346,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770681600,
+      "bar": 347,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770768000,
+      "bar": 348,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770854400,
+      "bar": 349,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770940800,
+      "bar": 350,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1771027200,
+      "bar": 351,
+      "equity": 10247.03792795922,
+      "cash": 10247.03792795922,
+      "positionsValue": 0,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1771113600,
+      "bar": 352,
+      "equity": 10229.756527581076,
+      "cash": 8197.630342367376,
+      "positionsValue": 2032.1261852136988,
+      "drawdownPct": 2.9671015414434008
+    }
+  ],
+  "trades": [
+    {
+      "token": "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984",
+      "symbol": "UNI",
+      "direction": "short",
+      "entryPrice": 6.86933,
+      "exitPrice": 5.967849999999999,
+      "entryTimestamp": 1742860800,
+      "exitTimestamp": 1743292800,
+      "pnl": 261.85320111277247,
+      "pnlPercent": 13.092660055638625,
+      "holdingBars": 11,
+      "exitReason": "take_profit",
+      "fees": 10.168429817755152
+    },
+    {
+      "token": "0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9",
+      "symbol": "AAVE",
+      "direction": "long",
+      "entryPrice": 268.09187,
+      "exitPrice": 250.78538,
+      "entryTimestamp": 1750723200,
+      "exitTimestamp": 1748563200,
+      "pnl": -154.04115612234895,
+      "pnlPercent": -7.4863245778834155,
+      "holdingBars": 6,
+      "exitReason": "stop_loss",
+      "fees": 10.760340424203243
+    },
+    {
+      "token": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "symbol": "WETH",
+      "direction": "long",
+      "entryPrice": 2482.95659,
+      "exitPrice": 2802.0784700000004,
+      "entryTimestamp": 1750204800,
+      "exitTimestamp": 1749513600,
+      "pnl": 239.25828603151692,
+      "pnlPercent": 11.657654876878004,
+      "holdingBars": 24,
+      "exitReason": "take_profit",
+      "fees": 11.931475632557559
+    },
+    {
+      "token": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "symbol": "WETH",
+      "direction": "short",
+      "entryPrice": 4233.053732943632,
+      "exitPrice": 4174.976211568652,
+      "entryTimestamp": 1766707200,
+      "exitTimestamp": 1761436800,
+      "pnl": 28.37515122543231,
+      "pnlPercent": 1.3711683750887296,
+      "holdingBars": 12,
+      "exitReason": "trailing_stop",
+      "fees": 11.071686625185754
+    },
+    {
+      "token": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+      "symbol": "WBTC",
+      "direction": "short",
+      "entryPrice": 88837.04959995247,
+      "exitPrice": 90850.1521534952,
+      "entryTimestamp": 1765152000,
+      "exitTimestamp": 1765152000,
+      "pnl": -46.85612297435992,
+      "pnlPercent": -2.2580294530259852,
+      "holdingBars": 3,
+      "exitReason": "stop_loss",
+      "fees": 11.312957910806663
+    },
+    {
+      "token": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+      "symbol": "WBTC",
+      "direction": "short",
+      "entryPrice": 90231.57382667814,
+      "exitPrice": 93804.79190899835,
+      "entryTimestamp": 1767657600,
+      "exitTimestamp": 1767657600,
+      "pnl": -81.55143131379147,
+      "pnlPercent": -3.947849434084363,
+      "holdingBars": 3,
+      "exitReason": "stop_loss",
+      "fees": 11.388477047221851
+    },
+    {
+      "token": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+      "symbol": "WBTC",
+      "direction": "short",
+      "entryPrice": 68442.38985279288,
+      "exitPrice": 68854.27986193707,
+      "entryTimestamp": 1771113600,
+      "exitTimestamp": 1771113600,
+      "pnl": -12.251310107332401,
+      "pnlPercent": -0.5977976364225456,
+      "holdingBars": 0,
+      "exitReason": "end_of_data",
+      "fees": 11.133177621369313
+    }
+  ],
+  "drawdownCurve": [
+    {
+      "timestamp": 1739750400,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1739836800,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1739923200,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740009600,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740096000,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740182400,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740355200,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740441600,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740528000,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740614400,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740700800,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740787200,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740873600,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1740960000,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741046400,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741132800,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741219200,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741305600,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741392000,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741478400,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741564800,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741651200,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741737600,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741824000,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741910400,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1741996800,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1742083200,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1742169600,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1742256000,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1742342400,
+      "drawdownPct": 0.45939743759579865
+    },
+    {
+      "timestamp": 1742428800,
+      "drawdownPct": 0.1698495486459433
+    },
+    {
+      "timestamp": 1742515200,
+      "drawdownPct": 0.1698495486459433
+    },
+    {
+      "timestamp": 1742601600,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1742688000,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1742774400,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1742860800,
+      "drawdownPct": 0.778592937924959
+    },
+    {
+      "timestamp": 1742947200,
+      "drawdownPct": 0.08651032643611259
+    },
+    {
+      "timestamp": 1743033600,
+      "drawdownPct": 0.08651032643611259
+    },
+    {
+      "timestamp": 1743120000,
+      "drawdownPct": 0.08651032643611259
+    },
+    {
+      "timestamp": 1743206400,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1743292800,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1743379200,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1743465600,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1743552000,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1743638400,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1743724800,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1743811200,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1743897600,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1743984000,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744070400,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744156800,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744243200,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744329600,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744416000,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744502400,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744588800,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744675200,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744761600,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744848000,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1744934400,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745020800,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745107200,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745193600,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745280000,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745366400,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745452800,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745539200,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745625600,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745712000,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745798400,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745884800,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1745971200,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746057600,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746144000,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746230400,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746316800,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746403200,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746489600,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746576000,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746662400,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746748800,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746835200,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1746921600,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1747008000,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1747094400,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1747180800,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1747267200,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1747353600,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1747440000,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1747526400,
+      "drawdownPct": 0.6244047551453006
+    },
+    {
+      "timestamp": 1747612800,
+      "drawdownPct": 0.20350969797329438
+    },
+    {
+      "timestamp": 1747699200,
+      "drawdownPct": 0.23588624083267815
+    },
+    {
+      "timestamp": 1747785600,
+      "drawdownPct": 0.23588624083267815
+    },
+    {
+      "timestamp": 1747872000,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1747958400,
+      "drawdownPct": 0.28633764728260713
+    },
+    {
+      "timestamp": 1748044800,
+      "drawdownPct": 0.8731899185337304
+    },
+    {
+      "timestamp": 1748131200,
+      "drawdownPct": 0.4343799793258749
+    },
+    {
+      "timestamp": 1748217600,
+      "drawdownPct": 0.1747966774522039
+    },
+    {
+      "timestamp": 1748304000,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1748390400,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1748476800,
+      "drawdownPct": 0.891459933441938
+    },
+    {
+      "timestamp": 1748563200,
+      "drawdownPct": 1.963767814436791
+    },
+    {
+      "timestamp": 1748649600,
+      "drawdownPct": 2.7374305926104583
+    },
+    {
+      "timestamp": 1748736000,
+      "drawdownPct": 2.656071318406348
+    },
+    {
+      "timestamp": 1748822400,
+      "drawdownPct": 2.049546215076806
+    },
+    {
+      "timestamp": 1748908800,
+      "drawdownPct": 2.049546215076806
+    },
+    {
+      "timestamp": 1748995200,
+      "drawdownPct": 2.213211719149874
+    },
+    {
+      "timestamp": 1749081600,
+      "drawdownPct": 2.074088149390577
+    },
+    {
+      "timestamp": 1749168000,
+      "drawdownPct": 3.088356579405467
+    },
+    {
+      "timestamp": 1749254400,
+      "drawdownPct": 3.088356579405467
+    },
+    {
+      "timestamp": 1749340800,
+      "drawdownPct": 2.744059282264332
+    },
+    {
+      "timestamp": 1749427200,
+      "drawdownPct": 1.5003908424421266
+    },
+    {
+      "timestamp": 1749513600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1749600000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1749686400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1749772800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1749859200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1749945600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750032000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750118400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750204800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750291200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750377600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750464000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750550400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750636800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750723200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750809600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750896000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1750982400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751068800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751155200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751241600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751328000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751414400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751500800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751587200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751673600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751760000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751846400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1751932800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752019200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752105600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752192000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752278400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752364800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752451200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752537600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752624000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752710400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752796800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752883200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1752969600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753056000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753142400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753228800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753315200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753401600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753488000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753574400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753660800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753747200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753833600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1753920000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754006400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754092800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754179200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754265600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754352000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754438400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754524800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754611200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754697600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754784000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754870400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1754956800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755043200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755129600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755216000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755302400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755388800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755475200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755561600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755648000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755734400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755820800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755907200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1755993600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756080000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756166400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756252800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756339200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756425600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756512000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756598400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756684800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756771200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756857600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1756944000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757116800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757203200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757289600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757376000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757462400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757548800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757635200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757721600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757808000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757894400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1757980800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758067200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758153600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758240000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758326400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758412800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758499200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758585600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758672000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758758400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758844800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1758931200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759104000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759190400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759276800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759363200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759449600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759536000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759622400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759708800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759795200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759881600,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1759968000,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1760054400,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1760140800,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1760227200,
+      "drawdownPct": 0.6777635112740313
+    },
+    {
+      "timestamp": 1760313600,
+      "drawdownPct": 0.8448011180857832
+    },
+    {
+      "timestamp": 1760400000,
+      "drawdownPct": 0.8448011180857832
+    },
+    {
+      "timestamp": 1760486400,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1760572800,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1760659200,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1760745600,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1760832000,
+      "drawdownPct": 0.26420120432418337
+    },
+    {
+      "timestamp": 1760918400,
+      "drawdownPct": 0.6772450439329551
+    },
+    {
+      "timestamp": 1761091200,
+      "drawdownPct": 0.19550833201601808
+    },
+    {
+      "timestamp": 1761177600,
+      "drawdownPct": 0
+    },
+    {
+      "timestamp": 1761264000,
+      "drawdownPct": 0.5744465704782032
+    },
+    {
+      "timestamp": 1761350400,
+      "drawdownPct": 0.5744465704782032
+    },
+    {
+      "timestamp": 1761436800,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1761523200,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1761609600,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1761696000,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1761782400,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1761868800,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1761955200,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762041600,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762128000,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762300800,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762387200,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762473600,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762560000,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762646400,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762732800,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762819200,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762905600,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1762992000,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1763078400,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1763164800,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1763251200,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1763337600,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1763510400,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1763596800,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1763769600,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1763856000,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1763942400,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764028800,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764115200,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764201600,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764288000,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764374400,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764460800,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764547200,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764633600,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764720000,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764806400,
+      "drawdownPct": 1.5851897132827548
+    },
+    {
+      "timestamp": 1764892800,
+      "drawdownPct": 2.3891887755406094
+    },
+    {
+      "timestamp": 1764979200,
+      "drawdownPct": 1.7505715649587614
+    },
+    {
+      "timestamp": 1765065600,
+      "drawdownPct": 1.9792019165025956
+    },
+    {
+      "timestamp": 1765152000,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1765238400,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1765324800,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1765411200,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1765584000,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1765670400,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1765756800,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1765843200,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1765929600,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766016000,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766102400,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766188800,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766275200,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766448000,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766534400,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766620800,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766707200,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766793600,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766880000,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1766966400,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1767052800,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1767139200,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1767225600,
+      "drawdownPct": 2.029636793765491
+    },
+    {
+      "timestamp": 1767312000,
+      "drawdownPct": 2.050604656321674
+    },
+    {
+      "timestamp": 1767484800,
+      "drawdownPct": 2.1944853089449134
+    },
+    {
+      "timestamp": 1767571200,
+      "drawdownPct": 2.3670145896333485
+    },
+    {
+      "timestamp": 1767657600,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1767744000,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1767830400,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1767916800,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768003200,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768089600,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768176000,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768262400,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768348800,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768435200,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768521600,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768608000,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768694400,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768780800,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768867200,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1768953600,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769040000,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769126400,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769212800,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769385600,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769472000,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769558400,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769644800,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769731200,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769817600,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769904000,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1769990400,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770076800,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770163200,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770249600,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770336000,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770422400,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770508800,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770595200,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770681600,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770768000,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770854400,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1770940800,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1771027200,
+      "drawdownPct": 2.80318127964704
+    },
+    {
+      "timestamp": 1771113600,
+      "drawdownPct": 2.9671015414434008
+    }
+  ]
+}
