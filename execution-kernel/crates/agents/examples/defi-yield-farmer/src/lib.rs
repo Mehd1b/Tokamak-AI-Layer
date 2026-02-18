@@ -391,4 +391,198 @@ mod tests {
         assert_eq!(output.actions.len(), 1, "Should produce 1 withdraw action");
         assert_eq!(output.actions[0].action_type, ACTION_TYPE_CALL);
     }
+
+    #[test]
+    fn test_force_supply_all_balance() {
+        let ctx = test_ctx();
+        let input = make_market_input(
+            [0x11u8; 20],
+            [0x22u8; 20],
+            500_000,  // vault_balance
+            0,        // supplied
+            100,      // rate doesn't matter for force
+            200,
+            8000,
+            1,        // FLAG_FORCE_SUPPLY
+        );
+        let output = agent_main(&ctx, &input);
+        assert_eq!(output.actions.len(), 1);
+        assert_eq!(output.actions[0].action_type, ACTION_TYPE_CALL);
+    }
+
+    #[test]
+    fn test_force_supply_zero_balance_no_action() {
+        let ctx = test_ctx();
+        let input = make_market_input(
+            [0x11u8; 20],
+            [0x22u8; 20],
+            0,        // no balance
+            500_000,
+            500,
+            200,
+            8000,
+            1,        // FLAG_FORCE_SUPPLY
+        );
+        let output = agent_main(&ctx, &input);
+        assert!(output.actions.is_empty());
+    }
+
+    #[test]
+    fn test_force_withdraw_all_supplied() {
+        let ctx = test_ctx();
+        let input = make_market_input(
+            [0x11u8; 20],
+            [0x22u8; 20],
+            200_000,
+            800_000,  // supplied
+            500,
+            200,
+            8000,
+            2,        // FLAG_FORCE_WITHDRAW
+        );
+        let output = agent_main(&ctx, &input);
+        assert_eq!(output.actions.len(), 1);
+        assert_eq!(output.actions[0].action_type, ACTION_TYPE_CALL);
+    }
+
+    #[test]
+    fn test_force_withdraw_nothing_supplied() {
+        let ctx = test_ctx();
+        let input = make_market_input(
+            [0x11u8; 20],
+            [0x22u8; 20],
+            500_000,
+            0,        // nothing supplied
+            500,
+            200,
+            8000,
+            2,        // FLAG_FORCE_WITHDRAW
+        );
+        let output = agent_main(&ctx, &input);
+        assert!(output.actions.is_empty());
+    }
+
+    #[test]
+    fn test_already_at_target_utilization() {
+        let ctx = test_ctx();
+        let input = make_market_input(
+            [0x11u8; 20],
+            [0x22u8; 20],
+            200_000,    // vault_balance
+            800_000,    // supplied: 80% of 1M total
+            500,        // rate ok
+            200,
+            8000,       // target: 80%
+            0,
+        );
+        let output = agent_main(&ctx, &input);
+        // Already at target (800K / 1M = 80%) -> no additional supply needed
+        assert!(output.actions.is_empty());
+    }
+
+    #[test]
+    fn test_partial_supply_to_reach_target() {
+        let ctx = test_ctx();
+        let input = make_market_input(
+            [0x11u8; 20],
+            [0x22u8; 20],
+            500_000,    // vault_balance: 500K
+            300_000,    // supplied: 300K
+            500,        // rate ok
+            200,
+            8000,       // target: 80% of 800K total = 640K
+            0,
+        );
+        let output = agent_main(&ctx, &input);
+        // Need: 640K - 300K = 340K, have 500K available -> supply 340K
+        assert_eq!(output.actions.len(), 1);
+    }
+
+    #[test]
+    fn test_zero_total_capital_no_action() {
+        let ctx = test_ctx();
+        let input = make_market_input(
+            [0x11u8; 20],
+            [0x22u8; 20],
+            0,
+            0,
+            500,
+            200,
+            8000,
+            0,
+        );
+        let output = agent_main(&ctx, &input);
+        assert!(output.actions.is_empty());
+    }
+
+    #[test]
+    fn test_unknown_flag_no_action() {
+        let ctx = test_ctx();
+        let input = make_market_input(
+            [0x11u8; 20],
+            [0x22u8; 20],
+            500_000,
+            0,
+            500,
+            200,
+            8000,
+            99,  // unknown flag
+        );
+        let output = agent_main(&ctx, &input);
+        assert!(output.actions.is_empty());
+    }
+
+    #[test]
+    fn test_supply_calldata_format() {
+        let ctx = test_ctx();
+        let input = make_market_input(
+            [0x11u8; 20],
+            [0x22u8; 20],
+            1_000_000,
+            0,
+            500,
+            200,
+            8000,
+            1,  // force supply
+        );
+        let output = agent_main(&ctx, &input);
+        assert_eq!(output.actions.len(), 1);
+
+        let payload = &output.actions[0].payload;
+        // CALL payload: 32 (value) + 32 (offset) + 32 (length) + padded_calldata
+        // value should be 0 (ERC20 supply, not ETH)
+        assert_eq!(&payload[0..32], &[0u8; 32], "Value should be 0 for ERC20 supply");
+
+        // Offset should be 64
+        assert_eq!(payload[63], 64);
+
+        // calldata length = 132 (4 selector + 32 asset + 32 amount + 32 onBehalf + 32 referral)
+        assert_eq!(payload[95], 132);
+
+        // Check supply selector inside calldata
+        assert_eq!(&payload[96..100], &SUPPLY_SELECTOR);
+    }
+
+    #[test]
+    fn test_determinism() {
+        let ctx = test_ctx();
+        let input = make_market_input(
+            [0x11u8; 20],
+            [0x22u8; 20],
+            1_000_000,
+            0,
+            500,
+            200,
+            8000,
+            0,
+        );
+        let output1 = agent_main(&ctx, &input);
+        let output2 = agent_main(&ctx, &input);
+        assert_eq!(output1.actions.len(), output2.actions.len());
+        for (a, b) in output1.actions.iter().zip(output2.actions.iter()) {
+            assert_eq!(a.action_type, b.action_type);
+            assert_eq!(a.target, b.target);
+            assert_eq!(a.payload, b.payload);
+        }
+    }
 }
