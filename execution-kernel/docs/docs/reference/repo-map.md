@@ -26,14 +26,17 @@ execution-kernel/
 │   │   └── kernel-sdk/           # Agent development SDK
 │   │
 │   ├── runtime/                  # zkVM execution
-│   │   ├── kernel-guest/         # Agent-agnostic kernel logic
-│   │   └── risc0-methods/        # RISC Zero build crate
+│   │   └── kernel-guest/         # Agent-agnostic kernel logic
 │   │
 │   ├── agents/
-│   │   ├── examples/
-│   │   │   └── example-yield-agent/  # Reference agent
-│   │   └── wrappers/
-│   │       └── kernel-guest-binding-yield/  # Agent binding
+│   │   ├── example-yield-agent/      # Reference yield agent
+│   │   │   ├── agent/                # Agent logic (lib.rs, build.rs)
+│   │   │   ├── binding/              # Kernel-guest binding wrapper
+│   │   │   └── risc0-methods/        # RISC Zero build + zkvm-guest/
+│   │   └── defi-yield-farmer/        # DeFi yield farming agent
+│   │       ├── agent/                # Agent logic (lib.rs, build.rs)
+│   │       ├── binding/              # Kernel-guest binding wrapper
+│   │       └── risc0-methods/        # RISC Zero build + zkvm-guest-defi/
 │   │
 │   ├── agent-pack/               # Agent Pack CLI tool
 │   │
@@ -146,7 +149,7 @@ pub fn read_bytes32(...) -> Option<[u8; 32]>;
 
 **Path**: `crates/runtime/kernel-guest/`
 
-zkVM guest execution logic.
+Agent-agnostic kernel execution logic. This is the canonical runtime; agent-specific RISC Zero build crates now live alongside each agent (see Agent Layer below).
 
 ```rust
 pub trait AgentEntrypoint {
@@ -160,40 +163,55 @@ pub fn kernel_main_with_agent<A: AgentEntrypoint>(
 ) -> Result<Vec<u8>, KernelError>;
 ```
 
-#### risc0-methods
-
-**Path**: `crates/runtime/risc0-methods/`
-
-RISC Zero build crate. Exports:
-
-```rust
-pub const ZKVM_GUEST_ELF: &[u8];
-pub const ZKVM_GUEST_ID: [u32; 8];
-```
-
 ### Agent Layer
+
+Each agent is a self-contained directory under `crates/agents/` with three sub-crates:
+
+| Sub-crate | Purpose |
+|-----------|---------|
+| `agent/` | Agent logic (`lib.rs`, `build.rs`, code hash) |
+| `binding/` | Kernel-guest binding wrapper (`AgentEntrypoint` impl) |
+| `risc0-methods/` | RISC Zero build crate + `zkvm-guest/` binary |
 
 #### example-yield-agent
 
-**Path**: `crates/agents/examples/example-yield-agent/`
+**Path**: `crates/agents/example-yield-agent/`
 
 Reference yield farming agent.
 
 ```rust
+// agent/
 pub const AGENT_CODE_HASH: [u8; 32];
 pub fn agent_main(ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput;
-```
 
-#### kernel-guest-binding-yield
-
-**Path**: `crates/agents/wrappers/kernel-guest-binding-yield/`
-
-Wrapper connecting yield agent to kernel.
-
-```rust
+// binding/
 pub struct YieldAgentWrapper;
 impl AgentEntrypoint for YieldAgentWrapper { ... }
 pub fn kernel_main(input_bytes: &[u8]) -> Result<Vec<u8>, KernelError>;
+
+// risc0-methods/
+pub const ZKVM_GUEST_ELF: &[u8];
+pub const ZKVM_GUEST_ID: [u32; 8];
+```
+
+#### defi-yield-farmer
+
+**Path**: `crates/agents/defi-yield-farmer/`
+
+DeFi yield farming agent with multi-protocol strategy support.
+
+```rust
+// agent/
+pub const AGENT_CODE_HASH: [u8; 32];
+pub fn agent_main(ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput;
+
+// binding/
+pub struct DefiYieldFarmerWrapper;
+impl AgentEntrypoint for DefiYieldFarmerWrapper { ... }
+
+// risc0-methods/
+pub const ZKVM_GUEST_ELF: &[u8];
+pub const ZKVM_GUEST_ID: [u32; 8];
 ```
 
 ### Tools
@@ -251,6 +269,8 @@ Test contract simulating a yield source.
 | `crates/protocol/kernel-core/src/codec.rs` | Deterministic encoding |
 | `crates/protocol/kernel-core/src/hash.rs` | SHA-256 commitments |
 | `crates/runtime/kernel-guest/src/lib.rs` | kernel_main implementation |
+| `crates/agents/example-yield-agent/agent/src/lib.rs` | Reference agent logic |
+| `crates/agents/defi-yield-farmer/agent/src/lib.rs` | DeFi agent logic |
 | `crates/sdk/kernel-sdk/src/prelude.rs` | Common imports |
 
 ## Related

@@ -45,7 +45,15 @@ Tokamak-AI-Layer/
 │       └── lib/            # Contract addresses, config
 ├── execution-kernel/       # RISC Zero zkVM Execution Kernel (independent protocol)
 │   ├── contracts/          # Foundry — AgentRegistry, KernelVault, VaultFactory, Verifier
-│   ├── crates/             # Rust workspace — kernel-core, kernel-sdk, kernel-guest, agents
+│   ├── crates/
+│   │   ├── protocol/       # kernel-core (types, codec, hashing)
+│   │   ├── sdk/            # kernel-sdk (Agent trait, development helpers)
+│   │   ├── runtime/        # kernel-guest — canonical runtime ONLY (agent-agnostic)
+│   │   ├── agents/         # Self-contained agent packages
+│   │   │   ├── example-yield-agent/  # agent/ + binding/ + risc0-methods/
+│   │   │   └── defi-yield-farmer/    # agent/ + binding/ + risc0-methods/
+│   │   ├── reference-integrator/     # Integration reference implementation
+│   │   └── testing/        # host-tests, e2e-tests
 │   ├── sdk/                # TypeScript SDK for EK contracts
 │   ├── frontend/           # Next.js 14 UI for vault management
 │   ├── docs/               # Architecture, flows, agent development

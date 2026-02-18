@@ -21,7 +21,10 @@ cargo build --release --features risc0
 crates/
 ├── protocol/kernel-core/     # Core types and codec
 ├── sdk/kernel-sdk/           # Agent development SDK
-├── runtime/kernel-guest/     # Kernel execution logic
+├── runtime/kernel-guest/     # Canonical kernel runtime ONLY (agent-agnostic)
+├── agents/                   # Self-contained agent packages
+│   ├── example-yield-agent/  # Reference agent (agent/ + binding/ + risc0-methods/)
+│   └── defi-yield-farmer/    # DeFi yield farming agent (agent/ + binding/ + risc0-methods/)
 ├── reference-integrator/     # Integration reference implementation
 └── testing/                  # Test suites
 ```

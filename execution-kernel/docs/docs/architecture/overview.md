@@ -44,13 +44,16 @@ crates/
 ├── sdk/
 │   └── kernel-sdk/              # Agent development SDK
 ├── runtime/                     # zkVM execution
-│   ├── kernel-guest/            # Agent-agnostic kernel execution logic
-│   └── risc0-methods/           # RISC Zero build - exports ELF and IMAGE_ID
+│   └── kernel-guest/            # Agent-agnostic kernel execution logic
 ├── agents/
-│   ├── examples/
-│   │   └── example-yield-agent/ # Yield farming agent implementation
-│   └── wrappers/
-│       └── kernel-guest-binding-yield/  # Binds yield agent to kernel
+│   ├── example-yield-agent/         # Reference yield agent
+│   │   ├── agent/                   # Agent logic (lib.rs, build.rs)
+│   │   ├── binding/                 # Kernel-guest binding wrapper
+│   │   └── risc0-methods/           # RISC Zero build + zkvm-guest/
+│   └── defi-yield-farmer/           # DeFi yield farming agent
+│       ├── agent/                   # Agent logic (lib.rs, build.rs)
+│       ├── binding/                 # Kernel-guest binding wrapper
+│       └── risc0-methods/           # RISC Zero build + zkvm-guest-defi/
 └── testing/
     ├── kernel-host-tests/       # Unit test suite
     └── e2e-tests/               # End-to-end zkVM proof tests
@@ -68,15 +71,15 @@ crates/
 
 ### Runtime Layer
 
-**kernel-guest** is the core execution logic. It defines the `AgentEntrypoint` trait and the `kernel_main_with_agent` function that orchestrates execution.
-
-**risc0-methods** compiles the zkVM guest program and exports `ZKVM_GUEST_ELF` (the compiled binary) and `ZKVM_GUEST_ID` (the imageId).
+**kernel-guest** is the core execution logic. It defines the `AgentEntrypoint` trait and the `kernel_main_with_agent` function that orchestrates execution. This is the canonical, agent-agnostic runtime; agent-specific RISC Zero build crates now live alongside each agent.
 
 ### Agents Layer
 
-**agents/examples/** contains reference agent implementations like `example-yield-agent`.
+Each agent is a self-contained directory under `crates/agents/` with three sub-crates: `agent/` (core logic), `binding/` (kernel-guest binding wrapper implementing `AgentEntrypoint`), and `risc0-methods/` (RISC Zero build crate exporting `ZKVM_GUEST_ELF` and `ZKVM_GUEST_ID`).
 
-**agents/wrappers/** contains binding crates that connect specific agents to the kernel.
+**example-yield-agent** is the reference yield farming agent.
+
+**defi-yield-farmer** is a DeFi yield farming agent with multi-protocol strategy support.
 
 ## Execution Flow
 

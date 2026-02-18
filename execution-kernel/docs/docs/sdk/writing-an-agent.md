@@ -5,7 +5,7 @@ sidebar_position: 2
 
 # Writing an Agent
 
-This guide walks through the process of creating an agent from scratch, covering the agent logic, build infrastructure, wrapper crate, and zkVM guest.
+This guide walks through the process of creating an agent from scratch, covering the agent logic, build infrastructure, binding crate, and zkVM guest.
 
 ## Quick Start with Scaffold
 
@@ -24,7 +24,7 @@ agent-pack scaffold my-yield-agent --template yield
 
 This generates a complete project structure with:
 - Agent crate with `agent_main()` template
-- Wrapper crate implementing `AgentEntrypoint`
+- Binding crate implementing `AgentEntrypoint`
 - Test harness with unit tests
 - Pre-populated `agent-pack.json` manifest
 - Build script for `AGENT_CODE_HASH` computation
@@ -242,26 +242,26 @@ Include the generated constant in `lib.rs`:
 include!(concat!(env!("OUT_DIR"), "/agent_code_hash.rs"));
 ```
 
-## Creating the Wrapper Crate
+## Creating the Binding Crate
 
-The wrapper connects your agent to the kernel.
+The binding crate connects your agent to the kernel. Each agent has its own `binding/` directory alongside the `agent/` crate.
 
-Create `kernel-guest-binding-myagent/Cargo.toml`:
+Create `my-agent/binding/Cargo.toml`:
 
 ```toml
 [package]
-name = "kernel-guest-binding-myagent"
+name = "my-agent-binding"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-kernel-guest = { path = "../runtime/kernel-guest" }
-kernel-core = { path = "../protocol/kernel-core" }
-kernel-sdk = { path = "../sdk/kernel-sdk" }
-my-agent = { path = "../agents/examples/my-agent" }
+kernel-guest = { path = "../../runtime/kernel-guest" }
+kernel-core = { path = "../../protocol/kernel-core" }
+kernel-sdk = { path = "../../sdk/kernel-sdk" }
+my-agent = { path = "../agent" }
 ```
 
-Create `kernel-guest-binding-myagent/src/lib.rs`:
+Create `my-agent/binding/src/lib.rs`:
 
 ```rust
 use kernel_guest::AgentEntrypoint;
@@ -289,7 +289,7 @@ pub fn kernel_main(input_bytes: &[u8]) -> Result<Vec<u8>, kernel_guest::KernelEr
 
 ## The zkVM Guest Entry Point
 
-Create the zkVM guest in `risc0-methods/zkvm-guest/src/main.rs`:
+Create the zkVM guest in `my-agent/risc0-methods/zkvm-guest/src/main.rs`:
 
 ```rust
 #![no_main]
@@ -301,7 +301,7 @@ fn main() {
 
     let input_bytes: Vec<u8> = env::read();
 
-    match kernel_guest_binding_myagent::kernel_main(&input_bytes) {
+    match my_agent_binding::kernel_main(&input_bytes) {
         Ok(journal_bytes) => {
             env::commit_slice(&journal_bytes);
         }

@@ -12,13 +12,13 @@ This document explains how the zkVM guest is built and how critical artifacts (E
 ```mermaid
 flowchart TD
     A[Agent Source] -->|build.rs| B[agent_code_hash]
-    C[kernel-guest] --> D[Wrapper Crate]
+    C[kernel-guest] --> D[Binding Crate]
     B --> D
     D --> E[zkvm-guest main.rs]
     E -->|risc0-build| F[ELF Binary]
     F -->|RISC Zero hash| G[imageId]
 
-    subgraph "risc0-methods"
+    subgraph "agents/my-agent/risc0-methods"
         E
         F
         G
@@ -27,8 +27,10 @@ flowchart TD
 
 ## Crate Structure
 
+Each agent has its own `risc0-methods/` directory within its folder:
+
 ```
-crates/runtime/risc0-methods/
+crates/agents/my-agent/risc0-methods/
 ├── Cargo.toml
 ├── build.rs              # Invokes risc0-build
 ├── src/
@@ -58,9 +60,9 @@ let hash = hasher.finalize();
 // Writes: pub const AGENT_CODE_HASH: [u8; 32] = [...]
 ```
 
-### 2. Wrapper Compilation
+### 2. Binding Compilation
 
-The wrapper crate links the agent to the kernel:
+The binding crate links the agent to the kernel:
 
 ```rust
 pub struct YieldAgentWrapper;
@@ -107,7 +109,7 @@ include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 
 The compiled zkVM guest:
 - Target: `riscv32im-risc0-zkvm-elf`
-- Contains: kernel + wrapper + agent code
+- Contains: kernel + binding + agent code
 - Location: `target/riscv-guest/.../zkvm-guest`
 - Used by: Prover to execute guest
 
@@ -166,8 +168,8 @@ edition = "2021"
 
 [dependencies]
 risc0-zkvm = { version = "1.0", default-features = false, features = ["guest"] }
-kernel-guest-binding-yield = { path = "../../agents/wrappers/kernel-guest-binding-yield" }
-kernel-core = { path = "../../protocol/kernel-core" }
+example-yield-agent-binding = { path = "../../binding" }
+kernel-core = { path = "../../../../protocol/kernel-core" }
 
 [profile.release]
 opt-level = 3

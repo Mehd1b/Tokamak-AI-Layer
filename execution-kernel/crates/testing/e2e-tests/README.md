@@ -327,8 +327,11 @@ This requires Docker and uses the official RISC Zero Docker image.
 
 ## Related Crates
 
-- `risc0-methods` - Builds kernel-guest as RISC Zero guest, exports ELF/IMAGE_ID
-- `kernel-guest` - The guest program that runs in zkVM (agent-agnostic)
-- `kernel-guest-binding-yield` - Binds yield agent to kernel-guest
-- `example-yield-agent` - Provides `agent_main` and `AGENT_CODE_HASH`
-- `kernel-core` - Types and encoding used by both host and guest
+- `crates/runtime/kernel-guest` - The canonical kernel runtime that runs in zkVM (agent-agnostic)
+- `crates/protocol/kernel-core` - Types and encoding used by both host and guest
+- `crates/agents/example-yield-agent/agent` - Reference yield agent logic, provides `agent_main` and `AGENT_CODE_HASH`
+- `crates/agents/example-yield-agent/binding` - Binds yield agent to kernel-guest for zkVM compilation
+- `crates/agents/example-yield-agent/risc0-methods` - Builds guest ELF, exports IMAGE_ID
+- `crates/agents/defi-yield-farmer/agent` - DeFi yield farming agent logic
+- `crates/agents/defi-yield-farmer/binding` - Binds defi-yield-farmer to kernel-guest
+- `crates/agents/defi-yield-farmer/risc0-methods` - Builds guest ELF, exports IMAGE_ID

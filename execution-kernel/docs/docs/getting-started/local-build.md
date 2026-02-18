@@ -20,7 +20,8 @@ This compiles:
 - `constraints` - Constraint engine
 - `kernel-sdk` - Agent development SDK
 - `kernel-guest` - Kernel execution logic
-- `example-yield-agent` - Reference agent implementation
+- `example-yield-agent` - Reference yield agent
+- `defi-yield-farmer` - DeFi yield farming agent
 
 ## Build with zkVM Support
 
@@ -30,9 +31,7 @@ To build with RISC Zero zkVM support:
 cargo build --release --features risc0
 ```
 
-This additionally compiles:
-- `risc0-methods` - zkVM guest binary and IMAGE_ID
-- zkVM-specific dependencies
+This additionally compiles each agent's `risc0-methods/` crate (zkVM guest binaries and IMAGE_IDs).
 
 :::note
 Building with `--features risc0` requires the RISC Zero toolchain. See [Prerequisites](/getting-started/prerequisites) for installation instructions.
@@ -69,21 +68,24 @@ cargo build -p kernel-sdk --release
 ### Runtime
 
 ```bash
-# Build kernel-guest
+# Build kernel-guest (canonical agent-agnostic runtime)
 cargo build -p kernel-guest --release
-
-# Build risc0-methods (requires risc0 feature)
-cargo build -p risc0-methods --release --features risc0
 ```
 
 ### Agents
 
+Each agent has three sub-crates: `agent`, `binding`, and `risc0-methods`.
+
 ```bash
 # Build example yield agent
 cargo build -p example-yield-agent --release
-
-# Build kernel binding for yield agent
 cargo build -p kernel-guest-binding-yield --release
+cargo build -p risc0-methods --release --features risc0
+
+# Build DeFi yield farmer agent
+cargo build -p defi-yield-farmer --release
+cargo build -p kernel-guest-binding-defi-yield --release
+cargo build -p risc0-methods-defi --release --features risc0
 ```
 
 ## Verify Build
@@ -120,16 +122,14 @@ After building, key artifacts are located at:
 
 ### Finding the IMAGE_ID
 
-After building with RISC Zero features, the IMAGE_ID is available as a constant:
+After building with RISC Zero features, each agent's IMAGE_ID is available as a constant from its `risc0-methods` crate:
 
 ```rust
+// Example yield agent
 use risc0_methods::ZKVM_GUEST_ID;
-```
 
-You can also find it in the build output or by running:
-
-```bash
-cargo build -p risc0-methods --features risc0 2>&1 | grep IMAGE_ID
+// DeFi yield farmer
+use risc0_methods_defi::ZKVM_GUEST_ID;
 ```
 
 ## Build Troubleshooting
@@ -200,13 +200,16 @@ crates/
 ├── sdk/
 │   └── kernel-sdk/        # Agent development SDK
 ├── runtime/
-│   ├── kernel-guest/      # Kernel execution logic
-│   └── risc0-methods/     # zkVM build crate
+│   └── kernel-guest/      # Agent-agnostic kernel execution logic
 ├── agents/
-│   ├── examples/
-│   │   └── example-yield-agent/
-│   └── wrappers/
-│       └── kernel-guest-binding-yield/
+│   ├── example-yield-agent/
+│   │   ├── agent/             # Agent logic
+│   │   ├── binding/           # Kernel-guest binding
+│   │   └── risc0-methods/     # RISC Zero build + zkvm-guest/
+│   └── defi-yield-farmer/
+│       ├── agent/             # Agent logic
+│       ├── binding/           # Kernel-guest binding
+│       └── risc0-methods/     # RISC Zero build + zkvm-guest-defi/
 ├── agent-pack/            # Agent Pack CLI tool
 └── testing/
     ├── kernel-host-tests/ # Unit tests

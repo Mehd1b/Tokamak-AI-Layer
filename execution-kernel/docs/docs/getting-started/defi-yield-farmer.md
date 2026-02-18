@@ -159,7 +159,7 @@ cargo test -p kernel-host-tests -- defi_yield_farmer
 ### Step 1: Build the zkVM Guest
 
 ```bash
-cargo build -p risc0-methods-defi --release
+cargo build -p defi-yield-farmer-risc0-methods --release
 ```
 
 This compiles the agent into a RISC Zero guest binary and generates the `IMAGE_ID`.
@@ -256,10 +256,10 @@ See the [shell deployment script](https://github.com/tokamak-network/Tokamak-AI-
 
 | File | Description |
 |------|-------------|
-| `crates/agents/examples/defi-yield-farmer/src/lib.rs` | Agent implementation (strategy, parsing, ABI encoding) |
-| `crates/agents/examples/defi-yield-farmer/build.rs` | Generates `AGENT_CODE_HASH` at compile time |
-| `crates/agents/wrappers/kernel-guest-binding-defi-yield/src/lib.rs` | Kernel guest wrapper |
-| `crates/runtime/risc0-methods-defi/` | RISC Zero guest build (ELF + IMAGE_ID) |
+| `crates/agents/defi-yield-farmer/agent/src/lib.rs` | Agent implementation (strategy, parsing, ABI encoding) |
+| `crates/agents/defi-yield-farmer/agent/build.rs` | Generates `AGENT_CODE_HASH` at compile time |
+| `crates/agents/defi-yield-farmer/binding/src/lib.rs` | Kernel guest wrapper |
+| `crates/agents/defi-yield-farmer/risc0-methods/` | RISC Zero guest build (ELF + IMAGE_ID) |
 | `crates/testing/kernel-host-tests/src/lib.rs` | Integration tests |
 | `contracts/script/DeployDefiYieldAgent.s.sol` | Forge deployment script |
 | `contracts/script/deploy-defi-yield-agent.sh` | Shell deployment script |
