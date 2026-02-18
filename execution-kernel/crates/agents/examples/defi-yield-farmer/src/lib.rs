@@ -140,8 +140,10 @@ fn min_u64(a: u64, b: u64) -> u64 {
 // ============================================================================
 
 /// Canonical agent entrypoint.
-#[no_mangle]
-#[allow(unsafe_code)]
+///
+/// Note: `#[no_mangle]` is intentionally omitted to avoid symbol collisions
+/// when multiple agent crates are linked into the same binary (e.g., tests).
+/// The wrapper crate calls this through the Rust module path.
 pub extern "Rust" fn agent_main(_ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput {
     let market = match parse_input(opaque_inputs) {
         Some(m) => m,

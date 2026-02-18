@@ -1,6 +1,9 @@
 // Re-export the agent code hash from the wrapper crate for tests to use.
 pub use kernel_guest_binding_yield::AGENT_CODE_HASH;
 
+// Re-export the DeFi yield farmer agent code hash.
+pub use kernel_guest_binding_defi_yield::AGENT_CODE_HASH as DEFI_AGENT_CODE_HASH;
+
 #[cfg(test)]
 mod tests {
     use constraints::EMPTY_OUTPUT_COMMITMENT;
@@ -1574,5 +1577,243 @@ mod tests {
         let mut arr = [0u8; 32];
         arr.copy_from_slice(&vec);
         arr
+    }
+}
+
+// ============================================================================
+// DeFi Yield Farmer — Kernel Integration Tests
+// ============================================================================
+
+#[cfg(test)]
+mod defi_yield_farmer_tests {
+    use constraints::EMPTY_OUTPUT_COMMITMENT;
+    use kernel_core::*;
+    use kernel_guest_binding_defi_yield::kernel_main as defi_kernel_main;
+
+    use crate::DEFI_AGENT_CODE_HASH;
+
+    /// Build 69-byte opaque input for the DeFi yield farmer agent.
+    fn make_defi_opaque_input(
+        lending_pool: [u8; 20],
+        asset_token: [u8; 20],
+        vault_balance: u64,
+        supplied_amount: u64,
+        supply_rate_bps: u32,
+        min_supply_rate_bps: u32,
+        target_utilization_bps: u32,
+        action_flag: u8,
+    ) -> Vec<u8> {
+        let mut input = Vec::with_capacity(69);
+        input.extend_from_slice(&lending_pool);
+        input.extend_from_slice(&asset_token);
+        input.extend_from_slice(&vault_balance.to_le_bytes());
+        input.extend_from_slice(&supplied_amount.to_le_bytes());
+        input.extend_from_slice(&supply_rate_bps.to_le_bytes());
+        input.extend_from_slice(&min_supply_rate_bps.to_le_bytes());
+        input.extend_from_slice(&target_utilization_bps.to_le_bytes());
+        input.push(action_flag);
+        input
+    }
+
+    /// Helper to create a KernelInputV1 for the defi yield farmer.
+    fn make_defi_input(opaque: Vec<u8>) -> KernelInputV1 {
+        KernelInputV1 {
+            protocol_version: PROTOCOL_VERSION,
+            kernel_version: KERNEL_VERSION,
+            agent_id: [0x42; 32],
+            agent_code_hash: DEFI_AGENT_CODE_HASH,
+            constraint_set_hash: [0xbb; 32],
+            input_root: [0xcc; 32],
+            execution_nonce: 1,
+            opaque_agent_inputs: opaque,
+        }
+    }
+
+    #[test]
+    fn test_defi_yield_farmer_supply_scenario() {
+        // Rate above threshold, vault has capital -> should produce a supply action
+        let opaque = make_defi_opaque_input(
+            [0x11u8; 20], // lending_pool
+            [0x22u8; 20], // asset_token
+            1_000_000,    // vault_balance
+            0,            // supplied_amount
+            500,          // supply_rate: 5%
+            200,          // min_supply_rate: 2%
+            8000,         // target_utilization: 80%
+            0,            // FLAG_EVALUATE
+        );
+
+        let input = make_defi_input(opaque);
+        let input_bytes = input.encode().unwrap();
+        let journal_bytes = defi_kernel_main(&input_bytes).expect("kernel execution");
+        let journal = KernelJournalV1::decode(&journal_bytes).unwrap();
+
+        assert_eq!(journal.protocol_version, PROTOCOL_VERSION);
+        assert_eq!(journal.kernel_version, KERNEL_VERSION);
+        assert_eq!(journal.agent_id, [0x42; 32]);
+        assert_eq!(journal.agent_code_hash, DEFI_AGENT_CODE_HASH);
+        assert_eq!(journal.execution_nonce, 1);
+        assert_eq!(journal.execution_status, ExecutionStatus::Success);
+        // Agent produces a supply action -> commitment is NOT empty
+        assert_ne!(journal.action_commitment, EMPTY_OUTPUT_COMMITMENT);
+    }
+
+    #[test]
+    fn test_defi_yield_farmer_withdraw_scenario() {
+        // Rate below threshold with supplied capital -> should produce a withdraw action
+        let opaque = make_defi_opaque_input(
+            [0x11u8; 20],
+            [0x22u8; 20],
+            200_000,  // vault_balance
+            800_000,  // supplied_amount
+            100,      // supply_rate: 1% (below threshold)
+            200,      // min_supply_rate: 2%
+            8000,
+            0,        // FLAG_EVALUATE
+        );
+
+        let input = make_defi_input(opaque);
+        let input_bytes = input.encode().unwrap();
+        let journal_bytes = defi_kernel_main(&input_bytes).expect("kernel execution");
+        let journal = KernelJournalV1::decode(&journal_bytes).unwrap();
+
+        assert_eq!(journal.execution_status, ExecutionStatus::Success);
+        assert_ne!(journal.action_commitment, EMPTY_OUTPUT_COMMITMENT);
+    }
+
+    #[test]
+    fn test_defi_yield_farmer_no_action_scenario() {
+        // Rate below threshold, nothing supplied -> no action
+        let opaque = make_defi_opaque_input(
+            [0x11u8; 20],
+            [0x22u8; 20],
+            1_000_000,
+            0,
+            100,  // supply_rate: 1% (below threshold)
+            200,  // min: 2%
+            8000,
+            0,
+        );
+
+        let input = make_defi_input(opaque);
+        let input_bytes = input.encode().unwrap();
+        let journal_bytes = defi_kernel_main(&input_bytes).expect("kernel execution");
+        let journal = KernelJournalV1::decode(&journal_bytes).unwrap();
+
+        assert_eq!(journal.execution_status, ExecutionStatus::Success);
+        // No action -> empty output commitment
+        assert_eq!(journal.action_commitment, EMPTY_OUTPUT_COMMITMENT);
+    }
+
+    #[test]
+    fn test_defi_yield_farmer_invalid_input_size() {
+        // Wrong input size -> empty output
+        let opaque = vec![0u8; 10]; // 10 bytes, not 69
+        let input = make_defi_input(opaque);
+        let input_bytes = input.encode().unwrap();
+        let journal_bytes = defi_kernel_main(&input_bytes).expect("kernel execution");
+        let journal = KernelJournalV1::decode(&journal_bytes).unwrap();
+
+        assert_eq!(journal.execution_status, ExecutionStatus::Success);
+        assert_eq!(journal.action_commitment, EMPTY_OUTPUT_COMMITMENT);
+    }
+
+    #[test]
+    fn test_defi_yield_farmer_force_supply() {
+        let opaque = make_defi_opaque_input(
+            [0x11u8; 20],
+            [0x22u8; 20],
+            500_000,
+            0,
+            100,  // rate doesn't matter for force
+            200,
+            8000,
+            1,    // FLAG_FORCE_SUPPLY
+        );
+
+        let input = make_defi_input(opaque);
+        let input_bytes = input.encode().unwrap();
+        let journal_bytes = defi_kernel_main(&input_bytes).expect("kernel execution");
+        let journal = KernelJournalV1::decode(&journal_bytes).unwrap();
+
+        assert_eq!(journal.execution_status, ExecutionStatus::Success);
+        assert_ne!(journal.action_commitment, EMPTY_OUTPUT_COMMITMENT);
+    }
+
+    #[test]
+    fn test_defi_yield_farmer_force_withdraw() {
+        let opaque = make_defi_opaque_input(
+            [0x11u8; 20],
+            [0x22u8; 20],
+            200_000,
+            800_000,
+            500,
+            200,
+            8000,
+            2,    // FLAG_FORCE_WITHDRAW
+        );
+
+        let input = make_defi_input(opaque);
+        let input_bytes = input.encode().unwrap();
+        let journal_bytes = defi_kernel_main(&input_bytes).expect("kernel execution");
+        let journal = KernelJournalV1::decode(&journal_bytes).unwrap();
+
+        assert_eq!(journal.execution_status, ExecutionStatus::Success);
+        assert_ne!(journal.action_commitment, EMPTY_OUTPUT_COMMITMENT);
+    }
+
+    #[test]
+    fn test_defi_yield_farmer_determinism() {
+        let opaque = make_defi_opaque_input(
+            [0x11u8; 20],
+            [0x22u8; 20],
+            1_000_000,
+            0,
+            500,
+            200,
+            8000,
+            0,
+        );
+
+        let input = make_defi_input(opaque);
+        let input_bytes = input.encode().unwrap();
+
+        let result1 = defi_kernel_main(&input_bytes).unwrap();
+        let result2 = defi_kernel_main(&input_bytes).unwrap();
+        let result3 = defi_kernel_main(&input_bytes).unwrap();
+
+        assert_eq!(result1, result2);
+        assert_eq!(result2, result3);
+    }
+
+    #[test]
+    fn test_defi_yield_farmer_code_hash_mismatch() {
+        let opaque = make_defi_opaque_input(
+            [0x11u8; 20],
+            [0x22u8; 20],
+            1_000_000,
+            0,
+            500,
+            200,
+            8000,
+            0,
+        );
+
+        let input = KernelInputV1 {
+            protocol_version: PROTOCOL_VERSION,
+            kernel_version: KERNEL_VERSION,
+            agent_id: [0x42; 32],
+            agent_code_hash: [0xde; 32], // WRONG hash
+            constraint_set_hash: [0xbb; 32],
+            input_root: [0xcc; 32],
+            execution_nonce: 1,
+            opaque_agent_inputs: opaque,
+        };
+
+        let input_bytes = input.encode().unwrap();
+        let result = defi_kernel_main(&input_bytes);
+
+        assert!(result.is_err());
+        assert!(matches!(result, Err(KernelError::AgentCodeHashMismatch)));
     }
 }
