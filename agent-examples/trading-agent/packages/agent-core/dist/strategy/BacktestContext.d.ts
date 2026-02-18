@@ -4,6 +4,7 @@ export interface BacktestMetrics {
     maxDrawdownPct: number;
     maxDrawdownDurationBars: number;
     annualizedVolatility: number;
+    downsideDeviation: number;
     sharpeRatio: number;
     sortinoRatio: number;
     calmarRatio: number;

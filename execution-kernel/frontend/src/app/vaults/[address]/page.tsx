@@ -3,8 +3,10 @@
 import { useParams } from 'next/navigation';
 import { useAccount } from 'wagmi';
 import { useVaultInfo, useVaultShares } from '@/hooks/useKernelVault';
+import { useVaultHistory } from '@/hooks/useVaultHistory';
 import { VaultDepositForm } from '@/components/VaultDepositForm';
 import { VaultWithdrawForm } from '@/components/VaultWithdrawForm';
+import { VaultChart } from '@/components/VaultChart';
 import { ExecutionSubmitForm } from '@/components/ExecutionSubmitForm';
 import { formatBytes32, formatEther, timestampToDate, truncateAddress } from '@/lib/utils';
 import Link from 'next/link';
@@ -16,6 +18,7 @@ export default function VaultDetailPage() {
 
   const vault = useVaultInfo(vaultAddress);
   const { data: userShares } = useVaultShares(vaultAddress, userAddress);
+  const { tvl, pps, isLoading: historyLoading } = useVaultHistory(vaultAddress);
 
   if (vault.isLoading) {
     return (
@@ -114,6 +117,27 @@ export default function VaultDetailPage() {
             <span className="text-[#A855F7] text-sm font-mono">{formatEther(userShares)}</span>
           </div>
         )}
+      </div>
+
+      {/* TVL & PPS Charts */}
+      <div className="grid grid-cols-1 gap-6 mb-8">
+        <VaultChart
+          title="Total Value Locked"
+          data={tvl}
+          type="area"
+          valueSuffix="ETH"
+          precision={4}
+          isLoading={historyLoading}
+          height={300}
+        />
+        <VaultChart
+          title="Price Per Share"
+          data={pps}
+          type="line"
+          precision={6}
+          isLoading={historyLoading}
+          height={250}
+        />
       </div>
 
       {/* Actions grid */}

@@ -25,7 +25,7 @@ const config = createConfig({
   connectors,
   chains: [sepolia],
   transports: {
-    [sepolia.id]: http(),
+    [sepolia.id]: http(process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL),
   },
   multiInjectedProviderDiscovery: false,
   ssr: true,
