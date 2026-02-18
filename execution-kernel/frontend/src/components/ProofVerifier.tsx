@@ -63,12 +63,12 @@ export function ProofVerifier() {
           <div className="space-y-3 text-sm" style={{ fontFamily: 'var(--font-mono), monospace' }}>
             {[
               ['Agent ID', parsed.agentId],
-              ['Vault Address', parsed.vaultAddress],
-              ['Old State Root', parsed.oldStateRoot],
-              ['New State Root', parsed.newStateRoot],
-              ['Nonce', parsed.nonce?.toString()],
-              ['Action Hash', parsed.actionHash],
-              ['Config Hash', parsed.configHash],
+              ['Agent Code Hash', parsed.agentCodeHash],
+              ['Constraint Set Hash', parsed.constraintSetHash],
+              ['Input Root', parsed.inputRoot],
+              ['Execution Nonce', parsed.executionNonce?.toString()],
+              ['Input Commitment', parsed.inputCommitment],
+              ['Action Commitment', parsed.actionCommitment],
             ].map(([label, value]) => (
               <div key={label} className="flex justify-between items-center py-2 border-b border-white/5">
                 <span className="text-gray-500">{label}</span>

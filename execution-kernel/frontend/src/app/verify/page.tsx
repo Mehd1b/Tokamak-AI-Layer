@@ -77,7 +77,7 @@ export default function VerifyPage() {
           </div>
           <div className="flex gap-4">
             <span className="text-[#A855F7] font-medium shrink-0">02</span>
-            <p>The journal contains: agentId, vaultAddress, old/new state roots, nonce, actionHash, and configHash.</p>
+            <p>The journal contains: agentId, agentCodeHash, constraintSetHash, inputRoot, executionNonce, inputCommitment, and actionCommitment.</p>
           </div>
           <div className="flex gap-4">
             <span className="text-[#A855F7] font-medium shrink-0">03</span>

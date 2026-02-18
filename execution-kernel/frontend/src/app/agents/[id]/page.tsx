@@ -1,14 +1,37 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { useAgent } from '@/hooks/useKernelAgent';
+import { useParams, useRouter } from 'next/navigation';
+import { useAccount } from 'wagmi';
+import { useAgent, useUnregisterAgent } from '@/hooks/useKernelAgent';
+import { useVaultsForAgent } from '@/hooks/useVaultFactory';
+import { VaultCard } from '@/components/VaultCard';
 import { formatBytes32, truncateAddress } from '@/lib/utils';
 import Link from 'next/link';
+import { useEffect } from 'react';
 
 export default function AgentDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const agentId = params.id as `0x${string}`;
+  const { address: userAddress } = useAccount();
   const { data: agent, isLoading, error } = useAgent(agentId);
+  const { data: associatedVaults, isLoading: isLoadingVaults } = useVaultsForAgent(agentId);
+  const {
+    unregisterAgent,
+    isPending: isUnregPending,
+    isConfirming: isUnregConfirming,
+    isSuccess: isUnregSuccess,
+    error: unregError,
+  } = useUnregisterAgent();
+
+  const isAuthor = userAddress && agent && userAddress.toLowerCase() === (agent.author as string).toLowerCase();
+
+  useEffect(() => {
+    if (isUnregSuccess) {
+      const timeout = setTimeout(() => router.push('/agents'), 1500);
+      return () => clearTimeout(timeout);
+    }
+  }, [isUnregSuccess, router]);
 
   if (isLoading) {
     return (
@@ -63,8 +86,8 @@ export default function AgentDetailPage() {
             <h1 className="text-2xl font-light text-white" style={{ fontFamily: 'var(--font-serif), serif' }}>
               Agent Detail
             </h1>
-            <span className={agent.active ? 'badge-success' : 'badge-error'}>
-              {agent.active ? 'Active' : 'Inactive'}
+            <span className={agent.exists ? 'badge-success' : 'badge-error'}>
+              {agent.exists ? 'Active' : 'Inactive'}
             </span>
           </div>
         </div>
@@ -86,19 +109,52 @@ export default function AgentDetailPage() {
             </a>
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
-            <span className="text-gray-500 text-sm">Codehash</span>
-            <span className="text-gray-300 text-sm break-all">{agent.codehash}</span>
+            <span className="text-gray-500 text-sm">Agent Code Hash</span>
+            <span className="text-gray-300 text-sm break-all">{agent.agentCodeHash}</span>
           </div>
-          <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
+          <div className="flex flex-col sm:flex-row sm:justify-between py-3">
             <span className="text-gray-500 text-sm">Image ID</span>
             <span className="text-gray-300 text-sm break-all">{agent.imageId}</span>
           </div>
-          <div className="flex flex-col sm:flex-row sm:justify-between py-3">
-            <span className="text-gray-500 text-sm">Metadata URI</span>
-            <span className="text-gray-300 text-sm break-all">{agent.metadataURI || '-'}</span>
-          </div>
         </div>
       </div>
+
+      {/* Unregister Agent */}
+      {isAuthor && (
+        <div className="card mb-8">
+          <h2
+            className="text-xl font-light text-white mb-4"
+            style={{ fontFamily: 'var(--font-serif), serif' }}
+          >
+            Danger Zone
+          </h2>
+          <p className="text-gray-400 text-sm font-mono mb-4">
+            Unregistering will permanently remove this agent and close all associated vaults.
+          </p>
+
+          {isUnregSuccess ? (
+            <p className="text-green-400 font-mono text-sm">Agent unregistered. Redirecting...</p>
+          ) : (
+            <>
+              <button
+                onClick={() => {
+                  const vaultAddresses = (associatedVaults ?? []).map((v) => v.address as `0x${string}`);
+                  unregisterAgent(agentId, vaultAddresses);
+                }}
+                disabled={isUnregPending || isUnregConfirming}
+                className="px-6 py-2.5 rounded-lg font-mono text-sm transition-all duration-200 bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isUnregPending ? 'Signing...' : isUnregConfirming ? 'Confirming...' : 'Unregister Agent'}
+              </button>
+              {unregError && (
+                <p className="text-red-400 font-mono text-sm mt-3">
+                  {(unregError as Error).message?.split('\n')[0] || 'Transaction failed'}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Associated Vaults */}
       <div className="card">
@@ -108,14 +164,38 @@ export default function AgentDetailPage() {
         >
           Associated Vaults
         </h2>
-        <div className="text-center py-8">
-          <p className="text-gray-500 font-mono text-sm mb-4">
-            Deploy a vault for this agent to manage funds and execute strategies.
-          </p>
-          <Link href="/vaults" className="btn-primary">
-            Deploy Vault
-          </Link>
-        </div>
+
+        {isLoadingVaults && (
+          <div className="text-center py-8">
+            <div className="animate-pulse text-[#A855F7] font-mono text-sm">Fetching vaults...</div>
+          </div>
+        )}
+
+        {associatedVaults && associatedVaults.length > 0 && (
+          <div className="grid md:grid-cols-2 gap-6">
+            {associatedVaults.map((v) => (
+              <VaultCard
+                key={v.address}
+                address={v.address}
+                agentId={v.agentId}
+                asset={v.asset}
+                totalAssets={v.totalAssets}
+                totalShares={v.totalShares}
+              />
+            ))}
+          </div>
+        )}
+
+        {associatedVaults && associatedVaults.length === 0 && (
+          <div className="text-center py-8">
+            <p className="text-gray-500 font-mono text-sm mb-4">
+              No vaults deployed for this agent yet.
+            </p>
+            <Link href="/vaults" className="btn-primary">
+              Deploy Vault
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

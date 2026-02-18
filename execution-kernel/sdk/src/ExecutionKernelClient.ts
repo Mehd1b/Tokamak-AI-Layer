@@ -74,7 +74,6 @@ export class ExecutionKernelClient {
     salt: `0x${string}`;
     imageId: `0x${string}`;
     agentCodeHash: `0x${string}`;
-    metadataURI: string;
   }): Promise<{ agentId: `0x${string}`; txHash: `0x${string}` }> {
     return this.agents.register(params);
   }

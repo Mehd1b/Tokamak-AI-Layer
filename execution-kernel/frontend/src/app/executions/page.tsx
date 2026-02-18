@@ -5,10 +5,10 @@ import { ExecutionHistoryTable } from '@/components/ExecutionHistoryTable';
 export default function ExecutionsPage() {
   // Placeholder - in production, these would come from event logs
   const executions: {
-    nonce: string;
+    executionNonce: string;
     agentId: string;
-    oldStateRoot: string;
-    newStateRoot: string;
+    actionCommitment: string;
+    actionCount: string;
     transactionHash?: string;
   }[] = [];
 

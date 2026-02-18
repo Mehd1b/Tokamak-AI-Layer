@@ -55,7 +55,7 @@ describe('AgentRegistryClient', () => {
         author: MOCK_AUTHOR,
         imageId: MOCK_IMAGE_ID,
         agentCodeHash: MOCK_CODE_HASH,
-        metadataURI: 'ipfs://QmTest',
+        _deprecated: '',
         exists: true,
       });
 
@@ -66,7 +66,6 @@ describe('AgentRegistryClient', () => {
         author: MOCK_AUTHOR,
         imageId: MOCK_IMAGE_ID,
         agentCodeHash: MOCK_CODE_HASH,
-        metadataURI: 'ipfs://QmTest',
         exists: true,
       });
     });
@@ -76,7 +75,7 @@ describe('AgentRegistryClient', () => {
         author: '0x0000000000000000000000000000000000000000',
         imageId: '0x0000000000000000000000000000000000000000000000000000000000000000',
         agentCodeHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-        metadataURI: '',
+        _deprecated: '',
         exists: false,
       });
 
@@ -111,7 +110,6 @@ describe('AgentRegistryClient', () => {
         salt: '0x0000000000000000000000000000000000000000000000000000000000000001',
         imageId: MOCK_IMAGE_ID,
         agentCodeHash: MOCK_CODE_HASH,
-        metadataURI: 'ipfs://QmTest',
       });
 
       expect(walletClient.writeContract).toHaveBeenCalledWith(
@@ -131,7 +129,6 @@ describe('AgentRegistryClient', () => {
           salt: '0x0000000000000000000000000000000000000000000000000000000000000001',
           imageId: MOCK_IMAGE_ID,
           agentCodeHash: MOCK_CODE_HASH,
-          metadataURI: 'ipfs://QmTest',
         }),
       ).rejects.toThrow('WalletClient required for write operations');
     });
@@ -146,14 +143,13 @@ describe('AgentRegistryClient', () => {
         agentId: MOCK_AGENT_ID,
         newImageId: MOCK_IMAGE_ID,
         newAgentCodeHash: MOCK_CODE_HASH,
-        newMetadataURI: 'ipfs://QmUpdated',
       });
 
       expect(walletClient.writeContract).toHaveBeenCalledWith(
         expect.objectContaining({
           address: REGISTRY_ADDRESS,
           functionName: 'update',
-          args: [MOCK_AGENT_ID, MOCK_IMAGE_ID, MOCK_CODE_HASH, 'ipfs://QmUpdated'],
+          args: [MOCK_AGENT_ID, MOCK_IMAGE_ID, MOCK_CODE_HASH],
         }),
       );
       expect(result).toBe(txHash);
@@ -166,7 +162,6 @@ describe('AgentRegistryClient', () => {
           agentId: MOCK_AGENT_ID,
           newImageId: MOCK_IMAGE_ID,
           newAgentCodeHash: MOCK_CODE_HASH,
-          newMetadataURI: 'ipfs://QmUpdated',
         }),
       ).rejects.toThrow('WalletClient required for write operations');
     });

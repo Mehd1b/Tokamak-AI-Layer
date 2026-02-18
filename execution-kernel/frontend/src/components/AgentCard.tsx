@@ -7,11 +7,10 @@ interface AgentCardProps {
   agentId: string;
   author: string;
   imageId: string;
-  metadataURI: string;
-  active: boolean;
+  exists: boolean;
 }
 
-export function AgentCard({ agentId, author, imageId, metadataURI, active }: AgentCardProps) {
+export function AgentCard({ agentId, author, imageId, exists }: AgentCardProps) {
   return (
     <Link href={`/agents/${agentId}`}>
       <div className="card-hover cursor-pointer group">
@@ -30,8 +29,8 @@ export function AgentCard({ agentId, author, imageId, metadataURI, active }: Age
               </svg>
             </div>
             <div>
-              <span className={active ? 'badge-success' : 'badge-error'}>
-                {active ? 'Active' : 'Inactive'}
+              <span className={exists ? 'badge-success' : 'badge-error'}>
+                {exists ? 'Active' : 'Inactive'}
               </span>
             </div>
           </div>
@@ -52,10 +51,6 @@ export function AgentCard({ agentId, author, imageId, metadataURI, active }: Age
           <div className="flex justify-between">
             <span className="text-gray-500">Image ID</span>
             <span>{truncateBytes32(imageId)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-500">Metadata</span>
-            <span className="truncate max-w-[150px]">{metadataURI || '-'}</span>
           </div>
         </div>
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import { Test, console2 } from "forge-std/Test.sol";
 import { KernelVault } from "../src/KernelVault.sol";
@@ -7,6 +7,7 @@ import { KernelExecutionVerifier } from "../src/KernelExecutionVerifier.sol";
 import { KernelOutputParser } from "../src/KernelOutputParser.sol";
 import { MockVerifier } from "./mocks/MockVerifier.sol";
 import { MockERC20 } from "./mocks/MockERC20.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /// @title KernelVaultTest
 /// @notice Comprehensive test suite for KernelVault
@@ -34,8 +35,13 @@ contract KernelVaultTest is Test {
         // Deploy mock RISC Zero verifier
         mockRiscZeroVerifier = new MockVerifier();
 
-        // Deploy KernelExecutionVerifier with mock
-        executionVerifier = new KernelExecutionVerifier(address(mockRiscZeroVerifier));
+        // Deploy KernelExecutionVerifier via proxy
+        KernelExecutionVerifier verifierImpl = new KernelExecutionVerifier();
+        ERC1967Proxy verifierProxy = new ERC1967Proxy(
+            address(verifierImpl),
+            abi.encodeCall(KernelExecutionVerifier.initialize, (address(mockRiscZeroVerifier), address(this)))
+        );
+        executionVerifier = KernelExecutionVerifier(address(verifierProxy));
 
         // Deploy mock ERC20 token
         token = new MockERC20("Test Token", "TEST", 18);

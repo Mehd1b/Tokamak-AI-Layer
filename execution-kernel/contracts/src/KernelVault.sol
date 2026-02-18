@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import { IKernelExecutionVerifier } from "./interfaces/IKernelExecutionVerifier.sol";
 import { IERC20 } from "./interfaces/IERC20.sol";

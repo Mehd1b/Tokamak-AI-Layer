@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import { Test, console2 } from "forge-std/Test.sol";
 import { KernelVault } from "../src/KernelVault.sol";

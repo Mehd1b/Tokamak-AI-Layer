@@ -3,10 +3,10 @@
 import { truncateBytes32 } from '@/lib/utils';
 
 interface ExecutionEvent {
-  nonce: string;
+  executionNonce: string;
   agentId: string;
-  oldStateRoot: string;
-  newStateRoot: string;
+  actionCommitment: string;
+  actionCount: string;
   transactionHash?: string;
   blockNumber?: string;
 }
@@ -27,18 +27,18 @@ export function ExecutionHistoryTable({ executions }: { executions: ExecutionEve
           <tr className="border-b border-white/10">
             <th className="text-left text-gray-500 py-3 px-4 text-xs uppercase tracking-wider">Nonce</th>
             <th className="text-left text-gray-500 py-3 px-4 text-xs uppercase tracking-wider">Agent ID</th>
-            <th className="text-left text-gray-500 py-3 px-4 text-xs uppercase tracking-wider">Old State</th>
-            <th className="text-left text-gray-500 py-3 px-4 text-xs uppercase tracking-wider">New State</th>
+            <th className="text-left text-gray-500 py-3 px-4 text-xs uppercase tracking-wider">Action Commitment</th>
+            <th className="text-left text-gray-500 py-3 px-4 text-xs uppercase tracking-wider">Actions</th>
             <th className="text-left text-gray-500 py-3 px-4 text-xs uppercase tracking-wider">Tx</th>
           </tr>
         </thead>
         <tbody>
           {executions.map((exec, i) => (
             <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-              <td className="py-3 px-4 text-[#A855F7]">#{exec.nonce}</td>
+              <td className="py-3 px-4 text-[#A855F7]">#{exec.executionNonce}</td>
               <td className="py-3 px-4 text-gray-300">{truncateBytes32(exec.agentId)}</td>
-              <td className="py-3 px-4 text-gray-400">{truncateBytes32(exec.oldStateRoot)}</td>
-              <td className="py-3 px-4 text-gray-400">{truncateBytes32(exec.newStateRoot)}</td>
+              <td className="py-3 px-4 text-gray-400">{truncateBytes32(exec.actionCommitment)}</td>
+              <td className="py-3 px-4 text-gray-400">{exec.actionCount}</td>
               <td className="py-3 px-4">
                 {exec.transactionHash ? (
                   <a

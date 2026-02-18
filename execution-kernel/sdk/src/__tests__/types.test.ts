@@ -45,13 +45,13 @@ describe('Types and Constants', () => {
 
     it('matches deployed addresses', () => {
       expect(OPTIMISM_SEPOLIA_ADDRESSES.agentRegistry).toBe(
-        '0xBa1DA5f7e12F2c8614696D019A2eb48918E1f2AA',
+        '0xED27f8fbB7D576f02D516d01593eEfBaAfe4b168',
       );
       expect(OPTIMISM_SEPOLIA_ADDRESSES.vaultFactory).toBe(
-        '0x3bB48a146bBC50F8990c86787a41185A6fC474d2',
+        '0x580e55fDE87fFC1cF1B6a446d6DBf8068EB07b8C',
       );
       expect(OPTIMISM_SEPOLIA_ADDRESSES.kernelExecutionVerifier).toBe(
-        '0x9Ef5bAB590AFdE8036D57b89ccD2947D4E3b1EFA',
+        '0x1eB41537037fB771CBA8Cd088C7c806936325eB5',
       );
     });
   });

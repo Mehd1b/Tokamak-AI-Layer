@@ -1,37 +1,90 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import { IVaultFactory } from "./interfaces/IVaultFactory.sol";
 import { IAgentRegistry } from "./interfaces/IAgentRegistry.sol";
 import { KernelVault } from "./KernelVault.sol";
+import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 /// @title VaultFactory
 /// @notice Factory for deploying KernelVault instances with CREATE2
 /// @dev Deploys vaults with imageId pinned from AgentRegistry at deployment time.
 ///      Registry updates do NOT affect already-deployed vaults.
-contract VaultFactory is IVaultFactory {
-    // ============ Immutables ============
+///      Uses UUPS proxy pattern for upgradeability.
+contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
+    // ============ State ============
 
     /// @notice The AgentRegistry contract
-    IAgentRegistry public immutable _registry;
+    IAgentRegistry public _registry;
 
     /// @notice The KernelExecutionVerifier contract address
-    address public immutable _verifier;
-
-    // ============ State ============
+    address public _verifier;
 
     /// @notice Mapping of deployed vault addresses
     mapping(address => bool) public isDeployedVault;
 
+    /// @notice Ordered list of all deployed vault addresses
+    address[] private _deployedVaults;
+
+    /// @notice Contract owner (authorized to upgrade)
+    address private _owner;
+
+    /// @notice Storage gap for future upgrades
+    uint256[46] private __gap;
+
+    // ============ Errors ============
+
+    /// @notice Caller is not the owner
+    error OwnableUnauthorizedAccount(address account);
+
+    // ============ Events ============
+
+    /// @notice Emitted when ownership is transferred
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+    // ============ Modifiers ============
+
+    /// @notice Restricts function access to the contract owner
+    modifier onlyOwner() {
+        if (msg.sender != _owner) revert OwnableUnauthorizedAccount(msg.sender);
+        _;
+    }
+
     // ============ Constructor ============
 
-    /// @notice Initialize the factory
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    // ============ Initializer ============
+
+    /// @notice Initialize the factory (called once via proxy)
     /// @param registry_ The AgentRegistry contract address
     /// @param verifier_ The KernelExecutionVerifier contract address
-    constructor(address registry_, address verifier_) {
+    /// @param initialOwner The address that will own this contract
+    function initialize(address registry_, address verifier_, address initialOwner)
+        external
+        initializer
+    {
         _registry = IAgentRegistry(registry_);
         _verifier = verifier_;
+        _owner = initialOwner;
+        emit OwnershipTransferred(address(0), initialOwner);
     }
+
+    // ============ Owner Functions ============
+
+    /// @notice Returns the current owner
+    function owner() external view returns (address) {
+        return _owner;
+    }
+
+    // ============ UUPS ============
+
+    /// @notice Authorize upgrade (only owner)
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     // ============ External Functions ============
 
@@ -47,13 +100,13 @@ contract VaultFactory is IVaultFactory {
 
     /// @inheritdoc IVaultFactory
     function computeVaultAddress(
-        address owner,
+        address owner_,
         bytes32 agentId,
         address asset,
         bytes32 userSalt
     ) external view returns (address vault, bytes32 salt) {
         // Compute CREATE2 salt
-        salt = _computeSalt(owner, agentId, asset, userSalt);
+        salt = _computeSalt(owner_, agentId, asset, userSalt);
 
         // Get agent info to include imageId in bytecode
         IAgentRegistry.AgentInfo memory agentInfo = _registry.get(agentId);
@@ -111,27 +164,43 @@ contract VaultFactory is IVaultFactory {
 
         // Track deployment
         isDeployedVault[vault] = true;
+        _deployedVaults.push(vault);
 
         emit VaultDeployed(vault, msg.sender, agentId, asset, agentInfo.imageId, salt);
 
         return vault;
     }
 
+    /// @inheritdoc IVaultFactory
+    function vaultCount() external view returns (uint256) {
+        return _deployedVaults.length;
+    }
+
+    /// @inheritdoc IVaultFactory
+    function vaultAt(uint256 index) external view returns (address) {
+        return _deployedVaults[index];
+    }
+
+    /// @inheritdoc IVaultFactory
+    function getAllVaults() external view returns (address[] memory) {
+        return _deployedVaults;
+    }
+
     // ============ Internal Functions ============
 
     /// @notice Compute CREATE2 salt from deployment parameters
-    /// @param owner The vault owner
+    /// @param owner_ The vault owner
     /// @param agentId The agent ID
     /// @param asset The asset address
     /// @param userSalt User-provided salt for uniqueness
     /// @return The CREATE2 salt
     function _computeSalt(
-        address owner,
+        address owner_,
         bytes32 agentId,
         address asset,
         bytes32 userSalt
     ) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(owner, agentId, asset, userSalt));
+        return keccak256(abi.encodePacked(owner_, agentId, asset, userSalt));
     }
 
     /// @notice Get the creation bytecode for KernelVault with constructor arguments

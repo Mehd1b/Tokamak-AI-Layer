@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import { Test, console2 } from "forge-std/Test.sol";
 import { KernelExecutionVerifier } from "../src/KernelExecutionVerifier.sol";
 import { MockVerifier, RevertingVerifier } from "./mocks/MockVerifier.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /// @title KernelExecutionVerifierTest
 /// @notice Comprehensive test suite for KernelExecutionVerifier
@@ -22,7 +23,12 @@ contract KernelExecutionVerifierTest is Test {
 
     function setUp() public {
         mockVerifier = new MockVerifier();
-        verifierContract = new KernelExecutionVerifier(address(mockVerifier));
+        KernelExecutionVerifier impl = new KernelExecutionVerifier();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(impl),
+            abi.encodeCall(KernelExecutionVerifier.initialize, (address(mockVerifier), address(this)))
+        );
+        verifierContract = KernelExecutionVerifier(address(proxy));
     }
 
     // ============ Helper Functions ============
@@ -261,8 +267,13 @@ contract KernelExecutionVerifierTest is Test {
     function test_verifyAndParseWithImageId_verifierReverts() public {
         // Deploy with reverting verifier
         RevertingVerifier revertingVerifier = new RevertingVerifier();
+        KernelExecutionVerifier revertImpl = new KernelExecutionVerifier();
+        ERC1967Proxy revertProxy = new ERC1967Proxy(
+            address(revertImpl),
+            abi.encodeCall(KernelExecutionVerifier.initialize, (address(revertingVerifier), address(this)))
+        );
         KernelExecutionVerifier contractWithRevertingVerifier =
-            new KernelExecutionVerifier(address(revertingVerifier));
+            KernelExecutionVerifier(address(revertProxy));
 
         bytes memory journal = _buildValidJournal();
         bytes memory seal = hex"deadbeef";

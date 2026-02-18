@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 /// @title MockYieldSource
 /// @notice Mock yield source for testing that returns 10% yield on withdrawals

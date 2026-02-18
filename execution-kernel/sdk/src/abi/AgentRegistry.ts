@@ -1,6 +1,23 @@
 export const AgentRegistryABI = [
   {
     type: 'function',
+    name: 'owner',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'upgradeToAndCall',
+    inputs: [
+      { name: 'newImplementation', type: 'address' },
+      { name: 'data', type: 'bytes' },
+    ],
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
     name: 'computeAgentId',
     inputs: [
       { name: 'author', type: 'address' },
@@ -16,7 +33,6 @@ export const AgentRegistryABI = [
       { name: 'salt', type: 'bytes32' },
       { name: 'imageId', type: 'bytes32' },
       { name: 'agentCodeHash', type: 'bytes32' },
-      { name: 'metadataURI', type: 'string' },
     ],
     outputs: [{ name: 'agentId', type: 'bytes32' }],
     stateMutability: 'nonpayable',
@@ -28,7 +44,6 @@ export const AgentRegistryABI = [
       { name: 'agentId', type: 'bytes32' },
       { name: 'newImageId', type: 'bytes32' },
       { name: 'newAgentCodeHash', type: 'bytes32' },
-      { name: 'newMetadataURI', type: 'string' },
     ],
     outputs: [],
     stateMutability: 'nonpayable',
@@ -45,7 +60,7 @@ export const AgentRegistryABI = [
           { name: 'author', type: 'address' },
           { name: 'imageId', type: 'bytes32' },
           { name: 'agentCodeHash', type: 'bytes32' },
-          { name: 'metadataURI', type: 'string' },
+          { name: '_deprecated', type: 'string' },
           { name: 'exists', type: 'bool' },
         ],
       },
@@ -67,7 +82,6 @@ export const AgentRegistryABI = [
       { name: 'author', type: 'address', indexed: true },
       { name: 'imageId', type: 'bytes32', indexed: true },
       { name: 'agentCodeHash', type: 'bytes32', indexed: false },
-      { name: 'metadataURI', type: 'string', indexed: false },
     ],
   },
   {
@@ -77,7 +91,6 @@ export const AgentRegistryABI = [
       { name: 'agentId', type: 'bytes32', indexed: true },
       { name: 'newImageId', type: 'bytes32', indexed: true },
       { name: 'newAgentCodeHash', type: 'bytes32', indexed: false },
-      { name: 'newMetadataURI', type: 'string', indexed: false },
     ],
   },
   {

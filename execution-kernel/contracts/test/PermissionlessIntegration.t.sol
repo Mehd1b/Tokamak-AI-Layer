@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import { Test, console2 } from "forge-std/Test.sol";
 import { VaultFactory } from "../src/VaultFactory.sol";
@@ -10,6 +10,7 @@ import { MockKernelExecutionVerifier } from "./mocks/MockKernelExecutionVerifier
 import { MockERC20 } from "./mocks/MockERC20.sol";
 import { IAgentRegistry } from "../src/interfaces/IAgentRegistry.sol";
 import { IVaultFactory } from "../src/interfaces/IVaultFactory.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /// @title Permissionless Integration Tests
 /// @notice Full flow tests for the permissionless agent registry and vault factory
@@ -27,7 +28,6 @@ contract PermissionlessIntegrationTest is Test {
     bytes32 public constant IMAGE_ID = bytes32(uint256(0x1234));
     bytes32 public constant CODE_HASH = bytes32(uint256(0xC0DE));
     bytes32 public constant USER_SALT = bytes32(uint256(0xABCD));
-    string public constant METADATA_URI = "ipfs://QmTest";
 
     bytes32 public agentId;
     address public vaultAddr;
@@ -40,16 +40,28 @@ contract PermissionlessIntegrationTest is Test {
         // Deploy mock verifier
         mockVerifier = new MockKernelExecutionVerifier();
 
-        // Deploy contracts
-        registry = new AgentRegistry();
-        factory = new VaultFactory(address(registry), address(mockVerifier));
+        // Deploy AgentRegistry via proxy
+        AgentRegistry registryImpl = new AgentRegistry();
+        ERC1967Proxy registryProxy = new ERC1967Proxy(
+            address(registryImpl),
+            abi.encodeCall(AgentRegistry.initialize, (address(this)))
+        );
+        registry = AgentRegistry(address(registryProxy));
+
+        // Deploy VaultFactory via proxy
+        VaultFactory factoryImpl = new VaultFactory();
+        ERC1967Proxy factoryProxy = new ERC1967Proxy(
+            address(factoryImpl),
+            abi.encodeCall(VaultFactory.initialize, (address(registry), address(mockVerifier), address(this)))
+        );
+        factory = VaultFactory(address(factoryProxy));
 
         // Deploy mock token
         token = new MockERC20("Test Token", "TEST", 18);
 
         // Step 1: Register agent in AgentRegistry (permissionless)
         vm.prank(author);
-        agentId = registry.register(SALT, IMAGE_ID, CODE_HASH, METADATA_URI);
+        agentId = registry.register(SALT, IMAGE_ID, CODE_HASH);
 
         // Step 2: Deploy vault via VaultFactory (only author can deploy)
         vm.prank(author);
@@ -140,7 +152,7 @@ contract PermissionlessIntegrationTest is Test {
         // Author updates the agent in registry
         bytes32 newImageId = bytes32(uint256(0x5678));
         vm.prank(author);
-        registry.update(agentId, newImageId, CODE_HASH, METADATA_URI);
+        registry.update(agentId, newImageId, CODE_HASH);
 
         // Verify registry is updated
         IAgentRegistry.AgentInfo memory info = registry.get(agentId);
@@ -193,7 +205,7 @@ contract PermissionlessIntegrationTest is Test {
         // Author updates the agent in registry
         bytes32 newImageId = bytes32(uint256(0x5678));
         vm.prank(author);
-        registry.update(agentId, newImageId, CODE_HASH, METADATA_URI);
+        registry.update(agentId, newImageId, CODE_HASH);
 
         // Author deploys a NEW vault (different salt)
         bytes32 newUserSalt = bytes32(uint256(0xBEEF));
@@ -227,8 +239,7 @@ contract PermissionlessIntegrationTest is Test {
         bytes32 agent2Id = registry.register(
             bytes32(uint256(0x2)),
             agent2ImageId,
-            agent2CodeHash,
-            "ipfs://QmTest2"
+            agent2CodeHash
         );
 
         // Author deploys vault for second agent
@@ -257,8 +268,7 @@ contract PermissionlessIntegrationTest is Test {
         bytes32 newAgentId = registry.register(
             bytes32(uint256(0x123)),
             bytes32(uint256(0xABCD)),
-            bytes32(uint256(0xEF01)),
-            "ipfs://QmRandom"
+            bytes32(uint256(0xEF01))
         );
 
         assertTrue(registry.agentExists(newAgentId), "Agent should be registered");
@@ -290,8 +300,7 @@ contract PermissionlessIntegrationTest is Test {
         bytes32 newAgentId = registry.register(
             bytes32(uint256(0x456)),
             bytes32(uint256(0x7890)),
-            bytes32(uint256(0xABCD)),
-            "ipfs://QmNewAgent"
+            bytes32(uint256(0xABCD))
         );
 
         // New author can deploy vault for their agent

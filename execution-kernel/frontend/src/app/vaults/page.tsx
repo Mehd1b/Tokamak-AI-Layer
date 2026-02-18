@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useDeployVault } from '@/hooks/useVaultFactory';
-import { useIsDeployedVault } from '@/hooks/useVaultFactory';
+import { useDeployVault, useIsDeployedVault, useDeployedVaultsList } from '@/hooks/useVaultFactory';
+import { VaultCard } from '@/components/VaultCard';
 import { isValidBytes32 } from '@/lib/utils';
 import Link from 'next/link';
 
@@ -10,16 +10,17 @@ export default function VaultsPage() {
   const [showDeploy, setShowDeploy] = useState(false);
   const [agentId, setAgentId] = useState('');
   const [asset, setAsset] = useState('');
-  const [imageId, setImageId] = useState('');
+  const [userSalt, setUserSalt] = useState('');
   const [searchAddress, setSearchAddress] = useState('');
   const { deploy, isPending, isConfirming, isSuccess, hash, error } = useDeployVault();
+  const { data: deployedVaults, isLoading: isLoadingVaults, error: vaultsError } = useDeployedVaultsList();
 
   const vaultHex = searchAddress.startsWith('0x') && searchAddress.length === 42
     ? (searchAddress as `0x${string}`)
     : undefined;
   const { data: isDeployed, isLoading: isCheckingVault } = useIsDeployedVault(vaultHex);
 
-  const canDeploy = isValidBytes32(agentId) && asset.startsWith('0x') && asset.length === 42 && isValidBytes32(imageId);
+  const canDeploy = isValidBytes32(agentId) && asset.startsWith('0x') && asset.length === 42 && isValidBytes32(userSalt);
 
   const handleDeploy = (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +28,7 @@ export default function VaultsPage() {
     deploy(
       agentId as `0x${string}`,
       asset as `0x${string}`,
-      imageId as `0x${string}`,
+      userSalt as `0x${string}`,
     );
   };
 
@@ -122,11 +123,11 @@ export default function VaultsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1 font-mono">Trusted Image ID (bytes32)</label>
+              <label className="block text-sm text-gray-400 mb-1 font-mono">Salt (bytes32)</label>
               <input
                 type="text"
-                value={imageId}
-                onChange={(e) => setImageId(e.target.value)}
+                value={userSalt}
+                onChange={(e) => setUserSalt(e.target.value)}
                 placeholder="0x..."
                 className="input-dark font-mono"
               />
@@ -158,19 +159,55 @@ export default function VaultsPage() {
         </div>
       )}
 
-      {/* Empty state */}
+      {/* On-chain deployed vaults */}
       {!vaultHex && !showDeploy && (
-        <div className="card text-center py-16">
-          <div className="mb-4">
-            <svg viewBox="0 0 64 64" className="w-16 h-16 mx-auto opacity-30" fill="none">
-              <rect x="12" y="16" width="40" height="32" rx="4" stroke="#A855F7" strokeWidth="1.5" strokeOpacity="0.5" />
-              <circle cx="32" cy="32" r="10" stroke="#A855F7" strokeWidth="1" strokeOpacity="0.4" />
-              <circle cx="32" cy="32" r="3" fill="#A855F7" fillOpacity="0.5" />
-            </svg>
-          </div>
-          <p className="text-gray-500 font-mono text-sm mb-2">Enter a vault address to look up</p>
-          <p className="text-gray-600 font-mono text-xs">or deploy a new vault above</p>
-        </div>
+        <>
+          {isLoadingVaults && (
+            <div className="card text-center py-12">
+              <div className="animate-pulse text-[#A855F7] font-mono text-sm">Fetching on-chain vaults...</div>
+            </div>
+          )}
+
+          {vaultsError && (
+            <div className="card text-center py-12 mb-8">
+              <p className="text-red-400 font-mono text-sm">Failed to fetch vaults: {vaultsError.message.slice(0, 120)}</p>
+            </div>
+          )}
+
+          {deployedVaults && deployedVaults.length > 0 && (
+            <div>
+              <h2 className="text-sm font-mono text-gray-500 uppercase tracking-wider mb-4">
+                Deployed Vaults ({deployedVaults.length} vault{deployedVaults.length !== 1 ? 's' : ''})
+              </h2>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {deployedVaults.map((v) => (
+                  <VaultCard
+                    key={v.address}
+                    address={v.address}
+                    agentId={v.agentId}
+                    asset={v.asset}
+                    totalAssets={v.totalAssets}
+                    totalShares={v.totalShares}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {deployedVaults && deployedVaults.length === 0 && (
+            <div className="card text-center py-16">
+              <div className="mb-4">
+                <svg viewBox="0 0 64 64" className="w-16 h-16 mx-auto opacity-30" fill="none">
+                  <rect x="12" y="16" width="40" height="32" rx="4" stroke="#A855F7" strokeWidth="1.5" strokeOpacity="0.5" />
+                  <circle cx="32" cy="32" r="10" stroke="#A855F7" strokeWidth="1" strokeOpacity="0.4" />
+                  <circle cx="32" cy="32" r="3" fill="#A855F7" fillOpacity="0.5" />
+                </svg>
+              </div>
+              <p className="text-gray-500 font-mono text-sm mb-2">No vaults deployed yet</p>
+              <p className="text-gray-600 font-mono text-xs">Deploy the first vault above</p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

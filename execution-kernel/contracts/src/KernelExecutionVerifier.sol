@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import { IRiscZeroVerifier } from "./interfaces/IRiscZeroVerifier.sol";
+import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 /// @title KernelExecutionVerifier
 /// @notice Verifies RISC Zero proofs of zkVM kernel execution and parses KernelJournalV1
@@ -9,7 +11,8 @@ import { IRiscZeroVerifier } from "./interfaces/IRiscZeroVerifier.sol";
 ///      1. Verifies RISC Zero proofs using an external verifier
 ///      2. Parses and validates the KernelJournalV1 binary format (209 bytes)
 ///      3. Enforces protocol invariants (version checks, execution status)
-contract KernelExecutionVerifier {
+///      Uses UUPS proxy pattern for upgradeability.
+contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
     // ============ Constants ============
 
     /// @notice Expected protocol version in the journal
@@ -27,7 +30,13 @@ contract KernelExecutionVerifier {
     // ============ State ============
 
     /// @notice RISC Zero verifier contract
-    IRiscZeroVerifier public immutable verifier;
+    IRiscZeroVerifier public verifier;
+
+    /// @notice Contract owner (authorized to upgrade)
+    address private _owner;
+
+    /// @notice Storage gap for future upgrades
+    uint256[48] private __gap;
 
     // ============ Errors ============
 
@@ -46,6 +55,14 @@ contract KernelExecutionVerifier {
     /// @notice Zero imageId provided to verifyAndParseWithImageId
     error ZeroImageId();
 
+    /// @notice Caller is not the owner
+    error OwnableUnauthorizedAccount(address account);
+
+    // ============ Events ============
+
+    /// @notice Emitted when ownership is transferred
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
     // ============ Structs ============
 
     /// @notice Parsed fields from KernelJournalV1
@@ -59,13 +76,43 @@ contract KernelExecutionVerifier {
         bytes32 actionCommitment;
     }
 
+    // ============ Modifiers ============
+
+    /// @notice Restricts function access to the contract owner
+    modifier onlyOwner() {
+        if (msg.sender != _owner) revert OwnableUnauthorizedAccount(msg.sender);
+        _;
+    }
+
     // ============ Constructor ============
 
-    /// @notice Initialize the verifier with a RISC Zero verifier address
-    /// @param _verifier Address of the RISC Zero verifier contract
-    constructor(address _verifier) {
-        verifier = IRiscZeroVerifier(_verifier);
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
     }
+
+    // ============ Initializer ============
+
+    /// @notice Initialize the verifier (called once via proxy)
+    /// @param _verifier Address of the RISC Zero verifier contract
+    /// @param initialOwner The address that will own this contract
+    function initialize(address _verifier, address initialOwner) external initializer {
+        verifier = IRiscZeroVerifier(_verifier);
+        _owner = initialOwner;
+        emit OwnershipTransferred(address(0), initialOwner);
+    }
+
+    // ============ Owner Functions ============
+
+    /// @notice Returns the current owner
+    function owner() external view returns (address) {
+        return _owner;
+    }
+
+    // ============ UUPS ============
+
+    /// @notice Authorize upgrade (only owner)
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     // ============ Core Verification ============
 

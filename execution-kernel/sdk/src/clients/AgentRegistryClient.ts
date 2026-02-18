@@ -34,14 +34,13 @@ export class AgentRegistryClient {
     salt: `0x${string}`;
     imageId: `0x${string}`;
     agentCodeHash: `0x${string}`;
-    metadataURI: string;
   }): Promise<{ agentId: `0x${string}`; txHash: `0x${string}` }> {
     this.requireWallet();
     const txHash = await this.walletClient!.writeContract({
       address: this.address,
       abi: AgentRegistryABI,
       functionName: 'register',
-      args: [params.salt, params.imageId, params.agentCodeHash, params.metadataURI],
+      args: [params.salt, params.imageId, params.agentCodeHash],
     });
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
     // Parse AgentRegistered event to get agentId
@@ -54,14 +53,13 @@ export class AgentRegistryClient {
     agentId: `0x${string}`;
     newImageId: `0x${string}`;
     newAgentCodeHash: `0x${string}`;
-    newMetadataURI: string;
   }): Promise<`0x${string}`> {
     this.requireWallet();
     const txHash = await this.walletClient!.writeContract({
       address: this.address,
       abi: AgentRegistryABI,
       functionName: 'update',
-      args: [params.agentId, params.newImageId, params.newAgentCodeHash, params.newMetadataURI],
+      args: [params.agentId, params.newImageId, params.newAgentCodeHash],
     });
     return txHash;
   }
@@ -78,7 +76,6 @@ export class AgentRegistryClient {
       author: result.author,
       imageId: result.imageId,
       agentCodeHash: result.agentCodeHash,
-      metadataURI: result.metadataURI,
       exists: result.exists,
     };
   }

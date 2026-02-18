@@ -87,7 +87,6 @@ describe('ExecutionKernelClient', () => {
         salt: '0x0000000000000000000000000000000000000000000000000000000000000001',
         imageId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         agentCodeHash: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-        metadataURI: 'ipfs://QmTest',
       });
 
       expect(result.txHash).toBe(txHash);
@@ -108,7 +107,7 @@ describe('ExecutionKernelClient', () => {
         author: '0x1111111111111111111111111111111111111111',
         imageId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         agentCodeHash: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-        metadataURI: 'ipfs://QmTest',
+        _deprecated: '',
         exists: true,
       });
 

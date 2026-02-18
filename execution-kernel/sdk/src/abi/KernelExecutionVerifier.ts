@@ -1,6 +1,23 @@
 export const KernelExecutionVerifierABI = [
   {
     type: 'function',
+    name: 'owner',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'upgradeToAndCall',
+    inputs: [
+      { name: 'newImplementation', type: 'address' },
+      { name: 'data', type: 'bytes' },
+    ],
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
     name: 'verifyAndParseWithImageId',
     inputs: [
       { name: 'expectedImageId', type: 'bytes32' },

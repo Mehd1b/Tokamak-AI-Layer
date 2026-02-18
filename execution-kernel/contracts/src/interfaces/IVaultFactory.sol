@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 /// @title IVaultFactory
 /// @notice Interface for CREATE2 vault deployment factory
@@ -41,6 +41,19 @@ interface IVaultFactory {
     /// @param vault The address to check
     /// @return True if the vault was deployed by this factory
     function isDeployedVault(address vault) external view returns (bool);
+
+    /// @notice Get the total number of deployed vaults
+    /// @return The number of deployed vaults
+    function vaultCount() external view returns (uint256);
+
+    /// @notice Get the vault address at a specific index
+    /// @param index The index in the vault list
+    /// @return The vault address at that index
+    function vaultAt(uint256 index) external view returns (address);
+
+    /// @notice Get all deployed vault addresses
+    /// @return All vault addresses as an array
+    function getAllVaults() external view returns (address[] memory);
 
     /// @notice Emitted when a vault is deployed
     event VaultDeployed(

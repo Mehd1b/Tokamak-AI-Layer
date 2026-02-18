@@ -117,7 +117,7 @@ const features = [
     icon: AgentIcon,
     title: 'Permissionless Agents',
     description:
-      'Register any agent with a codehash and zkVM image ID. Fully open and composable.',
+      'Register any agent with an agent code hash and zkVM image ID. Fully open and composable.',
     href: '/agents',
     number: '03',
   },
@@ -135,7 +135,7 @@ const howItWorks = [
   {
     step: '01',
     title: 'Register Agent',
-    description: 'Deploy your agent with a codehash and RISC Zero zkVM image ID to the on-chain registry.',
+    description: 'Deploy your agent with an agent code hash and RISC Zero zkVM image ID to the on-chain registry.',
   },
   {
     step: '02',
