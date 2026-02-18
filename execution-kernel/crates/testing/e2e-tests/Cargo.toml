@@ -17,10 +17,12 @@ kernel-sdk = { path = "../../sdk/kernel-sdk" }
 constraints = { path = "../../protocol/constraints" }
 
 # Agent code hash for input construction
-example-yield-agent = { path = "../../agents/examples/example-yield-agent" }
+example-yield-agent = { path = "../../agents/example-yield-agent/agent" }
+defi-yield-farmer = { path = "../../agents/defi-yield-farmer/agent", optional = true }
 
 # Methods crate provides the guest ELF and IMAGE_ID
-risc0-methods = { path = "../../runtime/risc0-methods", optional = true }
+risc0-methods = { path = "../../agents/example-yield-agent/risc0-methods", optional = true }
+risc0-methods-defi = { path = "../../agents/defi-yield-farmer/risc0-methods", optional = true }
 
 # RISC Zero prover and verifier (host-side)
 risc0-zkvm = { version = "3.0", default-features = false, optional = true }
@@ -35,7 +37,7 @@ dotenvy = { version = "0.15", optional = true }
 kernel-core = { path = "../../protocol/kernel-core" }
 kernel-sdk = { path = "../../sdk/kernel-sdk" }
 constraints = { path = "../../protocol/constraints" }
-example-yield-agent = { path = "../../agents/examples/example-yield-agent" }
+example-yield-agent = { path = "../../agents/example-yield-agent/agent" }
 
 [dependencies.hex]
 version = "0.4"
@@ -53,4 +55,15 @@ phase3-e2e = [
     "dep:tokio",
     "dep:dotenvy",
     "risc0-e2e",
+]
+
+# Enable this feature for defi-yield-farmer E2E tests
+defi-e2e = [
+    "dep:defi-yield-farmer",
+    "dep:risc0-methods-defi",
+    "dep:risc0-zkvm",
+    "risc0-zkvm/prove",
+    "dep:alloy",
+    "dep:tokio",
+    "dep:dotenvy",
 ]

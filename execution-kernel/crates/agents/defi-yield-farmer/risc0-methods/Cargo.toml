@@ -1,0 +1,12 @@
+[package]
+name = "risc0-methods-defi"
+version = "0.1.0"
+edition = "2021"
+description = "RISC Zero methods crate for defi-yield-farmer agent"
+license = "Apache-2.0"
+
+[build-dependencies]
+risc0-build = { version = "3.0", default-features = false }
+
+[package.metadata.risc0]
+methods = ["zkvm-guest-defi"]

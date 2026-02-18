@@ -1817,6 +1817,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7a1e2f27636f116493b8b860f5546edb47c8d8f8ea73e1d2a20be88e28d1fea"
 
 [[package]]
+name = "defi-yield-farmer"
+version = "0.1.0"
+dependencies = [
+ "kernel-sdk",
+ "sha2",
+]
+
+[[package]]
 name = "der"
 version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2052,12 +2060,14 @@ version = "0.1.0"
 dependencies = [
  "alloy",
  "constraints",
+ "defi-yield-farmer",
  "dotenvy",
  "example-yield-agent",
  "hex",
  "kernel-core",
  "kernel-sdk",
  "risc0-methods",
+ "risc0-methods-defi",
  "risc0-zkvm",
  "tokio",
 ]
@@ -3125,6 +3135,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "kernel-guest-binding-defi-yield"
+version = "0.1.0"
+dependencies = [
+ "constraints",
+ "defi-yield-farmer",
+ "kernel-core",
+ "kernel-guest",
+ "kernel-sdk",
+]
+
+[[package]]
 name = "kernel-guest-binding-yield"
 version = "0.1.0"
 dependencies = [
@@ -3140,9 +3161,11 @@ name = "kernel-host-tests"
 version = "0.1.0"
 dependencies = [
  "constraints",
+ "defi-yield-farmer",
  "example-yield-agent",
  "kernel-core",
  "kernel-guest",
+ "kernel-guest-binding-defi-yield",
  "kernel-guest-binding-yield",
  "kernel-sdk",
  "serde",
@@ -4578,6 +4601,13 @@ dependencies = [
 
 [[package]]
 name = "risc0-methods"
+version = "0.1.0"
+dependencies = [
+ "risc0-build",
+]
+
+[[package]]
+name = "risc0-methods-defi"
 version = "0.1.0"
 dependencies = [
  "risc0-build",

@@ -13,7 +13,7 @@ kernel-guest = { path = "../../../runtime/kernel-guest" }
 kernel-sdk = { path = "../../../sdk/kernel-sdk" }
 kernel-core = { path = "../../../protocol/kernel-core", default-features = false }
 constraints = { path = "../../../protocol/constraints" }
-defi-yield-farmer = { path = "../../examples/defi-yield-farmer" }
+defi-yield-farmer = { path = "../agent" }
 
 [features]
 default = []

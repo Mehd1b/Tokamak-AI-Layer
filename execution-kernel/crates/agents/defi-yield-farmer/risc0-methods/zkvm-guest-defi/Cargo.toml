@@ -1,0 +1,23 @@
+# RISC Zero Guest Wrapper for defi-yield-farmer agent
+#
+# Minimal wrapper that compiles the defi-yield-farmer agent
+# as a RISC Zero zkVM guest program.
+
+[package]
+name = "zkvm-guest-defi"
+version = "0.1.0"
+edition = "2021"
+
+# Required for risc0-build to recognize this as a standalone guest
+[workspace]
+
+[dependencies]
+kernel-guest-binding-defi-yield = { path = "../../binding" }
+risc0-zkvm = { version = "3.0", default-features = false, features = ["std"] }
+
+[features]
+default = []
+
+[profile.release]
+debug = 1
+lto = true

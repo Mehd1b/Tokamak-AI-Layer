@@ -32,6 +32,10 @@
 #[cfg(feature = "phase3-e2e")]
 pub mod phase3_yield;
 
+// DeFi Yield Farmer E2E Tests
+#[cfg(feature = "defi-e2e")]
+pub mod defi_e2e;
+
 use kernel_core::{
     compute_action_commitment, AgentOutput, CanonicalEncode, KernelInputV1, KERNEL_VERSION,
     PROTOCOL_VERSION,

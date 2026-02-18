@@ -1592,10 +1592,11 @@ mod defi_yield_farmer_tests {
 
     use crate::DEFI_AGENT_CODE_HASH;
 
-    /// Build 69-byte opaque input for the DeFi yield farmer agent.
+    /// Build 89-byte opaque input for the DeFi yield farmer agent.
     fn make_defi_opaque_input(
         lending_pool: [u8; 20],
         asset_token: [u8; 20],
+        vault_address: [u8; 20],
         vault_balance: u64,
         supplied_amount: u64,
         supply_rate_bps: u32,
@@ -1603,9 +1604,10 @@ mod defi_yield_farmer_tests {
         target_utilization_bps: u32,
         action_flag: u8,
     ) -> Vec<u8> {
-        let mut input = Vec::with_capacity(69);
+        let mut input = Vec::with_capacity(89);
         input.extend_from_slice(&lending_pool);
         input.extend_from_slice(&asset_token);
+        input.extend_from_slice(&vault_address);
         input.extend_from_slice(&vault_balance.to_le_bytes());
         input.extend_from_slice(&supplied_amount.to_le_bytes());
         input.extend_from_slice(&supply_rate_bps.to_le_bytes());
@@ -1635,6 +1637,7 @@ mod defi_yield_farmer_tests {
         let opaque = make_defi_opaque_input(
             [0x11u8; 20], // lending_pool
             [0x22u8; 20], // asset_token
+            [0x33u8; 20], // vault_address
             1_000_000,    // vault_balance
             0,            // supplied_amount
             500,          // supply_rate: 5%
@@ -1664,6 +1667,7 @@ mod defi_yield_farmer_tests {
         let opaque = make_defi_opaque_input(
             [0x11u8; 20],
             [0x22u8; 20],
+            [0x33u8; 20],
             200_000,  // vault_balance
             800_000,  // supplied_amount
             100,      // supply_rate: 1% (below threshold)
@@ -1687,6 +1691,7 @@ mod defi_yield_farmer_tests {
         let opaque = make_defi_opaque_input(
             [0x11u8; 20],
             [0x22u8; 20],
+            [0x33u8; 20],
             1_000_000,
             0,
             100,  // supply_rate: 1% (below threshold)
@@ -1708,7 +1713,7 @@ mod defi_yield_farmer_tests {
     #[test]
     fn test_defi_yield_farmer_invalid_input_size() {
         // Wrong input size -> empty output
-        let opaque = vec![0u8; 10]; // 10 bytes, not 69
+        let opaque = vec![0u8; 10]; // 10 bytes, not 89
         let input = make_defi_input(opaque);
         let input_bytes = input.encode().unwrap();
         let journal_bytes = defi_kernel_main(&input_bytes).expect("kernel execution");
@@ -1723,6 +1728,7 @@ mod defi_yield_farmer_tests {
         let opaque = make_defi_opaque_input(
             [0x11u8; 20],
             [0x22u8; 20],
+            [0x33u8; 20],
             500_000,
             0,
             100,  // rate doesn't matter for force
@@ -1745,6 +1751,7 @@ mod defi_yield_farmer_tests {
         let opaque = make_defi_opaque_input(
             [0x11u8; 20],
             [0x22u8; 20],
+            [0x33u8; 20],
             200_000,
             800_000,
             500,
@@ -1767,6 +1774,7 @@ mod defi_yield_farmer_tests {
         let opaque = make_defi_opaque_input(
             [0x11u8; 20],
             [0x22u8; 20],
+            [0x33u8; 20],
             1_000_000,
             0,
             500,
@@ -1791,6 +1799,7 @@ mod defi_yield_farmer_tests {
         let opaque = make_defi_opaque_input(
             [0x11u8; 20],
             [0x22u8; 20],
+            [0x33u8; 20],
             1_000_000,
             0,
             500,

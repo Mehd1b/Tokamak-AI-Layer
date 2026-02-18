@@ -8,15 +8,16 @@ members = [
     # SDK crates
     "crates/sdk/kernel-sdk",
 
-    # Runtime crates
+    # Runtime crates (canonical, shared)
     "crates/runtime/kernel-guest",
-    "crates/runtime/risc0-methods",
 
-    # Agent crates
-    "crates/agents/examples/example-yield-agent",
-    "crates/agents/examples/defi-yield-farmer",
-    "crates/agents/wrappers/kernel-guest-binding-yield",
-    "crates/agents/wrappers/kernel-guest-binding-defi-yield",
+    # Agent crates (self-contained: agent + binding + risc0-methods)
+    "crates/agents/example-yield-agent/agent",
+    "crates/agents/example-yield-agent/binding",
+    "crates/agents/example-yield-agent/risc0-methods",
+    "crates/agents/defi-yield-farmer/agent",
+    "crates/agents/defi-yield-farmer/binding",
+    "crates/agents/defi-yield-farmer/risc0-methods",
 
     # Testing crates
     "crates/testing/kernel-host-tests",

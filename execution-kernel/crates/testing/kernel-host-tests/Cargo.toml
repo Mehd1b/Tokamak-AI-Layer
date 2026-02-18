@@ -9,11 +9,11 @@ kernel-guest = { path = "../../runtime/kernel-guest" }
 kernel-sdk = { path = "../../sdk/kernel-sdk" }
 constraints = { path = "../../protocol/constraints" }
 # Wrapper crate that binds yield-agent to kernel-guest
-kernel-guest-binding-yield = { path = "../../agents/wrappers/kernel-guest-binding-yield" }
-example-yield-agent = { path = "../../agents/examples/example-yield-agent" }
+kernel-guest-binding-yield = { path = "../../agents/example-yield-agent/binding" }
+example-yield-agent = { path = "../../agents/example-yield-agent/agent" }
 # DeFi yield farmer agent + wrapper
-kernel-guest-binding-defi-yield = { path = "../../agents/wrappers/kernel-guest-binding-defi-yield" }
-defi-yield-farmer = { path = "../../agents/examples/defi-yield-farmer" }
+kernel-guest-binding-defi-yield = { path = "../../agents/defi-yield-farmer/binding" }
+defi-yield-farmer = { path = "../../agents/defi-yield-farmer/agent" }
 
 [dev-dependencies]
 serde = { version = "1.0", features = ["derive"] }

@@ -4,17 +4,18 @@
 //! Receives market state via opaque_inputs, computes optimal allocation,
 //! and outputs CALL actions for supply/withdraw operations.
 //!
-//! # Input Format (69 bytes)
+//! # Input Format (89 bytes)
 //!
 //! ```text
 //! [0:20]   lending_pool address (20 bytes)
 //! [20:40]  asset_token address (20 bytes)
-//! [40:48]  vault_balance (u64 LE)
-//! [48:56]  supplied_amount (u64 LE)
-//! [56:60]  supply_rate_bps (u32 LE)
-//! [60:64]  min_supply_rate_bps (u32 LE)
-//! [64:68]  target_utilization_bps (u32 LE)
-//! [68]     action_flag (u8)
+//! [40:60]  vault_address (20 bytes) — used as onBehalfOf/to in AAVE calls
+//! [60:68]  vault_balance (u64 LE)
+//! [68:76]  supplied_amount (u64 LE)
+//! [76:80]  supply_rate_bps (u32 LE)
+//! [80:84]  min_supply_rate_bps (u32 LE)
+//! [84:88]  target_utilization_bps (u32 LE)
+//! [88]     action_flag (u8)
 //! ```
 //!
 //! # Output Actions
@@ -38,15 +39,18 @@ include!(concat!(env!("OUT_DIR"), "/agent_hash.rs"));
 // Constants
 // ============================================================================
 
-/// Input size: 20 (pool) + 20 (token) + 8 (balance) + 8 (supplied)
-///           + 4 (rate) + 4 (min_rate) + 4 (target_util) + 1 (flag) = 69 bytes
-const INPUT_SIZE: usize = 69;
+/// Input size: 20 (pool) + 20 (token) + 20 (vault) + 8 (balance) + 8 (supplied)
+///           + 4 (rate) + 4 (min_rate) + 4 (target_util) + 1 (flag) = 89 bytes
+const INPUT_SIZE: usize = 89;
 
 /// AAVE supply function selector: keccak256("supply(address,uint256,address,uint16)")[:4]
 const SUPPLY_SELECTOR: [u8; 4] = [0x61, 0x7b, 0xa0, 0x37];
 
 /// AAVE withdraw function selector: keccak256("withdraw(address,uint256,address)")[:4]
 const WITHDRAW_SELECTOR: [u8; 4] = [0x69, 0x32, 0x8d, 0xec];
+
+/// ERC20 approve function selector: keccak256("approve(address,uint256)")[:4]
+const APPROVE_SELECTOR: [u8; 4] = [0x09, 0x5e, 0xa7, 0xb3];
 
 /// Action flag: evaluate market conditions and decide
 const FLAG_EVALUATE: u8 = 0;
@@ -57,6 +61,9 @@ const FLAG_FORCE_SUPPLY: u8 = 1;
 /// Action flag: force full withdrawal (operator override)
 const FLAG_FORCE_WITHDRAW: u8 = 2;
 
+/// Action flag: approve spender then force supply (operator override for first-time setup)
+const FLAG_APPROVE_AND_SUPPLY: u8 = 3;
+
 // ============================================================================
 // Input Parsing
 // ============================================================================
@@ -64,6 +71,7 @@ const FLAG_FORCE_WITHDRAW: u8 = 2;
 struct MarketInput {
     lending_pool: [u8; 20],
     asset_token: [u8; 20],
+    vault_address: [u8; 20],
     vault_balance: u64,
     supplied_amount: u64,
     supply_rate_bps: u32,
@@ -85,6 +93,10 @@ fn parse_input(opaque_inputs: &[u8]) -> Option<MarketInput> {
 
     let mut asset_token = [0u8; 20];
     asset_token.copy_from_slice(&opaque_inputs[offset..offset + 20]);
+    offset += 20;
+
+    let mut vault_address = [0u8; 20];
+    vault_address.copy_from_slice(&opaque_inputs[offset..offset + 20]);
     offset += 20;
 
     let vault_balance = u64::from_le_bytes(
@@ -117,6 +129,7 @@ fn parse_input(opaque_inputs: &[u8]) -> Option<MarketInput> {
     Some(MarketInput {
         lending_pool,
         asset_token,
+        vault_address,
         vault_balance,
         supplied_amount,
         supply_rate_bps,
@@ -154,6 +167,7 @@ pub extern "Rust" fn agent_main(_ctx: &AgentContext, opaque_inputs: &[u8]) -> Ag
         FLAG_FORCE_SUPPLY => force_supply(&market),
         FLAG_FORCE_WITHDRAW => force_withdraw(&market),
         FLAG_EVALUATE => evaluate_and_act(&market),
+        FLAG_APPROVE_AND_SUPPLY => approve_and_supply(&market),
         _ => AgentOutput { actions: Vec::new() }, // Unknown flag -> no-op
     }
 }
@@ -232,36 +246,75 @@ fn force_withdraw(market: &MarketInput) -> AgentOutput {
     AgentOutput { actions }
 }
 
+/// Approve the lending pool to spend the asset, then supply all available balance.
+///
+/// Emits two actions in order:
+/// 1. CALL: asset_token.approve(lending_pool, amount)
+/// 2. CALL: lending_pool.supply(asset_token, amount, vault_address, 0)
+///
+/// Used for first-time setup or when approval has expired.
+fn approve_and_supply(market: &MarketInput) -> AgentOutput {
+    if market.vault_balance == 0 {
+        return AgentOutput { actions: Vec::new() };
+    }
+    let approve = build_approve_action(market, &market.lending_pool, market.vault_balance);
+    let supply = build_supply_action(market, market.vault_balance);
+    let mut actions = Vec::with_capacity(2);
+    actions.push(approve);
+    actions.push(supply);
+    AgentOutput { actions }
+}
+
 // ============================================================================
 // ABI Encoding — AAVE Lending Pool Interface
 // ============================================================================
 
+/// Build a CALL action for ERC20.approve(address spender, uint256 amount).
+fn build_approve_action(market: &MarketInput, spender: &[u8; 20], amount: u64) -> ActionV1 {
+    let target = address_to_bytes32(&market.asset_token);
+    let calldata = encode_approve_call(spender, amount);
+    call_action(target, 0, &calldata)
+}
+
 /// Build a CALL action for AAVE supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode).
 fn build_supply_action(market: &MarketInput, amount: u64) -> ActionV1 {
     let target = address_to_bytes32(&market.lending_pool);
-    let calldata = encode_supply_call(&market.asset_token, amount);
+    let calldata = encode_supply_call(&market.asset_token, &market.vault_address, amount);
     call_action(target, 0, &calldata)
 }
 
 /// Build a CALL action for AAVE withdraw(address asset, uint256 amount, address to).
 fn build_withdraw_action(market: &MarketInput, amount: u64) -> ActionV1 {
     let target = address_to_bytes32(&market.lending_pool);
-    let calldata = encode_withdraw_call(&market.asset_token, amount);
+    let calldata = encode_withdraw_call(&market.asset_token, &market.vault_address, amount);
     call_action(target, 0, &calldata)
+}
+
+/// Encode approve(address, uint256) calldata.
+///
+/// Format: selector(4) + spender(32) + amount(32) = 68 bytes
+fn encode_approve_call(spender: &[u8; 20], amount: u64) -> Vec<u8> {
+    let mut calldata = Vec::with_capacity(68);
+    calldata.extend_from_slice(&APPROVE_SELECTOR);
+    // address spender (left-padded to 32 bytes)
+    calldata.extend_from_slice(&address_to_bytes32(spender));
+    // uint256 amount (big-endian, right-aligned in 32 bytes)
+    calldata.extend_from_slice(&u64_to_u256_be(amount));
+    calldata
 }
 
 /// Encode supply(address, uint256, address, uint16) calldata.
 ///
 /// Format: selector(4) + asset(32) + amount(32) + onBehalfOf(32) + referralCode(32) = 132 bytes
-fn encode_supply_call(asset: &[u8; 20], amount: u64) -> Vec<u8> {
+fn encode_supply_call(asset: &[u8; 20], on_behalf_of: &[u8; 20], amount: u64) -> Vec<u8> {
     let mut calldata = Vec::with_capacity(132);
     calldata.extend_from_slice(&SUPPLY_SELECTOR);
     // address asset (left-padded to 32 bytes)
     calldata.extend_from_slice(&address_to_bytes32(asset));
     // uint256 amount (big-endian, right-aligned in 32 bytes)
     calldata.extend_from_slice(&u64_to_u256_be(amount));
-    // address onBehalfOf = address(0) — the vault itself will be msg.sender
-    calldata.extend_from_slice(&[0u8; 32]);
+    // address onBehalfOf = vault address (receives the aTokens)
+    calldata.extend_from_slice(&address_to_bytes32(on_behalf_of));
     // uint16 referralCode = 0
     calldata.extend_from_slice(&[0u8; 32]);
     calldata
@@ -270,15 +323,15 @@ fn encode_supply_call(asset: &[u8; 20], amount: u64) -> Vec<u8> {
 /// Encode withdraw(address, uint256, address) calldata.
 ///
 /// Format: selector(4) + asset(32) + amount(32) + to(32) = 100 bytes
-fn encode_withdraw_call(asset: &[u8; 20], amount: u64) -> Vec<u8> {
+fn encode_withdraw_call(asset: &[u8; 20], to: &[u8; 20], amount: u64) -> Vec<u8> {
     let mut calldata = Vec::with_capacity(100);
     calldata.extend_from_slice(&WITHDRAW_SELECTOR);
     // address asset
     calldata.extend_from_slice(&address_to_bytes32(asset));
     // uint256 amount
     calldata.extend_from_slice(&u64_to_u256_be(amount));
-    // address to = address(0) — recipient is msg.sender (vault)
-    calldata.extend_from_slice(&[0u8; 32]);
+    // address to = vault address (receives the withdrawn tokens)
+    calldata.extend_from_slice(&address_to_bytes32(to));
     calldata
 }
 
@@ -300,6 +353,7 @@ mod tests {
     fn make_market_input(
         lending_pool: [u8; 20],
         asset_token: [u8; 20],
+        vault_address: [u8; 20],
         vault_balance: u64,
         supplied_amount: u64,
         supply_rate_bps: u32,
@@ -310,6 +364,7 @@ mod tests {
         let mut input = Vec::with_capacity(INPUT_SIZE);
         input.extend_from_slice(&lending_pool);
         input.extend_from_slice(&asset_token);
+        input.extend_from_slice(&vault_address);
         input.extend_from_slice(&vault_balance.to_le_bytes());
         input.extend_from_slice(&supplied_amount.to_le_bytes());
         input.extend_from_slice(&supply_rate_bps.to_le_bytes());
@@ -345,6 +400,7 @@ mod tests {
         let input = make_market_input(
             [0x11u8; 20],  // lending_pool
             [0x22u8; 20],  // asset_token
+            [0x33u8; 20],  // vault_address
             1_000_000,     // vault_balance: 1M tokens available
             0,             // supplied_amount: nothing supplied yet
             500,           // supply_rate: 5% APY
@@ -364,6 +420,7 @@ mod tests {
         let input = make_market_input(
             [0x11u8; 20],
             [0x22u8; 20],
+            [0x33u8; 20],
             1_000_000,
             0,
             100,           // supply_rate: 1% APY -- below threshold
@@ -381,6 +438,7 @@ mod tests {
         let input = make_market_input(
             [0x11u8; 20],
             [0x22u8; 20],
+            [0x33u8; 20],
             200_000,       // vault_balance: some idle
             800_000,       // supplied_amount: 800K supplied
             100,           // supply_rate: 1% -- dropped below threshold
@@ -400,6 +458,7 @@ mod tests {
         let input = make_market_input(
             [0x11u8; 20],
             [0x22u8; 20],
+            [0x33u8; 20],
             500_000,  // vault_balance
             0,        // supplied
             100,      // rate doesn't matter for force
@@ -418,6 +477,7 @@ mod tests {
         let input = make_market_input(
             [0x11u8; 20],
             [0x22u8; 20],
+            [0x33u8; 20],
             0,        // no balance
             500_000,
             500,
@@ -435,6 +495,7 @@ mod tests {
         let input = make_market_input(
             [0x11u8; 20],
             [0x22u8; 20],
+            [0x33u8; 20],
             200_000,
             800_000,  // supplied
             500,
@@ -453,6 +514,7 @@ mod tests {
         let input = make_market_input(
             [0x11u8; 20],
             [0x22u8; 20],
+            [0x33u8; 20],
             500_000,
             0,        // nothing supplied
             500,
@@ -470,6 +532,7 @@ mod tests {
         let input = make_market_input(
             [0x11u8; 20],
             [0x22u8; 20],
+            [0x33u8; 20],
             200_000,    // vault_balance
             800_000,    // supplied: 80% of 1M total
             500,        // rate ok
@@ -488,6 +551,7 @@ mod tests {
         let input = make_market_input(
             [0x11u8; 20],
             [0x22u8; 20],
+            [0x33u8; 20],
             500_000,    // vault_balance: 500K
             300_000,    // supplied: 300K
             500,        // rate ok
@@ -506,6 +570,7 @@ mod tests {
         let input = make_market_input(
             [0x11u8; 20],
             [0x22u8; 20],
+            [0x33u8; 20],
             0,
             0,
             500,
@@ -523,6 +588,7 @@ mod tests {
         let input = make_market_input(
             [0x11u8; 20],
             [0x22u8; 20],
+            [0x33u8; 20],
             500_000,
             0,
             500,
@@ -540,6 +606,7 @@ mod tests {
         let input = make_market_input(
             [0x11u8; 20],
             [0x22u8; 20],
+            [0x33u8; 20],
             1_000_000,
             0,
             500,
@@ -571,6 +638,7 @@ mod tests {
         let input = make_market_input(
             [0x11u8; 20],
             [0x22u8; 20],
+            [0x33u8; 20],
             1_000_000,
             0,
             500,
@@ -586,5 +654,60 @@ mod tests {
             assert_eq!(a.target, b.target);
             assert_eq!(a.payload, b.payload);
         }
+    }
+
+    #[test]
+    fn test_approve_and_supply() {
+        let ctx = test_ctx();
+        let input = make_market_input(
+            [0x11u8; 20],  // lending_pool
+            [0x22u8; 20],  // asset_token
+            [0x33u8; 20],  // vault_address
+            500_000,       // vault_balance
+            0,             // supplied
+            100,           // rate doesn't matter for approve_and_supply
+            200,
+            8000,
+            3,             // FLAG_APPROVE_AND_SUPPLY
+        );
+        let output = agent_main(&ctx, &input);
+        // Should produce 2 actions: approve + supply
+        assert_eq!(output.actions.len(), 2);
+        assert_eq!(output.actions[0].action_type, ACTION_TYPE_CALL); // approve
+        assert_eq!(output.actions[1].action_type, ACTION_TYPE_CALL); // supply
+
+        // First action target = asset_token (for approve)
+        let expected_token_target = address_to_bytes32(&[0x22u8; 20]);
+        assert_eq!(output.actions[0].target, expected_token_target);
+
+        // Second action target = lending_pool (for supply)
+        let expected_pool_target = address_to_bytes32(&[0x11u8; 20]);
+        assert_eq!(output.actions[1].target, expected_pool_target);
+
+        // Check approve selector in first action's calldata
+        let approve_payload = &output.actions[0].payload;
+        assert_eq!(&approve_payload[96..100], &APPROVE_SELECTOR);
+
+        // Check supply selector in second action's calldata
+        let supply_payload = &output.actions[1].payload;
+        assert_eq!(&supply_payload[96..100], &SUPPLY_SELECTOR);
+    }
+
+    #[test]
+    fn test_approve_and_supply_zero_balance_no_action() {
+        let ctx = test_ctx();
+        let input = make_market_input(
+            [0x11u8; 20],
+            [0x22u8; 20],
+            [0x33u8; 20],
+            0,        // no balance
+            500_000,
+            500,
+            200,
+            8000,
+            3,        // FLAG_APPROVE_AND_SUPPLY
+        );
+        let output = agent_main(&ctx, &input);
+        assert!(output.actions.is_empty());
     }
 }
