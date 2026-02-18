@@ -20,6 +20,9 @@ agent-examples/solidity-auditor/data/
 .env.local
 .env.*.local
 
+# Worktrees
+.worktrees/
+
 # IDE
 .idea/
 .vscode/
