@@ -127,6 +127,15 @@ fn parse_input(opaque_inputs: &[u8]) -> Option<MarketInput> {
 }
 
 // ============================================================================
+// Helpers
+// ============================================================================
+
+/// Return the smaller of two u64 values.
+fn min_u64(a: u64, b: u64) -> u64 {
+    if a < b { a } else { b }
+}
+
+// ============================================================================
 // Agent Entry Point
 // ============================================================================
 
@@ -134,18 +143,149 @@ fn parse_input(opaque_inputs: &[u8]) -> Option<MarketInput> {
 #[no_mangle]
 #[allow(unsafe_code)]
 pub extern "Rust" fn agent_main(_ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput {
-    // Parse input; return empty on invalid
-    let _market = match parse_input(opaque_inputs) {
+    let market = match parse_input(opaque_inputs) {
         Some(m) => m,
         None => return AgentOutput { actions: Vec::new() },
     };
 
-    // Strategy not yet implemented - return empty
-    AgentOutput { actions: Vec::new() }
+    match market.action_flag {
+        FLAG_FORCE_SUPPLY => force_supply(&market),
+        FLAG_FORCE_WITHDRAW => force_withdraw(&market),
+        FLAG_EVALUATE => evaluate_and_act(&market),
+        _ => AgentOutput { actions: Vec::new() }, // Unknown flag -> no-op
+    }
 }
 
 /// Compile-time check that agent_main matches the canonical AgentEntrypoint type.
 const _: AgentEntrypoint = agent_main;
+
+// ============================================================================
+// Strategy Logic
+// ============================================================================
+
+/// Evaluate market conditions and decide supply/withdraw/no-op.
+///
+/// Strategy:
+/// 1. If supply_rate >= min_rate AND vault has idle capital -> supply up to target utilization
+/// 2. If supply_rate < min_rate AND we have supplied capital -> withdraw everything
+/// 3. Otherwise -> no-op
+fn evaluate_and_act(market: &MarketInput) -> AgentOutput {
+    let rate_ok = market.supply_rate_bps >= market.min_supply_rate_bps;
+    let total_capital = saturating_add_u64(market.vault_balance, market.supplied_amount);
+
+    if total_capital == 0 {
+        return AgentOutput { actions: Vec::new() };
+    }
+
+    if rate_ok && market.vault_balance > 0 {
+        // Calculate target supply amount based on utilization target
+        let target_supplied = match apply_bps(total_capital, market.target_utilization_bps as u64) {
+            Some(v) => v,
+            None => return AgentOutput { actions: Vec::new() },
+        };
+
+        // How much more to supply (could be 0 if already at/above target)
+        let additional = saturating_sub_u64(target_supplied, market.supplied_amount);
+        // Don't supply more than available balance
+        let supply_amount = min_u64(additional, market.vault_balance);
+
+        if supply_amount == 0 {
+            return AgentOutput { actions: Vec::new() };
+        }
+
+        let action = build_supply_action(market, supply_amount);
+        let mut actions = Vec::with_capacity(1);
+        actions.push(action);
+        AgentOutput { actions }
+    } else if !rate_ok && market.supplied_amount > 0 {
+        // Rate dropped below threshold -> withdraw all supplied capital
+        let action = build_withdraw_action(market, market.supplied_amount);
+        let mut actions = Vec::with_capacity(1);
+        actions.push(action);
+        AgentOutput { actions }
+    } else {
+        AgentOutput { actions: Vec::new() }
+    }
+}
+
+/// Force supply all available vault balance.
+fn force_supply(market: &MarketInput) -> AgentOutput {
+    if market.vault_balance == 0 {
+        return AgentOutput { actions: Vec::new() };
+    }
+    let action = build_supply_action(market, market.vault_balance);
+    let mut actions = Vec::with_capacity(1);
+    actions.push(action);
+    AgentOutput { actions }
+}
+
+/// Force withdraw all supplied capital.
+fn force_withdraw(market: &MarketInput) -> AgentOutput {
+    if market.supplied_amount == 0 {
+        return AgentOutput { actions: Vec::new() };
+    }
+    let action = build_withdraw_action(market, market.supplied_amount);
+    let mut actions = Vec::with_capacity(1);
+    actions.push(action);
+    AgentOutput { actions }
+}
+
+// ============================================================================
+// ABI Encoding — AAVE Lending Pool Interface
+// ============================================================================
+
+/// Build a CALL action for AAVE supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode).
+fn build_supply_action(market: &MarketInput, amount: u64) -> ActionV1 {
+    let target = address_to_bytes32(&market.lending_pool);
+    let calldata = encode_supply_call(&market.asset_token, amount);
+    call_action(target, 0, &calldata)
+}
+
+/// Build a CALL action for AAVE withdraw(address asset, uint256 amount, address to).
+fn build_withdraw_action(market: &MarketInput, amount: u64) -> ActionV1 {
+    let target = address_to_bytes32(&market.lending_pool);
+    let calldata = encode_withdraw_call(&market.asset_token, amount);
+    call_action(target, 0, &calldata)
+}
+
+/// Encode supply(address, uint256, address, uint16) calldata.
+///
+/// Format: selector(4) + asset(32) + amount(32) + onBehalfOf(32) + referralCode(32) = 132 bytes
+fn encode_supply_call(asset: &[u8; 20], amount: u64) -> Vec<u8> {
+    let mut calldata = Vec::with_capacity(132);
+    calldata.extend_from_slice(&SUPPLY_SELECTOR);
+    // address asset (left-padded to 32 bytes)
+    calldata.extend_from_slice(&address_to_bytes32(asset));
+    // uint256 amount (big-endian, right-aligned in 32 bytes)
+    calldata.extend_from_slice(&u64_to_u256_be(amount));
+    // address onBehalfOf = address(0) — the vault itself will be msg.sender
+    calldata.extend_from_slice(&[0u8; 32]);
+    // uint16 referralCode = 0
+    calldata.extend_from_slice(&[0u8; 32]);
+    calldata
+}
+
+/// Encode withdraw(address, uint256, address) calldata.
+///
+/// Format: selector(4) + asset(32) + amount(32) + to(32) = 100 bytes
+fn encode_withdraw_call(asset: &[u8; 20], amount: u64) -> Vec<u8> {
+    let mut calldata = Vec::with_capacity(100);
+    calldata.extend_from_slice(&WITHDRAW_SELECTOR);
+    // address asset
+    calldata.extend_from_slice(&address_to_bytes32(asset));
+    // uint256 amount
+    calldata.extend_from_slice(&u64_to_u256_be(amount));
+    // address to = address(0) — recipient is msg.sender (vault)
+    calldata.extend_from_slice(&[0u8; 32]);
+    calldata
+}
+
+/// Convert a u64 to a big-endian u256 (32 bytes, right-aligned).
+fn u64_to_u256_be(value: u64) -> [u8; 32] {
+    let mut result = [0u8; 32];
+    result[24..32].copy_from_slice(&value.to_be_bytes());
+    result
+}
 
 // ============================================================================
 // Tests
