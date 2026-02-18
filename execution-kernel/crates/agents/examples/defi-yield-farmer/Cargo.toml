@@ -1,0 +1,15 @@
+[package]
+name = "defi-yield-farmer"
+version = "0.1.0"
+edition = "2021"
+description = "DeFi yield farming agent targeting AAVE-like lending pools"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+kernel-sdk = { path = "../../../sdk/kernel-sdk" }
+
+[build-dependencies]
+sha2 = "0.10"

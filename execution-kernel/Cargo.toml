@@ -14,6 +14,7 @@ members = [
 
     # Agent crates
     "crates/agents/examples/example-yield-agent",
+    "crates/agents/examples/defi-yield-farmer",
     "crates/agents/wrappers/kernel-guest-binding-yield",
 
     # Testing crates
