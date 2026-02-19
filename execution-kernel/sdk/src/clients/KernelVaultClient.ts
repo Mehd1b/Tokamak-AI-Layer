@@ -1,4 +1,5 @@
 import type { PublicClient, WalletClient } from 'viem';
+import { decodeEventLog } from 'viem';
 import { KernelVaultABI } from '../abi/KernelVault';
 import type { ExecuteParams, KernelVaultInfo } from '../types';
 
@@ -133,8 +134,7 @@ export class KernelVaultClient {
       args: [assets],
     });
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
-    // Parse Deposit event for sharesMinted - simplified extraction
-    const sharesMinted = receipt.logs.length > 0 ? 0n : 0n;
+    const sharesMinted = this.parseDepositEvent(receipt.logs);
     return { sharesMinted, txHash };
   }
 
@@ -147,7 +147,7 @@ export class KernelVaultClient {
       value,
     });
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
-    const sharesMinted = receipt.logs.length > 0 ? 0n : 0n;
+    const sharesMinted = this.parseDepositEvent(receipt.logs);
     return { sharesMinted, txHash };
   }
 
@@ -160,7 +160,7 @@ export class KernelVaultClient {
       args: [shareAmount],
     });
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
-    const assetsOut = receipt.logs.length > 0 ? 0n : 0n;
+    const assetsOut = this.parseWithdrawEvent(receipt.logs);
     return { assetsOut, txHash };
   }
 
@@ -210,6 +210,42 @@ export class KernelVaultClient {
       userShares,
       userAssets,
     };
+  }
+
+  private parseDepositEvent(logs: readonly { data: `0x${string}`; topics: readonly `0x${string}`[] }[]): bigint {
+    for (const log of logs) {
+      try {
+        const event = decodeEventLog({
+          abi: KernelVaultABI,
+          data: log.data,
+          topics: log.topics as [`0x${string}`, ...`0x${string}`[]],
+        });
+        if (event.eventName === 'Deposit') {
+          return (event.args as { shares: bigint }).shares;
+        }
+      } catch {
+        continue;
+      }
+    }
+    return 0n;
+  }
+
+  private parseWithdrawEvent(logs: readonly { data: `0x${string}`; topics: readonly `0x${string}`[] }[]): bigint {
+    for (const log of logs) {
+      try {
+        const event = decodeEventLog({
+          abi: KernelVaultABI,
+          data: log.data,
+          topics: log.topics as [`0x${string}`, ...`0x${string}`[]],
+        });
+        if (event.eventName === 'Withdraw') {
+          return (event.args as { amount: bigint }).amount;
+        }
+      } catch {
+        continue;
+      }
+    }
+    return 0n;
   }
 
   private requireWallet(): void {

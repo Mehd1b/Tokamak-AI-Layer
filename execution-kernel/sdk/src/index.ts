@@ -31,4 +31,8 @@ export {
   ExecutionStatus,
   OPTIMISM_SEPOLIA_ADDRESSES,
   DEFAULT_CHAIN_ID,
+  DEPLOYMENTS,
 } from './types';
+
+export type { DeploymentAddresses } from './addresses';
+export { SEPOLIA_ADDRESSES } from './addresses';

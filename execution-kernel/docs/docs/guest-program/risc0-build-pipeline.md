@@ -12,9 +12,10 @@ This document explains how the zkVM guest is built and how critical artifacts (E
 ```mermaid
 flowchart TD
     A[Agent Source] -->|build.rs| B[agent_code_hash]
-    C[kernel-guest] --> D[Binding Crate]
-    B --> D
-    D --> E[zkvm-guest main.rs]
+    A -->|agent_entrypoint! macro| C[Kernel Binding]
+    D[kernel-guest] --> C
+    B --> C
+    C --> E[zkvm-guest main.rs]
     E -->|risc0-build| F[ELF Binary]
     F -->|RISC Zero hash| G[imageId]
 
@@ -27,18 +28,24 @@ flowchart TD
 
 ## Crate Structure
 
-Each agent has its own `risc0-methods/` directory within its folder:
+Each agent has two crates: `agent/` (logic + kernel binding) and `risc0-methods/` (zkVM build):
 
 ```
-crates/agents/my-agent/risc0-methods/
-├── Cargo.toml
-├── build.rs              # Invokes risc0-build
-├── src/
-│   └── lib.rs            # Exports ELF and IMAGE_ID
-└── zkvm-guest/
-    ├── Cargo.toml        # Guest-specific dependencies
-    └── src/
-        └── main.rs       # zkVM entry point
+crates/agents/my-agent/
+├── agent/
+│   ├── Cargo.toml
+│   ├── build.rs              # Computes AGENT_CODE_HASH
+│   └── src/
+│       └── lib.rs            # agent_main() + agent_entrypoint!()
+└── risc0-methods/
+    ├── Cargo.toml
+    ├── build.rs              # Invokes risc0-build
+    ├── src/
+    │   └── lib.rs            # Exports ELF and IMAGE_ID
+    └── zkvm-guest/
+        ├── Cargo.toml        # Guest-specific dependencies
+        └── src/
+            └── main.rs       # zkVM entry point
 ```
 
 ## Build Process
@@ -60,19 +67,19 @@ let hash = hasher.finalize();
 // Writes: pub const AGENT_CODE_HASH: [u8; 32] = [...]
 ```
 
-### 2. Binding Compilation
+### 2. Entrypoint Generation
 
-The binding crate links the agent to the kernel:
+The `agent_entrypoint!` macro in the agent crate generates the kernel binding code:
 
 ```rust
-pub struct YieldAgentWrapper;
+// In agent/src/lib.rs
+kernel_sdk::agent_entrypoint!(agent_main);
 
-impl AgentEntrypoint for YieldAgentWrapper {
-    fn code_hash(&self) -> [u8; 32] {
-        example_yield_agent::AGENT_CODE_HASH  // From step 1
-    }
-    // ...
-}
+// This generates:
+// - __KernelAgentWrapper implementing AgentEntrypoint
+// - kernel_main(input_bytes) -> Result<Vec<u8>, KernelError>
+// - kernel_main_with_constraints(input_bytes, cs) -> Result<Vec<u8>, KernelError>
+// - pub use kernel_guest::KernelError;
 ```
 
 ### 3. zkVM Guest Compilation
@@ -109,7 +116,7 @@ include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 
 The compiled zkVM guest:
 - Target: `riscv32im-risc0-zkvm-elf`
-- Contains: kernel + binding + agent code
+- Contains: kernel + agent code (no separate binding)
 - Location: `target/riscv-guest/.../zkvm-guest`
 - Used by: Prover to execute guest
 
@@ -168,7 +175,7 @@ edition = "2021"
 
 [dependencies]
 risc0-zkvm = { version = "1.0", default-features = false, features = ["guest"] }
-example-yield-agent-binding = { path = "../../binding" }
+my-agent = { path = "../../agent" }
 kernel-core = { path = "../../../../protocol/kernel-core" }
 
 [profile.release]

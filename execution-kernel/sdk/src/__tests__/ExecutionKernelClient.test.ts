@@ -1,6 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
+import { encodeAbiParameters, encodeEventTopics } from 'viem';
 import { ExecutionKernelClient } from '../ExecutionKernelClient';
 import { OPTIMISM_SEPOLIA_ADDRESSES } from '../types';
+import { AgentRegistryABI } from '../abi/AgentRegistry';
+import { VaultFactoryABI } from '../abi/VaultFactory';
 
 function createMockPublicClient() {
   return {
@@ -77,16 +80,29 @@ describe('ExecutionKernelClient', () => {
       });
 
       const mockAgentId = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef' as `0x${string}`;
+      const mockAuthor = '0x1111111111111111111111111111111111111111' as `0x${string}`;
+      const mockImageId = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as `0x${string}`;
+      const mockCodeHash = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' as `0x${string}`;
       const txHash = '0xabc' as `0x${string}`;
       walletClient.writeContract.mockResolvedValue(txHash);
+
+      const topics = encodeEventTopics({
+        abi: AgentRegistryABI,
+        eventName: 'AgentRegistered',
+        args: { agentId: mockAgentId, author: mockAuthor, imageId: mockImageId },
+      });
+      const data = encodeAbiParameters(
+        [{ name: 'agentCodeHash', type: 'bytes32' }],
+        [mockCodeHash],
+      );
       publicClient.waitForTransactionReceipt.mockResolvedValue({
-        logs: [{ topics: [null, mockAgentId] }],
+        logs: [{ topics, data }],
       });
 
       const result = await client.registerAgent({
         salt: '0x0000000000000000000000000000000000000000000000000000000000000001',
-        imageId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        agentCodeHash: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        imageId: mockImageId,
+        agentCodeHash: mockCodeHash,
       });
 
       expect(result.txHash).toBe(txHash);
@@ -129,17 +145,36 @@ describe('ExecutionKernelClient', () => {
       });
 
       const txHash = '0xvault123' as `0x${string}`;
-      const vaultAddr = '0x2222222222222222222222222222222222222222';
-      const paddedVault = `0x000000000000000000000000${vaultAddr.slice(2)}`;
+      const vaultAddr = '0x2222222222222222222222222222222222222222' as `0x${string}`;
+      const ownerAddr = '0x1111111111111111111111111111111111111111' as `0x${string}`;
+      const agentId = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef' as `0x${string}`;
+      const asset = '0x3333333333333333333333333333333333333333' as `0x${string}`;
+      const imageId = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as `0x${string}`;
+      const salt = '0x0000000000000000000000000000000000000000000000000000000000000001' as `0x${string}`;
+
       walletClient.writeContract.mockResolvedValue(txHash);
+
+      const topics = encodeEventTopics({
+        abi: VaultFactoryABI,
+        eventName: 'VaultDeployed',
+        args: { vault: vaultAddr, owner: ownerAddr, agentId },
+      });
+      const data = encodeAbiParameters(
+        [
+          { name: 'asset', type: 'address' },
+          { name: 'trustedImageId', type: 'bytes32' },
+          { name: 'salt', type: 'bytes32' },
+        ],
+        [asset, imageId, salt],
+      );
       publicClient.waitForTransactionReceipt.mockResolvedValue({
-        logs: [{ topics: [null, paddedVault] }],
+        logs: [{ topics, data }],
       });
 
       const result = await client.deployVault({
-        agentId: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-        asset: '0x3333333333333333333333333333333333333333',
-        userSalt: '0x0000000000000000000000000000000000000000000000000000000000000001',
+        agentId,
+        asset,
+        userSalt: salt,
       });
 
       expect(result.txHash).toBe(txHash);

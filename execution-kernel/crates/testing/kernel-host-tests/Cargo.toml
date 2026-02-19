@@ -8,11 +8,8 @@ kernel-core = { path = "../../protocol/kernel-core", features = ["std"] }
 kernel-guest = { path = "../../runtime/kernel-guest" }
 kernel-sdk = { path = "../../sdk/kernel-sdk" }
 constraints = { path = "../../protocol/constraints" }
-# Wrapper crate that binds yield-agent to kernel-guest
-kernel-guest-binding-yield = { path = "../../agents/example-yield-agent/binding" }
+# Agent crates (generate kernel_main via agent_entrypoint! macro)
 example-yield-agent = { path = "../../agents/example-yield-agent/agent" }
-# DeFi yield farmer agent + wrapper
-kernel-guest-binding-defi-yield = { path = "../../agents/defi-yield-farmer/binding" }
 defi-yield-farmer = { path = "../../agents/defi-yield-farmer/agent" }
 
 [dev-dependencies]

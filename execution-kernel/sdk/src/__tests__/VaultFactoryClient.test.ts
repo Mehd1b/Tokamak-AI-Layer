@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { encodeAbiParameters, encodeEventTopics } from 'viem';
 import { VaultFactoryClient } from '../clients/VaultFactoryClient';
+import { VaultFactoryABI } from '../abi/VaultFactory';
 
 const FACTORY_ADDRESS = '0x3bB48a146bBC50F8990c86787a41185A6fC474d2' as `0x${string}`;
 const MOCK_AGENT_ID = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef' as `0x${string}`;
@@ -7,6 +9,24 @@ const MOCK_VAULT_ADDRESS = '0x2222222222222222222222222222222222222222' as `0x${
 const MOCK_OWNER = '0x1111111111111111111111111111111111111111' as `0x${string}`;
 const MOCK_ASSET = '0x3333333333333333333333333333333333333333' as `0x${string}`;
 const MOCK_SALT = '0x0000000000000000000000000000000000000000000000000000000000000001' as `0x${string}`;
+const MOCK_IMAGE_ID = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as `0x${string}`;
+
+function createVaultDeployedLog(vault: `0x${string}`, owner: `0x${string}`, agentId: `0x${string}`, asset: `0x${string}`, trustedImageId: `0x${string}`, salt: `0x${string}`) {
+  const topics = encodeEventTopics({
+    abi: VaultFactoryABI,
+    eventName: 'VaultDeployed',
+    args: { vault, owner, agentId },
+  });
+  const data = encodeAbiParameters(
+    [
+      { name: 'asset', type: 'address' },
+      { name: 'trustedImageId', type: 'bytes32' },
+      { name: 'salt', type: 'bytes32' },
+    ],
+    [asset, trustedImageId, salt],
+  );
+  return { topics, data };
+}
 
 function createMockPublicClient() {
   return {
@@ -85,11 +105,10 @@ describe('VaultFactoryClient', () => {
   describe('deployVault', () => {
     it('deploys and returns vault address', async () => {
       const txHash = '0xabc123' as `0x${string}`;
-      // VaultDeployed event: topics[1] is vault address (padded to 32 bytes)
-      const paddedVault = `0x000000000000000000000000${MOCK_VAULT_ADDRESS.slice(2)}`;
       walletClient.writeContract.mockResolvedValue(txHash);
+      const mockLog = createVaultDeployedLog(MOCK_VAULT_ADDRESS, MOCK_OWNER, MOCK_AGENT_ID, MOCK_ASSET, MOCK_IMAGE_ID, MOCK_SALT);
       publicClient.waitForTransactionReceipt.mockResolvedValue({
-        logs: [{ topics: [null, paddedVault] }],
+        logs: [mockLog],
       });
 
       const result = await client.deployVault({

@@ -1,8 +1,8 @@
-// Re-export the agent code hash from the wrapper crate for tests to use.
-pub use kernel_guest_binding_yield::AGENT_CODE_HASH;
+// Re-export the agent code hash from the agent crate for tests to use.
+pub use example_yield_agent::AGENT_CODE_HASH;
 
 // Re-export the DeFi yield farmer agent code hash.
-pub use kernel_guest_binding_defi_yield::AGENT_CODE_HASH as DEFI_AGENT_CODE_HASH;
+pub use defi_yield_farmer::AGENT_CODE_HASH as DEFI_AGENT_CODE_HASH;
 
 #[cfg(test)]
 mod tests {
@@ -12,7 +12,7 @@ mod tests {
         put_u64_le,
     };
     use kernel_core::*;
-    use kernel_guest_binding_yield::kernel_main;
+    use example_yield_agent::kernel_main;
     use kernel_sdk::prelude::{address_to_bytes32, call_action};
 
     // Import the agent code hash from the linked yield-agent crate.
@@ -1065,7 +1065,7 @@ mod tests {
     #[test]
     fn test_kernel_main_with_constraints_success() {
         use constraints::ConstraintSetV1;
-        use kernel_guest_binding_yield::kernel_main_with_constraints;
+        use example_yield_agent::kernel_main_with_constraints;
 
         let input = make_input([0x11; 20], [0x22; 20], 1000);
         let input_bytes = input.encode().unwrap();
@@ -1508,7 +1508,7 @@ mod tests {
     fn test_agent_code_hash_with_constraints() {
         // Test that agent code hash verification works with custom constraints too.
         use constraints::ConstraintSetV1;
-        use kernel_guest_binding_yield::kernel_main_with_constraints;
+        use example_yield_agent::kernel_main_with_constraints;
 
         // With valid hash - should succeed
         let valid_input = make_input([0x11; 20], [0x22; 20], 1000);
@@ -1588,7 +1588,7 @@ mod tests {
 mod defi_yield_farmer_tests {
     use constraints::EMPTY_OUTPUT_COMMITMENT;
     use kernel_core::*;
-    use kernel_guest_binding_defi_yield::kernel_main as defi_kernel_main;
+    use defi_yield_farmer::kernel_main as defi_kernel_main;
 
     use crate::DEFI_AGENT_CODE_HASH;
 

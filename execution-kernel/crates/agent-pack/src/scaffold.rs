@@ -139,7 +139,6 @@ fn create_directory_structure(root: &Path) -> Result<(), ScaffoldError> {
     let dirs = [
         root.to_path_buf(),
         root.join("agent/src"),
-        root.join("wrapper/src"),
         root.join("tests/src"),
         root.join("dist"),
     ];
@@ -156,7 +155,6 @@ fn create_directory_structure(root: &Path) -> Result<(), ScaffoldError> {
 fn generate_files(options: &ScaffoldOptions) -> Result<(), ScaffoldError> {
     let name = &options.name;
     let name_snake = to_snake_case(name);
-    let name_pascal = to_pascal_case(name);
     let agent_id_hex = format_agent_id(&options.agent_id);
 
     // Root files
@@ -185,16 +183,6 @@ fn generate_files(options: &ScaffoldOptions) -> Result<(), ScaffoldError> {
         TemplateType::Yield => generate_agent_lib_yield(),
     };
     write_file(&options.output_dir.join("agent/src/lib.rs"), &agent_lib)?;
-
-    // Wrapper crate
-    write_file(
-        &options.output_dir.join("wrapper/Cargo.toml"),
-        &generate_wrapper_cargo_toml(name),
-    )?;
-    write_file(
-        &options.output_dir.join("wrapper/src/lib.rs"),
-        &generate_wrapper_lib(&name_snake, &name_pascal),
-    )?;
 
     // Tests crate
     write_file(
@@ -247,19 +235,6 @@ fn to_snake_case(name: &str) -> String {
     name.replace('-', "_")
 }
 
-/// Convert a name to PascalCase.
-fn to_pascal_case(name: &str) -> String {
-    name.split(['-', '_'])
-        .map(|word| {
-            let mut chars = word.chars();
-            match chars.next() {
-                None => String::new(),
-                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-            }
-        })
-        .collect()
-}
-
 /// Format agent ID bytes as 0x-prefixed hex string.
 fn format_agent_id(bytes: &[u8; 32]) -> String {
     format!("0x{}", hex::encode(bytes))
@@ -275,7 +250,6 @@ fn generate_root_cargo_toml(name: &str) -> String {
 resolver = "2"
 members = [
     "agent",
-    "wrapper",
     "tests",
 ]
 
@@ -326,13 +300,10 @@ agent-pack compute --elf target/riscv-guest/riscv32im-risc0-zkvm-elf/release/zkv
 ```
 {name}/
 ├── Cargo.toml           # Workspace manifest
-├── agent/               # Core agent logic
+├── agent/               # Core agent logic + kernel binding
 │   ├── Cargo.toml
 │   ├── build.rs         # AGENT_CODE_HASH computation
-│   └── src/lib.rs       # agent_main() implementation
-├── wrapper/             # AgentEntrypoint binding
-│   ├── Cargo.toml
-│   └── src/lib.rs       # Kernel binding
+│   └── src/lib.rs       # agent_main() + agent_entrypoint! macro
 ├── tests/               # Test harness
 │   ├── Cargo.toml
 │   └── src/lib.rs       # Unit tests
@@ -345,13 +316,15 @@ agent-pack compute --elf target/riscv-guest/riscv32im-risc0-zkvm-elf/release/zkv
 Edit `agent/src/lib.rs` to implement your agent logic in the `agent_main` function:
 
 ```rust
-#[no_mangle]
 pub extern "Rust" fn agent_main(
     ctx: &AgentContext,
     opaque_inputs: &[u8],
 ) -> AgentOutput {{
     // Your logic here
 }}
+
+// This macro generates kernel_main() and kernel_main_with_constraints()
+kernel_sdk::agent_entrypoint!(agent_main);
 ```
 
 ## Testing
@@ -425,6 +398,8 @@ crate-type = ["rlib"]
 
 [dependencies]
 kernel-sdk = {{ git = "https://github.com/Defiesta/execution-kernel", branch = "main" }}
+kernel-guest = {{ git = "https://github.com/Defiesta/execution-kernel", branch = "main" }}
+constraints = {{ git = "https://github.com/Defiesta/execution-kernel", branch = "main" }}
 
 [build-dependencies]
 sha2.workspace = true
@@ -545,9 +520,11 @@ fn generate_agent_lib_minimal() -> String {
 //! Every agent MUST expose exactly this function signature:
 //!
 //! ```ignore
-//! #[no_mangle]
 //! pub extern "Rust" fn agent_main(ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput
 //! ```
+//!
+//! The `agent_entrypoint!` macro generates kernel_main() and
+//! kernel_main_with_constraints() for integration with the kernel.
 
 #![no_std]
 #![deny(unsafe_code)]
@@ -560,6 +537,18 @@ use kernel_sdk::prelude::*;
 // Include the generated agent hash constant.
 include!(concat!(env!("OUT_DIR"), "/agent_hash.rs"));
 
+// ============================================================================
+// Input Parsing (example — uncomment and customize)
+// ============================================================================
+
+// kernel_sdk::agent_input! {
+//     struct MyInput {
+//         target_address: [u8; 20],
+//         amount: u64,
+//         flag: u8,
+//     }
+// }
+
 /// Canonical agent entrypoint.
 ///
 /// # Arguments
@@ -570,18 +559,21 @@ include!(concat!(env!("OUT_DIR"), "/agent_hash.rs"));
 /// # Returns
 ///
 /// AgentOutput containing the actions to execute.
-#[no_mangle]
-#[allow(unsafe_code)]
 pub extern "Rust" fn agent_main(_ctx: &AgentContext, _opaque_inputs: &[u8]) -> AgentOutput {
     // TODO: Implement your agent logic here
     //
-    // Example: Parse inputs
-    // if opaque_inputs.len() < 4 {
-    //     return AgentOutput { actions: vec![] };
-    // }
+    // Example: Parse inputs with agent_input! macro
+    // let input = match MyInput::decode(opaque_inputs) {
+    //     Some(i) => i,
+    //     None => return AgentOutput { actions: vec![] },
+    // };
     //
-    // Example: Create actions
-    // let action = call_action(target, value, &calldata);
+    // Example: Create actions with CallBuilder
+    // use kernel_sdk::actions::CallBuilder;
+    // let action = CallBuilder::new(input.target_address)
+    //     .selector(0x12345678)
+    //     .param_u256_from_u64(input.amount)
+    //     .build();
 
     // Return a no-op action (placeholder)
     AgentOutput {
@@ -595,6 +587,9 @@ pub extern "Rust" fn agent_main(_ctx: &AgentContext, _opaque_inputs: &[u8]) -> A
 
 /// Compile-time check that agent_main matches the canonical AgentEntrypoint type.
 const _: AgentEntrypoint = agent_main;
+
+// Generate kernel_main, kernel_main_with_constraints, and KernelError re-export.
+kernel_sdk::agent_entrypoint!(agent_main);
 
 // ============================================================================
 // Tests
@@ -679,6 +674,7 @@ extern crate alloc;
 
 use alloc::{vec, vec::Vec};
 use kernel_sdk::prelude::*;
+use kernel_sdk::actions::CallBuilder;
 
 // Include the generated agent hash constant.
 include!(concat!(env!("OUT_DIR"), "/agent_hash.rs"));
@@ -687,11 +683,20 @@ include!(concat!(env!("OUT_DIR"), "/agent_hash.rs"));
 // Constants
 // ============================================================================
 
-/// Expected input size: 20 (vault) + 20 (yield source) + 8 (amount) = 48 bytes
-const INPUT_SIZE: usize = 48;
-
 /// Withdraw function selector: keccak256("withdraw(address)")[:4]
-const WITHDRAW_SELECTOR: [u8; 4] = [0x51, 0xcf, 0xf8, 0xd9];
+const WITHDRAW_SELECTOR: u32 = 0x51cff8d9;
+
+// ============================================================================
+// Input Parsing
+// ============================================================================
+
+kernel_sdk::agent_input! {
+    struct YieldInput {
+        vault_address: [u8; 20],
+        yield_source_address: [u8; 20],
+        transfer_amount: u64,
+    }
+}
 
 // ============================================================================
 // Agent Entry Point
@@ -707,33 +712,24 @@ const WITHDRAW_SELECTOR: [u8; 4] = [0x51, 0xcf, 0xf8, 0xd9];
 /// # Returns
 ///
 /// AgentOutput with two CALL actions: deposit and withdraw.
-#[no_mangle]
-#[allow(unsafe_code)]
 pub extern "Rust" fn agent_main(_ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput {
-    // Validate input size
-    if opaque_inputs.len() != INPUT_SIZE {
-        // Invalid input - return empty output (will be handled by constraints)
-        return AgentOutput {
-            actions: Vec::new(),
-        };
-    }
-
-    // Parse input
-    let vault_address: [u8; 20] = opaque_inputs[0..20].try_into().unwrap();
-    let yield_source_address: [u8; 20] = opaque_inputs[20..40].try_into().unwrap();
-    let transfer_amount = u64::from_le_bytes(opaque_inputs[40..48].try_into().unwrap());
-
-    // Build target (left-pad address to bytes32)
-    let target = address_to_bytes32(&yield_source_address);
+    let input = match YieldInput::decode(opaque_inputs) {
+        Some(i) => i,
+        None => return AgentOutput { actions: Vec::new() },
+    };
 
     // Build Action 1: Deposit ETH to yield source
     // call{value: amount}("") - sends ETH with empty calldata
-    let deposit_action = call_action(target, transfer_amount as u128, &[]);
+    let deposit_action = CallBuilder::new(input.yield_source_address)
+        .value(input.transfer_amount as u128)
+        .build();
 
     // Build Action 2: Withdraw from yield source
     // call{value: 0}(withdraw(vault_address))
-    let withdraw_calldata = encode_withdraw_call(&vault_address);
-    let withdraw_action = call_action(target, 0, &withdraw_calldata);
+    let withdraw_action = CallBuilder::new(input.yield_source_address)
+        .selector(WITHDRAW_SELECTOR)
+        .param_address(&input.vault_address)
+        .build();
 
     // Return both actions (deposit first, then withdraw)
     AgentOutput {
@@ -742,25 +738,14 @@ pub extern "Rust" fn agent_main(_ctx: &AgentContext, opaque_inputs: &[u8]) -> Ag
 }
 
 // ============================================================================
-// ABI Encoding Helpers
-// ============================================================================
-
-/// Encode the withdraw(address) function call.
-///
-/// Format: selector (4 bytes) + address (32 bytes, left-padded)
-fn encode_withdraw_call(depositor: &[u8; 20]) -> Vec<u8> {
-    let mut calldata = Vec::with_capacity(36);
-    calldata.extend_from_slice(&WITHDRAW_SELECTOR);
-    calldata.extend_from_slice(&address_to_bytes32(depositor));
-    calldata
-}
-
-// ============================================================================
 // Compile-time ABI Verification
 // ============================================================================
 
 /// Compile-time check that agent_main matches the canonical AgentEntrypoint type.
 const _: AgentEntrypoint = agent_main;
+
+// Generate kernel_main, kernel_main_with_constraints, and KernelError re-export.
+kernel_sdk::agent_entrypoint!(agent_main);
 
 // ============================================================================
 // Tests
@@ -771,7 +756,7 @@ mod tests {
     use super::*;
 
     fn make_test_input(vault: [u8; 20], yield_source: [u8; 20], amount: u64) -> Vec<u8> {
-        let mut input = Vec::with_capacity(INPUT_SIZE);
+        let mut input = Vec::with_capacity(YieldInput::ENCODED_SIZE);
         input.extend_from_slice(&vault);
         input.extend_from_slice(&yield_source);
         input.extend_from_slice(&amount.to_le_bytes());
@@ -858,102 +843,6 @@ mod tests {
 }
 "#
     .to_string()
-}
-
-fn generate_wrapper_cargo_toml(name: &str) -> String {
-    format!(
-        r#"[package]
-name = "{name}-wrapper"
-version = "0.1.0"
-edition.workspace = true
-license.workspace = true
-description = "Wrapper crate binding {name} to kernel-guest"
-
-[lib]
-crate-type = ["rlib"]
-
-[dependencies]
-kernel-guest = {{ git = "https://github.com/Defiesta/execution-kernel", branch = "main" }}
-kernel-sdk = {{ git = "https://github.com/Defiesta/execution-kernel", branch = "main" }}
-kernel-core = {{ git = "https://github.com/Defiesta/execution-kernel", branch = "main", default-features = false }}
-constraints = {{ git = "https://github.com/Defiesta/execution-kernel", branch = "main" }}
-{name} = {{ path = "../agent" }}
-
-[features]
-default = []
-risc0 = ["kernel-guest/risc0"]
-"#,
-        name = name
-    )
-}
-
-fn generate_wrapper_lib(name_snake: &str, name_pascal: &str) -> String {
-    format!(
-        r#"//! Wrapper crate binding {name_snake} to kernel-guest.
-//!
-//! This crate implements [`kernel_guest::AgentEntrypoint`] for the {name_snake},
-//! allowing it to be used with the agent-agnostic kernel execution functions.
-//!
-//! # Usage
-//!
-//! ```ignore
-//! // In a zkVM guest main.rs or test:
-//! let result = {name_snake}_wrapper::kernel_main(&input_bytes)?;
-//! ```
-
-use kernel_core::AgentOutput;
-use kernel_guest::AgentEntrypoint;
-use kernel_sdk::agent::AgentContext;
-
-// Re-export the agent code hash for convenience.
-pub use {name_snake}::AGENT_CODE_HASH;
-
-/// Wrapper implementing [`AgentEntrypoint`] for the {name_snake}.
-pub struct {name_pascal}Wrapper;
-
-impl AgentEntrypoint for {name_pascal}Wrapper {{
-    fn code_hash(&self) -> [u8; 32] {{
-        {name_snake}::AGENT_CODE_HASH
-    }}
-
-    fn run(&self, ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput {{
-        {name_snake}::agent_main(ctx, opaque_inputs)
-    }}
-}}
-
-/// Convenience function for kernel execution with the {name_snake}.
-///
-/// This is equivalent to calling:
-/// ```ignore
-/// kernel_guest::kernel_main_with_agent(input_bytes, &{name_pascal}Wrapper)
-/// ```
-pub fn kernel_main(input_bytes: &[u8]) -> Result<Vec<u8>, kernel_guest::KernelError> {{
-    kernel_guest::kernel_main_with_agent(input_bytes, &{name_pascal}Wrapper)
-}}
-
-/// Convenience function for kernel execution with the {name_snake} and custom constraints.
-///
-/// This is equivalent to calling:
-/// ```ignore
-/// kernel_guest::kernel_main_with_agent_and_constraints(input_bytes, &{name_pascal}Wrapper, constraint_set)
-/// ```
-pub fn kernel_main_with_constraints(
-    input_bytes: &[u8],
-    constraint_set: &constraints::ConstraintSetV1,
-) -> Result<Vec<u8>, kernel_guest::KernelError> {{
-    kernel_guest::kernel_main_with_agent_and_constraints(
-        input_bytes,
-        &{name_pascal}Wrapper,
-        constraint_set,
-    )
-}}
-
-// Re-export kernel_guest types for convenience.
-pub use kernel_guest::KernelError;
-"#,
-        name_snake = name_snake,
-        name_pascal = name_pascal
-    )
 }
 
 fn generate_tests_cargo_toml(name: &str) -> String {
@@ -1082,14 +971,6 @@ mod tests {
         assert_eq!(to_snake_case("my-agent"), "my_agent");
         assert_eq!(to_snake_case("my_agent"), "my_agent");
         assert_eq!(to_snake_case("myagent"), "myagent");
-    }
-
-    #[test]
-    fn test_to_pascal_case() {
-        assert_eq!(to_pascal_case("my-agent"), "MyAgent");
-        assert_eq!(to_pascal_case("my_agent"), "MyAgent");
-        assert_eq!(to_pascal_case("myagent"), "Myagent");
-        assert_eq!(to_pascal_case("my-yield-agent"), "MyYieldAgent");
     }
 
     #[test]

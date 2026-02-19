@@ -1,4 +1,5 @@
 import type { PublicClient, WalletClient } from 'viem';
+import { decodeEventLog } from 'viem';
 import { AgentRegistryABI } from '../abi/AgentRegistry';
 import type { KernelAgentInfo } from '../types';
 
@@ -44,8 +45,25 @@ export class AgentRegistryClient {
     });
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
     // Parse AgentRegistered event to get agentId
-    const log = receipt.logs[0];
-    const agentId = log?.topics?.[1] as `0x${string}` ?? '0x';
+    let agentId: `0x${string}` | undefined;
+    for (const log of receipt.logs) {
+      try {
+        const event = decodeEventLog({
+          abi: AgentRegistryABI,
+          data: log.data,
+          topics: log.topics as [`0x${string}`, ...`0x${string}`[]],
+        });
+        if (event.eventName === 'AgentRegistered') {
+          agentId = (event.args as { agentId: `0x${string}` }).agentId;
+          break;
+        }
+      } catch {
+        continue;
+      }
+    }
+    if (!agentId) {
+      throw new Error('AgentRegistered event not found in transaction receipt');
+    }
     return { agentId, txHash };
   }
 

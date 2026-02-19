@@ -1,6 +1,6 @@
 ---
 title: FAQ
-sidebar_position: 4
+sidebar_position: 5
 ---
 
 # Frequently Asked Questions
@@ -27,9 +27,28 @@ Zero-knowledge proofs allow:
 
 ## Development
 
+### How do I create a new agent?
+
+Use the `cargo agent` CLI:
+
+```bash
+cargo agent new my-agent --template yield
+```
+
+This scaffolds a complete agent project with two crates (`agent/` and `risc0-methods/`), a test harness, and a pre-populated manifest. See the [`cargo agent` CLI Reference](/sdk/cli-reference) for all options.
+
 ### What language do I write agents in?
 
 Agents are written in Rust. The SDK provides a `no_std` environment compatible with the zkVM.
+
+### Do I need a binding crate?
+
+No. The `agent_entrypoint!` macro generates all kernel binding code directly in your agent crate, eliminating the need for a separate binding crate. Each agent now has just two crates: `agent/` (logic + kernel binding) and `risc0-methods/` (zkVM build).
+
+```rust
+// In your agent's lib.rs — this replaces the entire binding crate
+kernel_sdk::agent_entrypoint!(agent_main);
+```
 
 ### Can I use external crates?
 
@@ -41,22 +60,37 @@ Yes, but with restrictions:
 
 ### How do I test my agent?
 
-Testing happens at multiple levels:
-
-1. **Unit tests**: Test `agent_main` directly in native Rust
-2. **Integration tests**: Run through the kernel without zkVM
-3. **E2E tests**: Generate actual proofs
+Use the `cargo agent` CLI and the SDK's `TestHarness`:
 
 ```bash
-# Unit tests
-cargo test -p my-agent
+# Unit tests (agent logic only)
+cargo agent test my-agent
 
-# Integration tests
+# Integration tests (kernel + constraints)
 cargo test -p kernel-host-tests
 
-# E2E proof tests
+# E2E proof tests (actual zkVM proofs)
 cargo test -p e2e-tests --features risc0-e2e
 ```
+
+In your test code, use `TestHarness` for minimal boilerplate:
+
+```rust
+use kernel_sdk::testing::*;
+use kernel_sdk::prelude::*;
+
+#[test]
+fn test_my_agent() {
+    let result = TestHarness::new()
+        .input(my_input.encode())
+        .execute(agent_main);
+
+    result.assert_action_count(2);
+    result.assert_action_type(0, ACTION_TYPE_CALL);
+}
+```
+
+See [Testing](/sdk/testing) for the full testing API.
 
 ### How long does proof generation take?
 

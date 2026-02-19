@@ -86,22 +86,19 @@ export interface ExecuteParams {
 
 // ============ Config ============
 
+import type { PublicClient, WalletClient } from 'viem';
+
 export interface ExecutionKernelConfig {
   chainId?: number;
   rpcUrl?: string;
-  agentRegistry: `0x${string}`;
-  vaultFactory: `0x${string}`;
-  kernelExecutionVerifier: `0x${string}`;
-  walletClient?: any;
-  publicClient?: any;
+  agentRegistry?: `0x${string}`;
+  vaultFactory?: `0x${string}`;
+  kernelExecutionVerifier?: `0x${string}`;
+  walletClient?: WalletClient;
+  publicClient?: PublicClient;
 }
 
-// ============ Deployed Addresses ============
+// ============ Deployed Addresses (re-exported from addresses.ts) ============
 
-export const OPTIMISM_SEPOLIA_ADDRESSES = {
-  agentRegistry: '0xED27f8fbB7D576f02D516d01593eEfBaAfe4b168' as `0x${string}`,
-  vaultFactory: '0x580e55fDE87fFC1cF1B6a446d6DBf8068EB07b8C' as `0x${string}`,
-  kernelExecutionVerifier: '0x1eB41537037fB771CBA8Cd088C7c806936325eB5' as `0x${string}`,
-} as const;
-
-export const DEFAULT_CHAIN_ID = 11155420; // Optimism Sepolia
+export { SEPOLIA_ADDRESSES as OPTIMISM_SEPOLIA_ADDRESSES, DEPLOYMENTS, DEFAULT_CHAIN_ID } from './addresses';
+export type { DeploymentAddresses } from './addresses';

@@ -5,6 +5,15 @@ import { useQuery } from '@tanstack/react-query';
 import { sepolia } from 'wagmi/chains';
 import { KERNEL_CONTRACTS, VaultFactoryABI, KernelVaultABI } from '@/lib/contracts';
 
+export interface VaultInfo {
+  address: `0x${string}`;
+  agentId: string;
+  asset: string;
+  totalAssets: bigint;
+  totalShares: bigint;
+  totalValueLocked: bigint;
+}
+
 export function useIsDeployedVault(vaultAddress: `0x${string}` | undefined) {
   return useReadContract({
     address: KERNEL_CONTRACTS.vaultFactory as `0x${string}`,
@@ -49,142 +58,94 @@ export function useDeployVault() {
 export function useDeployedVaultsList() {
   const client = usePublicClient({ chainId: sepolia.id });
 
-  return useQuery({
+  return useQuery<VaultInfo[]>({
     queryKey: ['deployedVaults'],
     queryFn: async () => {
       if (!client) return [];
 
-      // Fetch all vault addresses using the enumeration getter
       const vaultAddresses = await client.readContract({
         address: KERNEL_CONTRACTS.vaultFactory as `0x${string}`,
         abi: VaultFactoryABI,
         functionName: 'getAllVaults',
+      }) as `0x${string}`[];
+
+      if (vaultAddresses.length === 0) return [];
+
+      // Batch all per-vault reads into a single multicall (1 RPC call instead of 4N)
+      const calls = vaultAddresses.flatMap((vaultAddress) => [
+        {
+          address: vaultAddress,
+          abi: KernelVaultABI,
+          functionName: 'agentId' as const,
+        },
+        {
+          address: vaultAddress,
+          abi: KernelVaultABI,
+          functionName: 'asset' as const,
+        },
+        {
+          address: vaultAddress,
+          abi: KernelVaultABI,
+          functionName: 'totalAssets' as const,
+        },
+        {
+          address: vaultAddress,
+          abi: KernelVaultABI,
+          functionName: 'totalShares' as const,
+        },
+      ]);
+
+      const results = await client.multicall({ contracts: calls });
+
+      // Also batch totalValueLocked calls (may fail for old vaults)
+      const tvlCalls = vaultAddresses.map((vaultAddress) => ({
+        address: vaultAddress,
+        abi: KernelVaultABI,
+        functionName: 'totalValueLocked' as const,
+      }));
+
+      const tvlResults = await client.multicall({ contracts: tvlCalls });
+
+      const vaults: VaultInfo[] = vaultAddresses.map((vaultAddress, i) => {
+        const base = i * 4;
+        const agentId = results[base]?.result as string ?? '0x';
+        const asset = results[base + 1]?.result as string ?? '0x';
+        const totalAssets = (results[base + 2]?.result as bigint) ?? BigInt(0);
+        const totalShares = (results[base + 3]?.result as bigint) ?? BigInt(0);
+
+        // Fallback to totalAssets if totalValueLocked call failed (old vaults)
+        const totalValueLocked = tvlResults[i]?.status === 'success'
+          ? (tvlResults[i].result as bigint)
+          : totalAssets;
+
+        return {
+          address: vaultAddress,
+          agentId,
+          asset,
+          totalAssets,
+          totalShares,
+          totalValueLocked,
+        };
       });
-
-      // Fetch details for each vault
-      const vaults = await Promise.all(
-        (vaultAddresses as `0x${string}`[]).map(async (vaultAddress) => {
-          const [agentId, asset, totalAssets, totalShares] = await Promise.all([
-            client.readContract({
-              address: vaultAddress,
-              abi: KernelVaultABI,
-              functionName: 'agentId',
-            }),
-            client.readContract({
-              address: vaultAddress,
-              abi: KernelVaultABI,
-              functionName: 'asset',
-            }),
-            client.readContract({
-              address: vaultAddress,
-              abi: KernelVaultABI,
-              functionName: 'totalAssets',
-            }),
-            client.readContract({
-              address: vaultAddress,
-              abi: KernelVaultABI,
-              functionName: 'totalShares',
-            }),
-          ]);
-
-          // Fallback for old vaults without totalValueLocked()
-          let totalValueLocked: bigint;
-          try {
-            totalValueLocked = await client.readContract({
-              address: vaultAddress,
-              abi: KernelVaultABI,
-              functionName: 'totalValueLocked',
-            }) as bigint;
-          } catch {
-            totalValueLocked = totalAssets as bigint;
-          }
-
-          return {
-            address: vaultAddress,
-            agentId: agentId as string,
-            asset: asset as string,
-            totalAssets: totalAssets as bigint,
-            totalShares: totalShares as bigint,
-            totalValueLocked,
-          };
-        }),
-      );
 
       return vaults;
     },
     enabled: !!client,
+    staleTime: 30_000,
   });
 }
 
 export function useVaultsForAgent(agentId: `0x${string}` | undefined) {
-  const client = usePublicClient({ chainId: sepolia.id });
+  const { data: allVaults, isLoading, error } = useDeployedVaultsList();
 
-  return useQuery({
+  return useQuery<VaultInfo[]>({
     queryKey: ['vaultsForAgent', agentId],
-    queryFn: async () => {
-      if (!client || !agentId) return [];
-
-      // Fetch all vault addresses
-      const vaultAddresses = await client.readContract({
-        address: KERNEL_CONTRACTS.vaultFactory as `0x${string}`,
-        abi: VaultFactoryABI,
-        functionName: 'getAllVaults',
-      });
-
-      // Filter vaults that match the agent ID
-      const matchingVaults = await Promise.all(
-        (vaultAddresses as `0x${string}`[]).map(async (vaultAddress) => {
-          const vaultAgentId = await client.readContract({
-            address: vaultAddress,
-            abi: KernelVaultABI,
-            functionName: 'agentId',
-          });
-
-          if (vaultAgentId !== agentId) return null;
-
-          const [asset, totalAssets, totalShares] = await Promise.all([
-            client.readContract({
-              address: vaultAddress,
-              abi: KernelVaultABI,
-              functionName: 'asset',
-            }),
-            client.readContract({
-              address: vaultAddress,
-              abi: KernelVaultABI,
-              functionName: 'totalAssets',
-            }),
-            client.readContract({
-              address: vaultAddress,
-              abi: KernelVaultABI,
-              functionName: 'totalShares',
-            }),
-          ]);
-
-          // Fallback for old vaults without totalValueLocked()
-          let totalValueLocked: bigint;
-          try {
-            totalValueLocked = await client.readContract({
-              address: vaultAddress,
-              abi: KernelVaultABI,
-              functionName: 'totalValueLocked',
-            }) as bigint;
-          } catch {
-            totalValueLocked = totalAssets as bigint;
-          }
-
-          return {
-            address: vaultAddress,
-            agentId: vaultAgentId as string,
-            asset: asset as string,
-            totalAssets: totalAssets as bigint,
-            totalShares: totalShares as bigint,
-            totalValueLocked,
-          };
-        }),
-      );
-
-      return matchingVaults.filter((v): v is NonNullable<typeof v> => v !== null);
+    queryFn: () => {
+      if (!allVaults || !agentId) return [];
+      return allVaults.filter((v) => v.agentId === agentId);
     },
-    enabled: !!client && !!agentId,
+    enabled: !!allVaults && !!agentId && !isLoading,
+    // Re-derive whenever the underlying vault list changes
+    staleTime: 0,
   });
 }

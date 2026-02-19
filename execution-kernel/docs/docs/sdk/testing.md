@@ -1,11 +1,11 @@
 ---
 title: Testing
-sidebar_position: 4
+sidebar_position: 6
 ---
 
 # Testing Agents
 
-Testing happens at multiple levels, from fast unit tests to full on-chain E2E tests. This guide explains each level and how to use them effectively.
+Testing happens at multiple levels, from fast unit tests to full on-chain E2E tests. The SDK provides `TestHarness`, `ContextBuilder`, and hex helpers to reduce boilerplate.
 
 ## Testing Levels
 
@@ -28,56 +28,167 @@ flowchart TD
 | E2E Proof Tests | Minutes | Full zkVM proof generation |
 | On-Chain E2E | Minutes | Complete flow with blockchain |
 
+## TestHarness
+
+The `TestHarness` provides a fluent API for testing agents with minimal boilerplate:
+
+```rust
+use kernel_sdk::testing::*;
+use kernel_sdk::prelude::*;
+
+#[test]
+fn test_my_agent() {
+    let result = TestHarness::new()
+        .agent_id(bytes32("0x42"))
+        .input(my_input.encode())
+        .execute(agent_main);
+
+    result.assert_action_count(1);
+    result.assert_action_type(0, ACTION_TYPE_CALL);
+}
+```
+
+### Configuration Methods
+
+| Method | Description | Default |
+|--------|-------------|---------|
+| `.agent_id([u8; 32])` | Set agent ID | `[0x42; 32]` |
+| `.code_hash([u8; 32])` | Set agent code hash | `[0; 32]` |
+| `.nonce(u64)` | Set execution nonce | `1` |
+| `.input_root([u8; 32])` | Set input root | `[0; 32]` |
+| `.input(impl AsRef<[u8]>)` | Set opaque input bytes | `[]` |
+
+### Execution Methods
+
+| Method | Returns | Tests |
+|--------|---------|-------|
+| `.execute(agent_fn)` | `TestResult` | Agent logic only |
+| `.execute_kernel(kernel_fn)` | `KernelTestResult` | Full kernel pipeline |
+| `.execute_kernel_with_constraints(fn, &cs)` | `KernelTestResult` | Kernel + custom constraints |
+
+## Hex Helpers
+
+Convert hex strings to byte arrays for test inputs:
+
+```rust
+use kernel_sdk::testing::*;
+
+// 20-byte address
+let pool = addr("0x1111111111111111111111111111111111111111");
+
+// 32-byte ID
+let id = bytes32("0x4242424242424242424242424242424242424242424242424242424242424242");
+
+// Arbitrary bytes
+let data = hex_bytes("0xDEADBEEF");
+```
+
+Short inputs are right-padded with zeros:
+
+```rust
+let a = addr("0xABCD");       // [0xAB, 0xCD, 0, 0, ..., 0] (20 bytes)
+let b = bytes32("0xFF");      // [0xFF, 0, 0, ..., 0] (32 bytes)
+```
+
+## TestResult Assertions
+
+For `TestHarness::execute()` (agent-level):
+
+| Method | Description |
+|--------|-------------|
+| `assert_action_count(n)` | Exact number of actions |
+| `assert_action_type(index, type)` | Action type at position |
+| `assert_target(index, &[u8; 20])` | Action target address |
+| `assert_payload(index, &[u8])` | Raw payload bytes |
+| `assert_empty()` | No actions produced |
+| `assert_deterministic(agent_fn)` | Re-runs and asserts identical output |
+
+Inspectors:
+
+| Method | Returns |
+|--------|---------|
+| `action_count()` | `usize` |
+| `action(index)` | `&ActionV1` |
+| `is_empty()` | `bool` |
+| `actions_of_type(type)` | `Vec<&ActionV1>` |
+
+## KernelTestResult Assertions
+
+For `TestHarness::execute_kernel()` (kernel-level):
+
+| Method | Description |
+|--------|-------------|
+| `assert_success()` | Execution status is Success |
+| `assert_failure()` | Execution status is Failure |
+| `assert_deterministic(kernel_fn)` | Re-runs and asserts identical journal |
+| `assert_agent_id(&[u8; 32])` | Agent ID in journal matches |
+| `assert_nonce(u64)` | Nonce in journal matches |
+
+## ContextBuilder
+
+For fine-grained control over the `AgentContext`:
+
+```rust
+use kernel_sdk::testing::ContextBuilder;
+
+let ctx = ContextBuilder::new()
+    .agent_id([0xAA; 32])
+    .code_hash([0xBB; 32])
+    .nonce(42)
+    .input_root([0xCC; 32])
+    .constraint_set_hash([0xDD; 32])
+    .build();
+```
+
+Defaults: `protocol_version=1`, `kernel_version=1`, `agent_id=[0x42; 32]`, `nonce=1`.
+
 ## Unit Tests
 
-Test `agent_main` directly without the kernel:
+Test `agent_main` directly using `TestHarness`:
 
 ```rust
 #[cfg(test)]
 mod tests {
     use super::*;
-    use kernel_sdk::prelude::*;
-
-    fn make_test_context() -> AgentContext<'static> {
-        static AGENT_ID: [u8; 32] = [0x01; 32];
-        static CODE_HASH: [u8; 32] = [0x02; 32];
-        static CONSTRAINT_HASH: [u8; 32] = [0x03; 32];
-        static INPUT_ROOT: [u8; 32] = [0x04; 32];
-
-        AgentContext {
-            protocol_version: 1,
-            kernel_version: 1,
-            agent_id: &AGENT_ID,
-            agent_code_hash: &CODE_HASH,
-            constraint_set_hash: &CONSTRAINT_HASH,
-            input_root: &INPUT_ROOT,
-            execution_nonce: 1,
-            opaque_inputs: &[],
-        }
-    }
+    use kernel_sdk::testing::*;
 
     #[test]
-    fn test_empty_input_returns_empty_output() {
-        let ctx = make_test_context();
-        let output = agent_main(&ctx, &[]);
-        assert!(output.actions.is_empty());
-    }
+    fn test_supply_when_rate_above_threshold() {
+        let mut input = Vec::with_capacity(MarketInput::ENCODED_SIZE);
+        input.extend_from_slice(&[0x11; 20]); // lending_pool
+        input.extend_from_slice(&[0x22; 20]); // asset_token
+        input.extend_from_slice(&[0x33; 20]); // vault_address
+        input.extend_from_slice(&1_000_000u64.to_le_bytes());
+        input.extend_from_slice(&0u64.to_le_bytes());
+        input.extend_from_slice(&500u32.to_le_bytes());   // rate above threshold
+        input.extend_from_slice(&200u32.to_le_bytes());
+        input.extend_from_slice(&8000u32.to_le_bytes());
+        input.push(0); // evaluate
 
-    #[test]
-    fn test_valid_input_produces_action() {
-        let ctx = make_test_context();
-        let input = create_valid_input();
-        let output = agent_main(&ctx, &input);
-        assert_eq!(output.actions.len(), 1);
-        assert_eq!(output.actions[0].action_type, ACTION_TYPE_CALL);
+        let result = TestHarness::new()
+            .input(input)
+            .execute(agent_main);
+
+        result.assert_action_count(1);
+        result.assert_action_type(0, ACTION_TYPE_CALL);
     }
 
     #[test]
     fn test_invalid_input_returns_empty() {
-        let ctx = make_test_context();
-        let invalid_input = &[0x00; 10];  // Too short
-        let output = agent_main(&ctx, invalid_input);
-        assert!(output.actions.is_empty());
+        let result = TestHarness::new()
+            .input(&[0u8; 10])
+            .execute(agent_main);
+
+        result.assert_empty();
+    }
+
+    #[test]
+    fn test_determinism() {
+        let result = TestHarness::new()
+            .input(valid_input_bytes())
+            .execute(agent_main);
+
+        result.assert_deterministic(agent_main);
     }
 }
 ```
@@ -85,68 +196,35 @@ mod tests {
 Run unit tests:
 
 ```bash
-cargo test -p my-agent
+cargo agent test my-agent
 ```
 
 ## Integration Tests
 
-Test the agent through the kernel (without zkVM):
+Test through the kernel using `execute_kernel`:
 
 ```rust
-#[cfg(test)]
-mod integration_tests {
-    use kernel_core::*;
-    use kernel_guest_binding_myagent::kernel_main;
+use my_agent::kernel_main;
 
-    #[test]
-    fn test_kernel_execution_success() {
-        let input = KernelInputV1 {
-            protocol_version: PROTOCOL_VERSION,
-            kernel_version: KERNEL_VERSION,
-            agent_id: [0x01; 32],
-            agent_code_hash: my_agent::AGENT_CODE_HASH,
-            constraint_set_hash: [0x00; 32],
-            input_root: [0x00; 32],
-            execution_nonce: 1,
-            opaque_agent_inputs: create_valid_input(),
-        };
+#[test]
+fn test_kernel_execution_success() {
+    let result = TestHarness::new()
+        .agent_id([0x42; 32])
+        .input(valid_input_bytes())
+        .execute_kernel(kernel_main);
 
-        let journal_bytes = kernel_main(&input.encode().unwrap()).unwrap();
-        let journal = KernelJournalV1::decode(&journal_bytes).unwrap();
+    result.assert_success();
+    result.assert_agent_id(&[0x42; 32]);
+    result.assert_nonce(1);
+}
 
-        assert_eq!(journal.execution_status, ExecutionStatus::Success);
-    }
+#[test]
+fn test_kernel_determinism() {
+    let result = TestHarness::new()
+        .input(valid_input_bytes())
+        .execute_kernel(kernel_main);
 
-    #[test]
-    fn test_agent_code_hash_mismatch_fails() {
-        let input = KernelInputV1 {
-            protocol_version: PROTOCOL_VERSION,
-            kernel_version: KERNEL_VERSION,
-            agent_id: [0x01; 32],
-            agent_code_hash: [0x00; 32],  // Wrong hash!
-            constraint_set_hash: [0x00; 32],
-            input_root: [0x00; 32],
-            execution_nonce: 1,
-            opaque_agent_inputs: vec![],
-        };
-
-        let result = kernel_main(&input.encode().unwrap());
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_constraint_violation_produces_failure() {
-        // Test with constraints that will fail
-        let input = KernelInputV1 {
-            // ... setup with constraint-violating output
-        };
-
-        let journal_bytes = kernel_main(&input.encode().unwrap()).unwrap();
-        let journal = KernelJournalV1::decode(&journal_bytes).unwrap();
-
-        assert_eq!(journal.execution_status, ExecutionStatus::Failure);
-        assert_eq!(journal.action_commitment, EMPTY_OUTPUT_COMMITMENT);
-    }
+    result.assert_deterministic(kernel_main);
 }
 ```
 
@@ -156,210 +234,28 @@ Run integration tests:
 cargo test -p kernel-host-tests
 ```
 
-## E2E Proof Tests
+## Snapshot Testing
 
-Generate actual zkVM proofs:
+With the `std` feature, `TestResult` and `KernelTestResult` support snapshot testing:
 
 ```rust
-#[cfg(feature = "risc0-e2e")]
-mod e2e_tests {
-    use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts};
-    use risc0_methods::{ZKVM_GUEST_ELF, ZKVM_GUEST_ID};
-    use kernel_core::*;
+#[test]
+fn test_output_snapshot() {
+    let result = TestHarness::new()
+        .input(canonical_input())
+        .execute(agent_main);
 
-    #[test]
-    fn test_e2e_proof_generation() {
-        let input = KernelInputV1 {
-            protocol_version: PROTOCOL_VERSION,
-            kernel_version: KERNEL_VERSION,
-            agent_id: [0x01; 32],
-            agent_code_hash: my_agent::AGENT_CODE_HASH,
-            constraint_set_hash: [0x00; 32],
-            input_root: [0x00; 32],
-            execution_nonce: 1,
-            opaque_agent_inputs: create_valid_input(),
-        };
-
-        let input_bytes = input.encode().unwrap();
-
-        // Set up zkVM environment
-        let env = ExecutorEnv::builder()
-            .write(&input_bytes)
-            .unwrap()
-            .build()
-            .unwrap();
-
-        // Generate proof
-        let prover = default_prover();
-        let prove_info = prover
-            .prove_with_opts(env, ZKVM_GUEST_ELF, &ProverOpts::groth16())
-            .expect("proof generation failed");
-
-        // Verify receipt
-        prove_info.receipt.verify(ZKVM_GUEST_ID).unwrap();
-
-        // Check journal
-        let journal_bytes: Vec<u8> = prove_info.receipt.journal.decode().unwrap();
-        let journal = KernelJournalV1::decode(&journal_bytes).unwrap();
-
-        assert_eq!(journal.execution_status, ExecutionStatus::Success);
-    }
-
-    #[test]
-    fn test_e2e_determinism() {
-        let input = create_test_input();
-        let input_bytes = input.encode().unwrap();
-
-        // Run twice
-        let journal1 = run_proof(&input_bytes);
-        let journal2 = run_proof(&input_bytes);
-
-        // Must be identical
-        assert_eq!(journal1, journal2);
-    }
+    result.assert_snapshot("defi_farmer_supply");
 }
 ```
 
-Run E2E tests:
+Snapshots are saved to `tests/snapshots/<name>.snap`. Update with:
 
 ```bash
-# Install RISC Zero toolchain first
-cargo risczero install
-
-# Run E2E proof tests
-cargo test -p e2e-tests --features risc0-e2e -- --nocapture
-```
-
-:::note
-Proof generation can take several minutes. Use `--nocapture` to see progress.
-:::
-
-## On-Chain E2E Tests
-
-Test the complete flow on Sepolia testnet:
-
-```bash
-# Set environment variables
-export VAULT_ADDRESS=0xAdeDA97D2D07C7f2e332fD58F40Eb4f7F0192be7
-export MOCK_YIELD_ADDRESS=0x7B35E3F2e810170f146d31b00262b9D7138F9b39
-export RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
-export PRIVATE_KEY=0x...
-export EXECUTION_NONCE=1
-export TRANSFER_AMOUNT=10000000000000000  # 0.01 ETH
-
-# Run on-chain test
-cargo test --release -p e2e-tests --features phase3-e2e \
-    test_full_e2e_yield_execution -- --ignored --nocapture
-```
-
-## Test Patterns
-
-### Testing Input Parsing
-
-```rust
-#[test]
-fn test_input_parsing_edge_cases() {
-    // Empty input
-    assert!(parse_input(&[]).is_none());
-
-    // Too short
-    assert!(parse_input(&[0x00; 10]).is_none());
-
-    // Exact size
-    let valid = create_valid_input();
-    assert!(parse_input(&valid).is_some());
-
-    // Too long (may or may not be valid depending on agent)
-    let mut long = valid.clone();
-    long.extend_from_slice(&[0x00; 100]);
-    // Agent-specific behavior
-}
-```
-
-### Testing Action Construction
-
-```rust
-#[test]
-fn test_call_action_payload_encoding() {
-    let target = address_to_bytes32(&[0x01; 20]);
-    let value: u128 = 1_000_000;
-    let calldata = &[0xab, 0xcd, 0xef, 0x12];  // 4-byte selector
-
-    let action = call_action(target, value, calldata);
-
-    assert_eq!(action.action_type, ACTION_TYPE_CALL);
-    // Payload: 32 (value) + 32 (offset) + 32 (length) + 32 (padded calldata)
-    assert_eq!(action.payload.len(), 128);
-
-    // Verify ABI encoding structure
-    assert_eq!(action.payload[63], 64);  // Offset = 64
-    assert_eq!(action.payload[95], 4);   // Length = 4
-    assert_eq!(&action.payload[96..100], calldata);
-}
-
-#[test]
-fn test_transfer_erc20_action_encoding() {
-    let token = [0x11; 20];
-    let recipient = [0x22; 20];
-    let amount: u128 = 1_000_000;
-
-    let action = transfer_erc20_action(&token, &recipient, amount);
-
-    assert_eq!(action.action_type, ACTION_TYPE_TRANSFER_ERC20);
-    assert_eq!(action.payload.len(), 96);  // 3 × 32 bytes
-
-    // Verify token address (left-padded)
-    assert_eq!(&action.payload[12..32], &token);
-    // Verify recipient address (left-padded)
-    assert_eq!(&action.payload[44..64], &recipient);
-}
-```
-
-### Testing Constraint Behavior
-
-```rust
-#[test]
-fn test_action_type_constraint() {
-    let constraints = ConstraintSetV1::default();
-
-    // CALL action should pass with valid ABI payload
-    let target = address_to_bytes32(&[0x11; 20]);
-    let call = call_action(target, 0, &[0xab, 0xcd, 0xef, 0x12]);
-    assert!(check_constraints(&constraints, &[call]).is_ok());
-
-    // NO_OP should pass with empty payload
-    let noop = no_op_action();
-    assert!(check_constraints(&constraints, &[noop]).is_ok());
-
-    // Unknown action type should fail
-    let unknown = ActionV1 {
-        action_type: 0xFFFFFFFF,
-        target: [0; 32],
-        payload: vec![],
-    };
-    let result = check_constraints(&constraints, &[unknown]);
-    assert_eq!(result, Err(ViolationReason::UnknownActionType));
-}
-
-#[test]
-fn test_invalid_call_payload() {
-    let constraints = ConstraintSetV1::default();
-    let target = address_to_bytes32(&[0x11; 20]);
-
-    // CALL with too-short payload should fail
-    let invalid = ActionV1 {
-        action_type: ACTION_TYPE_CALL,
-        target,
-        payload: vec![0u8; 64],  // Need at least 96 bytes
-    };
-    let result = check_constraints(&constraints, &[invalid]);
-    assert_eq!(result, Err(ViolationReason::InvalidActionPayload));
-}
+BLESS=1 cargo test test_output_snapshot
 ```
 
 ## CI Integration
-
-Add to your CI pipeline:
 
 ```yaml
 jobs:
@@ -367,12 +263,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      # Unit and integration tests (fast)
       - name: Run unit tests
         run: cargo test
-
-      # E2E tests (only in environments with RISC Zero)
       - name: Run E2E proof tests
         if: ${{ matrix.risc0-enabled }}
         run: |
@@ -380,43 +272,9 @@ jobs:
           cargo test -p e2e-tests --features risc0-e2e -- --nocapture
 ```
 
-## Debugging Tips
-
-### Verbose Output
-
-```bash
-# See all test output
-cargo test -- --nocapture
-
-# Run specific test with output
-cargo test test_name -- --nocapture
-```
-
-### Debug Logging in Agent
-
-```rust
-// Only in debug builds, compiled out in release
-#[cfg(debug_assertions)]
-eprintln!("Debug: processing input of length {}", input.len());
-```
-
-### Check Commitments
-
-```rust
-#[test]
-fn test_commitment_matches() {
-    let input = create_test_input();
-    let input_bytes = input.encode().unwrap();
-    let expected_commitment = sha256(&input_bytes);
-
-    let journal = run_kernel(&input_bytes);
-
-    assert_eq!(journal.input_commitment, expected_commitment);
-}
-```
-
 ## Related
 
-- [Writing an Agent](/sdk/writing-an-agent) - Agent development guide
+- [`agent_input!` Macro](/sdk/agent-input-macro) - Declarative input parsing
+- [CallBuilder & ERC20 Helpers](/sdk/call-builder) - Action construction
 - [Constraints](/sdk/constraints-and-commitments) - Constraint system details
 - [Run an Example](/getting-started/run-an-example) - Running the yield agent

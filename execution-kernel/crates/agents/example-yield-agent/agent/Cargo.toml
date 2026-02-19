@@ -10,6 +10,11 @@ crate-type = ["rlib"]
 
 [dependencies]
 kernel-sdk = { path = "../../../sdk/kernel-sdk" }
+kernel-guest = { path = "../../../runtime/kernel-guest" }
+constraints = { path = "../../../protocol/constraints" }
+
+[dev-dependencies]
+kernel-sdk = { path = "../../../sdk/kernel-sdk", features = ["testing", "std"] }
 
 [build-dependencies]
 sha2 = "0.10"

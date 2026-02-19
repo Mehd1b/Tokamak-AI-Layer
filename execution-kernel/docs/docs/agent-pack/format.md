@@ -135,7 +135,7 @@ The manifest is a JSON file containing:
 ```mermaid
 flowchart TD
     A[Agent Source Code] -->|SHA-256| B[agent_code_hash]
-    C[Kernel + Wrapper + Agent] -->|RISC Zero compile| D[ELF Binary]
+    C[Kernel + Agent] -->|RISC Zero compile| D[ELF Binary]
     D -->|SHA-256| E[elf_sha256]
     D -->|RISC Zero hash| F[image_id]
 
@@ -152,7 +152,23 @@ Each step is deterministic. Given the same source and build environment:
 
 ## Creating an Agent Pack
 
-### 1. Initialize Manifest
+### Using `cargo agent` (recommended)
+
+The fastest way to create and package an agent:
+
+```bash
+# Scaffold a new agent
+cargo agent new my-yield-agent --template yield
+
+# Build and package
+cd my-yield-agent
+cargo agent build my-yield-agent
+cargo agent pack my-yield-agent --version 1.0.0
+```
+
+### Using `agent-pack` directly
+
+#### 1. Initialize Manifest
 
 ```bash
 agent-pack init \
@@ -163,13 +179,13 @@ agent-pack init \
 
 Creates `./dist/agent-pack.json` with placeholder values.
 
-### 2. Build with Reproducible Settings
+#### 2. Build with Reproducible Settings
 
 ```bash
 RISC0_USE_DOCKER=1 cargo build --release -p risc0-methods
 ```
 
-### 3. Compute Hashes
+#### 3. Compute Hashes
 
 ```bash
 agent-pack compute \
@@ -183,7 +199,7 @@ This updates:
 - `image_id` (requires `--features risc0`)
 - `build.cargo_lock_sha256`
 
-### 4. Add Documentation
+#### 4. Add Documentation
 
 Edit the manifest to include:
 - Input format description
@@ -191,7 +207,7 @@ Edit the manifest to include:
 - Network deployment info
 - Git repository info
 
-### 5. Verify
+#### 5. Verify
 
 ```bash
 agent-pack verify --manifest dist/agent-pack.json
@@ -238,30 +254,19 @@ OPTIONS:
 
 ### `agent-pack scaffold`
 
+:::note
+The `agent-pack scaffold` command is deprecated in favor of `cargo agent new`, which generates the same structure with a simpler interface.
+:::
+
 ```
 USAGE:
     agent-pack scaffold [OPTIONS] <NAME>
 
-ARGUMENTS:
-    <NAME>                     Agent project name (e.g., "my-yield-agent")
-
 OPTIONS:
-        --agent-id <AGENT_ID>  Pre-set agent ID (64-character hex with 0x prefix)
-                               [default: 0x00...00]
+        --agent-id <AGENT_ID>  Pre-set agent ID [default: 0x00...00]
     -o, --out <PATH>           Output directory [default: ./<name>]
         --template <TYPE>      Template type: minimal | yield [default: minimal]
         --no-git               Skip git init
-```
-
-Generates a complete, ready-to-build agent project structure. This is the fastest way to create a new agent:
-
-```bash
-# Create a minimal agent project
-agent-pack scaffold my-agent
-
-# Create a yield farming agent with custom ID
-agent-pack scaffold my-yield-agent --template yield \
-  --agent-id 0x0000000000000000000000000000000000000000000000000000000000000042
 ```
 
 **Generated Structure:**
@@ -271,13 +276,10 @@ my-agent/
 ├── Cargo.toml           # Workspace manifest
 ├── README.md            # Quick start guide
 ├── .gitignore
-├── agent/               # Core agent logic
+├── agent/               # Core agent logic + kernel binding
 │   ├── Cargo.toml
 │   ├── build.rs         # AGENT_CODE_HASH computation
-│   └── src/lib.rs       # agent_main() template
-├── wrapper/             # AgentEntrypoint binding
-│   ├── Cargo.toml
-│   └── src/lib.rs
+│   └── src/lib.rs       # agent_main() + agent_entrypoint!()
 ├── tests/               # Test harness
 │   ├── Cargo.toml
 │   └── src/lib.rs

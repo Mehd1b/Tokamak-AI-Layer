@@ -64,6 +64,27 @@ export const VaultFactoryABI = [
     stateMutability: 'view',
   },
   {
+    type: 'function',
+    name: 'vaultCount',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'vaultAt',
+    inputs: [{ name: 'index', type: 'uint256' }],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getAllVaults',
+    inputs: [],
+    outputs: [{ name: '', type: 'address[]' }],
+    stateMutability: 'view',
+  },
+  {
     type: 'event',
     name: 'VaultDeployed',
     inputs: [

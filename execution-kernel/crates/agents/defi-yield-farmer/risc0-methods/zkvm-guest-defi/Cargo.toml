@@ -12,7 +12,8 @@ edition = "2021"
 [workspace]
 
 [dependencies]
-kernel-guest-binding-defi-yield = { path = "../../binding" }
+# Agent crate (generates kernel_main via agent_entrypoint! macro)
+defi-yield-farmer = { path = "../../agent" }
 risc0-zkvm = { version = "3.0", default-features = false, features = ["std"] }
 
 [features]

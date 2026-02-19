@@ -1,7 +1,7 @@
 //! RISC Zero zkVM Guest Entry Point
 //!
-//! This is a wrapper that delegates to the wrapper crate for zkVM execution.
-//! The wrapper crate binds a specific agent to the kernel-guest library.
+//! This is a wrapper that delegates to the agent crate for zkVM execution.
+//! The agent crate generates kernel_main via the agent_entrypoint! macro.
 //!
 //! # Execution Flow
 //!
@@ -20,8 +20,8 @@ fn main() {
     // Read input bytes from the host
     let input_bytes: Vec<u8> = env::read();
 
-    // Execute kernel via the wrapper crate (which binds the specific agent)
-    match kernel_guest_binding_yield::kernel_main(&input_bytes) {
+    // Execute kernel via the agent crate (which binds the specific agent)
+    match example_yield_agent::kernel_main(&input_bytes) {
         Ok(journal_bytes) => {
             // Commit journal to the proof receipt
             env::commit_slice(&journal_bytes);

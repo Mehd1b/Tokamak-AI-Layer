@@ -69,10 +69,49 @@ export const AgentRegistryABI = [
   },
   {
     type: 'function',
+    name: 'unregister',
+    inputs: [
+      { name: 'agentId', type: 'bytes32' },
+      { name: 'vaults', type: 'address[]' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'agentExists',
     inputs: [{ name: 'agentId', type: 'bytes32' }],
     outputs: [{ name: '', type: 'bool' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'agentCount',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'agentAt',
+    inputs: [{ name: 'index', type: 'uint256' }],
+    outputs: [{ name: '', type: 'bytes32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getAllAgentIds',
+    inputs: [],
+    outputs: [{ name: '', type: 'bytes32[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    name: 'AgentUnregistered',
+    inputs: [
+      { name: 'agentId', type: 'bytes32', indexed: true },
+      { name: 'author', type: 'address', indexed: true },
+    ],
   },
   {
     type: 'event',

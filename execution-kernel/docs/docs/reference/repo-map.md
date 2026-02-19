@@ -23,20 +23,21 @@ execution-kernel/
 │   │   └── constraints/          # Constraint engine
 │   │
 │   ├── sdk/
-│   │   └── kernel-sdk/           # Agent development SDK
+│   │   └── kernel-sdk/           # Agent development SDK (macros, builders, testing)
 │   │
 │   ├── runtime/                  # zkVM execution
 │   │   └── kernel-guest/         # Agent-agnostic kernel logic
 │   │
 │   ├── agents/
 │   │   ├── example-yield-agent/      # Reference yield agent
-│   │   │   ├── agent/                # Agent logic (lib.rs, build.rs)
-│   │   │   ├── binding/              # Kernel-guest binding wrapper
+│   │   │   ├── agent/                # Agent logic + kernel binding
 │   │   │   └── risc0-methods/        # RISC Zero build + zkvm-guest/
 │   │   └── defi-yield-farmer/        # DeFi yield farming agent
-│   │       ├── agent/                # Agent logic (lib.rs, build.rs)
-│   │       ├── binding/              # Kernel-guest binding wrapper
+│   │       ├── agent/                # Agent logic + kernel binding
 │   │       └── risc0-methods/        # RISC Zero build + zkvm-guest-defi/
+│   │
+│   ├── tools/
+│   │   └── cargo-agent/          # cargo agent CLI subcommand
 │   │
 │   ├── agent-pack/               # Agent Pack CLI tool
 │   │
@@ -52,13 +53,7 @@ execution-kernel/
 │   │   └── MockYieldSource.sol
 │   └── foundry.toml
 │
-├── docs/                         # In-repo documentation
-│   ├── architecture.md
-│   ├── agents.md
-│   ├── building-an-agent.md
-│   ├── agent-pack.md
-│   ├── end-to-end-flow.md
-│   └── agent-pack.schema.json
+├── docs/                         # Docusaurus documentation site
 │
 ├── spec/                         # Technical specifications
 │   ├── codec.md
@@ -120,27 +115,33 @@ pub fn enforce_constraints(...) -> Result<AgentOutput, ViolationReason>;
 
 **Path**: `crates/sdk/kernel-sdk/`
 
-Agent development utilities.
+Agent development SDK providing macros, builders, and testing utilities.
 
 ```rust
-// Agent interface
-pub struct AgentContext<'a> { ... }
+// Macros
+agent_input! { struct MyInput { ... } }  // Declarative input parsing
+agent_entrypoint!(agent_main);           // Kernel binding generation
 
-// Action constructors
-pub fn echo_action(...) -> ActionV1;
-pub fn open_position_action(...) -> ActionV1;
-pub fn close_position_action(...) -> ActionV1;
-pub fn adjust_position_action(...) -> ActionV1;
-pub fn swap_action(...) -> ActionV1;
+// Action builders
+CallBuilder::new(target).selector(0x...).param_address(&addr).build();
+erc20::approve(&token, &spender, amount);
+erc20::transfer(&token, &to, amount);
+erc20::transfer_from(&token, &from, &to, amount);
+
+// Testing (behind "testing" feature)
+TestHarness::new().input(bytes).execute(agent_main);
+ContextBuilder::new().agent_id([0x42; 32]).build();
+addr("0x1111..."); bytes32("0x42"); hex_bytes("0xDEADBEEF");
 
 // Math helpers
-pub fn checked_add_u64(...) -> Option<u64>;
-pub fn checked_mul_div_u64(...) -> Option<u64>;
-pub fn apply_bps(...) -> Option<u64>;
+checked_add_u64(a, b);
+checked_mul_div_u64(value, numerator, denominator);
+apply_bps(value, bps);
 
 // Byte helpers
-pub fn read_u32_le(...) -> Option<u32>;
-pub fn read_bytes32(...) -> Option<[u8; 32]>;
+read_u32_le(buf, offset);
+read_u64_le(buf, offset);
+read_bytes32(buf, offset);
 ```
 
 ### Runtime Layer
@@ -165,12 +166,11 @@ pub fn kernel_main_with_agent<A: AgentEntrypoint>(
 
 ### Agent Layer
 
-Each agent is a self-contained directory under `crates/agents/` with three sub-crates:
+Each agent is a self-contained directory under `crates/agents/` with two sub-crates:
 
 | Sub-crate | Purpose |
 |-----------|---------|
-| `agent/` | Agent logic (`lib.rs`, `build.rs`, code hash) |
-| `binding/` | Kernel-guest binding wrapper (`AgentEntrypoint` impl) |
+| `agent/` | Agent logic, kernel binding via `agent_entrypoint!`, code hash |
 | `risc0-methods/` | RISC Zero build crate + `zkvm-guest/` binary |
 
 #### example-yield-agent
@@ -183,11 +183,7 @@ Reference yield farming agent.
 // agent/
 pub const AGENT_CODE_HASH: [u8; 32];
 pub fn agent_main(ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput;
-
-// binding/
-pub struct YieldAgentWrapper;
-impl AgentEntrypoint for YieldAgentWrapper { ... }
-pub fn kernel_main(input_bytes: &[u8]) -> Result<Vec<u8>, KernelError>;
+pub fn kernel_main(input_bytes: &[u8]) -> Result<Vec<u8>, KernelError>;  // generated
 
 // risc0-methods/
 pub const ZKVM_GUEST_ELF: &[u8];
@@ -204,10 +200,7 @@ DeFi yield farming agent with multi-protocol strategy support.
 // agent/
 pub const AGENT_CODE_HASH: [u8; 32];
 pub fn agent_main(ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput;
-
-// binding/
-pub struct DefiYieldFarmerWrapper;
-impl AgentEntrypoint for DefiYieldFarmerWrapper { ... }
+pub fn kernel_main(input_bytes: &[u8]) -> Result<Vec<u8>, KernelError>;  // generated
 
 // risc0-methods/
 pub const ZKVM_GUEST_ELF: &[u8];
@@ -215,6 +208,20 @@ pub const ZKVM_GUEST_ID: [u32; 8];
 ```
 
 ### Tools
+
+#### cargo-agent
+
+**Path**: `crates/tools/cargo-agent/`
+
+CLI subcommand for agent development workflow:
+
+```bash
+cargo agent new my-agent --template yield    # Scaffold a new agent
+cargo agent build my-agent --release         # Build an agent
+cargo agent test my-agent                    # Run agent tests
+cargo agent pack my-agent --version 1.0.0    # Package for distribution
+cargo agent list                             # List all agents
+```
 
 #### agent-pack
 
@@ -269,9 +276,12 @@ Test contract simulating a yield source.
 | `crates/protocol/kernel-core/src/codec.rs` | Deterministic encoding |
 | `crates/protocol/kernel-core/src/hash.rs` | SHA-256 commitments |
 | `crates/runtime/kernel-guest/src/lib.rs` | kernel_main implementation |
+| `crates/sdk/kernel-sdk/src/lib.rs` | SDK macros (`agent_input!`, `agent_entrypoint!`) |
+| `crates/sdk/kernel-sdk/src/actions.rs` | `CallBuilder`, `erc20` helpers |
+| `crates/sdk/kernel-sdk/src/testing.rs` | `TestHarness`, `ContextBuilder`, hex helpers |
 | `crates/agents/example-yield-agent/agent/src/lib.rs` | Reference agent logic |
 | `crates/agents/defi-yield-farmer/agent/src/lib.rs` | DeFi agent logic |
-| `crates/sdk/kernel-sdk/src/prelude.rs` | Common imports |
+| `crates/tools/cargo-agent/src/main.rs` | `cargo agent` CLI |
 
 ## Related
 

@@ -25,11 +25,11 @@ export class ExecutionKernelClient {
     this.config = config;
 
     // Use provided publicClient or create one
-    this.publicClient = (config.publicClient ??
+    this.publicClient = config.publicClient ??
       createPublicClient({
         chain: optimismSepolia,
         transport: http(config.rpcUrl),
-      })) as PublicClient;
+      });
 
     this.walletClient = config.walletClient;
 

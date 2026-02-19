@@ -90,8 +90,8 @@ const config: Config = {
               to: '/architecture/overview',
             },
             {
-              label: 'Getting Started',
-              to: '/getting-started/prerequisites',
+              label: 'Quickstart',
+              to: '/quickstart',
             },
           ],
         },
@@ -104,7 +104,7 @@ const config: Config = {
             },
             {
               label: 'Building an Agent',
-              to: '/sdk/writing-an-agent',
+              to: '/quickstart',
             },
             {
               label: 'Agent Pack',

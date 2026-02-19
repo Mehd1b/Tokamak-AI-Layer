@@ -9,27 +9,43 @@ This guide walks through running the example yield agent, from local testing to 
 
 ## The Yield Agent
 
-The `example-yield-agent` is a reference implementation that demonstrates a complete agent lifecycle:
-
-1. Deposits ETH into a yield source
-2. Withdraws ETH plus yield
+The `example-yield-agent` demonstrates a complete agent lifecycle using the modern SDK APIs:
 
 ```rust
-// Simplified yield agent logic
-pub fn agent_main(ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput {
-    // Parse 48 bytes: vault (20) + yield_source (20) + amount (8)
-    let vault_address = &opaque_inputs[0..20];
-    let yield_source = &opaque_inputs[20..40];
-    let amount = u64::from_le_bytes(opaque_inputs[40..48].try_into().unwrap());
+use kernel_sdk::prelude::*;
+use kernel_sdk::actions::CallBuilder;
 
-    // Create deposit and withdraw actions
-    let deposit = call_action(yield_source, amount, &deposit_calldata);
-    let withdraw = call_action(yield_source, 0, &withdraw_calldata);
-
-    AgentOutput {
-        actions: vec![deposit, withdraw]
+kernel_sdk::agent_input! {
+    struct YieldInput {
+        vault_address: [u8; 20],
+        mock_yield_address: [u8; 20],
+        transfer_amount: u64,
     }
 }
+
+pub extern "Rust" fn agent_main(_ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput {
+    let input = match YieldInput::decode(opaque_inputs) {
+        Some(i) => i,
+        None => return AgentOutput { actions: Vec::new() },
+    };
+
+    // Deposit ETH to yield source
+    let deposit = CallBuilder::new(input.mock_yield_address)
+        .value(input.transfer_amount as u128)
+        .build();
+
+    // Withdraw from yield source
+    let withdraw = CallBuilder::new(input.mock_yield_address)
+        .selector(0x51cff8d9) // withdraw(address)
+        .param_address(&input.vault_address)
+        .build();
+
+    AgentOutput {
+        actions: vec![deposit, withdraw],
+    }
+}
+
+kernel_sdk::agent_entrypoint!(agent_main);
 ```
 
 ## Unit Tests (No zkVM)
@@ -37,12 +53,12 @@ pub fn agent_main(ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput {
 Run the agent logic without proof generation:
 
 ```bash
-cargo test -p example-yield-agent
+cargo agent test example-yield-agent
 ```
 
 This tests:
-- Input parsing
-- Action construction
+- Input parsing via `agent_input!`
+- Action construction with `CallBuilder`
 - Code hash consistency
 
 ## Integration Tests (Kernel Execution)
@@ -95,78 +111,30 @@ Execute the complete flow with on-chain verification on Sepolia.
 ### Fund the Contracts
 
 ```bash
-# Set your RPC URL
 export RPC_URL="https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY"
 export PRIVATE_KEY="0x..."
 
-# Contract addresses
-export VAULT_ADDRESS=0xAdeDA97D2D07C7f2e332fD58F40Eb4f7F0192be7
+export VAULT_ADDRESS=0xAdeDA97D2D07C7f2e810170f146d31b00262b9D7138F9b39
 export MOCK_YIELD_ADDRESS=0x7B35E3F2e810170f146d31b00262b9D7138F9b39
 
-# Check current balances
-cast balance $VAULT_ADDRESS --rpc-url $RPC_URL
-cast balance $MOCK_YIELD_ADDRESS --rpc-url $RPC_URL
-
-# Fund the vault (needs ETH to transfer)
 cast send $VAULT_ADDRESS --value 0.5ether \
     --private-key $PRIVATE_KEY --rpc-url $RPC_URL
 
-# Fund MockYieldSource (needs ETH to pay 10% yield)
 cast send $MOCK_YIELD_ADDRESS --value 1ether \
     --private-key $PRIVATE_KEY --rpc-url $RPC_URL
-```
-
-### Check Vault State
-
-```bash
-# Get current execution nonce
-cast call $VAULT_ADDRESS "lastExecutionNonce()(uint64)" --rpc-url $RPC_URL
 ```
 
 ### Run the Test
 
 ```bash
-# Set execution parameters
-export EXECUTION_NONCE=1  # Must be lastExecutionNonce + 1
+export EXECUTION_NONCE=1
 export TRANSFER_AMOUNT=10000000000000000  # 0.01 ETH in wei
 
-# Run the on-chain E2E test
 cargo test --release -p e2e-tests --features phase3-e2e \
     test_full_e2e_yield_execution -- --ignored --nocapture
 ```
 
-### Expected Output
-
-```
-=== Initial State ===
-Vault address: 0xAdeDA97D2D07C7f2e332fD58F40Eb4f7F0192be7
-MockYieldSource address: 0x7B35E3F2e810170f146d31b00262b9D7138F9b39
-Initial nonce: 1
-Initial vault balance: 1010000000000000000 wei
-Agent ID: 0x0000000000000000000000000000000000000000000000000000000000000001
-Transfer amount: 100000000000000000 wei
-
-=== Generating zkVM Proof ===
-Proof generated and verified!
-
-=== Submitting Transaction ===
-Journal length: 209 bytes
-Seal length: 260 bytes
-Agent output length: 348 bytes
-Transaction sent: 0x376a678...
-Transaction confirmed in block: Some(10141050)
-Gas used: 403945
-
-=== Verifying Results ===
-Final nonce: 2
-Final vault balance: 1020000000000000000 wei
-MockYieldSource deposits[vault]: 0 wei
-
-=== E2E Test Passed! ===
-Yield earned: 10000000000000000 wei (10%)
-```
-
-## Understanding the Flow
+### Understanding the Flow
 
 ```mermaid
 sequenceDiagram
@@ -187,37 +155,6 @@ sequenceDiagram
     M->>V: Return ETH + yield
     T->>T: Verify vault balance increased by 10%
 ```
-
-## Troubleshooting
-
-### "execution reverted: Invalid proof"
-
-Check that the IMAGE_ID is registered:
-
-```bash
-export VERIFIER_ADDRESS=0x9Ef5bAB590AFdE8036D57b89ccD2947D4E3b1EFA
-export AGENT_ID=0x0000000000000000000000000000000000000000000000000000000000000001
-
-cast call $VERIFIER_ADDRESS "registeredImageIds(bytes32)(bytes32)" \
-    $AGENT_ID --rpc-url $RPC_URL
-```
-
-### "execution reverted: Invalid nonce"
-
-Check the current nonce and increment:
-
-```bash
-cast call $VAULT_ADDRESS "lastExecutionNonce()(uint64)" --rpc-url $RPC_URL
-```
-
-Use `lastExecutionNonce + 1` as your `EXECUTION_NONCE`.
-
-### "execution reverted: Insufficient balance"
-
-Ensure both contracts have sufficient ETH:
-
-- **Vault**: Needs enough for the transfer amount
-- **MockYieldSource**: Needs enough for transfer + 10% yield
 
 ## Next Steps
 

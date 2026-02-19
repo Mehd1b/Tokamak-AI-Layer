@@ -31,6 +31,7 @@ extern crate alloc;
 
 use alloc::{vec, vec::Vec};
 use kernel_sdk::prelude::*;
+use kernel_sdk::actions::CallBuilder;
 
 // Include the generated agent hash constant.
 include!(concat!(env!("OUT_DIR"), "/agent_hash.rs"));
@@ -39,11 +40,20 @@ include!(concat!(env!("OUT_DIR"), "/agent_hash.rs"));
 // Constants
 // ============================================================================
 
-/// Expected input size: 20 (vault) + 20 (yield source) + 8 (amount) = 48 bytes
-const INPUT_SIZE: usize = 48;
-
 /// Withdraw function selector: keccak256("withdraw(address)")[:4]
-const WITHDRAW_SELECTOR: [u8; 4] = [0x51, 0xcf, 0xf8, 0xd9];
+const WITHDRAW_SELECTOR: u32 = 0x51cff8d9;
+
+// ============================================================================
+// Input Parsing
+// ============================================================================
+
+kernel_sdk::agent_input! {
+    struct YieldInput {
+        vault_address: [u8; 20],
+        mock_yield_address: [u8; 20],
+        transfer_amount: u64,
+    }
+}
 
 // ============================================================================
 // Agent Entry Point
@@ -59,33 +69,24 @@ const WITHDRAW_SELECTOR: [u8; 4] = [0x51, 0xcf, 0xf8, 0xd9];
 /// # Returns
 ///
 /// AgentOutput with two CALL actions: deposit and withdraw.
-#[no_mangle]
-#[allow(unsafe_code)]
 pub extern "Rust" fn agent_main(_ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput {
-    // Validate input size
-    if opaque_inputs.len() != INPUT_SIZE {
-        // Invalid input - return empty output (will be handled by constraints)
-        return AgentOutput {
-            actions: Vec::new(),
-        };
-    }
-
-    // Parse input
-    let vault_address: [u8; 20] = opaque_inputs[0..20].try_into().unwrap();
-    let mock_yield_address: [u8; 20] = opaque_inputs[20..40].try_into().unwrap();
-    let transfer_amount = u64::from_le_bytes(opaque_inputs[40..48].try_into().unwrap());
-
-    // Build target (left-pad address to bytes32)
-    let target = address_to_bytes32(&mock_yield_address);
+    let input = match YieldInput::decode(opaque_inputs) {
+        Some(i) => i,
+        None => return AgentOutput { actions: Vec::new() },
+    };
 
     // Build Action 1: Deposit ETH to MockYieldSource
     // call{value: amount}("") - sends ETH with empty calldata
-    let deposit_action = call_action(target, transfer_amount as u128, &[]);
+    let deposit_action = CallBuilder::new(input.mock_yield_address)
+        .value(input.transfer_amount as u128)
+        .build();
 
     // Build Action 2: Withdraw from MockYieldSource
     // call{value: 0}(withdraw(vault_address))
-    let withdraw_calldata = encode_withdraw_call(&vault_address);
-    let withdraw_action = call_action(target, 0, &withdraw_calldata);
+    let withdraw_action = CallBuilder::new(input.mock_yield_address)
+        .selector(WITHDRAW_SELECTOR)
+        .param_address(&input.vault_address)
+        .build();
 
     // Return both actions (deposit first, then withdraw)
     AgentOutput {
@@ -94,25 +95,14 @@ pub extern "Rust" fn agent_main(_ctx: &AgentContext, opaque_inputs: &[u8]) -> Ag
 }
 
 // ============================================================================
-// ABI Encoding Helpers
-// ============================================================================
-
-/// Encode the withdraw(address) function call.
-///
-/// Format: selector (4 bytes) + address (32 bytes, left-padded)
-fn encode_withdraw_call(depositor: &[u8; 20]) -> Vec<u8> {
-    let mut calldata = Vec::with_capacity(36);
-    calldata.extend_from_slice(&WITHDRAW_SELECTOR);
-    calldata.extend_from_slice(&address_to_bytes32(depositor));
-    calldata
-}
-
-// ============================================================================
 // Compile-time ABI Verification
 // ============================================================================
 
 /// Compile-time check that agent_main matches the canonical AgentEntrypoint type.
 const _: AgentEntrypoint = agent_main;
+
+// Generate kernel_main, kernel_main_with_constraints, and KernelError re-export.
+kernel_sdk::agent_entrypoint!(agent_main);
 
 // ============================================================================
 // Tests
@@ -123,7 +113,7 @@ mod tests {
     use super::*;
 
     fn make_test_input(vault: [u8; 20], yield_source: [u8; 20], amount: u64) -> Vec<u8> {
-        let mut input = Vec::with_capacity(INPUT_SIZE);
+        let mut input = Vec::with_capacity(YieldInput::ENCODED_SIZE);
         input.extend_from_slice(&vault);
         input.extend_from_slice(&yield_source);
         input.extend_from_slice(&amount.to_le_bytes());
@@ -248,7 +238,7 @@ mod tests {
         assert_eq!(withdraw_payload[95], 36);
 
         // Check selector (bytes 96-99)
-        assert_eq!(&withdraw_payload[96..100], &WITHDRAW_SELECTOR);
+        assert_eq!(&withdraw_payload[96..100], &WITHDRAW_SELECTOR.to_be_bytes());
 
         // Check vault address (bytes 100-131, left-padded)
         assert_eq!(&withdraw_payload[100..112], &[0u8; 12]); // Padding
@@ -257,18 +247,25 @@ mod tests {
 
     #[test]
     fn test_withdraw_calldata_encoding() {
+        // Verify CallBuilder produces correct withdraw calldata
         let vault = [0x11u8; 20];
-        let calldata = encode_withdraw_call(&vault);
+        let yield_source = [0x22u8; 20];
 
-        // calldata = 4 (selector) + 32 (address) = 36 bytes
-        assert_eq!(calldata.len(), 36, "Withdraw calldata should be 36 bytes");
+        let action = CallBuilder::new(yield_source)
+            .selector(WITHDRAW_SELECTOR)
+            .param_address(&vault)
+            .build();
+
+        // Calldata is embedded in the payload starting at offset 96
+        // calldata length is at payload[64..96], should be 36
+        assert_eq!(action.payload[95], 36);
 
         // Check selector
-        assert_eq!(&calldata[0..4], &WITHDRAW_SELECTOR);
+        assert_eq!(&action.payload[96..100], &WITHDRAW_SELECTOR.to_be_bytes());
 
         // Check vault address (left-padded to 32 bytes)
-        assert_eq!(&calldata[4..16], &[0u8; 12]); // Padding
-        assert_eq!(&calldata[16..36], &vault);
+        assert_eq!(&action.payload[100..112], &[0u8; 12]); // Padding
+        assert_eq!(&action.payload[112..132], &vault);
     }
 
     #[test]
@@ -313,6 +310,6 @@ mod tests {
     fn test_withdraw_selector_is_correct() {
         // keccak256("withdraw(address)") = 0x51cff8d9...
         // This is the standard selector for withdraw(address)
-        assert_eq!(WITHDRAW_SELECTOR, [0x51, 0xcf, 0xf8, 0xd9]);
+        assert_eq!(WITHDRAW_SELECTOR, 0x51cff8d9);
     }
 }

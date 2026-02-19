@@ -1,4 +1,5 @@
 import type { PublicClient, WalletClient } from 'viem';
+import { decodeEventLog } from 'viem';
 import { VaultFactoryABI } from '../abi/VaultFactory';
 import type { DeployVaultParams } from '../types';
 
@@ -60,11 +61,25 @@ export class VaultFactoryClient {
     });
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
     // Parse VaultDeployed event to get vault address
-    const log = receipt.logs[0];
-    const vaultTopic = log?.topics?.[1];
-    const vaultAddress = vaultTopic
-      ? (`0x${vaultTopic.slice(26)}` as `0x${string}`)
-      : ('0x' as `0x${string}`);
+    let vaultAddress: `0x${string}` | undefined;
+    for (const log of receipt.logs) {
+      try {
+        const event = decodeEventLog({
+          abi: VaultFactoryABI,
+          data: log.data,
+          topics: log.topics as [`0x${string}`, ...`0x${string}`[]],
+        });
+        if (event.eventName === 'VaultDeployed') {
+          vaultAddress = (event.args as { vault: `0x${string}` }).vault;
+          break;
+        }
+      } catch {
+        continue;
+      }
+    }
+    if (!vaultAddress) {
+      throw new Error('VaultDeployed event not found in transaction receipt');
+    }
     return { vaultAddress, txHash };
   }
 

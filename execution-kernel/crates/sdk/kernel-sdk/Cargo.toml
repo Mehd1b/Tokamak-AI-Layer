@@ -14,6 +14,7 @@ crate-type = ["rlib"]
 
 [dependencies]
 kernel-core = { path = "../../protocol/kernel-core", default-features = false }
+constraints = { path = "../../protocol/constraints", optional = true }
 
 [dev-dependencies]
 # No dev dependencies - keep SDK minimal
@@ -24,8 +25,11 @@ default = []
 # Marker feature for guest-specific code paths (e.g., risc0-zkvm shims)
 guest = []
 
-# Enable testing-only action types (ACTION_TYPE_ECHO)
-testing = ["kernel-core/testing"]
+# Enable std for host-side testing (conditional no_std)
+std = ["kernel-core/std"]
+
+# Enable testing-only action types (ACTION_TYPE_ECHO) and testing module
+testing = ["kernel-core/testing", "dep:constraints"]
 
 [lints.clippy]
 std_instead_of_alloc = "deny"

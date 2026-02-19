@@ -12,8 +12,9 @@ The Execution Kernel is a **consensus-critical, deterministic agent execution fr
 
 | If you want to... | Start here |
 |-------------------|------------|
+| **Build an agent in 5 minutes** | [Quickstart](/quickstart) |
 | **Understand how it works** | [Architecture Overview](/architecture/overview) |
-| **Build an agent** | [Writing an Agent](/sdk/writing-an-agent) |
+| **Write a full agent** | [Writing an Agent](/sdk/writing-an-agent) |
 | **Set up your dev environment** | [Prerequisites](/getting-started/prerequisites) |
 | **Integrate with smart contracts** | [On-Chain Verification](/onchain/verifier-overview) |
 | **Understand the binary formats** | [Input Format](/kernel/input-format) |
@@ -42,16 +43,34 @@ The kernel acts as a **verifiable sandbox**: an agent runs inside the kernel, wh
 
 ### Agent-Agnostic Design
 
-The kernel uses trait-based dependency injection, allowing new agents without modifying kernel code:
+The kernel uses the `agent_entrypoint!` macro for zero-boilerplate agent integration:
 
 ```rust
-pub trait AgentEntrypoint {
-    fn code_hash(&self) -> [u8; 32];
-    fn run(&self, ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput;
+use kernel_sdk::prelude::*;
+use kernel_sdk::actions::CallBuilder;
+
+kernel_sdk::agent_input! {
+    struct MyInput {
+        target: [u8; 20],
+        amount: u64,
+    }
 }
 
-// Execute kernel with any agent
-let journal = kernel_main_with_agent(&input_bytes, &MyAgent)?;
+pub fn agent_main(_ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput {
+    let input = match MyInput::decode(opaque_inputs) {
+        Some(i) => i,
+        None => return AgentOutput { actions: Vec::new() },
+    };
+
+    let action = CallBuilder::new(input.target)
+        .selector(0x617ba037)
+        .param_u256_from_u64(input.amount)
+        .build();
+
+    AgentOutput { actions: vec![action] }
+}
+
+kernel_sdk::agent_entrypoint!(agent_main);
 ```
 
 ### Cryptographic Commitments
@@ -69,6 +88,22 @@ The constraint engine validates agent outputs against safety rules:
 - Leverage bounds
 - Asset whitelists
 - Cooldown periods
+
+## Quick Start
+
+```bash
+# Install the cargo agent CLI
+cargo install --path crates/tools/cargo-agent
+
+# Scaffold a new agent
+cargo agent new my-agent --template yield
+
+# Run tests
+cargo agent test my-agent
+
+# Build with zkVM support
+cargo build --release --features risc0
+```
 
 ## Protocol Constants
 
@@ -97,22 +132,9 @@ These constants are defined in [`kernel-core/src/lib.rs`](https://github.com/tok
 
 The system is **fully permissionless**: anyone can register agents via `AgentRegistry` and deploy vaults via `VaultFactory`. See [Permissionless System](/onchain/permissionless-system) for details.
 
-## Quick Start
-
-```bash
-# Clone the repository
-git clone https://github.com/tokamak-network/Tokamak-AI-Layer.git
-cd Tokamak-AI-Layer/execution-kernel
-
-# Run tests
-cargo test
-
-# Build with zkVM support
-cargo build --release --features risc0
-```
-
 ## Next Steps
 
+- [Quickstart](/quickstart) - Build an agent in 5 minutes
 - [Architecture Overview](/architecture/overview) - Understand the system design
 - [Prerequisites](/getting-started/prerequisites) - Set up your development environment
-- [Writing an Agent](/sdk/writing-an-agent) - Build your first agent
+- [Writing an Agent](/sdk/writing-an-agent) - Full agent development guide

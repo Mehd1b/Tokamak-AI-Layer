@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { encodeAbiParameters, encodeEventTopics } from 'viem';
 import { AgentRegistryClient } from '../clients/AgentRegistryClient';
+import { AgentRegistryABI } from '../abi/AgentRegistry';
 import type { KernelAgentInfo } from '../types';
 
 const REGISTRY_ADDRESS = '0xBa1DA5f7e12F2c8614696D019A2eb48918E1f2AA' as `0x${string}`;
@@ -7,6 +9,19 @@ const MOCK_AGENT_ID = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567
 const MOCK_IMAGE_ID = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as `0x${string}`;
 const MOCK_CODE_HASH = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' as `0x${string}`;
 const MOCK_AUTHOR = '0x1111111111111111111111111111111111111111' as `0x${string}`;
+
+function createAgentRegisteredLog(agentId: `0x${string}`, author: `0x${string}`, imageId: `0x${string}`, agentCodeHash: `0x${string}`) {
+  const topics = encodeEventTopics({
+    abi: AgentRegistryABI,
+    eventName: 'AgentRegistered',
+    args: { agentId, author, imageId },
+  });
+  const data = encodeAbiParameters(
+    [{ name: 'agentCodeHash', type: 'bytes32' }],
+    [agentCodeHash],
+  );
+  return { topics, data };
+}
 
 function createMockPublicClient() {
   return {
@@ -102,8 +117,9 @@ describe('AgentRegistryClient', () => {
     it('calls writeContract and returns agentId', async () => {
       const txHash = '0xabc123' as `0x${string}`;
       walletClient.writeContract.mockResolvedValue(txHash);
+      const mockLog = createAgentRegisteredLog(MOCK_AGENT_ID, MOCK_AUTHOR, MOCK_IMAGE_ID, MOCK_CODE_HASH);
       publicClient.waitForTransactionReceipt.mockResolvedValue({
-        logs: [{ topics: [null, MOCK_AGENT_ID] }],
+        logs: [mockLog],
       });
 
       const result = await client.register({

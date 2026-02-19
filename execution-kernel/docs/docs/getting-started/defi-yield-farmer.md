@@ -54,19 +54,24 @@ Operator override. Withdraws all supplied capital regardless of rate conditions.
 
 ## Input Format
 
-The agent receives exactly **69 bytes** of opaque input:
+The agent uses the `agent_input!` macro for declarative input parsing:
 
-```
-Offset  Size  Type       Field                 Description
-──────  ────  ─────────  ────────────────────  ──────────────────────────────────
-0       20    address    lending_pool          AAVE V3 Pool contract address
-20      20    address    asset_token           ERC20 token address (e.g., DAI)
-40      8     u64 LE     vault_balance         Idle tokens in vault (wei)
-48      8     u64 LE     supplied_amount       Tokens currently supplied to AAVE
-56      4     u32 LE     supply_rate_bps       Current AAVE supply rate (basis points)
-60      4     u32 LE     min_supply_rate_bps   Minimum acceptable rate threshold
-64      4     u32 LE     target_utilization_bps Target % of capital to deploy (bps)
-68      1     u8         action_flag           0=evaluate, 1=force supply, 2=force withdraw
+```rust
+use kernel_sdk::prelude::*;
+
+kernel_sdk::agent_input! {
+    struct MarketInput {
+        lending_pool: [u8; 20],
+        asset_token: [u8; 20],
+        vault_balance: u64,
+        supplied_amount: u64,
+        supply_rate_bps: u32,
+        min_supply_rate_bps: u32,
+        target_utilization_bps: u32,
+        action_flag: u8,
+    }
+}
+// MarketInput::ENCODED_SIZE == 69
 ```
 
 All integers use **little-endian** encoding. Addresses are raw 20-byte values (no padding).
@@ -84,30 +89,37 @@ Rates and percentages use basis points (1 bps = 0.01%):
 
 ## Output Actions
 
-The agent outputs `CALL` actions targeting the AAVE V3 Pool:
+The agent uses `CallBuilder` and `erc20` helpers to construct ABI-encoded actions targeting the AAVE V3 Pool:
 
 ### Supply Action
 
-Calls `supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode)`:
+```rust
+use kernel_sdk::actions::{CallBuilder, erc20};
 
-```
-Selector: 0x617ba037
-Calldata: selector(4) + asset(32) + amount(32) + onBehalfOf(32) + referralCode(32) = 132 bytes
-```
+// Approve AAVE pool to spend tokens
+let approve = erc20::approve(&input.asset_token, &input.lending_pool, supply_amount);
 
-- `onBehalfOf` is set to `address(0)` — the vault is `msg.sender`
-- `referralCode` is `0`
+// Call supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode)
+let supply = CallBuilder::new(input.lending_pool)
+    .selector(0x617ba037)
+    .param_address(&input.asset_token)
+    .param_u256_from_u64(supply_amount)
+    .param_address(&[0u8; 20])  // onBehalfOf = address(0), vault is msg.sender
+    .param_u16(0)                // referralCode = 0
+    .build();
+```
 
 ### Withdraw Action
 
-Calls `withdraw(address asset, uint256 amount, address to)`:
-
+```rust
+// Call withdraw(address asset, uint256 amount, address to)
+let withdraw = CallBuilder::new(input.lending_pool)
+    .selector(0x69328dec)
+    .param_address(&input.asset_token)
+    .param_u256_from_u64(withdraw_amount)
+    .param_address(&[0u8; 20])  // to = address(0), funds return to vault
+    .build();
 ```
-Selector: 0x69328dec
-Calldata: selector(4) + asset(32) + amount(32) + to(32) = 100 bytes
-```
-
-- `to` is set to `address(0)` — funds return to the vault (`msg.sender`)
 
 ## AAVE V3 Sepolia Addresses
 
@@ -135,7 +147,7 @@ The agent is designed for consensus-critical execution inside RISC Zero zkVM:
 ### Unit Tests
 
 ```bash
-cargo test -p defi-yield-farmer
+cargo agent test defi-yield-farmer
 ```
 
 14 tests covering all strategy branches, edge cases, ABI encoding, and determinism.
@@ -159,7 +171,7 @@ cargo test -p kernel-host-tests -- defi_yield_farmer
 ### Step 1: Build the zkVM Guest
 
 ```bash
-cargo build -p defi-yield-farmer-risc0-methods --release
+cargo agent build defi-yield-farmer
 ```
 
 This compiles the agent into a RISC Zero guest binary and generates the `IMAGE_ID`.
@@ -258,7 +270,6 @@ See the [shell deployment script](https://github.com/tokamak-network/Tokamak-AI-
 |------|-------------|
 | `crates/agents/defi-yield-farmer/agent/src/lib.rs` | Agent implementation (strategy, parsing, ABI encoding) |
 | `crates/agents/defi-yield-farmer/agent/build.rs` | Generates `AGENT_CODE_HASH` at compile time |
-| `crates/agents/defi-yield-farmer/binding/src/lib.rs` | Kernel guest wrapper |
 | `crates/agents/defi-yield-farmer/risc0-methods/` | RISC Zero guest build (ELF + IMAGE_ID) |
 | `crates/testing/kernel-host-tests/src/lib.rs` | Integration tests |
 | `contracts/script/DeployDefiYieldAgent.s.sol` | Forge deployment script |

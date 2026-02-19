@@ -1,0 +1,14 @@
+[package]
+name = "cargo-agent"
+version = "0.1.0"
+edition = "2021"
+description = "Cargo subcommand for Execution Kernel agent development"
+license = "MIT OR Apache-2.0"
+
+[[bin]]
+name = "cargo-agent"
+path = "src/main.rs"
+
+[dependencies]
+agent-pack = { path = "../../agent-pack" }
+clap = { version = "4", features = ["derive"] }

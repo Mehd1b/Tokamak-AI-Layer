@@ -540,6 +540,8 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 name = "example-yield-agent"
 version = "0.1.0"
 dependencies = [
+ "constraints",
+ "kernel-guest",
  "kernel-sdk",
  "sha2",
 ]
@@ -684,17 +686,6 @@ version = "0.1.0"
 dependencies = [
  "constraints",
  "kernel-core",
- "kernel-sdk",
-]
-
-[[package]]
-name = "kernel-guest-binding-yield"
-version = "0.1.0"
-dependencies = [
- "constraints",
- "example-yield-agent",
- "kernel-core",
- "kernel-guest",
  "kernel-sdk",
 ]
 
@@ -1511,6 +1502,6 @@ dependencies = [
 name = "zkvm-guest"
 version = "0.1.0"
 dependencies = [
- "kernel-guest-binding-yield",
+ "example-yield-agent",
  "risc0-zkvm",
 ]

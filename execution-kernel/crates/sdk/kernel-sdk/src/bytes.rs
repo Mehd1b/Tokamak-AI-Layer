@@ -37,6 +37,18 @@ use alloc::vec::Vec;
 // Reading Integers (Little-Endian) - Fixed Offset
 // ============================================================================
 
+/// Read a u16 from bytes at the given offset (little-endian).
+///
+/// Returns `None` if there are insufficient bytes.
+#[inline]
+pub fn read_u16_le(bytes: &[u8], offset: usize) -> Option<u16> {
+    if offset.checked_add(2)? > bytes.len() {
+        return None;
+    }
+    let arr: [u8; 2] = bytes[offset..offset + 2].try_into().ok()?;
+    Some(u16::from_le_bytes(arr))
+}
+
 /// Read a u32 from bytes at the given offset (little-endian).
 ///
 /// Returns `None` if there are insufficient bytes.
@@ -88,6 +100,17 @@ pub fn read_bool_u8(bytes: &[u8], offset: usize) -> Option<bool> {
 // ============================================================================
 // Reading Integers (Little-Endian) - Cursor Style
 // ============================================================================
+
+/// Read a u16 and advance the offset (little-endian).
+///
+/// This is the cursor-style variant for sequential decoding.
+/// Returns `None` if there are insufficient bytes or offset overflow.
+#[inline]
+pub fn read_u16_le_at(bytes: &[u8], offset: &mut usize) -> Option<u16> {
+    let v = read_u16_le(bytes, *offset)?;
+    *offset = offset.checked_add(2)?;
+    Some(v)
+}
 
 /// Read a u32 and advance the offset (little-endian).
 ///
@@ -151,6 +174,18 @@ pub fn read_bool_u8_at(bytes: &[u8], offset: &mut usize) -> Option<bool> {
 // Reading Fixed-Size Arrays - Fixed Offset
 // ============================================================================
 
+/// Read a 20-byte array from bytes at the given offset.
+///
+/// Returns `None` if there are insufficient bytes.
+#[inline]
+pub fn read_bytes20(bytes: &[u8], offset: usize) -> Option<[u8; 20]> {
+    if offset.checked_add(20)? > bytes.len() {
+        return None;
+    }
+    let arr: [u8; 20] = bytes[offset..offset + 20].try_into().ok()?;
+    Some(arr)
+}
+
 /// Read a 32-byte array from bytes at the given offset.
 ///
 /// Returns `None` if there are insufficient bytes.
@@ -179,6 +214,17 @@ pub fn read_slice(bytes: &[u8], offset: usize, len: usize) -> Option<&[u8]> {
 // Reading Fixed-Size Arrays - Cursor Style
 // ============================================================================
 
+/// Read a 20-byte array and advance the offset.
+///
+/// This is the cursor-style variant for sequential decoding.
+/// Returns `None` if there are insufficient bytes or offset overflow.
+#[inline]
+pub fn read_bytes20_at(bytes: &[u8], offset: &mut usize) -> Option<[u8; 20]> {
+    let v = read_bytes20(bytes, *offset)?;
+    *offset = offset.checked_add(20)?;
+    Some(v)
+}
+
 /// Read a 32-byte array and advance the offset.
 ///
 /// This is the cursor-style variant for sequential decoding.
@@ -204,6 +250,12 @@ pub fn read_slice_at<'a>(bytes: &'a [u8], offset: &mut usize, len: usize) -> Opt
 // ============================================================================
 // Writing Integers (Little-Endian)
 // ============================================================================
+
+/// Write a u16 to a Vec (little-endian).
+#[inline]
+pub fn write_u16_le(buf: &mut Vec<u8>, value: u16) {
+    buf.extend_from_slice(&value.to_le_bytes());
+}
 
 /// Write a u32 to a Vec (little-endian).
 #[inline]
@@ -347,6 +399,66 @@ pub fn clone_truncated(slice: &[u8], max_len: usize) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_read_u16_le() {
+        let bytes = [0x34, 0x12, 0xFF];
+        assert_eq!(read_u16_le(&bytes, 0), Some(0x1234));
+        assert_eq!(read_u16_le(&bytes, 1), Some(0xFF12));
+        assert_eq!(read_u16_le(&bytes, 2), None); // Not enough bytes
+    }
+
+    #[test]
+    fn test_read_u16_le_at() {
+        let bytes = [0x01, 0x00, 0x02, 0x00];
+        let mut offset = 0;
+
+        assert_eq!(read_u16_le_at(&bytes, &mut offset), Some(1));
+        assert_eq!(offset, 2);
+
+        assert_eq!(read_u16_le_at(&bytes, &mut offset), Some(2));
+        assert_eq!(offset, 4);
+
+        // End of buffer
+        assert_eq!(read_u16_le_at(&bytes, &mut offset), None);
+    }
+
+    #[test]
+    fn test_read_bytes20() {
+        let bytes = [0x42u8; 24];
+        let result = read_bytes20(&bytes, 0);
+        assert_eq!(result, Some([0x42u8; 20]));
+
+        let result = read_bytes20(&bytes, 4);
+        assert_eq!(result, Some([0x42u8; 20]));
+
+        let result = read_bytes20(&bytes, 5);
+        assert_eq!(result, None); // Not enough bytes
+    }
+
+    #[test]
+    fn test_read_bytes20_at() {
+        let bytes = [0x42u8; 44];
+        let mut offset = 0;
+
+        let arr = read_bytes20_at(&bytes, &mut offset).unwrap();
+        assert_eq!(arr, [0x42u8; 20]);
+        assert_eq!(offset, 20);
+
+        let arr = read_bytes20_at(&bytes, &mut offset).unwrap();
+        assert_eq!(arr, [0x42u8; 20]);
+        assert_eq!(offset, 40);
+
+        // Only 4 bytes left, not enough for another bytes20
+        assert_eq!(read_bytes20_at(&bytes, &mut offset), None);
+    }
+
+    #[test]
+    fn test_write_u16_le() {
+        let mut buf = Vec::new();
+        write_u16_le(&mut buf, 0x1234);
+        assert_eq!(buf, alloc::vec![0x34, 0x12]);
+    }
 
     #[test]
     fn test_read_u32_le() {

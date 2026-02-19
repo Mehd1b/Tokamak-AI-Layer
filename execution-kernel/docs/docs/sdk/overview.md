@@ -31,12 +31,13 @@ The SDK is `no_std` and forbids unsafe code. Agents inherit these constraints.
 ```
 kernel-sdk/
 ├── src/
-│   ├── lib.rs          # Crate root with re-exports
+│   ├── lib.rs          # Crate root, macros (agent_input!, agent_entrypoint!)
 │   ├── agent.rs        # AgentContext and AgentEntrypoint
 │   ├── types.rs        # ActionV1, AgentOutput
+│   ├── actions.rs      # CallBuilder, erc20 helpers
 │   ├── math.rs         # Checked/saturating arithmetic
 │   ├── bytes.rs        # Binary reading/writing helpers
-│   └── prelude.rs      # Convenient imports
+│   └── testing.rs      # TestHarness, ContextBuilder, hex helpers (behind "testing" feature)
 ```
 
 ## Using the SDK
@@ -46,7 +47,8 @@ Add to your `Cargo.toml`:
 ```toml
 [dependencies]
 kernel-sdk = { path = "../sdk/kernel-sdk" }
-kernel-core = { path = "../protocol/kernel-core" }
+kernel-guest = { path = "../runtime/kernel-guest" }
+constraints = { path = "../protocol/constraints" }
 ```
 
 Import the prelude for common types:
@@ -55,16 +57,45 @@ Import the prelude for common types:
 use kernel_sdk::prelude::*;
 ```
 
+## Macros
+
+### `agent_input!`
+
+Generates a struct with `decode()` and `encode()` for fixed-size input parsing:
+
+```rust
+kernel_sdk::agent_input! {
+    struct MyInput {
+        target: [u8; 20],
+        amount: u64,
+    }
+}
+// MyInput::ENCODED_SIZE == 28
+// MyInput::decode(bytes) -> Option<MyInput>
+```
+
+See [`agent_input!` Macro](/sdk/agent-input-macro) for full documentation.
+
+### `agent_entrypoint!`
+
+Generates kernel binding code, eliminating the need for a separate binding crate:
+
+```rust
+kernel_sdk::agent_entrypoint!(agent_main);
+// Generates: kernel_main(), kernel_main_with_constraints(), KernelError re-export
+```
+
 ## The Prelude
 
 The prelude exports commonly used items:
 
 | Category | Items |
 |----------|-------|
-| Context | `AgentContext` |
+| Context | `AgentContext`, `AgentEntrypoint` |
 | Types | `ActionV1`, `AgentOutput`, `MAX_ACTIONS_PER_OUTPUT`, `MAX_ACTION_PAYLOAD_BYTES` |
 | Action Constants | `ACTION_TYPE_CALL`, `ACTION_TYPE_TRANSFER_ERC20`, `ACTION_TYPE_NO_OP` (production); `ACTION_TYPE_ECHO` (testing only) |
 | Constructors | `call_action`, `transfer_erc20_action`, `no_op_action`, `address_to_bytes32` (production); `echo_action` (testing only) |
+| Builders | `CallBuilder` |
 | Math | `checked_add_u64`, `checked_mul_div_u64`, `apply_bps`, `calculate_bps`, `BPS_DENOMINATOR` |
 | Bytes | `read_u32_le`, `read_u64_le`, `read_bytes32`, `read_u32_le_at`, etc. |
 | Alloc | `Vec` (NOT `vec![]` macro) |
@@ -76,15 +107,14 @@ The prelude exports commonly used items:
 Contains execution context passed to the agent:
 
 ```rust
-pub struct AgentContext<'a> {
+pub struct AgentContext {
     pub protocol_version: u32,
     pub kernel_version: u32,
-    pub agent_id: &'a [u8; 32],
-    pub agent_code_hash: &'a [u8; 32],
-    pub constraint_set_hash: &'a [u8; 32],
-    pub input_root: &'a [u8; 32],
+    pub agent_id: [u8; 32],
+    pub agent_code_hash: [u8; 32],
+    pub constraint_set_hash: [u8; 32],
+    pub input_root: [u8; 32],
     pub execution_nonce: u64,
-    pub opaque_inputs: &'a [u8],
 }
 ```
 
@@ -112,85 +142,49 @@ pub struct ActionV1 {
 
 ## Action Types
 
-The following action types are supported for on-chain execution via KernelVault:
-
 | Constant | Value | Description |
 |----------|-------|-------------|
 | `ACTION_TYPE_CALL` | `0x00000002` | Generic contract call |
 | `ACTION_TYPE_TRANSFER_ERC20` | `0x00000003` | ERC20 token transfer |
 | `ACTION_TYPE_NO_OP` | `0x00000004` | No operation (skipped) |
-
-Testing-only action type (not executable on-chain):
-
-| Constant | Value | Description |
-|----------|-------|-------------|
 | `ACTION_TYPE_ECHO` | `0x00000001` | Test/debug action (requires `testing` feature) |
 
-Higher-level strategy concepts (e.g., "open position", "swap") are agent abstractions that must be compiled down to `CALL` or `TRANSFER_ERC20` actions.
+## Action Construction
 
-## Helper Functions
-
-### Action Constructors
+### CallBuilder (recommended)
 
 ```rust
-// Create a CALL action for generic contract calls
-let target = address_to_bytes32(&contract_address);  // [u8; 20] -> [u8; 32]
+use kernel_sdk::actions::CallBuilder;
+
+let action = CallBuilder::new(target_address)
+    .selector(0x617ba037)
+    .param_address(&asset)
+    .param_u256_from_u64(amount)
+    .build();
+```
+
+### ERC20 helpers
+
+```rust
+use kernel_sdk::actions::erc20;
+
+let approve = erc20::approve(&token, &spender, amount);
+let transfer = erc20::transfer(&token, &to, amount);
+let transfer_from = erc20::transfer_from(&token, &from, &to, amount);
+```
+
+### Low-level constructors
+
+```rust
+let target = address_to_bytes32(&contract_address);
 let action = call_action(target, value, calldata);
-
-// Create a TRANSFER_ERC20 action
 let action = transfer_erc20_action(&token, &recipient, amount);
-
-// Create a NO_OP action (placeholder, skipped on-chain)
 let action = no_op_action();
-
-// Testing only: Create an ECHO action
-#[cfg(any(test, feature = "testing"))]
-let action = echo_action(target, payload);
 ```
 
-### Address Conversion
-
-EVM addresses (20 bytes) must be converted to bytes32 (32 bytes) with left-padding:
-
-```rust
-let addr: [u8; 20] = [0x11; 20];
-let target = address_to_bytes32(&addr);
-// target[0..12] = [0; 12]  // zero padding
-// target[12..32] = addr    // original address
-```
-
-### Math Helpers
-
-```rust
-// Checked arithmetic (returns None on overflow)
-let sum = checked_add_u64(a, b)?;
-let product = checked_mul_u64(a, b)?;
-let quotient = checked_div_u64(a, b)?;
-
-// Compound operations
-let result = checked_mul_div_u64(a, b, denom)?;
-
-// Basis points
-let fee = apply_bps(amount, 100)?;  // 1% fee
-let pct = calculate_bps(numerator, denominator)?;
-```
-
-### Byte Helpers
-
-```rust
-// Fixed-offset readers
-let value = read_u32_le(bytes, offset)?;
-let hash = read_bytes32(bytes, offset)?;
-
-// Cursor-style readers (advance offset)
-let mut offset = 0;
-let value = read_u64_le_at(bytes, &mut offset)?;
-let hash = read_bytes32_at(bytes, &mut offset)?;
-```
+See [CallBuilder & ERC20 Helpers](/sdk/call-builder) for full documentation.
 
 ## Forbidden Behavior
-
-Agents MUST NOT:
 
 | Forbidden | Reason |
 |-----------|--------|
@@ -214,5 +208,7 @@ Agents MUST NOT:
 ## Next Steps
 
 - [Writing an Agent](/sdk/writing-an-agent) - Build your first agent
-- [Constraints](/sdk/constraints-and-commitments) - Understanding constraint enforcement
-- [Testing](/sdk/testing) - Test your agent at multiple levels
+- [`agent_input!` Macro](/sdk/agent-input-macro) - Declarative input parsing
+- [CallBuilder & ERC20 Helpers](/sdk/call-builder) - Fluent action construction
+- [Testing](/sdk/testing) - TestHarness and testing utilities
+- [`cargo agent` CLI Reference](/sdk/cli-reference) - Development workflow

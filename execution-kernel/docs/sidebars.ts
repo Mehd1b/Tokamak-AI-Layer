@@ -3,16 +3,7 @@ import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
 const sidebars: SidebarsConfig = {
   docsSidebar: [
     'intro',
-    {
-      type: 'category',
-      label: 'Architecture',
-      collapsed: false,
-      items: [
-        'architecture/overview',
-        'architecture/trust-model',
-        'architecture/cryptographic-chain',
-      ],
-    },
+    'quickstart',
     {
       type: 'category',
       label: 'Getting Started',
@@ -21,7 +12,42 @@ const sidebars: SidebarsConfig = {
         'getting-started/prerequisites',
         'getting-started/local-build',
         'getting-started/run-an-example',
+        'getting-started/defi-yield-farmer',
         'getting-started/faq',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Agent Development',
+      collapsed: false,
+      items: [
+        'sdk/overview',
+        'sdk/writing-an-agent',
+        'sdk/agent-input-macro',
+        'sdk/call-builder',
+        'sdk/testing',
+        'sdk/constraints-and-commitments',
+        'sdk/cli-reference',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Cookbook',
+      collapsed: true,
+      items: [
+        'cookbook/erc20-agent',
+        'cookbook/multi-action-agent',
+        'cookbook/custom-constraints',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Architecture',
+      collapsed: true,
+      items: [
+        'architecture/overview',
+        'architecture/trust-model',
+        'architecture/cryptographic-chain',
       ],
     },
     {
@@ -32,17 +58,6 @@ const sidebars: SidebarsConfig = {
         'kernel/input-format',
         'kernel/journal-format',
         'kernel/versioning',
-      ],
-    },
-    {
-      type: 'category',
-      label: 'SDK',
-      collapsed: true,
-      items: [
-        'sdk/overview',
-        'sdk/writing-an-agent',
-        'sdk/constraints-and-commitments',
-        'sdk/testing',
       ],
     },
     {
@@ -74,6 +89,7 @@ const sidebars: SidebarsConfig = {
         'onchain/verifier-overview',
         'onchain/solidity-integration',
         'onchain/security-considerations',
+        'onchain/permissionless-system',
       ],
     },
     {
@@ -84,6 +100,16 @@ const sidebars: SidebarsConfig = {
         'integration/overview',
         'integration/reference-integrator',
         'integration/golden-path',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Decisions',
+      collapsed: true,
+      items: [
+        'decisions/binding-elimination',
+        'decisions/agent-input-macro',
+        'decisions/cargo-agent-cli',
       ],
     },
     {

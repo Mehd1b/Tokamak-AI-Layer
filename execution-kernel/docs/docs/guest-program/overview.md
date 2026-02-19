@@ -43,27 +43,28 @@ pub fn kernel_main_with_agent<A: AgentEntrypoint>(
 ) -> Result<Vec<u8>, KernelError>;
 ```
 
-### Wrapper Crate
+### Kernel Binding via `agent_entrypoint!`
 
-Each agent has a wrapper that implements `AgentEntrypoint`:
+The `agent_entrypoint!` macro generates the `AgentEntrypoint` implementation and kernel binding directly in your agent crate, eliminating the need for a separate binding crate:
 
 ```rust
-pub struct YieldAgentWrapper;
-
-impl AgentEntrypoint for YieldAgentWrapper {
-    fn code_hash(&self) -> [u8; 32] {
-        example_yield_agent::AGENT_CODE_HASH
-    }
-
-    fn run(&self, ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput {
-        example_yield_agent::agent_main(ctx, opaque_inputs)
-    }
+// In your agent's lib.rs
+pub fn agent_main(ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput {
+    // ... agent logic ...
 }
+
+kernel_sdk::agent_entrypoint!(agent_main);
 ```
+
+This macro generates:
+- `__KernelAgentWrapper` — a struct implementing `AgentEntrypoint`
+- `kernel_main(input_bytes)` — calls `kernel_main_with_agent` without constraints
+- `kernel_main_with_constraints(input_bytes, cs)` — calls with custom constraints
+- `KernelError` re-export from `kernel_guest`
 
 ### zkVM Guest
 
-The zkVM guest is the actual entry point:
+The zkVM guest is the actual entry point compiled for RISC-V:
 
 ```rust
 #![no_main]
@@ -76,8 +77,8 @@ fn main() {
     // Read input from zkVM environment
     let input_bytes: Vec<u8> = env::read();
 
-    // Execute kernel with agent
-    match kernel_guest_binding_yield::kernel_main(&input_bytes) {
+    // Execute kernel with agent (uses generated kernel_main)
+    match my_agent::kernel_main(&input_bytes) {
         Ok(journal_bytes) => {
             // Commit journal to proof
             env::commit_slice(&journal_bytes);

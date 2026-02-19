@@ -13,9 +13,8 @@ edition = "2021"
 [workspace]
 
 [dependencies]
-# Wrapper crate that binds the yield agent to kernel-guest.
-# To use a different agent, change this to a different wrapper crate.
-kernel-guest-binding-yield = { path = "../../binding" }
+# Agent crate (generates kernel_main via agent_entrypoint! macro)
+example-yield-agent = { path = "../../agent" }
 
 # RISC Zero zkVM guest runtime
 risc0-zkvm = { version = "3.0", default-features = false, features = ["std"] }

@@ -1446,6 +1446,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "cargo-agent"
+version = "0.1.0"
+dependencies = [
+ "agent-pack",
+ "clap",
+]
+
+[[package]]
 name = "cargo-platform"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1820,6 +1828,8 @@ checksum = "d7a1e2f27636f116493b8b860f5546edb47c8d8f8ea73e1d2a20be88e28d1fea"
 name = "defi-yield-farmer"
 version = "0.1.0"
 dependencies = [
+ "constraints",
+ "kernel-guest",
  "kernel-sdk",
  "sha2",
 ]
@@ -2221,6 +2231,8 @@ dependencies = [
 name = "example-yield-agent"
 version = "0.1.0"
 dependencies = [
+ "constraints",
+ "kernel-guest",
  "kernel-sdk",
  "sha2",
 ]
@@ -3135,28 +3147,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kernel-guest-binding-defi-yield"
-version = "0.1.0"
-dependencies = [
- "constraints",
- "defi-yield-farmer",
- "kernel-core",
- "kernel-guest",
- "kernel-sdk",
-]
-
-[[package]]
-name = "kernel-guest-binding-yield"
-version = "0.1.0"
-dependencies = [
- "constraints",
- "example-yield-agent",
- "kernel-core",
- "kernel-guest",
- "kernel-sdk",
-]
-
-[[package]]
 name = "kernel-host-tests"
 version = "0.1.0"
 dependencies = [
@@ -3165,8 +3155,6 @@ dependencies = [
  "example-yield-agent",
  "kernel-core",
  "kernel-guest",
- "kernel-guest-binding-defi-yield",
- "kernel-guest-binding-yield",
  "kernel-sdk",
  "serde",
  "serde_json",
@@ -3176,6 +3164,7 @@ dependencies = [
 name = "kernel-sdk"
 version = "0.1.0"
 dependencies = [
+ "constraints",
  "kernel-core",
 ]
 

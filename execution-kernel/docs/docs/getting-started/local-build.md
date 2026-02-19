@@ -52,10 +52,7 @@ This uses RISC Zero's Docker image to ensure identical builds across different m
 ### Protocol Layer
 
 ```bash
-# Build kernel-core
 cargo build -p kernel-core --release
-
-# Build constraints
 cargo build -p constraints --release
 ```
 
@@ -68,32 +65,36 @@ cargo build -p kernel-sdk --release
 ### Runtime
 
 ```bash
-# Build kernel-guest (canonical agent-agnostic runtime)
 cargo build -p kernel-guest --release
 ```
 
 ### Agents
 
-Each agent has three sub-crates: `agent`, `binding`, and `risc0-methods`.
+Use the `cargo agent` CLI or build directly:
 
 ```bash
-# Build example yield agent
-cargo build -p example-yield-agent --release
-cargo build -p kernel-guest-binding-yield --release
-cargo build -p risc0-methods --release --features risc0
+# Using cargo agent (recommended)
+cargo agent build example-yield-agent
+cargo agent build defi-yield-farmer
 
-# Build DeFi yield farmer agent
+# Or directly with cargo
+cargo build -p example-yield-agent --release
 cargo build -p defi-yield-farmer --release
-cargo build -p kernel-guest-binding-defi-yield --release
-cargo build -p risc0-methods-defi --release --features risc0
 ```
 
 ## Verify Build
 
-### Run Unit Tests
+### Run All Tests
 
 ```bash
 cargo test
+```
+
+### Run Agent Tests
+
+```bash
+cargo agent test example-yield-agent
+cargo agent test defi-yield-farmer
 ```
 
 ### Run Specific Test
@@ -130,6 +131,33 @@ use risc0_methods::ZKVM_GUEST_ID;
 
 // DeFi yield farmer
 use risc0_methods_defi::ZKVM_GUEST_ID;
+```
+
+## Workspace Structure
+
+```
+Cargo.toml                 # Workspace root
+crates/
+├── protocol/
+│   ├── kernel-core/       # Core types, codec, hashing
+│   └── constraints/       # Constraint engine
+├── sdk/
+│   └── kernel-sdk/        # Agent development SDK
+├── runtime/
+│   └── kernel-guest/      # Agent-agnostic kernel execution logic
+├── agents/
+│   ├── example-yield-agent/
+│   │   ├── agent/             # Agent logic + kernel binding
+│   │   └── risc0-methods/     # RISC Zero build + zkvm-guest/
+│   └── defi-yield-farmer/
+│       ├── agent/             # Agent logic + kernel binding
+│       └── risc0-methods/     # RISC Zero build + zkvm-guest-defi/
+├── tools/
+│   └── cargo-agent/       # cargo agent CLI
+├── agent-pack/            # Agent Pack CLI tool
+└── testing/
+    ├── kernel-host-tests/ # Unit tests
+    └── e2e-tests/         # End-to-end tests
 ```
 
 ## Build Troubleshooting
@@ -183,37 +211,7 @@ error: RISC0_USE_DOCKER is set but docker is not available
 **Solution**: Install and start Docker:
 
 ```bash
-# Verify Docker is running
 docker info
-```
-
-## Workspace Structure
-
-The workspace is organized as follows:
-
-```
-Cargo.toml                 # Workspace root
-crates/
-├── protocol/
-│   ├── kernel-core/       # Core types, codec, hashing
-│   └── constraints/       # Constraint engine
-├── sdk/
-│   └── kernel-sdk/        # Agent development SDK
-├── runtime/
-│   └── kernel-guest/      # Agent-agnostic kernel execution logic
-├── agents/
-│   ├── example-yield-agent/
-│   │   ├── agent/             # Agent logic
-│   │   ├── binding/           # Kernel-guest binding
-│   │   └── risc0-methods/     # RISC Zero build + zkvm-guest/
-│   └── defi-yield-farmer/
-│       ├── agent/             # Agent logic
-│       ├── binding/           # Kernel-guest binding
-│       └── risc0-methods/     # RISC Zero build + zkvm-guest-defi/
-├── agent-pack/            # Agent Pack CLI tool
-└── testing/
-    ├── kernel-host-tests/ # Unit tests
-    └── e2e-tests/         # End-to-end tests
 ```
 
 ## Next Steps

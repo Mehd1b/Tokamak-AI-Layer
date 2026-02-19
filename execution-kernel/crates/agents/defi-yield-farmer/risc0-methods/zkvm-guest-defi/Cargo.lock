@@ -427,6 +427,8 @@ dependencies = [
 name = "defi-yield-farmer"
 version = "0.1.0"
 dependencies = [
+ "constraints",
+ "kernel-guest",
  "kernel-sdk",
  "sha2",
 ]
@@ -684,17 +686,6 @@ version = "0.1.0"
 dependencies = [
  "constraints",
  "kernel-core",
- "kernel-sdk",
-]
-
-[[package]]
-name = "kernel-guest-binding-defi-yield"
-version = "0.1.0"
-dependencies = [
- "constraints",
- "defi-yield-farmer",
- "kernel-core",
- "kernel-guest",
  "kernel-sdk",
 ]
 
@@ -1511,6 +1502,6 @@ dependencies = [
 name = "zkvm-guest-defi"
 version = "0.1.0"
 dependencies = [
- "kernel-guest-binding-defi-yield",
+ "defi-yield-farmer",
  "risc0-zkvm",
 ]

@@ -42,18 +42,19 @@ crates/
 │   ├── kernel-core/             # Types, deterministic codec, SHA-256 hashing
 │   └── constraints/             # Constraint engine with action validation
 ├── sdk/
-│   └── kernel-sdk/              # Agent development SDK
+│   └── kernel-sdk/              # Agent development SDK (macros, builders, testing)
 ├── runtime/                     # zkVM execution
 │   └── kernel-guest/            # Agent-agnostic kernel execution logic
 ├── agents/
 │   ├── example-yield-agent/         # Reference yield agent
-│   │   ├── agent/                   # Agent logic (lib.rs, build.rs)
-│   │   ├── binding/                 # Kernel-guest binding wrapper
+│   │   ├── agent/                   # Agent logic + kernel binding
 │   │   └── risc0-methods/           # RISC Zero build + zkvm-guest/
 │   └── defi-yield-farmer/           # DeFi yield farming agent
-│       ├── agent/                   # Agent logic (lib.rs, build.rs)
-│       ├── binding/                 # Kernel-guest binding wrapper
+│       ├── agent/                   # Agent logic + kernel binding
 │       └── risc0-methods/           # RISC Zero build + zkvm-guest-defi/
+├── tools/
+│   └── cargo-agent/             # cargo agent CLI subcommand
+├── agent-pack/                  # Agent Pack CLI tool
 └── testing/
     ├── kernel-host-tests/       # Unit test suite
     └── e2e-tests/               # End-to-end zkVM proof tests
@@ -67,19 +68,28 @@ crates/
 
 ### SDK Layer
 
-**kernel-sdk** provides utilities for agent developers. It includes helper functions for constructing actions, working with addresses, and managing the `AgentContext` that the kernel provides to agents.
+**kernel-sdk** provides utilities for agent developers. It includes:
+- `agent_input!` macro for declarative input parsing
+- `agent_entrypoint!` macro for kernel binding (eliminates the need for a separate binding crate)
+- `CallBuilder` and `erc20` helpers for action construction
+- `TestHarness`, `ContextBuilder`, and hex helpers for testing
+- Math and byte manipulation helpers
 
 ### Runtime Layer
 
-**kernel-guest** is the core execution logic. It defines the `AgentEntrypoint` trait and the `kernel_main_with_agent` function that orchestrates execution. This is the canonical, agent-agnostic runtime; agent-specific RISC Zero build crates now live alongside each agent.
+**kernel-guest** is the core execution logic. It defines the `AgentEntrypoint` trait and the `kernel_main_with_agent` function that orchestrates execution. This is the canonical, agent-agnostic runtime.
 
 ### Agents Layer
 
-Each agent is a self-contained directory under `crates/agents/` with three sub-crates: `agent/` (core logic), `binding/` (kernel-guest binding wrapper implementing `AgentEntrypoint`), and `risc0-methods/` (RISC Zero build crate exporting `ZKVM_GUEST_ELF` and `ZKVM_GUEST_ID`).
+Each agent is a self-contained directory under `crates/agents/` with two sub-crates: `agent/` (core logic + kernel binding via `agent_entrypoint!` macro) and `risc0-methods/` (RISC Zero build crate exporting `ZKVM_GUEST_ELF` and `ZKVM_GUEST_ID`).
 
 **example-yield-agent** is the reference yield farming agent.
 
 **defi-yield-farmer** is a DeFi yield farming agent with multi-protocol strategy support.
+
+### Tools
+
+**cargo-agent** provides the `cargo agent` CLI subcommand for scaffolding, building, testing, and packaging agents.
 
 ## Execution Flow
 
@@ -125,7 +135,7 @@ pub trait AgentEntrypoint {
 }
 ```
 
-Any type implementing this trait can be passed to `kernel_main_with_agent`.
+Any type implementing this trait can be passed to `kernel_main_with_agent`. The `agent_entrypoint!` macro generates this implementation automatically from any `agent_main` function.
 
 ## Key Design Principles
 

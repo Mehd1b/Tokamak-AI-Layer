@@ -31,6 +31,7 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use kernel_sdk::prelude::*;
+use kernel_sdk::actions::CallBuilder;
 
 // Include the generated agent hash constant.
 include!(concat!(env!("OUT_DIR"), "/agent_hash.rs"));
@@ -39,18 +40,11 @@ include!(concat!(env!("OUT_DIR"), "/agent_hash.rs"));
 // Constants
 // ============================================================================
 
-/// Input size: 20 (pool) + 20 (token) + 20 (vault) + 8 (balance) + 8 (supplied)
-///           + 4 (rate) + 4 (min_rate) + 4 (target_util) + 1 (flag) = 89 bytes
-const INPUT_SIZE: usize = 89;
-
 /// AAVE supply function selector: keccak256("supply(address,uint256,address,uint16)")[:4]
-const SUPPLY_SELECTOR: [u8; 4] = [0x61, 0x7b, 0xa0, 0x37];
+const SUPPLY_SELECTOR: u32 = 0x617ba037;
 
 /// AAVE withdraw function selector: keccak256("withdraw(address,uint256,address)")[:4]
-const WITHDRAW_SELECTOR: [u8; 4] = [0x69, 0x32, 0x8d, 0xec];
-
-/// ERC20 approve function selector: keccak256("approve(address,uint256)")[:4]
-const APPROVE_SELECTOR: [u8; 4] = [0x09, 0x5e, 0xa7, 0xb3];
+const WITHDRAW_SELECTOR: u32 = 0x69328dec;
 
 /// Action flag: evaluate market conditions and decide
 const FLAG_EVALUATE: u8 = 0;
@@ -68,75 +62,18 @@ const FLAG_APPROVE_AND_SUPPLY: u8 = 3;
 // Input Parsing
 // ============================================================================
 
-struct MarketInput {
-    lending_pool: [u8; 20],
-    asset_token: [u8; 20],
-    vault_address: [u8; 20],
-    vault_balance: u64,
-    supplied_amount: u64,
-    supply_rate_bps: u32,
-    min_supply_rate_bps: u32,
-    target_utilization_bps: u32,
-    action_flag: u8,
-}
-
-fn parse_input(opaque_inputs: &[u8]) -> Option<MarketInput> {
-    if opaque_inputs.len() != INPUT_SIZE {
-        return None;
+kernel_sdk::agent_input! {
+    struct MarketInput {
+        lending_pool: [u8; 20],
+        asset_token: [u8; 20],
+        vault_address: [u8; 20],
+        vault_balance: u64,
+        supplied_amount: u64,
+        supply_rate_bps: u32,
+        min_supply_rate_bps: u32,
+        target_utilization_bps: u32,
+        action_flag: u8,
     }
-
-    let mut offset = 0usize;
-
-    let mut lending_pool = [0u8; 20];
-    lending_pool.copy_from_slice(&opaque_inputs[offset..offset + 20]);
-    offset += 20;
-
-    let mut asset_token = [0u8; 20];
-    asset_token.copy_from_slice(&opaque_inputs[offset..offset + 20]);
-    offset += 20;
-
-    let mut vault_address = [0u8; 20];
-    vault_address.copy_from_slice(&opaque_inputs[offset..offset + 20]);
-    offset += 20;
-
-    let vault_balance = u64::from_le_bytes(
-        opaque_inputs[offset..offset + 8].try_into().ok()?
-    );
-    offset += 8;
-
-    let supplied_amount = u64::from_le_bytes(
-        opaque_inputs[offset..offset + 8].try_into().ok()?
-    );
-    offset += 8;
-
-    let supply_rate_bps = u32::from_le_bytes(
-        opaque_inputs[offset..offset + 4].try_into().ok()?
-    );
-    offset += 4;
-
-    let min_supply_rate_bps = u32::from_le_bytes(
-        opaque_inputs[offset..offset + 4].try_into().ok()?
-    );
-    offset += 4;
-
-    let target_utilization_bps = u32::from_le_bytes(
-        opaque_inputs[offset..offset + 4].try_into().ok()?
-    );
-    offset += 4;
-
-    let action_flag = opaque_inputs[offset];
-
-    Some(MarketInput {
-        lending_pool,
-        asset_token,
-        vault_address,
-        vault_balance,
-        supplied_amount,
-        supply_rate_bps,
-        min_supply_rate_bps,
-        target_utilization_bps,
-        action_flag,
-    })
 }
 
 // ============================================================================
@@ -158,7 +95,7 @@ fn min_u64(a: u64, b: u64) -> u64 {
 /// when multiple agent crates are linked into the same binary (e.g., tests).
 /// The wrapper crate calls this through the Rust module path.
 pub extern "Rust" fn agent_main(_ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput {
-    let market = match parse_input(opaque_inputs) {
+    let market = match MarketInput::decode(opaque_inputs) {
         Some(m) => m,
         None => return AgentOutput { actions: Vec::new() },
     };
@@ -174,6 +111,9 @@ pub extern "Rust" fn agent_main(_ctx: &AgentContext, opaque_inputs: &[u8]) -> Ag
 
 /// Compile-time check that agent_main matches the canonical AgentEntrypoint type.
 const _: AgentEntrypoint = agent_main;
+
+// Generate kernel_main, kernel_main_with_constraints, and KernelError re-export.
+kernel_sdk::agent_entrypoint!(agent_main);
 
 // ============================================================================
 // Strategy Logic
@@ -271,75 +211,28 @@ fn approve_and_supply(market: &MarketInput) -> AgentOutput {
 
 /// Build a CALL action for ERC20.approve(address spender, uint256 amount).
 fn build_approve_action(market: &MarketInput, spender: &[u8; 20], amount: u64) -> ActionV1 {
-    let target = address_to_bytes32(&market.asset_token);
-    let calldata = encode_approve_call(spender, amount);
-    call_action(target, 0, &calldata)
+    kernel_sdk::actions::erc20::approve(&market.asset_token, spender, amount)
 }
 
 /// Build a CALL action for AAVE supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode).
 fn build_supply_action(market: &MarketInput, amount: u64) -> ActionV1 {
-    let target = address_to_bytes32(&market.lending_pool);
-    let calldata = encode_supply_call(&market.asset_token, &market.vault_address, amount);
-    call_action(target, 0, &calldata)
+    CallBuilder::new(market.lending_pool)
+        .selector(SUPPLY_SELECTOR)
+        .param_address(&market.asset_token)
+        .param_u256_from_u64(amount)
+        .param_address(&market.vault_address)
+        .param_u16(0) // referralCode
+        .build()
 }
 
 /// Build a CALL action for AAVE withdraw(address asset, uint256 amount, address to).
 fn build_withdraw_action(market: &MarketInput, amount: u64) -> ActionV1 {
-    let target = address_to_bytes32(&market.lending_pool);
-    let calldata = encode_withdraw_call(&market.asset_token, &market.vault_address, amount);
-    call_action(target, 0, &calldata)
-}
-
-/// Encode approve(address, uint256) calldata.
-///
-/// Format: selector(4) + spender(32) + amount(32) = 68 bytes
-fn encode_approve_call(spender: &[u8; 20], amount: u64) -> Vec<u8> {
-    let mut calldata = Vec::with_capacity(68);
-    calldata.extend_from_slice(&APPROVE_SELECTOR);
-    // address spender (left-padded to 32 bytes)
-    calldata.extend_from_slice(&address_to_bytes32(spender));
-    // uint256 amount (big-endian, right-aligned in 32 bytes)
-    calldata.extend_from_slice(&u64_to_u256_be(amount));
-    calldata
-}
-
-/// Encode supply(address, uint256, address, uint16) calldata.
-///
-/// Format: selector(4) + asset(32) + amount(32) + onBehalfOf(32) + referralCode(32) = 132 bytes
-fn encode_supply_call(asset: &[u8; 20], on_behalf_of: &[u8; 20], amount: u64) -> Vec<u8> {
-    let mut calldata = Vec::with_capacity(132);
-    calldata.extend_from_slice(&SUPPLY_SELECTOR);
-    // address asset (left-padded to 32 bytes)
-    calldata.extend_from_slice(&address_to_bytes32(asset));
-    // uint256 amount (big-endian, right-aligned in 32 bytes)
-    calldata.extend_from_slice(&u64_to_u256_be(amount));
-    // address onBehalfOf = vault address (receives the aTokens)
-    calldata.extend_from_slice(&address_to_bytes32(on_behalf_of));
-    // uint16 referralCode = 0
-    calldata.extend_from_slice(&[0u8; 32]);
-    calldata
-}
-
-/// Encode withdraw(address, uint256, address) calldata.
-///
-/// Format: selector(4) + asset(32) + amount(32) + to(32) = 100 bytes
-fn encode_withdraw_call(asset: &[u8; 20], to: &[u8; 20], amount: u64) -> Vec<u8> {
-    let mut calldata = Vec::with_capacity(100);
-    calldata.extend_from_slice(&WITHDRAW_SELECTOR);
-    // address asset
-    calldata.extend_from_slice(&address_to_bytes32(asset));
-    // uint256 amount
-    calldata.extend_from_slice(&u64_to_u256_be(amount));
-    // address to = vault address (receives the withdrawn tokens)
-    calldata.extend_from_slice(&address_to_bytes32(to));
-    calldata
-}
-
-/// Convert a u64 to a big-endian u256 (32 bytes, right-aligned).
-fn u64_to_u256_be(value: u64) -> [u8; 32] {
-    let mut result = [0u8; 32];
-    result[24..32].copy_from_slice(&value.to_be_bytes());
-    result
+    CallBuilder::new(market.lending_pool)
+        .selector(WITHDRAW_SELECTOR)
+        .param_address(&market.asset_token)
+        .param_u256_from_u64(amount)
+        .param_address(&market.vault_address)
+        .build()
 }
 
 // ============================================================================
@@ -349,6 +242,9 @@ fn u64_to_u256_be(value: u64) -> [u8; 32] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Approve selector bytes for test assertions.
+    const APPROVE_SELECTOR_BYTES: [u8; 4] = [0x09, 0x5e, 0xa7, 0xb3];
 
     fn make_market_input(
         lending_pool: [u8; 20],
@@ -361,7 +257,7 @@ mod tests {
         target_utilization_bps: u32,
         action_flag: u8,
     ) -> Vec<u8> {
-        let mut input = Vec::with_capacity(INPUT_SIZE);
+        let mut input = Vec::with_capacity(MarketInput::ENCODED_SIZE);
         input.extend_from_slice(&lending_pool);
         input.extend_from_slice(&asset_token);
         input.extend_from_slice(&vault_address);
@@ -629,7 +525,7 @@ mod tests {
         assert_eq!(payload[95], 132);
 
         // Check supply selector inside calldata
-        assert_eq!(&payload[96..100], &SUPPLY_SELECTOR);
+        assert_eq!(&payload[96..100], &SUPPLY_SELECTOR.to_be_bytes());
     }
 
     #[test]
@@ -686,11 +582,11 @@ mod tests {
 
         // Check approve selector in first action's calldata
         let approve_payload = &output.actions[0].payload;
-        assert_eq!(&approve_payload[96..100], &APPROVE_SELECTOR);
+        assert_eq!(&approve_payload[96..100], &APPROVE_SELECTOR_BYTES);
 
         // Check supply selector in second action's calldata
         let supply_payload = &output.actions[1].payload;
-        assert_eq!(&supply_payload[96..100], &SUPPLY_SELECTOR);
+        assert_eq!(&supply_payload[96..100], &SUPPLY_SELECTOR.to_be_bytes());
     }
 
     #[test]
