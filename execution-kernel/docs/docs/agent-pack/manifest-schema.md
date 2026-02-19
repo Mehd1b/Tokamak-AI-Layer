@@ -309,7 +309,7 @@ Full SHA-1 hash:
 
   "networks": {
     "sepolia": {
-      "verifier": "0x9Ef5bAB590AFdE8036D57b89ccD2947D4E3b1EFA",
+      "verifier": "0x1eB41537037fB771CBA8Cd088C7c806936325eB5",
       "registered_image_id": "0x5f42241afd61bf9e341442c8baffa9c544cf20253720f2540cf6705f27bae2c4"
     }
   },

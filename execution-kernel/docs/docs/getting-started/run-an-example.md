@@ -77,8 +77,8 @@ Execute the complete flow with on-chain verification on Sepolia.
 export RPC_URL="https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY"
 export PRIVATE_KEY="0x..."
 
-export VAULT_ADDRESS=0xAdeDA97D2D07C7f2e810170f146d31b00262b9D7138F9b39
-export MOCK_YIELD_ADDRESS=0x7B35E3F2e810170f146d31b00262b9D7138F9b39
+export VAULT_ADDRESS=0xf7a179D55dF775d4cb3854ba3301564b44010508
+export MOCK_YIELD_ADDRESS=0xFF44663C1C3567F0CdA7D4B3817e34B4D8d82792
 
 cast send $VAULT_ADDRESS --value 0.5ether \
     --private-key $PRIVATE_KEY --rpc-url $RPC_URL

@@ -104,7 +104,7 @@ After offline verification, check the on-chain registration. The `verify-onchain
 agent-pack verify-onchain \
   --manifest agent-pack.json \
   --rpc https://sepolia.infura.io/v3/YOUR_KEY \
-  --verifier 0x9Ef5bAB590AFdE8036D57b89ccD2947D4E3b1EFA
+  --verifier 0x1eB41537037fB771CBA8Cd088C7c806936325eB5
 ```
 
 :::note
@@ -130,7 +130,7 @@ The command returns structured exit codes for CI integration:
 You can also verify manually using `cast`:
 
 ```bash
-export VERIFIER_ADDRESS=0x9Ef5bAB590AFdE8036D57b89ccD2947D4E3b1EFA
+export VERIFIER_ADDRESS=0x1eB41537037fB771CBA8Cd088C7c806936325eB5
 export AGENT_ID=0x0000000000000000000000000000000000000000000000000000000000000001
 
 # Query registered imageId
@@ -170,7 +170,7 @@ agent-pack verify --manifest submission/agent-pack.json --base-dir submission
 agent-pack verify-onchain \
   --manifest submission/agent-pack.json \
   --rpc "$RPC_URL" \
-  --verifier 0x9Ef5bAB590AFdE8036D57b89ccD2947D4E3b1EFA
+  --verifier 0x1eB41537037fB771CBA8Cd088C7c806936325eB5
 
 echo "Agent verified successfully!"
 ```

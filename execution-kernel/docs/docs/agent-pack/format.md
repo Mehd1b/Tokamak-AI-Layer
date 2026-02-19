@@ -59,7 +59,7 @@ The manifest is a JSON file containing:
 
   "networks": {
     "sepolia": {
-      "verifier": "0x9Ef5bAB590AFdE8036D57b89ccD2947D4E3b1EFA",
+      "verifier": "0x1eB41537037fB771CBA8Cd088C7c806936325eB5",
       "registered_image_id": "0x5f42241a..."
     }
   },

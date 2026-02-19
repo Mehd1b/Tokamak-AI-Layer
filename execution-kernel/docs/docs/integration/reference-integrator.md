@@ -96,7 +96,7 @@ use reference_integrator::verify_onchain;
 let result = verify_onchain(
     &bundle,
     "https://sepolia.infura.io/v3/YOUR_KEY",
-    "0x9Ef5bAB590AFdE8036D57b89ccD2947D4E3b1EFA",
+    "0x1eB41537037fB771CBA8Cd088C7c806936325eB5",
 ).await?;
 
 match result {
@@ -161,7 +161,7 @@ use reference_integrator::execute_onchain;
 
 let tx_hash = execute_onchain(
     "https://sepolia.infura.io/v3/YOUR_KEY",
-    "0xAdeDA97D2D07C7f2e332fD58F40Eb4f7F0192be7",  // KernelVault
+    "0xf7a179D55dF775d4cb3854ba3301564b44010508",  // KernelVault
     "YOUR_PRIVATE_KEY",
     &journal_bytes,
     &seal_bytes,
@@ -234,7 +234,7 @@ refint verify ./my-agent-bundle --structure-only
 # On-chain verification (requires --features onchain)
 refint verify ./my-agent-bundle --onchain \
   --rpc https://sepolia.infura.io/v3/YOUR_KEY \
-  --verifier 0x9Ef5bAB590AFdE8036D57b89ccD2947D4E3b1EFA
+  --verifier 0x1eB41537037fB771CBA8Cd088C7c806936325eB5
 ```
 
 #### prove
@@ -289,7 +289,7 @@ Execute a proof on-chain via the KernelVault (requires `--features onchain`).
 ```bash
 refint execute --bundle ./my-agent-bundle \
   --rpc https://sepolia.infura.io/v3/YOUR_KEY \
-  --vault 0xAdeDA97D2D07C7f2e332fD58F40Eb4f7F0192be7 \
+  --vault 0xf7a179D55dF775d4cb3854ba3301564b44010508 \
   --pk env:PRIVATE_KEY \
   --journal ./output/journal.bin \
   --seal ./output/seal.bin \
@@ -362,7 +362,7 @@ async fn process_agent_bundle(
 
     let onchain_result = verify_onchain(
         &bundle, "https://sepolia.infura.io/v3/YOUR_KEY",
-        "0x9Ef5bAB590AFdE8036D57b89ccD2947D4E3b1EFA",
+        "0x1eB41537037fB771CBA8Cd088C7c806936325eB5",
     ).await?;
     if !matches!(onchain_result, OnchainVerificationResult::Match) {
         return Err("On-chain verification failed".into());
@@ -379,7 +379,7 @@ async fn process_agent_bundle(
 
     let tx_hash = execute_onchain(
         "https://sepolia.infura.io/v3/YOUR_KEY",
-        "0xAdeDA97D2D07C7f2e332fD58F40Eb4f7F0192be7",
+        "0xf7a179D55dF775d4cb3854ba3301564b44010508",
         std::env::var("PRIVATE_KEY")?.as_str(),
         &prove_result.journal_bytes,
         &prove_result.seal_bytes,
@@ -435,8 +435,8 @@ echo "Bundle verified successfully"
 
 | Contract                  | Address                                      |
 |---------------------------|----------------------------------------------|
-| KernelExecutionVerifier   | `0x9Ef5bAB590AFdE8036D57b89ccD2947D4E3b1EFA` |
-| KernelVault               | `0xAdeDA97D2D07C7f2e332fD58F40Eb4f7F0192be7` |
+| KernelExecutionVerifier   | `0x1eB41537037fB771CBA8Cd088C7c806936325eB5` |
+| KernelVault               | `0xf7a179D55dF775d4cb3854ba3301564b44010508` |
 | RISC Zero Verifier Router | `0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187` |
 
 ## Error Handling

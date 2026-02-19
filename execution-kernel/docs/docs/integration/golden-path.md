@@ -29,8 +29,8 @@ The demo requires several environment variables. Create a `.env` file or export 
 export RPC_URL="https://sepolia.infura.io/v3/YOUR_KEY"
 
 # Contract addresses (Sepolia deployment)
-export VERIFIER_ADDRESS="0x9Ef5bAB590AFdE8036D57b89ccD2947D4E3b1EFA"
-export VAULT_ADDRESS="0xAdeDA97D2D07C7f2e332fD58F40Eb4f7F0192be7"
+export VERIFIER_ADDRESS="0x1eB41537037fB771CBA8Cd088C7c806936325eB5"
+export VAULT_ADDRESS="0xf7a179D55dF775d4cb3854ba3301564b44010508"
 
 # Private key for signing transactions (never commit this)
 export PRIVATE_KEY="0x..."
@@ -45,7 +45,7 @@ For the `example-yield-agent`, you also need:
 
 ```bash
 # MockYieldSource contract address (for yield agent)
-export MOCK_YIELD_SOURCE="0x7B35E3F2e810170f146d31b00262b9D7138F9b39"
+export MOCK_YIELD_SOURCE="0xFF44663C1C3567F0CdA7D4B3817e34B4D8d82792"
 
 # Optional: amount in little-endian hex (default: 1000000 = 1 USDC)
 export YIELD_AMOUNT="40420F0000000000"
@@ -171,7 +171,7 @@ The script validates environment variables, runs each step, and writes outputs t
 For the yield agent, set `MOCK_YIELD_SOURCE` to enable automatic opaque inputs construction:
 
 ```bash
-export MOCK_YIELD_SOURCE="0x7B35E3F2e810170f146d31b00262b9D7138F9b39"
+export MOCK_YIELD_SOURCE="0xFF44663C1C3567F0CdA7D4B3817e34B4D8d82792"
 export NONCE=5  # Increment for each execution
 
 ./scripts/golden_path_sepolia.sh ./bundles/example-yield-agent
@@ -192,8 +192,8 @@ Here is a successful execution on Sepolia testnet:
 [INFO] Bundle: ./bundles/example-yield-agent
 [INFO] Output: ./run/golden-path/20250130_143522
 [INFO] RPC: https://sepolia.infura.io/v3/...
-[INFO] Verifier: 0x9Ef5bAB590AFdE8036D57b89ccD2947D4E3b1EFA
-[INFO] Vault: 0xAdeDA97D2D07C7f2e332fD58F40Eb4f7F0192be7
+[INFO] Verifier: 0x1eB41537037fB771CBA8Cd088C7c806936325eB5
+[INFO] Vault: 0xf7a179D55dF775d4cb3854ba3301564b44010508
 [INFO] Nonce: 5
 
 [INFO] Step 1: Offline verification...

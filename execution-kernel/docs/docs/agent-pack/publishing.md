@@ -196,7 +196,7 @@ set -e
 
 BUNDLE_DIR="$1"
 RPC_URL="${RPC_URL:-https://sepolia.infura.io/v3/YOUR_KEY}"
-VERIFIER="0x9Ef5bAB590AFdE8036D57b89ccD2947D4E3b1EFA"
+VERIFIER="0x1eB41537037fB771CBA8Cd088C7c806936325eB5"
 
 # Step 1: Offline verification
 echo "Running offline verification..."
