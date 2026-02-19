@@ -9,7 +9,7 @@ interface VaultCardProps {
   asset: string;
   totalAssets: bigint;
   totalShares: bigint;
-  totalValueLocked: bigint;
+  totalValueLocked?: bigint;
 }
 
 export function VaultCard({ address, agentId, asset, totalAssets, totalShares, totalValueLocked }: VaultCardProps) {
@@ -49,7 +49,7 @@ export function VaultCard({ address, agentId, asset, totalAssets, totalShares, t
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">TVL</span>
-            <span>{formatEther(totalValueLocked)}</span>
+            <span>{formatEther(totalValueLocked ?? totalAssets)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">Vault Balance</span>

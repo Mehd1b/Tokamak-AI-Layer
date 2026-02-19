@@ -42,6 +42,31 @@ async function paginatedGetLogs(
   return results;
 }
 
+/**
+ * Try reading totalValueLocked(); fall back to totalAssets() for old vaults.
+ */
+async function readTvlOrFallback(
+  client: any,
+  vaultAddress: `0x${string}`,
+  blockNumber?: bigint,
+): Promise<bigint> {
+  try {
+    return await client.readContract({
+      address: vaultAddress,
+      abi: KernelVaultABI,
+      functionName: 'totalValueLocked',
+      ...(blockNumber !== undefined ? { blockNumber } : {}),
+    }) as bigint;
+  } catch {
+    return await client.readContract({
+      address: vaultAddress,
+      abi: KernelVaultABI,
+      functionName: 'totalAssets',
+      ...(blockNumber !== undefined ? { blockNumber } : {}),
+    }) as bigint;
+  }
+}
+
 export function useVaultHistory(vaultAddress: `0x${string}` | undefined): VaultHistoryData {
   const client = usePublicClient({ chainId: sepolia.id });
 
@@ -156,11 +181,7 @@ export function useVaultHistory(vaultAddress: `0x${string}` | undefined): VaultH
       // Even with no historical events, still show a live data point
       if (allEvents.length === 0) {
         const [currentTvl, currentAssets, currentShares] = await Promise.all([
-          client.readContract({
-            address: vaultAddress,
-            abi: KernelVaultABI,
-            functionName: 'totalValueLocked',
-          }) as Promise<bigint>,
+          readTvlOrFallback(client, vaultAddress),
           client.readContract({
             address: vaultAddress,
             abi: KernelVaultABI,
@@ -232,12 +253,7 @@ export function useVaultHistory(vaultAddress: `0x${string}` | undefined): VaultH
           const timestamp = timestampMap.get(blockNumber.toString())!;
 
           const [tvlVal, assets, shares] = await Promise.all([
-            client.readContract({
-              address: vaultAddress,
-              abi: KernelVaultABI,
-              functionName: 'totalValueLocked',
-              blockNumber,
-            }) as Promise<bigint>,
+            readTvlOrFallback(client, vaultAddress, blockNumber),
             client.readContract({
               address: vaultAddress,
               abi: KernelVaultABI,
@@ -289,11 +305,7 @@ export function useVaultHistory(vaultAddress: `0x${string}` | undefined): VaultH
 
       // Step 6: Append live data point
       const [currentTvl, currentAssets, currentShares] = await Promise.all([
-        client.readContract({
-          address: vaultAddress,
-          abi: KernelVaultABI,
-          functionName: 'totalValueLocked',
-        }) as Promise<bigint>,
+        readTvlOrFallback(client, vaultAddress),
         client.readContract({
           address: vaultAddress,
           abi: KernelVaultABI,

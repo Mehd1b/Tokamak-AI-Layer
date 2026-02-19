@@ -64,7 +64,7 @@ export function useDeployedVaultsList() {
       // Fetch details for each vault
       const vaults = await Promise.all(
         (vaultAddresses as `0x${string}`[]).map(async (vaultAddress) => {
-          const [agentId, asset, totalAssets, totalShares, totalValueLocked] = await Promise.all([
+          const [agentId, asset, totalAssets, totalShares] = await Promise.all([
             client.readContract({
               address: vaultAddress,
               abi: KernelVaultABI,
@@ -85,12 +85,19 @@ export function useDeployedVaultsList() {
               abi: KernelVaultABI,
               functionName: 'totalShares',
             }),
-            client.readContract({
+          ]);
+
+          // Fallback for old vaults without totalValueLocked()
+          let totalValueLocked: bigint;
+          try {
+            totalValueLocked = await client.readContract({
               address: vaultAddress,
               abi: KernelVaultABI,
               functionName: 'totalValueLocked',
-            }),
-          ]);
+            }) as bigint;
+          } catch {
+            totalValueLocked = totalAssets as bigint;
+          }
 
           return {
             address: vaultAddress,
@@ -98,7 +105,7 @@ export function useDeployedVaultsList() {
             asset: asset as string,
             totalAssets: totalAssets as bigint,
             totalShares: totalShares as bigint,
-            totalValueLocked: totalValueLocked as bigint,
+            totalValueLocked,
           };
         }),
       );
@@ -135,7 +142,7 @@ export function useVaultsForAgent(agentId: `0x${string}` | undefined) {
 
           if (vaultAgentId !== agentId) return null;
 
-          const [asset, totalAssets, totalShares, totalValueLocked] = await Promise.all([
+          const [asset, totalAssets, totalShares] = await Promise.all([
             client.readContract({
               address: vaultAddress,
               abi: KernelVaultABI,
@@ -151,12 +158,19 @@ export function useVaultsForAgent(agentId: `0x${string}` | undefined) {
               abi: KernelVaultABI,
               functionName: 'totalShares',
             }),
-            client.readContract({
+          ]);
+
+          // Fallback for old vaults without totalValueLocked()
+          let totalValueLocked: bigint;
+          try {
+            totalValueLocked = await client.readContract({
               address: vaultAddress,
               abi: KernelVaultABI,
               functionName: 'totalValueLocked',
-            }),
-          ]);
+            }) as bigint;
+          } catch {
+            totalValueLocked = totalAssets as bigint;
+          }
 
           return {
             address: vaultAddress,
@@ -164,7 +178,7 @@ export function useVaultsForAgent(agentId: `0x${string}` | undefined) {
             asset: asset as string,
             totalAssets: totalAssets as bigint,
             totalShares: totalShares as bigint,
-            totalValueLocked: totalValueLocked as bigint,
+            totalValueLocked,
           };
         }),
       );

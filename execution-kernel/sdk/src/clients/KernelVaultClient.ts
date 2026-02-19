@@ -175,13 +175,20 @@ export class KernelVaultClient {
   }
 
   async getInfo(userAddress?: `0x${string}`): Promise<KernelVaultInfo> {
-    const [assetAddr, agentIdVal, totalAssetsVal, totalSharesVal, totalValueLockedVal] = await Promise.all([
+    const [assetAddr, agentIdVal, totalAssetsVal, totalSharesVal] = await Promise.all([
       this.asset(),
       this.agentId(),
       this.totalAssets(),
       this.totalShares(),
-      this.totalValueLocked(),
     ]);
+
+    // Fallback for old vaults without totalValueLocked()
+    let totalValueLockedVal: bigint;
+    try {
+      totalValueLockedVal = await this.totalValueLocked();
+    } catch {
+      totalValueLockedVal = totalAssetsVal;
+    }
 
     let userShares = 0n;
     let userAssets = 0n;
