@@ -237,37 +237,6 @@ cast send $VAULT_ADDRESS \
 
 See the [shell deployment script](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/execution-kernel/contracts/script/deploy-defi-yield-agent.sh) for a complete automated deployment.
 
-## Architecture
-
-```
-┌─────────────────────────────────────────────────┐
-│                  Vault Operator                  │
-│  Reads AAVE rates, builds 69-byte input packet  │
-└────────────────────┬────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────┐
-│              RISC Zero zkVM Prover               │
-│                                                  │
-│  ┌─────────────┐  ┌──────────────────────────┐  │
-│  │ Kernel Guest │──│ defi-yield-farmer agent  │  │
-│  │ (sandbox)    │  │ parse → evaluate → encode│  │
-│  └─────────────┘  └──────────────────────────┘  │
-│                                                  │
-│  Output: journal (209 bytes) + seal (proof)      │
-└────────────────────┬────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────┐
-│              KernelVault (on-chain)               │
-│                                                  │
-│  1. Verify RISC Zero proof                       │
-│  2. Check agent ID + nonce                       │
-│  3. Verify action commitment                     │
-│  4. Execute CALL actions → AAVE V3 Pool          │
-└─────────────────────────────────────────────────┘
-```
-
 ## Key Files
 
 | File | Description |

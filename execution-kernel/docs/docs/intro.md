@@ -41,38 +41,6 @@ The kernel acts as a **verifiable sandbox**: an agent runs inside the kernel, wh
 
 ## Key Features
 
-### Agent-Agnostic Design
-
-The kernel uses the `agent_entrypoint!` macro for zero-boilerplate agent integration:
-
-```rust
-use kernel_sdk::prelude::*;
-use kernel_sdk::actions::CallBuilder;
-
-kernel_sdk::agent_input! {
-    struct MyInput {
-        target: [u8; 20],
-        amount: u64,
-    }
-}
-
-pub fn agent_main(_ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput {
-    let input = match MyInput::decode(opaque_inputs) {
-        Some(i) => i,
-        None => return AgentOutput { actions: Vec::new() },
-    };
-
-    let action = CallBuilder::new(input.target)
-        .selector(0x617ba037)
-        .param_u256_from_u64(input.amount)
-        .build();
-
-    AgentOutput { actions: vec![action] }
-}
-
-kernel_sdk::agent_entrypoint!(agent_main);
-```
-
 ### Cryptographic Commitments
 
 Every execution produces a journal containing:

@@ -32,16 +32,6 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: 'Cookbook',
-      collapsed: true,
-      items: [
-        'cookbook/erc20-agent',
-        'cookbook/multi-action-agent',
-        'cookbook/custom-constraints',
-      ],
-    },
-    {
-      type: 'category',
       label: 'Architecture',
       collapsed: true,
       items: [

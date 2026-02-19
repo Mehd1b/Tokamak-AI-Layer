@@ -9,44 +9,7 @@ This guide walks through running the example yield agent, from local testing to 
 
 ## The Yield Agent
 
-The `example-yield-agent` demonstrates a complete agent lifecycle using the modern SDK APIs:
-
-```rust
-use kernel_sdk::prelude::*;
-use kernel_sdk::actions::CallBuilder;
-
-kernel_sdk::agent_input! {
-    struct YieldInput {
-        vault_address: [u8; 20],
-        mock_yield_address: [u8; 20],
-        transfer_amount: u64,
-    }
-}
-
-pub extern "Rust" fn agent_main(_ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput {
-    let input = match YieldInput::decode(opaque_inputs) {
-        Some(i) => i,
-        None => return AgentOutput { actions: Vec::new() },
-    };
-
-    // Deposit ETH to yield source
-    let deposit = CallBuilder::new(input.mock_yield_address)
-        .value(input.transfer_amount as u128)
-        .build();
-
-    // Withdraw from yield source
-    let withdraw = CallBuilder::new(input.mock_yield_address)
-        .selector(0x51cff8d9) // withdraw(address)
-        .param_address(&input.vault_address)
-        .build();
-
-    AgentOutput {
-        actions: vec![deposit, withdraw],
-    }
-}
-
-kernel_sdk::agent_entrypoint!(agent_main);
-```
+The `example-yield-agent` demonstrates a complete agent lifecycle using the modern SDK APIs. It parses a 48-byte input (vault address, yield source, amount), then produces two `CALL` actions: deposit ETH to a yield source and withdraw with yield. See [Writing an Agent](/sdk/writing-an-agent) for how the `agent_input!` macro and `CallBuilder` work.
 
 ## Unit Tests (No zkVM)
 
