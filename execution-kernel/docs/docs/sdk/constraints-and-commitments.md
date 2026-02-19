@@ -46,19 +46,11 @@ pub struct ConstraintSetV1 {
 
 ### Default Constraint Set
 
-```rust
-ConstraintSetV1 {
-    version: 1,
-    max_position_notional: u64::MAX,  // No position size limit
-    max_leverage_bps: 100_000,        // 10x max leverage
-    max_drawdown_bps: 10_000,         // 100% drawdown allowed (disabled)
-    cooldown_seconds: 0,              // No cooldown
-    max_actions_per_output: 64,       // Match protocol max
-    allowed_asset_id: [0u8; 32],      // Zero = all assets allowed
-}
-```
+The default constraint set is maximally permissive: no position size limit (`u64::MAX`), 10x max leverage (`100_000` bps), 100% drawdown allowed, no cooldown, up to 64 actions, and all assets allowed (`[0; 32]`).
 
 ## Constraint Evaluation Order
+
+Understanding the evaluation order helps you debug why your agent's output was rejected — the first violated constraint determines the error code.
 
 Constraints are evaluated in deterministic order:
 
@@ -110,13 +102,7 @@ When a constraint is violated:
 3. A valid `KernelJournalV1` is still produced
 4. Proof is valid, but verifiers should reject state transitions
 
-```rust
-// On constraint failure
-let empty_output = AgentOutput { actions: vec![] };
-let empty_encoded = empty_output.encode()?;  // [0x00, 0x00, 0x00, 0x00]
-let action_commitment = sha256(&empty_encoded);
-// = df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119
-```
+On failure, the `action_commitment` is computed over an empty `AgentOutput` (`[0x00, 0x00, 0x00, 0x00]`), producing the well-known constant `df3f61...b81119`. See [Cryptographic Chain](/architecture/cryptographic-chain#action-commitment) for full details.
 
 ## State Snapshot
 
@@ -147,22 +133,11 @@ ELSE IF snapshot is missing:
 
 ### Input Commitment
 
-```rust
-input_commitment = SHA-256(encoded_kernel_input_v1)
-```
-
-Computed over the entire encoded KernelInputV1 bytes.
+The `input_commitment` is `SHA-256(encoded_kernel_input_v1)`, computed over the entire encoded `KernelInputV1` bytes.
 
 ### Action Commitment
 
-```rust
-// On success
-action_commitment = SHA-256(encoded_agent_output)
-
-// On failure
-action_commitment = SHA-256([0x00, 0x00, 0x00, 0x00])
-                  = df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119
-```
+On success, `action_commitment = SHA-256(encoded_agent_output)`. On failure, it is the SHA-256 of empty output (`df3f61...b81119`). See [Cryptographic Chain](/architecture/cryptographic-chain#action-commitment) for details.
 
 ### Canonicalization
 
@@ -248,26 +223,7 @@ Payload must be empty (0 bytes). Skipped during on-chain execution.
 
 ### Handling Constraint Failures in Agents
 
-Since constraint checking is unskippable, agents should:
-
-1. Understand the active constraint set
-2. Avoid obviously invalid actions
-3. Handle failure gracefully (empty output)
-
-```rust
-pub fn agent_main(ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput {
-    // Parse inputs and check constraints are satisfiable
-    let amount = parse_amount(opaque_inputs)?;
-
-    // If we know constraints will fail, return empty
-    if amount > KNOWN_MAX_POSITION {
-        return AgentOutput { actions: Vec::new() };
-    }
-
-    // Proceed with action creation
-    // ...
-}
-```
+Since constraint checking is unskippable, agents should understand the active constraint set, avoid obviously invalid actions, and return empty output when they know constraints will fail. See [Writing an Agent — Defensive Parsing](/sdk/writing-an-agent#defensive-parsing) for patterns.
 
 ## Related
 

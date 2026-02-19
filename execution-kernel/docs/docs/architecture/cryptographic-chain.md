@@ -37,38 +37,9 @@ flowchart TD
 
 ### Agent Code Hash
 
-The `agent_code_hash` is a SHA-256 hash of the agent's source files, computed at build time by `build.rs`:
+The `agent_code_hash` is a SHA-256 hash of the agent's source files, computed at build time by `build.rs`. The script collects all `.rs` files in `src/`, sorts them for deterministic ordering, then feeds each filename and its contents into a SHA-256 hasher. The resulting hash is embedded as a constant (`AGENT_CODE_HASH`) in the compiled binary.
 
-```rust
-// build.rs
-fn main() {
-    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let src_dir = Path::new(&manifest_dir).join("src");
-
-    // Collect all .rs files in src/
-    let mut source_files: Vec<_> = fs::read_dir(&src_dir)
-        .unwrap()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map_or(false, |ext| ext == "rs"))
-        .map(|e| e.path())
-        .collect();
-    source_files.sort();  // Deterministic ordering
-
-    // Hash the contents
-    let mut hasher = Sha256::new();
-    for path in &source_files {
-        let contents = fs::read_to_string(path).unwrap();
-        hasher.update(path.file_name().unwrap().to_string_lossy().as_bytes());
-        hasher.update(contents.as_bytes());
-    }
-    let hash = hasher.finalize();
-
-    // Generate constant
-    // AGENT_CODE_HASH: [u8; 32] = [0x5a, 0xac, ...]
-}
-```
-
-This hash is embedded in the compiled agent binary and returned by `AgentEntrypoint::code_hash()`.
+See the [scaffold `build.rs` template](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/execution-kernel/crates/agent-pack/src/scaffold.rs) for the full implementation.
 
 **Properties**:
 - Changes when source code changes
@@ -77,16 +48,7 @@ This hash is embedded in the compiled agent binary and returned by `AgentEntrypo
 
 ### ImageId
 
-The `imageId` is computed by RISC Zero from the compiled ELF binary:
-
-```rust
-// risc0-methods/build.rs
-risc0_build::embed_methods();
-
-// Generates:
-// pub const ZKVM_GUEST_ELF: &[u8] = ...;
-// pub const ZKVM_GUEST_ID: [u32; 8] = ...;  // The imageId
-```
+The `imageId` is computed by RISC Zero from the compiled ELF binary. The `risc0-methods/build.rs` calls `risc0_build::embed_methods()`, which generates two constants: `ZKVM_GUEST_ELF` (the binary) and `ZKVM_GUEST_ID` (the imageId).
 
 **Properties**:
 - Unique hash of the entire guest binary
@@ -97,14 +59,7 @@ risc0_build::embed_methods();
 
 ### Input Commitment
 
-The `input_commitment` is the SHA-256 hash of the raw encoded input bytes:
-
-```rust
-let input_bytes = input.encode()?;
-let input_commitment = sha256(&input_bytes);
-```
-
-This commits to:
+The `input_commitment` is the SHA-256 hash of the raw encoded `KernelInputV1` bytes. This commits to:
 - Protocol and kernel versions
 - Agent identity (agent_id, agent_code_hash)
 - Constraint set hash
@@ -114,15 +69,7 @@ This commits to:
 
 ### Action Commitment
 
-The `action_commitment` is the SHA-256 hash of the canonicalized, encoded `AgentOutput`:
-
-```rust
-// Canonicalize (sort actions) before encoding
-let encoded_output = agent_output.encode()?;
-let action_commitment = sha256(&encoded_output);
-```
-
-For successful executions, this commits to exactly what actions the agent produced.
+The `action_commitment` is the SHA-256 hash of the canonicalized (sorted), encoded `AgentOutput`. For successful executions, this commits to exactly what actions the agent produced.
 
 For failed executions (constraint violations), a well-known constant is used:
 

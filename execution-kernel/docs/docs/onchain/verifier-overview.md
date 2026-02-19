@@ -5,7 +5,7 @@ sidebar_position: 1
 
 # On-Chain Verifier Overview
 
-The `KernelExecutionVerifier` contract validates zkVM proofs on-chain. Combined with `AgentRegistry` and `VaultFactory`, it enables fully permissionless agent execution.
+The `KernelExecutionVerifier` contract validates zkVM proofs on-chain. Combined with `AgentRegistry` and `VaultFactory`, it enables fully permissionless agent execution. This page covers the contract architecture and key functions. For integration examples (custom vaults, Foundry tests, `cast` commands), see [Solidity Integration](/onchain/solidity-integration).
 
 ## Architecture
 

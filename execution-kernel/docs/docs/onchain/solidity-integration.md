@@ -9,128 +9,7 @@ This document provides details on integrating with the Execution Kernel contract
 
 ## Contract Interfaces
 
-### IAgentRegistry
-
-```solidity
-interface IAgentRegistry {
-    struct AgentInfo {
-        address author;
-        bytes32 imageId;
-        bytes32 agentCodeHash;
-        string metadataURI;
-        bool exists;
-    }
-
-    /// @notice Compute deterministic agent ID
-    function computeAgentId(address author, bytes32 salt) external pure returns (bytes32);
-
-    /// @notice Register a new agent (permissionless)
-    function register(
-        bytes32 salt,
-        bytes32 imageId,
-        bytes32 agentCodeHash,
-        string calldata metadataURI
-    ) external returns (bytes32 agentId);
-
-    /// @notice Update agent configuration (author only)
-    function update(
-        bytes32 agentId,
-        bytes32 newImageId,
-        bytes32 newAgentCodeHash,
-        string calldata newMetadataURI
-    ) external;
-
-    /// @notice Get agent information
-    function get(bytes32 agentId) external view returns (AgentInfo memory);
-
-    /// @notice Check if agent exists
-    function agentExists(bytes32 agentId) external view returns (bool);
-}
-```
-
-### IVaultFactory
-
-```solidity
-interface IVaultFactory {
-    /// @notice Compute deterministic vault address before deployment
-    function computeVaultAddress(
-        address owner,
-        bytes32 agentId,
-        address asset,
-        bytes32 userSalt
-    ) external view returns (address vault, bytes32 salt);
-
-    /// @notice Deploy a new vault with pinned imageId (author only)
-    function deployVault(
-        bytes32 agentId,
-        address asset,
-        bytes32 userSalt
-    ) external returns (address vault);
-
-    /// @notice Get the registry address
-    function registry() external view returns (address);
-
-    /// @notice Get the verifier address
-    function verifier() external view returns (address);
-
-    /// @notice Check if address is a deployed vault
-    function isDeployedVault(address vault) external view returns (bool);
-}
-```
-
-### IKernelExecutionVerifier
-
-```solidity
-interface IKernelExecutionVerifier {
-    struct ParsedJournal {
-        uint32 protocolVersion;
-        uint32 kernelVersion;
-        bytes32 agentId;
-        bytes32 agentCodeHash;
-        bytes32 constraintSetHash;
-        bytes32 inputRoot;
-        uint64 executionNonce;
-        bytes32 inputCommitment;
-        bytes32 actionCommitment;
-        uint8 executionStatus;
-    }
-
-    /// @notice Verify proof and parse journal with caller-provided imageId
-    function verifyAndParseWithImageId(
-        bytes32 expectedImageId,
-        bytes calldata journal,
-        bytes calldata seal
-    ) external view returns (ParsedJournal memory);
-
-    /// @notice Parse journal without verification
-    function parseJournal(bytes calldata journal) external pure returns (ParsedJournal memory);
-}
-```
-
-### IKernelVault
-
-```solidity
-interface IKernelVault {
-    /// @notice Execute verified agent actions
-    function execute(
-        bytes calldata journal,
-        bytes calldata seal,
-        bytes calldata agentOutput
-    ) external;
-
-    /// @notice Get the last execution nonce
-    function lastExecutionNonce() external view returns (uint64);
-
-    /// @notice Get the bound agent ID
-    function agentId() external view returns (bytes32);
-
-    /// @notice Get the pinned imageId
-    function trustedImageId() external view returns (bytes32);
-
-    /// @notice Get the verifier contract
-    function verifier() external view returns (IKernelExecutionVerifier);
-}
-```
+The Execution Kernel has four core contracts: `AgentRegistry`, `VaultFactory`, `KernelExecutionVerifier`, and `KernelVault`. For function signatures and detailed descriptions of each contract, see the [Verifier Overview](/onchain/verifier-overview).
 
 ## Parsing the Journal
 
@@ -266,66 +145,21 @@ library AgentOutputParser {
 ### Registering an Agent
 
 ```solidity
-// SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.20;
+// agentId is deterministic: keccak256(abi.encodePacked(msg.sender, salt))
+bytes32 agentId = registry.register(salt, imageId, codeHash, "ipfs://metadata");
 
-import "./IAgentRegistry.sol";
-
-contract AgentRegistrar {
-    IAgentRegistry public registry;
-
-    constructor(address _registry) {
-        registry = IAgentRegistry(_registry);
-    }
-
-    function registerMyAgent(
-        bytes32 salt,
-        bytes32 imageId,
-        bytes32 codeHash
-    ) external returns (bytes32 agentId) {
-        // Register agent - agentId is deterministic
-        agentId = registry.register(salt, imageId, codeHash, "ipfs://metadata");
-
-        // agentId = keccak256(abi.encodePacked(msg.sender, salt))
-    }
-
-    function precomputeAgentId(bytes32 salt) external view returns (bytes32) {
-        return registry.computeAgentId(msg.sender, salt);
-    }
-}
+// Pre-compute the ID before registration
+bytes32 expectedId = registry.computeAgentId(msg.sender, salt);
 ```
 
 ### Deploying a Vault
 
 ```solidity
-// SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.20;
+// Only the agent author can deploy vaults for their agent
+address vault = factory.deployVault(agentId, asset, bytes32(0));
 
-import "./IVaultFactory.sol";
-
-contract VaultDeployer {
-    IVaultFactory public factory;
-
-    constructor(address _factory) {
-        factory = IVaultFactory(_factory);
-    }
-
-    function deployVaultForAgent(
-        bytes32 agentId,
-        address asset
-    ) external returns (address vault) {
-        // Only the agent author can call this
-        vault = factory.deployVault(agentId, asset, bytes32(0));
-    }
-
-    function precomputeVaultAddress(
-        bytes32 agentId,
-        address asset,
-        bytes32 userSalt
-    ) external view returns (address vault) {
-        (vault, ) = factory.computeVaultAddress(msg.sender, agentId, asset, userSalt);
-    }
-}
+// Pre-compute the vault address before deployment
+(address predicted, ) = factory.computeVaultAddress(msg.sender, agentId, asset, userSalt);
 ```
 
 ## Implementing a Custom Vault
@@ -420,49 +254,18 @@ contract MyVault {
 
 ### Using Foundry
 
+Standard Foundry testing patterns apply. The key assertions for an integration test:
+
 ```solidity
-// SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.20;
+// Register → Deploy → Verify
+vm.prank(author);
+bytes32 agentId = registry.register(bytes32(uint256(1)), imageId, codeHash, "ipfs://test");
 
-import "forge-std/Test.sol";
-import "../src/AgentRegistry.sol";
-import "../src/VaultFactory.sol";
-import "../src/KernelVault.sol";
+vm.prank(author);
+address vault = factory.deployVault(agentId, address(0), bytes32(0));
 
-contract IntegrationTest is Test {
-    AgentRegistry registry;
-    VaultFactory factory;
-    address verifier = 0x9Ef5bAB590AFdE8036D57b89ccD2947D4E3b1EFA;
-
-    address author = address(0x1234);
-    bytes32 imageId = bytes32(uint256(0x5678));
-    bytes32 codeHash = bytes32(uint256(0xABCD));
-
-    function setUp() public {
-        registry = new AgentRegistry();
-        factory = new VaultFactory(address(registry), verifier);
-    }
-
-    function testFullFlow() public {
-        // 1. Register agent
-        vm.prank(author);
-        bytes32 agentId = registry.register(
-            bytes32(uint256(1)),
-            imageId,
-            codeHash,
-            "ipfs://test"
-        );
-
-        // 2. Deploy vault
-        vm.prank(author);
-        address vault = factory.deployVault(agentId, address(0), bytes32(0));
-
-        // 3. Verify vault configuration
-        KernelVault v = KernelVault(payable(vault));
-        assertEq(v.agentId(), agentId);
-        assertEq(v.trustedImageId(), imageId);
-    }
-}
+assertEq(KernelVault(payable(vault)).agentId(), agentId);
+assertEq(KernelVault(payable(vault)).trustedImageId(), imageId);
 ```
 
 ### Using Cast
@@ -485,27 +288,6 @@ cast send $VAULT_FACTORY \
 cast call $VAULT "agentId()(bytes32)" --rpc-url $RPC_URL
 cast call $VAULT "trustedImageId()(bytes32)" --rpc-url $RPC_URL
 cast call $VAULT "lastExecutionNonce()(uint64)" --rpc-url $RPC_URL
-```
-
-## Events
-
-Consider emitting events for tracking:
-
-```solidity
-event ExecutionCompleted(
-    bytes32 indexed agentId,
-    uint64 nonce,
-    bytes32 inputCommitment,
-    bytes32 actionCommitment,
-    uint256 actionsExecuted
-);
-
-event ActionExecuted(
-    uint256 indexed index,
-    uint32 actionType,
-    bytes32 target,
-    bool success
-);
 ```
 
 ## Related

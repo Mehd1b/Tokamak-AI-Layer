@@ -50,9 +50,10 @@ See [`cargo agent` CLI Reference](/sdk/cli-reference) for all scaffold options.
 
 The rest of this guide explains what the scaffold creates and how to customize it.
 
-## Setting Up Your Agent Crate
+<details>
+<summary>Manual setup (without <code>cargo agent</code>)</summary>
 
-Create a new Rust library crate:
+If you prefer not to use the scaffold, create a Rust library crate manually:
 
 ```bash
 cargo new --lib my-agent
@@ -79,17 +80,11 @@ constraints = { path = "../protocol/constraints" }
 sha2 = "0.10"
 ```
 
+</details>
+
 ## Implementing agent_main
 
-The core of your agent is a single function:
-
-```rust
-use kernel_sdk::prelude::*;
-
-pub extern "Rust" fn agent_main(ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput {
-    // Your logic here
-}
-```
+The core of your agent is a single function with the signature `fn(ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput`.
 
 ### A Minimal Agent
 
@@ -234,14 +229,10 @@ let action = CallBuilder::new(pool_address)
 After defining `agent_main`, add the `agent_entrypoint!` macro to bind your agent to the kernel:
 
 ```rust
-// Compile-time check that agent_main matches the canonical signature
-const _: AgentEntrypoint = agent_main;
-
-// Generate kernel_main() and kernel_main_with_constraints()
 kernel_sdk::agent_entrypoint!(agent_main);
 ```
 
-This single macro generates everything needed for kernel integration — no separate binding crate required.
+This single macro generates `kernel_main()` and `kernel_main_with_constraints()` — everything needed for kernel integration, with no separate binding crate required.
 
 ## The Code Hash Build Script
 
@@ -281,41 +272,33 @@ cast send $VERIFIER_ADDRESS "registerAgent(bytes32,bytes32)" \
 
 ## Best Practices
 
-### Memory Management
-
-```rust
-// Good: bounded allocation
-let mut actions = Vec::with_capacity(1);
-actions.push(action);
-
-// Avoid: unbounded allocation
-let actions = vec![action];  // vec! macro not in prelude
-```
-
 ### Error Handling
 
+Return empty output instead of panicking — panics abort proof generation:
+
 ```rust
-// Good: return empty output
 if condition_failed {
     return AgentOutput { actions: Vec::new() };
 }
-
-// Avoid: panicking
-assert!(condition, "this will abort proof generation");
 ```
 
-### Determinism
+<details>
+<summary>Memory management and determinism tips</summary>
+
+**Memory**: Prefer `Vec::with_capacity(n)` over `vec![]` for bounded allocation in the zkVM guest.
+
+**Determinism**: Never iterate over `HashMap` directly — order varies between runs. Collect into a `Vec` and sort first:
 
 ```rust
-// Good: deterministic iteration
 let mut items: Vec<_> = map.iter().collect();
 items.sort_by_key(|(k, _)| *k);
-
-// Avoid: HashMap iteration (non-deterministic)
-for (k, v) in hash_map.iter() { /* order varies! */ }
 ```
 
-## Next Steps
+See [Trust Model](/architecture/trust-model) for a full discussion of determinism requirements.
+
+</details>
+
+## Related
 
 - [`agent_input!` Macro](/sdk/agent-input-macro) - Declarative input parsing
 - [CallBuilder & ERC20 Helpers](/sdk/call-builder) - Fluent action construction

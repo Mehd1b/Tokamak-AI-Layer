@@ -130,11 +130,14 @@ These constants are defined in [`kernel-core/src/lib.rs`](https://github.com/tok
 | KernelExecutionVerifier | [`0x9Ef5bAB590AFdE8036D57b89ccD2947D4E3b1EFA`](https://sepolia.etherscan.io/address/0x9Ef5bAB590AFdE8036D57b89ccD2947D4E3b1EFA) |
 | RISC Zero Verifier Router | [`0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187`](https://sepolia.etherscan.io/address/0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187) |
 
+Each agent is identified by its **imageId** — a unique hash of the compiled zkVM guest binary that identifies exactly which code will run. The imageId is registered on-chain so that proofs can only be verified against known, auditable agent binaries.
+
 The system is **fully permissionless**: anyone can register agents via `AgentRegistry` and deploy vaults via `VaultFactory`. See [Permissionless System](/onchain/permissionless-system) for details.
 
-## Next Steps
+## Related
 
 - [Quickstart](/quickstart) - Build an agent in 5 minutes
 - [Architecture Overview](/architecture/overview) - Understand the system design
 - [Prerequisites](/getting-started/prerequisites) - Set up your development environment
 - [Writing an Agent](/sdk/writing-an-agent) - Full agent development guide
+- [Cryptographic Chain](/architecture/cryptographic-chain) - How imageId and commitments work

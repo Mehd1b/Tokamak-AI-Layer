@@ -78,7 +78,7 @@ All integers use **little-endian** encoding. Addresses are raw 20-byte values (n
 
 ### Basis Points
 
-Rates and percentages use basis points (1 bps = 0.01%):
+Rates and percentages use **basis points** (bps): 1 bps = 0.01%, so 10,000 bps = 100%.
 
 | Value | Meaning |
 |-------|---------|
@@ -161,6 +161,10 @@ cargo test -p kernel-host-tests -- defi_yield_farmer
 8 kernel-level tests verifying the full execution pipeline: input encoding, kernel execution, journal construction, commitment verification, and code hash validation.
 
 ## Deployment
+
+:::tip Placeholder variables
+Shell variables like `$AGENT_REGISTRY`, `$VAULT_FACTORY`, and `$PRIVATE_KEY` are placeholders. See [Deployed Contracts](/onchain/verifier-overview#deployed-contracts-sepolia) for actual contract addresses.
+:::
 
 ### Prerequisites
 
@@ -274,3 +278,11 @@ See the [shell deployment script](https://github.com/tokamak-network/Tokamak-AI-
 | `crates/testing/kernel-host-tests/src/lib.rs` | Integration tests |
 | `contracts/script/DeployDefiYieldAgent.s.sol` | Forge deployment script |
 | `contracts/script/deploy-defi-yield-agent.sh` | Shell deployment script |
+
+## Related
+
+- [Writing an Agent](/sdk/writing-an-agent) - Full agent development guide
+- [Constraints and Commitments](/sdk/constraints-and-commitments) - Constraint enforcement rules
+- [Verifier Overview](/onchain/verifier-overview) - On-chain contract architecture
+- [Agent Pack Format](/agent-pack/format) - Packaging agents for distribution
+- [Golden Path Demo](/integration/golden-path) - End-to-end walkthrough

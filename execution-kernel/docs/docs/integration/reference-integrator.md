@@ -61,22 +61,11 @@ reference-integrator = { path = "...", features = ["full"] }
 ```rust
 use reference_integrator::LoadedBundle;
 
-// Load a bundle from a directory
 let bundle = LoadedBundle::load("./my-agent-bundle")?;
-
-// Access manifest data
-println!("Agent: {} v{}",
-    bundle.manifest.agent_name,
-    bundle.manifest.agent_version);
-println!("Agent ID: {}", bundle.manifest.agent_id);
-
-// Read the ELF binary
-let elf_bytes = bundle.read_elf()?;
-
-// Parse hex values to bytes
-let agent_id_bytes: [u8; 32] = bundle.agent_id_bytes()?;
-let image_id_bytes: [u8; 32] = bundle.image_id_bytes()?;
+println!("Agent: {} v{}", bundle.manifest.agent_name, bundle.manifest.agent_version);
 ```
+
+The `LoadedBundle` also provides `read_elf()`, `agent_id_bytes()`, and `image_id_bytes()` accessors.
 
 ### Offline Verification
 
@@ -354,7 +343,10 @@ Feature Status:
 
 ## Complete Workflow Example
 
-Here's a complete example of ingesting, verifying, proving, and executing an agent:
+The individual API sections above form a complete walkthrough: load → verify → build input → prove → execute.
+
+<details>
+<summary>Full end-to-end example combining all steps</summary>
 
 ```rust
 use reference_integrator::*;
@@ -362,46 +354,29 @@ use reference_integrator::*;
 async fn process_agent_bundle(
     bundle_path: &str
 ) -> Result<String, Box<dyn std::error::Error>> {
-    // 1. Load the bundle
     let bundle = LoadedBundle::load(bundle_path)?;
-    println!("Loaded: {} v{}",
-        bundle.manifest.agent_name,
-        bundle.manifest.agent_version);
 
-    // 2. Verify offline
+    // Verify offline + on-chain
     let offline_result = verify_offline(&bundle);
-    if !offline_result.passed {
-        return Err("Offline verification failed".into());
-    }
+    if !offline_result.passed { return Err("Offline verification failed".into()); }
 
-    // 3. Verify on-chain registration
     let onchain_result = verify_onchain(
-        &bundle,
-        "https://sepolia.infura.io/v3/YOUR_KEY",
+        &bundle, "https://sepolia.infura.io/v3/YOUR_KEY",
         "0x9Ef5bAB590AFdE8036D57b89ccD2947D4E3b1EFA",
     ).await?;
-
-    match onchain_result {
-        OnchainVerificationResult::Match => {},
-        _ => return Err("On-chain verification failed".into()),
+    if !matches!(onchain_result, OnchainVerificationResult::Match) {
+        return Err("On-chain verification failed".into());
     }
 
-    // 4. Build kernel input
+    // Build input, prove, execute
     let params = InputParams {
         opaque_agent_inputs: b"market data here".to_vec(),
         ..Default::default()
     };
     let input_bytes = build_and_encode_input(&bundle, &params)?;
-
-    // 5. Generate proof
     let elf_bytes = bundle.read_elf()?;
-    let prove_result = prove(
-        &elf_bytes,
-        &input_bytes,
-        ProvingMode::Groth16
-    )?;
+    let prove_result = prove(&elf_bytes, &input_bytes, ProvingMode::Groth16)?;
 
-    // 6. Execute on-chain
     let tx_hash = execute_onchain(
         "https://sepolia.infura.io/v3/YOUR_KEY",
         "0xAdeDA97D2D07C7f2e332fD58F40Eb4f7F0192be7",
@@ -414,6 +389,8 @@ async fn process_agent_bundle(
     Ok(tx_hash)
 }
 ```
+
+</details>
 
 ## Marketplace Integration
 
@@ -467,22 +444,16 @@ echo "Bundle verified successfully"
 All public functions return `Result` types with descriptive errors:
 
 ```rust
-use reference_integrator::{BundleError, VerifyError, InputError, ProveError};
+use reference_integrator::BundleError;
 
 match LoadedBundle::load("./bundle") {
     Ok(bundle) => { /* ... */ }
-    Err(BundleError::DirectoryNotFound(path)) => {
-        eprintln!("Bundle directory not found: {}", path.display());
-    }
-    Err(BundleError::ManifestNotFound(path)) => {
-        eprintln!("Missing agent-pack.json at: {}", path.display());
-    }
-    Err(BundleError::ElfNotFound(path)) => {
-        eprintln!("ELF file not found: {}", path.display());
-    }
+    Err(BundleError::DirectoryNotFound(path)) => eprintln!("Not found: {}", path.display()),
     Err(e) => eprintln!("Error: {}", e),
 }
 ```
+
+Error types include `BundleError`, `VerifyError`, `InputError`, and `ProveError` — see the crate docs for all variants.
 
 ## Testing
 

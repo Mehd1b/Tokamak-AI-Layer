@@ -215,125 +215,13 @@ agent-pack verify --manifest dist/agent-pack.json
 
 ## CLI Commands
 
-### `agent-pack init`
-
-```
-USAGE:
-    agent-pack init [OPTIONS] --name <NAME> --version <VERSION> --agent-id <AGENT_ID>
-
-OPTIONS:
-    -n, --name <NAME>          Agent name
-    -v, --version <VERSION>    Agent version (semver)
-    -a, --agent-id <AGENT_ID>  32-byte agent ID (0x hex)
-    -o, --out <PATH>           Output path [default: ./dist/agent-pack.json]
-```
-
-### `agent-pack compute`
-
-```
-USAGE:
-    agent-pack compute [OPTIONS] --elf <PATH>
-
-OPTIONS:
-    -e, --elf <PATH>           Path to ELF binary
-    -o, --out <PATH>           Manifest path [default: ./dist/agent-pack.json]
-        --cargo-lock <PATH>    Path to Cargo.lock for hash computation
-```
-
-### `agent-pack verify`
-
-```
-USAGE:
-    agent-pack verify [OPTIONS]
-
-OPTIONS:
-    -m, --manifest <PATH>      Manifest path [default: ./dist/agent-pack.json]
-    -b, --base-dir <PATH>      Base directory for resolving artifact paths
-        --structure-only       Only verify manifest structure
-```
-
-### `agent-pack scaffold`
+The `agent-pack` CLI provides commands for managing manifests: `init`, `compute`, `verify`, `scaffold`, `pack`, and `verify-onchain`.
 
 :::note
 The `agent-pack scaffold` command is deprecated in favor of `cargo agent new`, which generates the same structure with a simpler interface.
 :::
 
-```
-USAGE:
-    agent-pack scaffold [OPTIONS] <NAME>
-
-OPTIONS:
-        --agent-id <AGENT_ID>  Pre-set agent ID [default: 0x00...00]
-    -o, --out <PATH>           Output directory [default: ./<name>]
-        --template <TYPE>      Template type: minimal | yield [default: minimal]
-        --no-git               Skip git init
-```
-
-**Generated Structure:**
-
-```
-my-agent/
-├── Cargo.toml           # Workspace manifest
-├── README.md            # Quick start guide
-├── .gitignore
-├── agent/               # Core agent logic + kernel binding
-│   ├── Cargo.toml
-│   ├── build.rs         # AGENT_CODE_HASH computation
-│   └── src/lib.rs       # agent_main() + agent_entrypoint!()
-├── tests/               # Test harness
-│   ├── Cargo.toml
-│   └── src/lib.rs
-└── dist/
-    └── agent-pack.json  # Pre-populated manifest
-```
-
-After scaffolding:
-
-```bash
-cd my-agent
-cargo build       # Build and compute AGENT_CODE_HASH
-cargo test        # Run unit tests
-```
-
-### `agent-pack pack`
-
-```
-USAGE:
-    agent-pack pack [OPTIONS] --manifest <PATH> --elf <PATH> --out <PATH>
-
-OPTIONS:
-    -m, --manifest <PATH>      Path to input manifest
-    -e, --elf <PATH>           Path to the built zkVM guest ELF binary
-    -o, --out <PATH>           Output directory for the bundle
-        --cargo-lock <PATH>    Path to Cargo.lock for hash computation
-        --copy-elf <BOOL>      Copy ELF into bundle artifacts folder [default: true]
-        --force                Overwrite existing files in output directory
-```
-
-Creates a self-contained bundle directory with the manifest and ELF binary. See [Publishing Bundles](/agent-pack/publishing) for the complete workflow.
-
-### `agent-pack verify-onchain`
-
-```
-USAGE:
-    agent-pack verify-onchain --manifest <PATH> --rpc <URL> --verifier <ADDRESS>
-
-OPTIONS:
-    -m, --manifest <PATH>      Path to manifest file
-        --rpc <URL>            RPC endpoint URL (e.g., https://sepolia.infura.io/v3/YOUR_KEY)
-        --verifier <ADDRESS>   KernelExecutionVerifier contract address
-        --timeout-ms <MS>      RPC timeout in milliseconds [default: 30000]
-```
-
-Verifies agent registration against the on-chain KernelExecutionVerifier contract. Requires building with `--features onchain`.
-
-**Exit Codes:**
-- `0`: Match (image_id matches on-chain)
-- `1`: Error (RPC failure, parse error, etc.)
-- `2`: Mismatch (image_id differs from on-chain)
-- `3`: Not registered (agent_id returns zero)
-
-See [Verification](/agent-pack/verification#on-chain-verification) for usage details.
+For full usage details, flags, and examples for each command, see the [CLI Reference](/sdk/cli-reference).
 
 ## Related
 

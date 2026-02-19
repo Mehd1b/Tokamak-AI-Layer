@@ -5,7 +5,7 @@ sidebar_position: 2
 
 # Transcript and Hashing
 
-This document explains how commitments are computed and how the cryptographic transcript works in the kernel.
+This document explains how commitments are computed and how the cryptographic transcript works in the kernel. For the full security model and build-time commitment chain, see [Cryptographic Chain](/architecture/cryptographic-chain).
 
 ## Commitment Overview
 
