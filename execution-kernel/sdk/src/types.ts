@@ -67,6 +67,7 @@ export interface KernelVaultInfo {
   asset: `0x${string}`;
   totalAssets: bigint;
   totalShares: bigint;
+  totalValueLocked: bigint;
   userShares: bigint;
   userAssets: bigint;
 }

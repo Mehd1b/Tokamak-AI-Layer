@@ -188,6 +188,7 @@ export default function VaultsPage() {
                     asset={v.asset}
                     totalAssets={v.totalAssets}
                     totalShares={v.totalShares}
+                    totalValueLocked={v.totalValueLocked}
                   />
                 ))}
               </div>

@@ -155,7 +155,12 @@ export function useVaultHistory(vaultAddress: `0x${string}` | undefined): VaultH
 
       // Even with no historical events, still show a live data point
       if (allEvents.length === 0) {
-        const [currentAssets, currentShares] = await Promise.all([
+        const [currentTvl, currentAssets, currentShares] = await Promise.all([
+          client.readContract({
+            address: vaultAddress,
+            abi: KernelVaultABI,
+            functionName: 'totalValueLocked',
+          }) as Promise<bigint>,
           client.readContract({
             address: vaultAddress,
             abi: KernelVaultABI,
@@ -169,7 +174,7 @@ export function useVaultHistory(vaultAddress: `0x${string}` | undefined): VaultH
         ]);
 
         const now = Math.floor(Date.now() / 1000);
-        const tvl = Number(currentAssets) / 1e18;
+        const tvl = Number(currentTvl) / 1e18;
         const pps = currentShares > BigInt(0) ? Number(currentAssets) / Number(currentShares) : 1.0;
 
         // Only show a point if there's actually value in the vault
@@ -221,12 +226,18 @@ export function useVaultHistory(vaultAddress: `0x${string}` | undefined): VaultH
       }
 
       if (useArchive) {
-        // Archive node path: read totalAssets/totalShares at each event block
+        // Archive node path: read totalValueLocked for TVL, totalAssets/totalShares for PPS
         for (const event of allEvents) {
           const blockNumber = event.log.blockNumber!;
           const timestamp = timestampMap.get(blockNumber.toString())!;
 
-          const [assets, shares] = await Promise.all([
+          const [tvlVal, assets, shares] = await Promise.all([
+            client.readContract({
+              address: vaultAddress,
+              abi: KernelVaultABI,
+              functionName: 'totalValueLocked',
+              blockNumber,
+            }) as Promise<bigint>,
             client.readContract({
               address: vaultAddress,
               abi: KernelVaultABI,
@@ -241,7 +252,7 @@ export function useVaultHistory(vaultAddress: `0x${string}` | undefined): VaultH
             }) as Promise<bigint>,
           ]);
 
-          const tvl = Number(assets) / 1e18;
+          const tvl = Number(tvlVal) / 1e18;
           const pps = shares > BigInt(0) ? Number(assets) / Number(shares) : 1.0;
 
           tvlPoints.push({ time: timestamp, value: tvl });
@@ -277,7 +288,12 @@ export function useVaultHistory(vaultAddress: `0x${string}` | undefined): VaultH
       }
 
       // Step 6: Append live data point
-      const [currentAssets, currentShares] = await Promise.all([
+      const [currentTvl, currentAssets, currentShares] = await Promise.all([
+        client.readContract({
+          address: vaultAddress,
+          abi: KernelVaultABI,
+          functionName: 'totalValueLocked',
+        }) as Promise<bigint>,
         client.readContract({
           address: vaultAddress,
           abi: KernelVaultABI,
@@ -291,7 +307,7 @@ export function useVaultHistory(vaultAddress: `0x${string}` | undefined): VaultH
       ]);
 
       const now = Math.floor(Date.now() / 1000);
-      const liveTvl = Number(currentAssets) / 1e18;
+      const liveTvl = Number(currentTvl) / 1e18;
       const livePps = currentShares > BigInt(0) ? Number(currentAssets) / Number(currentShares) : 1.0;
 
       tvlPoints.push({ time: now, value: liveTvl });

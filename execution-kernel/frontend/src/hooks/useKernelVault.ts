@@ -40,6 +40,13 @@ export function useVaultInfo(vaultAddress: `0x${string}` | undefined) {
     query: { enabled: !!vaultAddress },
   });
 
+  const totalValueLocked = useReadContract({
+    address: vaultAddress,
+    abi: KernelVaultABI,
+    functionName: 'totalValueLocked',
+    query: { enabled: !!vaultAddress },
+  });
+
   const lastExecutionNonce = useReadContract({
     address: vaultAddress,
     abi: KernelVaultABI,
@@ -60,6 +67,7 @@ export function useVaultInfo(vaultAddress: `0x${string}` | undefined) {
     trustedImageId: trustedImageId.data,
     totalShares: totalShares.data,
     totalAssets: totalAssets.data,
+    totalValueLocked: totalValueLocked.data,
     lastExecutionNonce: lastExecutionNonce.data,
     lastExecutionTimestamp: lastExecutionTimestamp.data,
     isLoading: asset.isLoading || agentId.isLoading || trustedImageId.isLoading || totalShares.isLoading || totalAssets.isLoading,

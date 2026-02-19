@@ -57,6 +57,30 @@ export class KernelVaultClient {
     });
   }
 
+  async totalDeposited(): Promise<bigint> {
+    return await this.publicClient.readContract({
+      address: this.vaultAddress,
+      abi: KernelVaultABI,
+      functionName: 'totalDeposited',
+    });
+  }
+
+  async totalWithdrawn(): Promise<bigint> {
+    return await this.publicClient.readContract({
+      address: this.vaultAddress,
+      abi: KernelVaultABI,
+      functionName: 'totalWithdrawn',
+    });
+  }
+
+  async totalValueLocked(): Promise<bigint> {
+    return await this.publicClient.readContract({
+      address: this.vaultAddress,
+      abi: KernelVaultABI,
+      functionName: 'totalValueLocked',
+    });
+  }
+
   async shares(account: `0x${string}`): Promise<bigint> {
     return await this.publicClient.readContract({
       address: this.vaultAddress,
@@ -151,11 +175,12 @@ export class KernelVaultClient {
   }
 
   async getInfo(userAddress?: `0x${string}`): Promise<KernelVaultInfo> {
-    const [assetAddr, agentIdVal, totalAssetsVal, totalSharesVal] = await Promise.all([
+    const [assetAddr, agentIdVal, totalAssetsVal, totalSharesVal, totalValueLockedVal] = await Promise.all([
       this.asset(),
       this.agentId(),
       this.totalAssets(),
       this.totalShares(),
+      this.totalValueLocked(),
     ]);
 
     let userShares = 0n;
@@ -174,6 +199,7 @@ export class KernelVaultClient {
       asset: assetAddr,
       totalAssets: totalAssetsVal,
       totalShares: totalSharesVal,
+      totalValueLocked: totalValueLockedVal,
       userShares,
       userAssets,
     };

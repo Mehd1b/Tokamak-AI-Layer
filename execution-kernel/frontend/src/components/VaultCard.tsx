@@ -9,9 +9,10 @@ interface VaultCardProps {
   asset: string;
   totalAssets: bigint;
   totalShares: bigint;
+  totalValueLocked: bigint;
 }
 
-export function VaultCard({ address, agentId, asset, totalAssets, totalShares }: VaultCardProps) {
+export function VaultCard({ address, agentId, asset, totalAssets, totalShares, totalValueLocked }: VaultCardProps) {
   return (
     <Link href={`/vaults/${address}`}>
       <div className="card-hover cursor-pointer group">
@@ -47,7 +48,11 @@ export function VaultCard({ address, agentId, asset, totalAssets, totalShares }:
             <span>{truncateAddress(asset)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-500">Total Assets</span>
+            <span className="text-gray-500">TVL</span>
+            <span>{formatEther(totalValueLocked)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Vault Balance</span>
             <span>{formatEther(totalAssets)}</span>
           </div>
           <div className="flex justify-between">

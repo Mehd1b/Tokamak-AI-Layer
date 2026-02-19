@@ -100,6 +100,33 @@ describe('KernelVaultClient', () => {
       const result = await client.convertToAssets(1000n);
       expect(result).toBe(2000n);
     });
+
+    it('reads totalDeposited', async () => {
+      publicClient.readContract.mockResolvedValue(5000n);
+      const result = await client.totalDeposited();
+      expect(result).toBe(5000n);
+      expect(publicClient.readContract).toHaveBeenCalledWith(
+        expect.objectContaining({ functionName: 'totalDeposited' }),
+      );
+    });
+
+    it('reads totalWithdrawn', async () => {
+      publicClient.readContract.mockResolvedValue(3000n);
+      const result = await client.totalWithdrawn();
+      expect(result).toBe(3000n);
+      expect(publicClient.readContract).toHaveBeenCalledWith(
+        expect.objectContaining({ functionName: 'totalWithdrawn' }),
+      );
+    });
+
+    it('reads totalValueLocked', async () => {
+      publicClient.readContract.mockResolvedValue(2000n);
+      const result = await client.totalValueLocked();
+      expect(result).toBe(2000n);
+      expect(publicClient.readContract).toHaveBeenCalledWith(
+        expect.objectContaining({ functionName: 'totalValueLocked' }),
+      );
+    });
   });
 
   describe('depositERC20', () => {
@@ -205,7 +232,8 @@ describe('KernelVaultClient', () => {
         .mockResolvedValueOnce(MOCK_ASSET)     // asset
         .mockResolvedValueOnce(MOCK_AGENT_ID)  // agentId
         .mockResolvedValueOnce(2000n)          // totalAssets
-        .mockResolvedValueOnce(1000n);         // totalShares
+        .mockResolvedValueOnce(1000n)          // totalShares
+        .mockResolvedValueOnce(2000n);         // totalValueLocked
 
       const info = await client.getInfo();
 
@@ -214,6 +242,7 @@ describe('KernelVaultClient', () => {
       expect(info.asset).toBe(MOCK_ASSET);
       expect(info.totalAssets).toBe(2000n);
       expect(info.totalShares).toBe(1000n);
+      expect(info.totalValueLocked).toBe(2000n);
       expect(info.userShares).toBe(0n);
       expect(info.userAssets).toBe(0n);
     });
@@ -224,6 +253,7 @@ describe('KernelVaultClient', () => {
         .mockResolvedValueOnce(MOCK_AGENT_ID)  // agentId
         .mockResolvedValueOnce(2000n)          // totalAssets
         .mockResolvedValueOnce(1000n)          // totalShares
+        .mockResolvedValueOnce(2000n)          // totalValueLocked
         .mockResolvedValueOnce(500n)           // shares(user)
         .mockResolvedValueOnce(1000n);         // convertToAssets(500)
 

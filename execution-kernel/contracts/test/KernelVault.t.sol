@@ -772,6 +772,108 @@ contract KernelVaultTest is Test {
         assertEq(assetsOut, 150 ether);
     }
 
+    // ============ TVL Tracking Tests ============
+
+    function test_tvl_startsAtZero() public view {
+        assertEq(vault.totalValueLocked(), 0);
+        assertEq(vault.totalDeposited(), 0);
+        assertEq(vault.totalWithdrawn(), 0);
+    }
+
+    function test_tvl_increasesOnDeposit() public {
+        vm.prank(user);
+        vault.depositERC20Tokens(DEPOSIT_AMOUNT);
+
+        assertEq(vault.totalValueLocked(), DEPOSIT_AMOUNT);
+        assertEq(vault.totalDeposited(), DEPOSIT_AMOUNT);
+        assertEq(vault.totalWithdrawn(), 0);
+    }
+
+    function test_tvl_decreasesOnWithdraw() public {
+        vm.startPrank(user);
+        vault.depositERC20Tokens(DEPOSIT_AMOUNT);
+
+        uint256 withdrawShares = DEPOSIT_AMOUNT / 2;
+        uint256 assetsOut = vault.withdraw(withdrawShares);
+        vm.stopPrank();
+
+        assertEq(vault.totalValueLocked(), DEPOSIT_AMOUNT - assetsOut);
+        assertEq(vault.totalDeposited(), DEPOSIT_AMOUNT);
+        assertEq(vault.totalWithdrawn(), assetsOut);
+    }
+
+    function test_tvl_unaffectedByExecute() public {
+        // Deposit 100
+        vm.prank(user);
+        vault.depositERC20Tokens(DEPOSIT_AMOUNT);
+
+        assertEq(vault.totalValueLocked(), DEPOSIT_AMOUNT);
+
+        // Execute transfers 40 tokens out of vault
+        uint256 transferAmount = 40 ether;
+        bytes memory agentOutputBytes =
+            _buildTransferAction(address(token), recipient, transferAmount);
+        bytes32 actionCommitment = sha256(agentOutputBytes);
+        uint64 nonce = 1;
+        bytes memory journal = _buildJournal(TEST_AGENT_ID, nonce, actionCommitment);
+        bytes memory seal = hex"deadbeef";
+
+        vault.execute(journal, seal, agentOutputBytes);
+
+        // Key invariant: TVL stays at 100 even though vault balance is 60
+        assertEq(vault.totalAssets(), DEPOSIT_AMOUNT - transferAmount);
+        assertEq(vault.totalValueLocked(), DEPOSIT_AMOUNT);
+    }
+
+    function test_tvl_unaffectedByDirectTransfer() public {
+        vm.prank(user);
+        vault.depositERC20Tokens(DEPOSIT_AMOUNT);
+
+        assertEq(vault.totalValueLocked(), DEPOSIT_AMOUNT);
+
+        // Direct transfer to vault (not through deposit)
+        token.mint(address(vault), 50 ether);
+
+        // totalAssets increases but TVL should not
+        assertEq(vault.totalAssets(), DEPOSIT_AMOUNT + 50 ether);
+        assertEq(vault.totalValueLocked(), DEPOSIT_AMOUNT);
+    }
+
+    function test_tvl_safeUnderflow() public {
+        // Deposit 100
+        vm.prank(user);
+        vault.depositERC20Tokens(DEPOSIT_AMOUNT);
+
+        // Simulate yield: double the assets
+        token.mint(address(vault), DEPOSIT_AMOUNT);
+
+        // Withdraw all shares — assetsOut will be 200 (> totalDeposited of 100)
+        vm.prank(user);
+        uint256 assetsOut = vault.withdraw(DEPOSIT_AMOUNT);
+        assertEq(assetsOut, 200 ether);
+
+        // totalWithdrawn (200) > totalDeposited (100) — should return 0, not underflow
+        assertEq(vault.totalValueLocked(), 0);
+    }
+
+    function test_tvl_multipleDepositsAndWithdrawals() public {
+        vm.startPrank(user);
+
+        // Deposit 50
+        vault.depositERC20Tokens(50 ether);
+        assertEq(vault.totalValueLocked(), 50 ether);
+
+        // Deposit 50 more
+        vault.depositERC20Tokens(50 ether);
+        assertEq(vault.totalValueLocked(), 100 ether);
+
+        // Withdraw 25 shares (25 assets at 1:1 PPS)
+        vault.withdraw(25 ether);
+        assertEq(vault.totalValueLocked(), 75 ether);
+
+        vm.stopPrank();
+    }
+
     function test_rounding_depositorGetsFewer() public {
         // User1 deposits 100 assets → gets 100 shares
         vm.prank(user);

@@ -92,7 +92,11 @@ export default function VaultDetailPage() {
             <span className="text-gray-300 text-sm">{vault.trustedImageId ? formatBytes32(vault.trustedImageId) : '-'}</span>
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
-            <span className="text-gray-500 text-sm">Total Assets</span>
+            <span className="text-gray-500 text-sm">Total Value Locked</span>
+            <span className="text-gray-300 text-sm">{vault.totalValueLocked !== undefined ? formatEther(vault.totalValueLocked) : '-'}</span>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
+            <span className="text-gray-500 text-sm">Vault Balance</span>
             <span className="text-gray-300 text-sm">{vault.totalAssets !== undefined ? formatEther(vault.totalAssets) : '-'}</span>
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">

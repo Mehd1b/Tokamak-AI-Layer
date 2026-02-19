@@ -62,6 +62,12 @@ contract KernelVault is ReentrancyGuard {
     /// @notice Shares balance per account
     mapping(address => uint256) public shares;
 
+    /// @notice Cumulative deposited assets (for TVL tracking)
+    uint256 public totalDeposited;
+
+    /// @notice Cumulative withdrawn assets (for TVL tracking)
+    uint256 public totalWithdrawn;
+
     // ============ Events ============
 
     /// @notice Emitted when tokens are deposited
@@ -205,6 +211,7 @@ contract KernelVault is ReentrancyGuard {
         // Update state
         shares[msg.sender] += sharesMinted;
         totalShares += sharesMinted;
+        totalDeposited += assets;
 
         emit Deposit(msg.sender, assets, sharesMinted);
     }
@@ -236,6 +243,7 @@ contract KernelVault is ReentrancyGuard {
         // Update state
         shares[msg.sender] += sharesMinted;
         totalShares += sharesMinted;
+        totalDeposited += msg.value;
 
         emit Deposit(msg.sender, msg.value, sharesMinted);
     }
@@ -260,6 +268,7 @@ contract KernelVault is ReentrancyGuard {
         // Burn shares
         shares[msg.sender] -= shareAmount;
         totalShares -= shareAmount;
+        totalWithdrawn += assetsOut;
 
         // Transfer tokens or ETH
         bool isETH = address(asset) == address(0);
@@ -425,6 +434,13 @@ contract KernelVault is ReentrancyGuard {
             return address(this).balance;
         }
         return asset.balanceOf(address(this));
+    }
+
+    /// @notice Returns total value locked (cumulative deposits minus cumulative withdrawals)
+    /// @dev Independent of vault balance — tracks depositor capital flows only.
+    function totalValueLocked() public view returns (uint256) {
+        if (totalWithdrawn > totalDeposited) return 0;
+        return totalDeposited - totalWithdrawn;
     }
 
     /// @notice Convert assets to shares using current exchange rate

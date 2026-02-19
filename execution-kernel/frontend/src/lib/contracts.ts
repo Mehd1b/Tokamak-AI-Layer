@@ -280,6 +280,27 @@ export const KernelVaultABI = [
   },
   {
     type: 'function',
+    name: 'totalDeposited',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'totalWithdrawn',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'totalValueLocked',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'shares',
     inputs: [{ name: 'depositor', type: 'address', internalType: 'address' }],
     outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
