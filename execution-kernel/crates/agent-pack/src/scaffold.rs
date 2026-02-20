@@ -277,7 +277,7 @@ fn generate_readme(name: &str) -> String {
     format!(
         r#"# {name}
 
-A verifiable agent for the Defiesta Execution Kernel.
+A verifiable agent for the Tokamak Execution Kernel.
 
 ## Quick Start
 
@@ -397,9 +397,9 @@ description = "Agent implementation for {name}"
 crate-type = ["rlib"]
 
 [dependencies]
-kernel-sdk = {{ git = "https://github.com/Defiesta/execution-kernel", branch = "main" }}
-kernel-guest = {{ git = "https://github.com/Defiesta/execution-kernel", branch = "main" }}
-constraints = {{ git = "https://github.com/Defiesta/execution-kernel", branch = "main" }}
+kernel-sdk = {{ git = "https://github.com/tokamak-network/Tokamak-AI-Layer", branch = "master", path = "execution-kernel/crates/sdk/kernel-sdk" }}
+kernel-guest = {{ git = "https://github.com/tokamak-network/Tokamak-AI-Layer", branch = "master", path = "execution-kernel/crates/runtime/kernel-guest" }}
+constraints = {{ git = "https://github.com/tokamak-network/Tokamak-AI-Layer", branch = "master", path = "execution-kernel/crates/protocol/kernel-core" }}
 
 [build-dependencies]
 sha2.workspace = true
@@ -858,7 +858,7 @@ description = "Test suite for {name}"
 crate-type = ["rlib"]
 
 [dependencies]
-kernel-sdk = {{ git = "https://github.com/Defiesta/execution-kernel", branch = "main" }}
+kernel-sdk = {{ git = "https://github.com/tokamak-network/Tokamak-AI-Layer", branch = "master", path = "execution-kernel/crates/sdk/kernel-sdk" }}
 {name} = {{ path = "../agent" }}
 
 [dev-dependencies]

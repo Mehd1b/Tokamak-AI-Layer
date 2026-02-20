@@ -38,6 +38,8 @@ export class AgentRegistryClient {
   }): Promise<{ agentId: `0x${string}`; txHash: `0x${string}` }> {
     this.requireWallet();
     const txHash = await this.walletClient!.writeContract({
+      chain: this.walletClient!.chain ?? null,
+      account: this.walletClient!.account!,
       address: this.address,
       abi: AgentRegistryABI,
       functionName: 'register',
@@ -74,6 +76,8 @@ export class AgentRegistryClient {
   }): Promise<`0x${string}`> {
     this.requireWallet();
     const txHash = await this.walletClient!.writeContract({
+      chain: this.walletClient!.chain ?? null,
+      account: this.walletClient!.account!,
       address: this.address,
       abi: AgentRegistryABI,
       functionName: 'update',

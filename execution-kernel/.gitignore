@@ -5,6 +5,7 @@ target/
 /prompts
 /bundles/*
 /run/*
+/content
 
 # Generated agent-pack manifests (keep only the example)
 dist/agent-pack.json

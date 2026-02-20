@@ -128,6 +128,8 @@ export class KernelVaultClient {
   async depositERC20(assets: bigint): Promise<{ sharesMinted: bigint; txHash: `0x${string}` }> {
     this.requireWallet();
     const txHash = await this.walletClient!.writeContract({
+      chain: this.walletClient!.chain ?? null,
+      account: this.walletClient!.account!,
       address: this.vaultAddress,
       abi: KernelVaultABI,
       functionName: 'depositERC20Tokens',
@@ -141,6 +143,8 @@ export class KernelVaultClient {
   async depositETH(value: bigint): Promise<{ sharesMinted: bigint; txHash: `0x${string}` }> {
     this.requireWallet();
     const txHash = await this.walletClient!.writeContract({
+      chain: this.walletClient!.chain ?? null,
+      account: this.walletClient!.account!,
       address: this.vaultAddress,
       abi: KernelVaultABI,
       functionName: 'depositETH',
@@ -154,6 +158,8 @@ export class KernelVaultClient {
   async withdraw(shareAmount: bigint): Promise<{ assetsOut: bigint; txHash: `0x${string}` }> {
     this.requireWallet();
     const txHash = await this.walletClient!.writeContract({
+      chain: this.walletClient!.chain ?? null,
+      account: this.walletClient!.account!,
       address: this.vaultAddress,
       abi: KernelVaultABI,
       functionName: 'withdraw',
@@ -167,6 +173,8 @@ export class KernelVaultClient {
   async execute(params: ExecuteParams): Promise<`0x${string}`> {
     this.requireWallet();
     return await this.walletClient!.writeContract({
+      chain: this.walletClient!.chain ?? null,
+      account: this.walletClient!.account!,
       address: this.vaultAddress,
       abi: KernelVaultABI,
       functionName: 'execute',

@@ -23,13 +23,15 @@ __export(index_exports, {
   AgentRegistryABI: () => AgentRegistryABI,
   AgentRegistryClient: () => AgentRegistryClient,
   DEFAULT_CHAIN_ID: () => DEFAULT_CHAIN_ID,
+  DEPLOYMENTS: () => DEPLOYMENTS,
   ExecutionKernelClient: () => ExecutionKernelClient,
   ExecutionStatus: () => ExecutionStatus,
   KernelActionType: () => KernelActionType,
   KernelExecutionVerifierABI: () => KernelExecutionVerifierABI,
   KernelVaultABI: () => KernelVaultABI,
   KernelVaultClient: () => KernelVaultClient,
-  OPTIMISM_SEPOLIA_ADDRESSES: () => OPTIMISM_SEPOLIA_ADDRESSES,
+  OPTIMISM_SEPOLIA_ADDRESSES: () => SEPOLIA_ADDRESSES,
+  SEPOLIA_ADDRESSES: () => SEPOLIA_ADDRESSES,
   VaultFactoryABI: () => VaultFactoryABI,
   VaultFactoryClient: () => VaultFactoryClient,
   VerifierClient: () => VerifierClient
@@ -37,8 +39,11 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/ExecutionKernelClient.ts
-var import_viem = require("viem");
+var import_viem4 = require("viem");
 var import_chains = require("viem/chains");
+
+// src/clients/AgentRegistryClient.ts
+var import_viem = require("viem");
 
 // src/abi/AgentRegistry.ts
 var AgentRegistryABI = [
@@ -112,10 +117,49 @@ var AgentRegistryABI = [
   },
   {
     type: "function",
+    name: "unregister",
+    inputs: [
+      { name: "agentId", type: "bytes32" },
+      { name: "vaults", type: "address[]" }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
     name: "agentExists",
     inputs: [{ name: "agentId", type: "bytes32" }],
     outputs: [{ name: "", type: "bool" }],
     stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "agentCount",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "agentAt",
+    inputs: [{ name: "index", type: "uint256" }],
+    outputs: [{ name: "", type: "bytes32" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "getAllAgentIds",
+    inputs: [],
+    outputs: [{ name: "", type: "bytes32[]" }],
+    stateMutability: "view"
+  },
+  {
+    type: "event",
+    name: "AgentUnregistered",
+    inputs: [
+      { name: "agentId", type: "bytes32", indexed: true },
+      { name: "author", type: "address", indexed: true }
+    ]
   },
   {
     type: "event",
@@ -189,19 +233,40 @@ var AgentRegistryClient = class {
   async register(params) {
     this.requireWallet();
     const txHash = await this.walletClient.writeContract({
+      chain: this.walletClient.chain ?? null,
+      account: this.walletClient.account,
       address: this.address,
       abi: AgentRegistryABI,
       functionName: "register",
       args: [params.salt, params.imageId, params.agentCodeHash]
     });
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
-    const log = receipt.logs[0];
-    const agentId = log?.topics?.[1] ?? "0x";
+    let agentId;
+    for (const log of receipt.logs) {
+      try {
+        const event = (0, import_viem.decodeEventLog)({
+          abi: AgentRegistryABI,
+          data: log.data,
+          topics: log.topics
+        });
+        if (event.eventName === "AgentRegistered") {
+          agentId = event.args.agentId;
+          break;
+        }
+      } catch {
+        continue;
+      }
+    }
+    if (!agentId) {
+      throw new Error("AgentRegistered event not found in transaction receipt");
+    }
     return { agentId, txHash };
   }
   async update(params) {
     this.requireWallet();
     const txHash = await this.walletClient.writeContract({
+      chain: this.walletClient.chain ?? null,
+      account: this.walletClient.account,
       address: this.address,
       abi: AgentRegistryABI,
       functionName: "update",
@@ -238,6 +303,9 @@ var AgentRegistryClient = class {
     }
   }
 };
+
+// src/clients/VaultFactoryClient.ts
+var import_viem2 = require("viem");
 
 // src/abi/VaultFactory.ts
 var VaultFactoryABI = [
@@ -303,6 +371,27 @@ var VaultFactoryABI = [
     name: "isDeployedVault",
     inputs: [{ name: "vault", type: "address" }],
     outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "vaultCount",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "vaultAt",
+    inputs: [{ name: "index", type: "uint256" }],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "getAllVaults",
+    inputs: [],
+    outputs: [{ name: "", type: "address[]" }],
     stateMutability: "view"
   },
   {
@@ -374,15 +463,33 @@ var VaultFactoryClient = class {
   async deployVault(params) {
     this.requireWallet();
     const txHash = await this.walletClient.writeContract({
+      chain: this.walletClient.chain ?? null,
+      account: this.walletClient.account,
       address: this.address,
       abi: VaultFactoryABI,
       functionName: "deployVault",
       args: [params.agentId, params.asset, params.userSalt]
     });
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
-    const log = receipt.logs[0];
-    const vaultTopic = log?.topics?.[1];
-    const vaultAddress = vaultTopic ? `0x${vaultTopic.slice(26)}` : "0x";
+    let vaultAddress;
+    for (const log of receipt.logs) {
+      try {
+        const event = (0, import_viem2.decodeEventLog)({
+          abi: VaultFactoryABI,
+          data: log.data,
+          topics: log.topics
+        });
+        if (event.eventName === "VaultDeployed") {
+          vaultAddress = event.args.vault;
+          break;
+        }
+      } catch {
+        continue;
+      }
+    }
+    if (!vaultAddress) {
+      throw new Error("VaultDeployed event not found in transaction receipt");
+    }
     return { vaultAddress, txHash };
   }
   async isDeployedVault(vault) {
@@ -399,6 +506,9 @@ var VaultFactoryClient = class {
     }
   }
 };
+
+// src/clients/KernelVaultClient.ts
+var import_viem3 = require("viem");
 
 // src/abi/KernelVault.ts
 var KernelVaultABI = [
@@ -662,42 +772,50 @@ var KernelVaultClient = class {
   async depositERC20(assets) {
     this.requireWallet();
     const txHash = await this.walletClient.writeContract({
+      chain: this.walletClient.chain ?? null,
+      account: this.walletClient.account,
       address: this.vaultAddress,
       abi: KernelVaultABI,
       functionName: "depositERC20Tokens",
       args: [assets]
     });
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
-    const sharesMinted = receipt.logs.length > 0 ? 0n : 0n;
+    const sharesMinted = this.parseDepositEvent(receipt.logs);
     return { sharesMinted, txHash };
   }
   async depositETH(value) {
     this.requireWallet();
     const txHash = await this.walletClient.writeContract({
+      chain: this.walletClient.chain ?? null,
+      account: this.walletClient.account,
       address: this.vaultAddress,
       abi: KernelVaultABI,
       functionName: "depositETH",
       value
     });
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
-    const sharesMinted = receipt.logs.length > 0 ? 0n : 0n;
+    const sharesMinted = this.parseDepositEvent(receipt.logs);
     return { sharesMinted, txHash };
   }
   async withdraw(shareAmount) {
     this.requireWallet();
     const txHash = await this.walletClient.writeContract({
+      chain: this.walletClient.chain ?? null,
+      account: this.walletClient.account,
       address: this.vaultAddress,
       abi: KernelVaultABI,
       functionName: "withdraw",
       args: [shareAmount]
     });
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
-    const assetsOut = receipt.logs.length > 0 ? 0n : 0n;
+    const assetsOut = this.parseWithdrawEvent(receipt.logs);
     return { assetsOut, txHash };
   }
   async execute(params) {
     this.requireWallet();
     return await this.walletClient.writeContract({
+      chain: this.walletClient.chain ?? null,
+      account: this.walletClient.account,
       address: this.vaultAddress,
       abi: KernelVaultABI,
       functionName: "execute",
@@ -737,6 +855,40 @@ var KernelVaultClient = class {
       userShares,
       userAssets
     };
+  }
+  parseDepositEvent(logs) {
+    for (const log of logs) {
+      try {
+        const event = (0, import_viem3.decodeEventLog)({
+          abi: KernelVaultABI,
+          data: log.data,
+          topics: log.topics
+        });
+        if (event.eventName === "Deposit") {
+          return event.args.shares;
+        }
+      } catch {
+        continue;
+      }
+    }
+    return 0n;
+  }
+  parseWithdrawEvent(logs) {
+    for (const log of logs) {
+      try {
+        const event = (0, import_viem3.decodeEventLog)({
+          abi: KernelVaultABI,
+          data: log.data,
+          topics: log.topics
+        });
+        if (event.eventName === "Withdraw") {
+          return event.args.amount;
+        }
+      } catch {
+        continue;
+      }
+    }
+    return 0n;
   }
   requireWallet() {
     if (!this.walletClient) {
@@ -856,6 +1008,18 @@ var VerifierClient = class {
   }
 };
 
+// src/addresses.ts
+var SEPOLIA_ADDRESSES = {
+  agentRegistry: "0xED27f8fbB7D576f02D516d01593eEfBaAfe4b168",
+  vaultFactory: "0x580e55fDE87fFC1cF1B6a446d6DBf8068EB07b8C",
+  kernelExecutionVerifier: "0x1eB41537037fB771CBA8Cd088C7c806936325eB5",
+  riscZeroVerifierRouter: "0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187"
+};
+var DEPLOYMENTS = {
+  sepolia: SEPOLIA_ADDRESSES
+};
+var DEFAULT_CHAIN_ID = 11155420;
+
 // src/types.ts
 var KernelActionType = /* @__PURE__ */ ((KernelActionType2) => {
   KernelActionType2[KernelActionType2["CALL"] = 2] = "CALL";
@@ -868,12 +1032,6 @@ var ExecutionStatus = /* @__PURE__ */ ((ExecutionStatus2) => {
   ExecutionStatus2[ExecutionStatus2["Failure"] = 2] = "Failure";
   return ExecutionStatus2;
 })(ExecutionStatus || {});
-var OPTIMISM_SEPOLIA_ADDRESSES = {
-  agentRegistry: "0xED27f8fbB7D576f02D516d01593eEfBaAfe4b168",
-  vaultFactory: "0x580e55fDE87fFC1cF1B6a446d6DBf8068EB07b8C",
-  kernelExecutionVerifier: "0x1eB41537037fB771CBA8Cd088C7c806936325eB5"
-};
-var DEFAULT_CHAIN_ID = 11155420;
 
 // src/ExecutionKernelClient.ts
 var ExecutionKernelClient = class {
@@ -885,15 +1043,15 @@ var ExecutionKernelClient = class {
   config;
   constructor(config) {
     this.config = config;
-    this.publicClient = config.publicClient ?? (0, import_viem.createPublicClient)({
+    this.publicClient = config.publicClient ?? (0, import_viem4.createPublicClient)({
       chain: import_chains.optimismSepolia,
-      transport: (0, import_viem.http)(config.rpcUrl)
+      transport: (0, import_viem4.http)(config.rpcUrl)
     });
     this.walletClient = config.walletClient;
     const addresses = {
-      agentRegistry: config.agentRegistry ?? OPTIMISM_SEPOLIA_ADDRESSES.agentRegistry,
-      vaultFactory: config.vaultFactory ?? OPTIMISM_SEPOLIA_ADDRESSES.vaultFactory,
-      kernelExecutionVerifier: config.kernelExecutionVerifier ?? OPTIMISM_SEPOLIA_ADDRESSES.kernelExecutionVerifier
+      agentRegistry: config.agentRegistry ?? SEPOLIA_ADDRESSES.agentRegistry,
+      vaultFactory: config.vaultFactory ?? SEPOLIA_ADDRESSES.vaultFactory,
+      kernelExecutionVerifier: config.kernelExecutionVerifier ?? SEPOLIA_ADDRESSES.kernelExecutionVerifier
     };
     this.agents = new AgentRegistryClient(
       this.publicClient,
@@ -952,6 +1110,7 @@ var ExecutionKernelClient = class {
   AgentRegistryABI,
   AgentRegistryClient,
   DEFAULT_CHAIN_ID,
+  DEPLOYMENTS,
   ExecutionKernelClient,
   ExecutionStatus,
   KernelActionType,
@@ -959,6 +1118,7 @@ var ExecutionKernelClient = class {
   KernelVaultABI,
   KernelVaultClient,
   OPTIMISM_SEPOLIA_ADDRESSES,
+  SEPOLIA_ADDRESSES,
   VaultFactoryABI,
   VaultFactoryClient,
   VerifierClient

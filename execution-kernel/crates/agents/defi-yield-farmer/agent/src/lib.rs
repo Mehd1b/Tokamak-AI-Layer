@@ -77,15 +77,6 @@ kernel_sdk::agent_input! {
 }
 
 // ============================================================================
-// Helpers
-// ============================================================================
-
-/// Return the smaller of two u64 values.
-fn min_u64(a: u64, b: u64) -> u64 {
-    if a < b { a } else { b }
-}
-
-// ============================================================================
 // Agent Entry Point
 // ============================================================================
 
@@ -143,7 +134,7 @@ fn evaluate_and_act(market: &MarketInput) -> AgentOutput {
         // How much more to supply (could be 0 if already at/above target)
         let additional = saturating_sub_u64(target_supplied, market.supplied_amount);
         // Don't supply more than available balance
-        let supply_amount = min_u64(additional, market.vault_balance);
+        let supply_amount = core::cmp::min(additional, market.vault_balance);
 
         if supply_amount == 0 {
             return AgentOutput { actions: Vec::new() };

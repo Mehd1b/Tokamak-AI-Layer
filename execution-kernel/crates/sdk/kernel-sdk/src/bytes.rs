@@ -31,7 +31,6 @@
 //! assert_eq!(offset, 8);
 //! ```
 
-use alloc::vec::Vec;
 
 // ============================================================================
 // Reading Integers (Little-Endian) - Fixed Offset
@@ -248,152 +247,13 @@ pub fn read_slice_at<'a>(bytes: &'a [u8], offset: &mut usize, len: usize) -> Opt
 }
 
 // ============================================================================
-// Writing Integers (Little-Endian)
-// ============================================================================
-
-/// Write a u16 to a Vec (little-endian).
-#[inline]
-pub fn write_u16_le(buf: &mut Vec<u8>, value: u16) {
-    buf.extend_from_slice(&value.to_le_bytes());
-}
-
-/// Write a u32 to a Vec (little-endian).
-#[inline]
-pub fn write_u32_le(buf: &mut Vec<u8>, value: u32) {
-    buf.extend_from_slice(&value.to_le_bytes());
-}
-
-/// Write a u64 to a Vec (little-endian).
-#[inline]
-pub fn write_u64_le(buf: &mut Vec<u8>, value: u64) {
-    buf.extend_from_slice(&value.to_le_bytes());
-}
-
-/// Write a u8 to a Vec.
-#[inline]
-pub fn write_u8(buf: &mut Vec<u8>, value: u8) {
-    buf.push(value);
-}
-
-// ============================================================================
-// Writing Fixed-Size Arrays
-// ============================================================================
-
-/// Write a 32-byte array to a Vec.
-#[inline]
-pub fn write_bytes32(buf: &mut Vec<u8>, value: &[u8; 32]) {
-    buf.extend_from_slice(value);
-}
-
-/// Write a byte slice to a Vec.
-#[inline]
-pub fn write_slice(buf: &mut Vec<u8>, value: &[u8]) {
-    buf.extend_from_slice(value);
-}
-
-// ============================================================================
 // Comparison Helpers
 // ============================================================================
-
-/// Compare two byte slices for equality.
-///
-/// **WARNING:** Constant-time comparison is NOT guaranteed.
-/// Do NOT use this for secret data (keys, passwords, etc.).
-#[inline]
-pub fn bytes_eq(a: &[u8], b: &[u8]) -> bool {
-    a == b
-}
-
-/// Compare two 32-byte arrays for equality.
-///
-/// **WARNING:** Constant-time comparison is NOT guaranteed.
-/// Do NOT use this for secret data (keys, passwords, etc.).
-#[inline]
-pub fn bytes32_eq(a: &[u8; 32], b: &[u8; 32]) -> bool {
-    a == b
-}
 
 /// Check if a 32-byte array is all zeros.
 #[inline]
 pub fn is_zero_bytes32(value: &[u8; 32]) -> bool {
     *value == [0u8; 32]
-}
-
-/// Check if a byte slice is all zeros.
-#[inline]
-pub fn is_all_zeros(value: &[u8]) -> bool {
-    value.iter().all(|&b| b == 0)
-}
-
-// ============================================================================
-// Conversion Helpers
-// ============================================================================
-
-/// Convert a slice to a 32-byte array.
-///
-/// Returns `None` if the slice is not exactly 32 bytes.
-#[inline]
-pub fn slice_to_bytes32(slice: &[u8]) -> Option<[u8; 32]> {
-    if slice.len() != 32 {
-        return None;
-    }
-    let mut arr = [0u8; 32];
-    arr.copy_from_slice(slice);
-    Some(arr)
-}
-
-/// Convert a slice to a 32-byte array, padding with zeros if shorter.
-///
-/// Returns `None` if the slice is longer than 32 bytes.
-#[inline]
-pub fn slice_to_bytes32_padded(slice: &[u8]) -> Option<[u8; 32]> {
-    if slice.len() > 32 {
-        return None;
-    }
-    let mut arr = [0u8; 32];
-    arr[..slice.len()].copy_from_slice(slice);
-    Some(arr)
-}
-
-// ============================================================================
-// Bounded Vec Helpers
-// ============================================================================
-
-/// Create a Vec with a capped initial capacity.
-///
-/// Returns a Vec with the specified capacity, capped at `max_capacity`.
-///
-/// **IMPORTANT:** This only caps the *initial* allocation. It does NOT
-/// prevent the Vec from growing beyond `max_capacity` via `push()` or
-/// `extend()`. Unbounded memory enforcement happens at the VM level,
-/// not in this helper.
-///
-/// If you need a truly bounded collection, use a fixed-size array or
-/// implement a custom wrapper type.
-#[inline]
-pub fn vec_with_capped_initial_capacity<T>(capacity: usize, max_capacity: usize) -> Vec<T> {
-    let cap = if capacity > max_capacity {
-        max_capacity
-    } else {
-        capacity
-    };
-    Vec::with_capacity(cap)
-}
-
-/// Truncate a byte slice to a maximum length.
-#[inline]
-pub fn truncate_slice(slice: &[u8], max_len: usize) -> &[u8] {
-    if slice.len() > max_len {
-        &slice[..max_len]
-    } else {
-        slice
-    }
-}
-
-/// Clone a slice into a Vec, truncating to max_len if needed.
-#[inline]
-pub fn clone_truncated(slice: &[u8], max_len: usize) -> Vec<u8> {
-    truncate_slice(slice, max_len).to_vec()
 }
 
 #[cfg(test)]
@@ -451,13 +311,6 @@ mod tests {
 
         // Only 4 bytes left, not enough for another bytes20
         assert_eq!(read_bytes20_at(&bytes, &mut offset), None);
-    }
-
-    #[test]
-    fn test_write_u16_le() {
-        let mut buf = Vec::new();
-        write_u16_le(&mut buf, 0x1234);
-        assert_eq!(buf, alloc::vec![0x34, 0x12]);
     }
 
     #[test]
@@ -587,30 +440,6 @@ mod tests {
     }
 
     #[test]
-    fn test_write_u32_le() {
-        let mut buf = Vec::new();
-        write_u32_le(&mut buf, 0x12345678);
-        assert_eq!(buf, alloc::vec![0x78, 0x56, 0x34, 0x12]);
-    }
-
-    #[test]
-    fn test_write_u64_le() {
-        let mut buf = Vec::new();
-        write_u64_le(&mut buf, 0x123456789ABCDEF0);
-        assert_eq!(
-            buf,
-            alloc::vec![0xF0, 0xDE, 0xBC, 0x9A, 0x78, 0x56, 0x34, 0x12]
-        );
-    }
-
-    #[test]
-    fn test_bytes_eq() {
-        assert!(bytes_eq(&[1, 2, 3], &[1, 2, 3]));
-        assert!(!bytes_eq(&[1, 2, 3], &[1, 2, 4]));
-        assert!(!bytes_eq(&[1, 2], &[1, 2, 3]));
-    }
-
-    #[test]
     fn test_is_zero_bytes32() {
         assert!(is_zero_bytes32(&[0u8; 32]));
         let mut arr = [0u8; 32];
@@ -618,46 +447,4 @@ mod tests {
         assert!(!is_zero_bytes32(&arr));
     }
 
-    #[test]
-    fn test_slice_to_bytes32() {
-        let slice = [0x42u8; 32];
-        assert_eq!(slice_to_bytes32(&slice), Some([0x42u8; 32]));
-
-        let short = [0x42u8; 16];
-        assert_eq!(slice_to_bytes32(&short), None);
-    }
-
-    #[test]
-    fn test_slice_to_bytes32_padded() {
-        let slice = [0x42u8; 16];
-        let result = slice_to_bytes32_padded(&slice).unwrap();
-        assert_eq!(&result[..16], &[0x42u8; 16]);
-        assert_eq!(&result[16..], &[0u8; 16]);
-
-        let too_long = [0x42u8; 40];
-        assert_eq!(slice_to_bytes32_padded(&too_long), None);
-    }
-
-    #[test]
-    fn test_truncate_slice() {
-        let slice = [1, 2, 3, 4, 5];
-        assert_eq!(truncate_slice(&slice, 3), &[1, 2, 3]);
-        assert_eq!(truncate_slice(&slice, 10), &slice);
-    }
-
-    #[test]
-    fn test_clone_truncated() {
-        let slice = [1, 2, 3, 4, 5];
-        assert_eq!(clone_truncated(&slice, 3), alloc::vec![1, 2, 3]);
-        assert_eq!(clone_truncated(&slice, 10), alloc::vec![1, 2, 3, 4, 5]);
-    }
-
-    #[test]
-    fn test_vec_with_capped_initial_capacity() {
-        let v: Vec<u8> = vec_with_capped_initial_capacity(1000, 100);
-        assert_eq!(v.capacity(), 100);
-
-        let v: Vec<u8> = vec_with_capped_initial_capacity(50, 100);
-        assert_eq!(v.capacity(), 50);
-    }
 }

@@ -75,38 +75,6 @@ pub fn checked_div_u64(a: u64, b: u64) -> Option<u64> {
     a.checked_div(b)
 }
 
-/// Checked addition for u32.
-///
-/// Returns `None` if the addition would overflow.
-#[inline]
-pub fn checked_add_u32(a: u32, b: u32) -> Option<u32> {
-    a.checked_add(b)
-}
-
-/// Checked subtraction for u32.
-///
-/// Returns `None` if the subtraction would underflow.
-#[inline]
-pub fn checked_sub_u32(a: u32, b: u32) -> Option<u32> {
-    a.checked_sub(b)
-}
-
-/// Checked multiplication for u32.
-///
-/// Returns `None` if the multiplication would overflow.
-#[inline]
-pub fn checked_mul_u32(a: u32, b: u32) -> Option<u32> {
-    a.checked_mul(b)
-}
-
-/// Checked division for u32.
-///
-/// Returns `None` if the divisor is zero.
-#[inline]
-pub fn checked_div_u32(a: u32, b: u32) -> Option<u32> {
-    a.checked_div(b)
-}
-
 // ============================================================================
 // Compound Arithmetic
 // ============================================================================
@@ -165,21 +133,6 @@ pub fn saturating_mul_u64(a: u64, b: u64) -> u64 {
 
 /// Basis points denominator (10000 = 100%).
 pub const BPS_DENOMINATOR: u64 = 10_000;
-
-/// Check if a percentage basis points value is valid (0..=10000).
-///
-/// This is a convenience helper for agents to self-validate **percentage**
-/// bps values (e.g., drawdown thresholds, fee rates) before submission.
-/// The constraint engine performs its own validation.
-///
-/// Returns `true` if `bps <= BPS_DENOMINATOR` (i.e., 0% to 100%).
-///
-/// **Note:** This is for percentage values only. Leverage bps values can
-/// exceed 10,000 (e.g., 50,000 = 5x leverage) and should NOT use this check.
-#[inline]
-pub fn is_valid_pct_bps(bps: u64) -> bool {
-    bps <= BPS_DENOMINATOR
-}
 
 /// Apply basis points to a value.
 ///
@@ -276,78 +229,6 @@ pub fn drawdown_bps(current_equity: u64, peak_equity: u64) -> Option<u64> {
     checked_mul_div_u64(drawdown, BPS_DENOMINATOR, peak_equity)
 }
 
-// ============================================================================
-// Min/Max Helpers
-// ============================================================================
-
-/// Return the minimum of two u64 values.
-#[inline]
-pub fn min_u64(a: u64, b: u64) -> u64 {
-    if a < b {
-        a
-    } else {
-        b
-    }
-}
-
-/// Return the maximum of two u64 values.
-#[inline]
-pub fn max_u64(a: u64, b: u64) -> u64 {
-    if a > b {
-        a
-    } else {
-        b
-    }
-}
-
-/// Return the minimum of two u32 values.
-#[inline]
-pub fn min_u32(a: u32, b: u32) -> u32 {
-    if a < b {
-        a
-    } else {
-        b
-    }
-}
-
-/// Return the maximum of two u32 values.
-#[inline]
-pub fn max_u32(a: u32, b: u32) -> u32 {
-    if a > b {
-        a
-    } else {
-        b
-    }
-}
-
-/// Clamp a u64 value to a range.
-///
-/// Returns `min` if `value < min`, `max` if `value > max`, otherwise `value`.
-#[inline]
-pub fn clamp_u64(value: u64, min: u64, max: u64) -> u64 {
-    if value < min {
-        min
-    } else if value > max {
-        max
-    } else {
-        value
-    }
-}
-
-/// Clamp a u32 value to a range.
-///
-/// Returns `min` if `value < min`, `max` if `value > max`, otherwise `value`.
-#[inline]
-pub fn clamp_u32(value: u32, min: u32, max: u32) -> u32 {
-    if value < min {
-        min
-    } else if value > max {
-        max
-    } else {
-        value
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -356,32 +237,24 @@ mod tests {
     fn test_checked_add() {
         assert_eq!(checked_add_u64(100, 200), Some(300));
         assert_eq!(checked_add_u64(u64::MAX, 1), None);
-        assert_eq!(checked_add_u32(100, 200), Some(300));
-        assert_eq!(checked_add_u32(u32::MAX, 1), None);
     }
 
     #[test]
     fn test_checked_sub() {
         assert_eq!(checked_sub_u64(300, 100), Some(200));
         assert_eq!(checked_sub_u64(100, 200), None);
-        assert_eq!(checked_sub_u32(300, 100), Some(200));
-        assert_eq!(checked_sub_u32(100, 200), None);
     }
 
     #[test]
     fn test_checked_mul() {
         assert_eq!(checked_mul_u64(100, 200), Some(20000));
         assert_eq!(checked_mul_u64(u64::MAX, 2), None);
-        assert_eq!(checked_mul_u32(100, 200), Some(20000));
-        assert_eq!(checked_mul_u32(u32::MAX, 2), None);
     }
 
     #[test]
     fn test_checked_div() {
         assert_eq!(checked_div_u64(200, 100), Some(2));
         assert_eq!(checked_div_u64(100, 0), None);
-        assert_eq!(checked_div_u32(200, 100), Some(2));
-        assert_eq!(checked_div_u32(100, 0), None);
     }
 
     #[test]
@@ -404,19 +277,6 @@ mod tests {
         assert_eq!(saturating_add_u64(u64::MAX, 1), u64::MAX);
         assert_eq!(saturating_sub_u64(100, 200), 0);
         assert_eq!(saturating_mul_u64(u64::MAX, 2), u64::MAX);
-    }
-
-    #[test]
-    fn test_is_valid_pct_bps() {
-        assert!(is_valid_pct_bps(0));
-        assert!(is_valid_pct_bps(5000));
-        assert!(is_valid_pct_bps(10000));
-        assert!(!is_valid_pct_bps(10001));
-        assert!(!is_valid_pct_bps(u64::MAX));
-
-        // Leverage bps can exceed 10000, so don't use is_valid_pct_bps for that
-        // 50000 bps = 5x leverage - NOT a valid "percentage"
-        assert!(!is_valid_pct_bps(50000));
     }
 
     #[test]
@@ -449,19 +309,4 @@ mod tests {
         assert_eq!(drawdown_bps(50, 0), None); // Invalid peak
     }
 
-    #[test]
-    fn test_min_max() {
-        assert_eq!(min_u64(10, 20), 10);
-        assert_eq!(max_u64(10, 20), 20);
-        assert_eq!(min_u32(10, 20), 10);
-        assert_eq!(max_u32(10, 20), 20);
-    }
-
-    #[test]
-    fn test_clamp() {
-        assert_eq!(clamp_u64(50, 10, 100), 50);
-        assert_eq!(clamp_u64(5, 10, 100), 10);
-        assert_eq!(clamp_u64(150, 10, 100), 100);
-        assert_eq!(clamp_u32(50, 10, 100), 50);
-    }
 }

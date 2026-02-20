@@ -54,6 +54,8 @@ export class VaultFactoryClient {
   ): Promise<{ vaultAddress: `0x${string}`; txHash: `0x${string}` }> {
     this.requireWallet();
     const txHash = await this.walletClient!.writeContract({
+      chain: this.walletClient!.chain ?? null,
+      account: this.walletClient!.account!,
       address: this.address,
       abi: VaultFactoryABI,
       functionName: 'deployVault',
