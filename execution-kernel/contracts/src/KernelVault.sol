@@ -68,6 +68,15 @@ contract KernelVault is ReentrancyGuard {
     /// @notice Cumulative withdrawn assets (for TVL tracking)
     uint256 public totalWithdrawn;
 
+    /// @notice Whether a strategy is active (CALL reduced tracked asset balance)
+    bool public strategyActive;
+
+    /// @notice Snapshot of totalAssets at time strategy was activated
+    uint256 public snapshotTotalAssets;
+
+    /// @notice Snapshot of totalShares at time strategy was activated
+    uint256 public snapshotTotalShares;
+
     // ============ Events ============
 
     /// @notice Emitted when tokens are deposited
@@ -100,6 +109,12 @@ contract KernelVault is ReentrancyGuard {
 
     /// @notice Emitted when nonces are skipped (gap in sequence)
     event NoncesSkipped(uint64 indexed fromNonce, uint64 indexed toNonce, uint64 skippedCount);
+
+    /// @notice Emitted when a strategy is activated (CALL reduced tracked asset balance)
+    event StrategyActivated(uint256 snapshotAssets, uint256 snapshotShares);
+
+    /// @notice Emitted when a strategy is settled (assets returned to vault)
+    event StrategySettled(uint256 settledAssets, uint256 currentAssets);
 
     // ============ Errors ============
 
@@ -160,6 +175,12 @@ contract KernelVault is ReentrancyGuard {
     /// @notice Invalid trusted image ID (zero)
     error InvalidTrustedImageId();
 
+    /// @notice Strategy is not active (cannot settle)
+    error StrategyNotActive();
+
+    /// @notice Insufficient available assets for withdrawal during active strategy
+    error InsufficientAvailableAssets(uint256 requested, uint256 available);
+
     // ============ Constructor ============
 
     /// @notice Initialize the vault
@@ -190,17 +211,17 @@ contract KernelVault is ReentrancyGuard {
         if (address(asset) == address(0)) revert WrongDepositFunction();
         if (assets == 0) revert ZeroDeposit();
 
-        // Calculate shares BEFORE transfer (use pre-transfer totalAssets)
+        // Calculate shares BEFORE transfer using effective total assets
         uint256 supply = totalShares;
-        uint256 assetsBefore = asset.balanceOf(address(this));
+        uint256 effectiveAssets = effectiveTotalAssets();
 
         if (supply == 0) {
             // First deposit: 1:1 ratio
             sharesMinted = assets;
         } else {
             // Subsequent deposits: standard PPS calculation
-            if (assetsBefore == 0) revert ZeroAssets();
-            sharesMinted = (assets * supply) / assetsBefore;
+            if (effectiveAssets == 0) revert ZeroAssets();
+            sharesMinted = (assets * supply) / effectiveAssets;
             if (sharesMinted == 0) revert ZeroShares();
         }
 
@@ -212,6 +233,12 @@ contract KernelVault is ReentrancyGuard {
         shares[msg.sender] += sharesMinted;
         totalShares += sharesMinted;
         totalDeposited += assets;
+
+        // Update snapshot to include new deposit
+        if (strategyActive) {
+            snapshotTotalAssets += assets;
+            snapshotTotalShares += sharesMinted;
+        }
 
         emit Deposit(msg.sender, assets, sharesMinted);
     }
@@ -225,18 +252,19 @@ contract KernelVault is ReentrancyGuard {
         if (address(asset) != address(0)) revert WrongDepositFunction();
         if (msg.value == 0) revert ZeroDeposit();
 
-        // Calculate shares BEFORE transfer
-        // msg.value is already added to balance, so subtract it for pre-transfer calculation
+        // Calculate shares using effective total assets
+        // For non-strategy: msg.value is already in balance, subtract it for pre-transfer calculation
         uint256 supply = totalShares;
-        uint256 assetsBefore = address(this).balance - msg.value;
+        uint256 effectiveAssets =
+            strategyActive ? snapshotTotalAssets : (address(this).balance - msg.value);
 
         if (supply == 0) {
             // First deposit: 1:1 ratio
             sharesMinted = msg.value;
         } else {
             // Subsequent deposits: standard PPS calculation
-            if (assetsBefore == 0) revert ZeroAssets();
-            sharesMinted = (msg.value * supply) / assetsBefore;
+            if (effectiveAssets == 0) revert ZeroAssets();
+            sharesMinted = (msg.value * supply) / effectiveAssets;
             if (sharesMinted == 0) revert ZeroShares();
         }
 
@@ -244,6 +272,12 @@ contract KernelVault is ReentrancyGuard {
         shares[msg.sender] += sharesMinted;
         totalShares += sharesMinted;
         totalDeposited += msg.value;
+
+        // Update snapshot to include new deposit
+        if (strategyActive) {
+            snapshotTotalAssets += msg.value;
+            snapshotTotalShares += sharesMinted;
+        }
 
         emit Deposit(msg.sender, msg.value, sharesMinted);
     }
@@ -257,18 +291,30 @@ contract KernelVault is ReentrancyGuard {
             revert InsufficientShares(shareAmount, shares[msg.sender]);
         }
 
-        // Calculate assets BEFORE burning shares (use pre-burn totalShares)
-        uint256 assetsBefore = totalAssets();
+        // Calculate assets using effective total assets (snapshot PPS if strategy active)
+        uint256 effectiveAssets = effectiveTotalAssets();
         uint256 supply = totalShares;
         if (supply == 0) revert ZeroShares();
 
-        assetsOut = (shareAmount * assetsBefore) / supply;
+        assetsOut = (shareAmount * effectiveAssets) / supply;
         if (assetsOut == 0) revert ZeroAssetsOut();
+
+        // Cap to actual available balance during active strategy
+        uint256 available = totalAssets();
+        if (assetsOut > available) {
+            revert InsufficientAvailableAssets(assetsOut, available);
+        }
 
         // Burn shares
         shares[msg.sender] -= shareAmount;
         totalShares -= shareAmount;
         totalWithdrawn += assetsOut;
+
+        // Update snapshot to reflect withdrawal
+        if (strategyActive) {
+            snapshotTotalAssets -= assetsOut;
+            snapshotTotalShares -= shareAmount;
+        }
 
         // Transfer tokens or ETH
         bool isETH = address(asset) == address(0);
@@ -400,6 +446,7 @@ contract KernelVault is ReentrancyGuard {
 
     /// @notice Execute a CALL action
     /// @dev Payload format: abi.encode(uint256 value, bytes callData)
+    ///      Snapshots PPS on first balance-reducing call to prevent yield dilution.
     function _executeCall(uint256 index, KernelOutputParser.Action memory action) internal {
         // Decode payload: (uint256 value, bytes callData)
         if (action.payload.length < 64) {
@@ -416,16 +463,59 @@ contract KernelVault is ReentrancyGuard {
         // Convert target bytes32 to address (safe after validation above)
         address target = address(uint160(uint256(action.target)));
 
+        // Capture balance before call for snapshot detection
+        uint256 balanceBefore = totalAssets();
+
         // Execute call
         (bool success, bytes memory returnData) = target.call{ value: value }(callData);
         if (!success) {
             revert CallFailed(action.target, returnData);
         }
 
+        // Snapshot PPS if balance decreased and no strategy is active yet
+        uint256 balanceAfter = totalAssets();
+        if (!strategyActive && balanceAfter < balanceBefore) {
+            snapshotTotalAssets = balanceBefore;
+            snapshotTotalShares = totalShares;
+            strategyActive = true;
+            emit StrategyActivated(balanceBefore, totalShares);
+        } else if (strategyActive && balanceAfter >= snapshotTotalAssets) {
+            // Auto-settle when balance recovers to snapshot level
+            _settle();
+        }
+
         emit ActionExecuted(index, action.actionType, action.target, true);
     }
 
+    // ============ Settlement ============
+
+    /// @notice Permissionless settlement — clears strategy and restores live PPS accounting
+    /// @dev Anyone can call this when assets have returned to the vault
+    function settle() external {
+        if (!strategyActive) revert StrategyNotActive();
+        _settle();
+    }
+
+    /// @notice Internal settlement logic (used by settle() and auto-settlement in _executeCall)
+    function _settle() internal {
+        uint256 settledAssets = snapshotTotalAssets;
+        uint256 currentAssets = totalAssets();
+
+        strategyActive = false;
+        snapshotTotalAssets = 0;
+        snapshotTotalShares = 0;
+
+        emit StrategySettled(settledAssets, currentAssets);
+    }
+
     // ============ View Functions ============
+
+    /// @notice Returns effective total assets for PPS calculations
+    /// @dev During active strategy, returns snapshot value to prevent yield dilution.
+    ///      Otherwise returns live totalAssets().
+    function effectiveTotalAssets() public view returns (uint256) {
+        return strategyActive ? snapshotTotalAssets : totalAssets();
+    }
 
     /// @notice Returns total assets held by the vault
     /// @return Total balance of the vault's asset (ETH balance if asset is address(0))
@@ -450,8 +540,9 @@ contract KernelVault is ReentrancyGuard {
         uint256 supply = totalShares;
         if (supply == 0) return assets;
 
-        if (totalAssets() == 0) return 0; // Prevent division by zero
-        return (assets * supply) / totalAssets();
+        uint256 effectiveAssets = effectiveTotalAssets();
+        if (effectiveAssets == 0) return 0; // Prevent division by zero
+        return (assets * supply) / effectiveAssets;
     }
 
     /// @notice Convert shares to assets using current exchange rate
@@ -462,7 +553,7 @@ contract KernelVault is ReentrancyGuard {
         if (supply == 0) {
             return _shares; // 1:1 when empty
         }
-        return (_shares * totalAssets()) / supply;
+        return (_shares * effectiveTotalAssets()) / supply;
     }
 
     /// @notice Allow receiving ETH for CALL actions with value
