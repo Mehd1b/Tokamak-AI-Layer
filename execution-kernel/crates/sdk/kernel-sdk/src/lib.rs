@@ -96,6 +96,7 @@ pub mod actions;
 pub mod agent;
 pub mod bytes;
 pub mod math;
+pub mod oracle;
 pub mod types;
 
 #[cfg(any(test, feature = "testing"))]
@@ -169,6 +170,12 @@ pub mod prelude {
 
     // Action builder
     pub use crate::actions::CallBuilder;
+
+    // Oracle helpers
+    pub use crate::oracle::{
+        compute_feed_hash, decode_price_feed, get_price, get_price_point,
+        verify_feed_commitment, OraclePriceFeed, PricePoint,
+    };
 
     // Re-export Vec for no_std agent code
     // Note: vec![] macro intentionally not exported to discourage unbounded allocations

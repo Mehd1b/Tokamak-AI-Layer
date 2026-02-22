@@ -1,0 +1,12 @@
+[package]
+name = "backtest"
+version = "0.1.0"
+edition = "2021"
+description = "Backtesting framework for perp-trader agent strategies"
+license = "Apache-2.0"
+
+[dependencies]
+# Reuse the agent's strategy via its public entry point
+perp-trader = { path = "../../agents/perp-trader/agent" }
+kernel-sdk = { path = "../../sdk/kernel-sdk", features = ["testing", "std"] }
+constraints = { path = "../../protocol/constraints" }

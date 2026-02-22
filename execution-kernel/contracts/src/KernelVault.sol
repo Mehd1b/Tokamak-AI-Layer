@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import { IKernelExecutionVerifier } from "./interfaces/IKernelExecutionVerifier.sol";
 import { IERC20 } from "./interfaces/IERC20.sol";
 import { KernelOutputParser } from "./KernelOutputParser.sol";
+import { OracleVerifier } from "./libraries/OracleVerifier.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /// @title KernelVault
@@ -48,6 +49,9 @@ contract KernelVault is ReentrancyGuard {
     ///      Registry updates do NOT affect this vault's imageId.
     bytes32 public immutable trustedImageId;
 
+    /// @notice The vault owner (agent author) who can call execute()
+    address public immutable owner;
+
     // ============ State ============
 
     /// @notice Total shares outstanding
@@ -76,6 +80,12 @@ contract KernelVault is ReentrancyGuard {
 
     /// @notice Snapshot of totalShares at time strategy was activated
     uint256 public snapshotTotalShares;
+
+    /// @notice Trusted oracle signer address (address(0) = oracle verification disabled)
+    address public oracleSigner;
+
+    /// @notice Maximum age of oracle data in seconds (0 = no age check)
+    uint64 public maxOracleAge;
 
     // ============ Events ============
 
@@ -115,6 +125,9 @@ contract KernelVault is ReentrancyGuard {
 
     /// @notice Emitted when a strategy is settled (assets returned to vault)
     event StrategySettled(uint256 settledAssets, uint256 currentAssets);
+
+    /// @notice Emitted when oracle signer configuration is updated
+    event OracleSignerUpdated(address indexed signer, uint64 maxAge);
 
     // ============ Errors ============
 
@@ -178,6 +191,9 @@ contract KernelVault is ReentrancyGuard {
     /// @notice Strategy is not active (cannot settle)
     error StrategyNotActive();
 
+    /// @notice Caller is not the vault owner
+    error NotOwner();
+
     /// @notice Insufficient available assets for withdrawal during active strategy
     error InsufficientAvailableAssets(uint256 requested, uint256 available);
 
@@ -188,12 +204,26 @@ contract KernelVault is ReentrancyGuard {
     /// @param _verifier The KernelExecutionVerifier contract address
     /// @param _agentId The agent ID this vault is bound to
     /// @param _trustedImageId The trusted RISC Zero image ID (pinned at deployment)
-    constructor(address _asset, address _verifier, bytes32 _agentId, bytes32 _trustedImageId) {
+    /// @param _owner The vault owner (agent author) who can submit executions
+    constructor(address _asset, address _verifier, bytes32 _agentId, bytes32 _trustedImageId, address _owner) {
         if (_trustedImageId == bytes32(0)) revert InvalidTrustedImageId();
         asset = IERC20(_asset);
         verifier = IKernelExecutionVerifier(_verifier);
         agentId = _agentId;
         trustedImageId = _trustedImageId;
+        owner = _owner;
+    }
+
+    // ============ Oracle Configuration ============
+
+    /// @notice Configure the trusted oracle signer and maximum data age
+    /// @param _signer Oracle signer address (address(0) disables oracle verification)
+    /// @param _maxAge Maximum age of oracle data in seconds (0 = no age check)
+    function setOracleSigner(address _signer, uint64 _maxAge) external {
+        if (msg.sender != owner) revert NotOwner();
+        oracleSigner = _signer;
+        maxOracleAge = _maxAge;
+        emit OracleSignerUpdated(_signer, _maxAge);
     }
 
     // ============ Deposit/Withdraw ============
@@ -339,6 +369,31 @@ contract KernelVault is ReentrancyGuard {
         external
         nonReentrant
     {
+        _execute(journal, seal, agentOutputBytes, "");
+    }
+
+    /// @notice Execute with oracle signature verification
+    /// @param journal The raw journal bytes (209 bytes)
+    /// @param seal The RISC Zero proof seal
+    /// @param agentOutputBytes The agent output bytes containing actions
+    /// @param oracleSignature 65-byte ECDSA signature over the feed hash (journal.inputRoot)
+    function executeWithOracle(
+        bytes calldata journal,
+        bytes calldata seal,
+        bytes calldata agentOutputBytes,
+        bytes calldata oracleSignature
+    ) external nonReentrant {
+        _execute(journal, seal, agentOutputBytes, oracleSignature);
+    }
+
+    /// @notice Internal execution logic shared by execute() and executeWithOracle()
+    function _execute(
+        bytes calldata journal,
+        bytes calldata seal,
+        bytes calldata agentOutputBytes,
+        bytes memory oracleSignature
+    ) internal {
+        if (msg.sender != owner) revert NotOwner();
         // 1. Verify proof and parse journal using pinned trustedImageId
         IKernelExecutionVerifier.ParsedJournal memory parsed =
             verifier.verifyAndParseWithImageId(trustedImageId, journal, seal);
@@ -348,7 +403,16 @@ contract KernelVault is ReentrancyGuard {
             revert AgentIdMismatch(agentId, parsed.agentId);
         }
 
-        // 3. Verify nonce is valid (must be > lastNonce and within MAX_NONCE_GAP)
+        // 3. Verify oracle signature if oracle signer is configured
+        if (oracleSigner != address(0)) {
+            OracleVerifier.requireValidOracleSignature(
+                parsed.inputRoot,
+                oracleSignature,
+                oracleSigner
+            );
+        }
+
+        // 4. Verify nonce is valid (must be > lastNonce and within MAX_NONCE_GAP)
         // This allows gaps for liveness while preventing replay and unbounded skips
         uint64 lastNonce = lastExecutionNonce;
         uint64 providedNonce = parsed.executionNonce;
@@ -367,25 +431,25 @@ contract KernelVault is ReentrancyGuard {
             emit NoncesSkipped(lastNonce + 1, providedNonce - 1, gap - 1);
         }
 
-        // 4. Verify action commitment
+        // 5. Verify action commitment
         bytes32 computedCommitment = sha256(agentOutputBytes);
         if (computedCommitment != parsed.actionCommitment) {
             revert ActionCommitmentMismatch(parsed.actionCommitment, computedCommitment);
         }
 
-        // 5. Update last execution nonce
+        // 6. Update last execution nonce
         lastExecutionNonce = providedNonce;
 
-        // 6. Parse actions from agentOutputBytes
+        // 7. Parse actions from agentOutputBytes
         KernelOutputParser.Action[] memory actions =
             KernelOutputParser.parseActions(agentOutputBytes);
 
-        // 7. Execute actions in order (atomic - any failure reverts entire execution)
+        // 8. Execute actions in order (atomic - any failure reverts entire execution)
         for (uint256 i = 0; i < actions.length; i++) {
             _executeAction(i, actions[i]);
         }
 
-        // 8. Emit execution event
+        // 9. Emit execution event
         emit ExecutionApplied(
             parsed.agentId, parsed.executionNonce, parsed.actionCommitment, actions.length
         );

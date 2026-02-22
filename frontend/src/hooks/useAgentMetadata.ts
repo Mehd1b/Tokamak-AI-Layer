@@ -37,6 +37,7 @@ interface AgentMetadata {
   socials?: AgentSocials;
   pricing?: AgentPricing;
   customUI?: CustomUIMeta;
+  validationModel?: number;
 }
 
 interface UseAgentMetadataResult {
@@ -51,6 +52,7 @@ interface UseAgentMetadataResult {
   socials?: AgentSocials;
   pricing?: AgentPricing;
   customUI?: CustomUIMeta;
+  validationModel?: number;
   isLoading: boolean;
   error?: string;
 }
@@ -157,6 +159,7 @@ export function useAgentMetadata(agentURI: string | undefined): UseAgentMetadata
                   minHeight: typeof rawCustomUI.minHeight === 'number' ? rawCustomUI.minHeight : undefined,
                 }
               : undefined,
+            validationModel: typeof data.tal?.validationModel === 'number' ? data.tal.validationModel : undefined,
           };
 
           metadataCache.set(agentURI, parsed);
@@ -198,6 +201,7 @@ export function useAgentMetadata(agentURI: string | undefined): UseAgentMetadata
     socials: metadata?.socials,
     pricing: metadata?.pricing,
     customUI: metadata?.customUI,
+    validationModel: metadata?.validationModel,
     isLoading,
     error,
   };

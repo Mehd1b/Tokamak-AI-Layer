@@ -40,7 +40,7 @@ export class RegistrationBuilder {
   }
 
   setSupportedTrust(
-    models: Array<'reputation' | 'crypto-economic' | 'tee-attestation'>,
+    models: Array<'reputation' | 'tee-attestation'>,
   ): this {
     this.data.supportedTrust = models;
     return this;

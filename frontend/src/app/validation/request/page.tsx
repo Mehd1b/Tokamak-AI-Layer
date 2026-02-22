@@ -3,21 +3,20 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Shield, Send, Info, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Shield, Send, Info } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
 import { useRequestValidationOnChain } from '@/hooks/useValidation';
 import { useL2Config } from '@/hooks/useL2Config';
 import { parseEther } from 'viem';
 import { useReadContract } from 'wagmi';
-import { CONTRACTS } from '@/lib/contracts';
-import { TALIdentityRegistryV2ABI } from '../../../../../sdk/src/abi/TALIdentityRegistryV2';
+import { CONTRACTS, THANOS_CHAIN_ID } from '@/lib/contracts';
+import { TALIdentityRegistryABI } from '../../../../../sdk/src/abi/TALIdentityRegistry';
+import { useAgentMetadata } from '@/hooks/useAgentMetadata';
 import { getValidationModelLabel, getValidationModelColor } from '@/lib/utils';
 
 const MODEL_INFO: Record<number, { desc: string; minBounty: string }> = {
   0: { desc: 'Lightweight, aggregated feedback scores', minBounty: '0' },
-  1: { desc: 'DRB-selected validator with stake collateral', minBounty: '10' },
-  2: { desc: 'Hardware-attested execution verification', minBounty: '1' },
-  3: { desc: 'Combines stake + TEE for maximum security', minBounty: '10' },
+  1: { desc: 'Hardware-attested execution verification with stake-backed security', minBounty: '1' },
 };
 
 const DEADLINE_OPTIONS = [
@@ -31,20 +30,29 @@ function isValidBytes32(value: string): boolean {
   return /^0x[0-9a-fA-F]{64}$/.test(value);
 }
 
+/**
+ * Read the agent's validation model from IPFS metadata (tal.validationModel).
+ * Falls back to 0 (ReputationOnly) if not found.
+ */
 function useAgentValidationModel(agentId: string) {
   const enabled = !!agentId && parseInt(agentId) > 0;
-  const { data, isLoading, error } = useReadContract({
+
+  // Read agent URI from on-chain
+  const { data: agentURI, isLoading: uriLoading } = useReadContract({
     address: CONTRACTS.identityRegistry,
-    abi: TALIdentityRegistryV2ABI,
-    functionName: 'getAgentValidationModel',
+    abi: TALIdentityRegistryABI,
+    functionName: 'agentURI',
     args: enabled ? [BigInt(agentId)] : undefined,
+    chainId: THANOS_CHAIN_ID,
     query: { enabled },
   });
 
+  // Fetch IPFS metadata to get validation model
+  const { validationModel, isLoading: metaLoading } = useAgentMetadata(agentURI as string | undefined);
+
   return {
-    model: data !== undefined ? Number(data) : undefined,
-    isLoading: enabled && isLoading,
-    error,
+    model: validationModel ?? (enabled && !uriLoading && !metaLoading ? 0 : undefined),
+    isLoading: enabled && (uriLoading || metaLoading),
   };
 }
 
@@ -84,8 +92,7 @@ function RequestValidationContent() {
   const modelInfo = MODEL_INFO[effectiveModel] ?? MODEL_INFO[0];
   const minBounty = modelInfo.minBounty;
   const isReputationOnly = agentModel === 0;
-  const isComingSoon = effectiveModel === 2 || effectiveModel === 3;
-  const isUnavailable = isReputationOnly || isComingSoon;
+  const isUnavailable = isReputationOnly;
 
   // Redirect after success
   useEffect(() => {
@@ -254,11 +261,6 @@ function RequestValidationContent() {
                     <span className={`${getValidationModelColor(effectiveModel)} text-sm`}>
                       {getValidationModelLabel(effectiveModel)}
                     </span>
-                    {isComingSoon && (
-                      <span className="rounded bg-zinc-700 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
-                        Coming soon
-                      </span>
-                    )}
                     {isReputationOnly && (
                       <span className="rounded bg-zinc-700 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
                         Not supported
@@ -279,18 +281,7 @@ function RequestValidationContent() {
                 <div className="mt-3 flex items-start gap-2">
                   <Info className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-amber-400">
-                    Reputation Only agents rely on aggregated feedback scores and do not support on-chain validation requests. To request validation, the agent&apos;s operator must upgrade its validation model to Stake Secured or higher.
-                  </p>
-                </div>
-              )}
-
-              {isComingSoon && (
-                <div className="mt-3 flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-amber-400">
-                    {effectiveModel === 2
-                      ? 'TEE Attested validation requires TEE infrastructure that is not yet deployed. This agent cannot be validated until TEE provider support is live.'
-                      : 'Hybrid validation requires both TEE infrastructure and DRB validator selection, which are not yet deployed.'}
+                    Reputation Only agents rely on aggregated feedback scores and do not support on-chain validation requests. To request validation, the agent&apos;s operator must upgrade its validation model to TEE Attested.
                   </p>
                 </div>
               )}

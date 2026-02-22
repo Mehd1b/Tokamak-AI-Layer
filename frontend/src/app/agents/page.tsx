@@ -10,7 +10,7 @@ import { shortenAddress, getAgentStatusLabel, getAgentStatusColor, getValidation
 
 type SortOption = 'newest' | 'rating' | 'reviews';
 type StatusFilter = 'all' | 0 | 1 | 2;
-type ModelFilter = 'all' | 0 | 1 | 2 | 3;
+type ModelFilter = 'all' | 0 | 1;
 
 interface AgentCardProps {
   agentId: number;
@@ -270,7 +270,7 @@ export default function AgentsPage() {
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-zinc-500">Model:</span>
               <div className="flex gap-1">
-                {([['all', 'All'], [0, 'Reputation'], [1, 'Stake'], [2, 'TEE'], [3, 'Hybrid']] as const).map(([value, label]) => (
+                {([['all', 'All'], [0, 'Reputation'], [1, 'TEE']] as const).map(([value, label]) => (
                   <button
                     key={String(value)}
                     onClick={() => setModelFilter(value as ModelFilter)}

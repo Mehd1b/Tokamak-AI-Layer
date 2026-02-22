@@ -65,13 +65,13 @@ interface ITALValidationRegistry is IERC8004ValidationRegistry {
     /// @notice Raised when ReputationOnly model is used (no validation needed in V3)
     error ReputationOnlyNoValidationNeeded();
 
-    /// @notice Raised when agent owner has insufficient stake for dual-staking requirement
+    /// @notice Raised when agent owner has insufficient stake for TEE staking requirement
     error InsufficientAgentOwnerStake(address owner, uint256 stake, uint256 required);
 
     /// @notice Raised when deadline has not yet passed for missed-deadline slashing
     error DeadlineNotPassed(bytes32 requestHash);
 
-    /// @notice Raised when validation model is not slashable (not StakeSecured or Hybrid)
+    /// @notice Raised when validation model is not slashable (not TEEAttested)
     error NotSlashableModel(bytes32 requestHash);
 
     /// @notice Raised when no validator has been selected for a request
@@ -143,24 +143,24 @@ interface ITALValidationRegistry is IERC8004ValidationRegistry {
 
     /**
      * @notice Emitted when validation system parameters are updated
-     * @param minStakeSecuredBounty New minimum bounty for StakeSecured validation type
      * @param minTEEBounty New minimum bounty for TEEAttested validation type
+     * @param minTEEStake New minimum stake for TEEAttested agents
      * @param protocolFeeBps New protocol fee as basis points (e.g., 1000 = 10%)
      */
     event ValidationParametersUpdated(
-        uint256 minStakeSecuredBounty,
         uint256 minTEEBounty,
+        uint256 minTEEStake,
         uint256 protocolFeeBps
     );
 
-    // ============ Constants ============
-
     /**
-     * @notice Get minimum bounty required for StakeSecured validation type
-     * @dev StakeSecured validations use validator stake as security mechanism
-     * @return The minimum bounty amount in TON (wei)
+     * @notice Emitted when an agent's TEE enclave configuration is updated
+     * @param agentId The agent whose TEE config was updated
+     * @param enclaveHash The new enclave hash for the agent
      */
-    function MIN_STAKE_SECURED_BOUNTY() external view returns (uint256);
+    event AgentTEEConfigUpdated(uint256 indexed agentId, bytes32 enclaveHash);
+
+    // ============ Constants ============
 
     /**
      * @notice Get minimum bounty required for TEEAttested validation type
@@ -168,6 +168,12 @@ interface ITALValidationRegistry is IERC8004ValidationRegistry {
      * @return The minimum bounty amount in TON (wei)
      */
     function MIN_TEE_BOUNTY() external view returns (uint256);
+
+    /**
+     * @notice Get minimum stake required for TEEAttested agents (configurable via V4)
+     * @return The minimum stake amount in TON (wei)
+     */
+    function MIN_TEE_STAKE() external view returns (uint256);
 
     /**
      * @notice Get the protocol fee in basis points
@@ -377,15 +383,14 @@ interface ITALValidationRegistry is IERC8004ValidationRegistry {
     // ============ V3 Slashing ============
 
     /**
-     * @notice Slash a validator for missing a validation deadline (permissionless)
+     * @notice Slash for missing a validation deadline (permissionless)
      * @dev Can be called by anyone after the deadline has passed. Slashes 10% of the
-     *      selected validator's operator stake and refunds the bounty to the requester.
+     *      agent owner's stake and refunds the bounty to the requester.
      *
      * Requirements:
      * - Request must exist and be Pending
      * - Deadline must have passed
-     * - Model must be StakeSecured or Hybrid
-     * - A validator must have been selected
+     * - Model must be TEEAttested
      * - Request must not have already been slashed for missed deadline
      *
      * @param requestHash The validation request identifier
@@ -430,15 +435,31 @@ interface ITALValidationRegistry is IERC8004ValidationRegistry {
      * - Protocol fee should be reasonable (typically 5-20%)
      * - Minimum bounties should reflect cost of validation work
      *
-     * @param minStakeSecuredBounty New minimum bounty for StakeSecured validations (in wei)
      * @param minTEEBounty New minimum bounty for TEEAttested validations (in wei)
+     * @param minTEEStake New minimum stake for TEEAttested agents (in wei)
      * @param protocolFeeBps New protocol fee as basis points (10000 = 100%)
      *
      * Emits ValidationParametersUpdated event with new values
      */
     function updateValidationParameters(
-        uint256 minStakeSecuredBounty,
         uint256 minTEEBounty,
+        uint256 minTEEStake,
         uint256 protocolFeeBps
     ) external;
+
+    // ============ V4 Agent TEE Configuration ============
+
+    /**
+     * @notice Set per-agent TEE enclave hash (agent owner only)
+     * @param agentId The agent to configure
+     * @param enclaveHash The expected enclave hash for TEE validation
+     */
+    function setAgentTEEConfig(uint256 agentId, bytes32 enclaveHash) external;
+
+    /**
+     * @notice Get per-agent TEE enclave hash
+     * @param agentId The agent to query
+     * @return The configured enclave hash (bytes32(0) if not set)
+     */
+    function getAgentTEEConfig(uint256 agentId) external view returns (bytes32);
 }

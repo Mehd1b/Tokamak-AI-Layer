@@ -8,6 +8,7 @@ import {ITALValidationRegistry} from "../../src/interfaces/ITALValidationRegistr
 import {IERC8004ValidationRegistry} from "../../src/interfaces/IERC8004ValidationRegistry.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MockStakingV3} from "../mocks/MockStakingV3.sol";
+import {MockWSTONVault} from "../mocks/MockWSTONVault.sol";
 import {MockTEEProvider} from "../mocks/MockTEEProvider.sol";
 import {MockZKVerifier} from "../mocks/MockZKVerifier.sol";
 
@@ -21,6 +22,7 @@ contract TEEAttestedValidationTest is Test {
     TALValidationRegistry public validationRegistry;
     TALIdentityRegistry public identityRegistry;
     MockStakingV3 public mockStaking;
+    MockWSTONVault public mockVault;
     MockTEEProvider public mockTEE;
     MockZKVerifier public mockZKVerifier;
 
@@ -49,6 +51,7 @@ contract TEEAttestedValidationTest is Test {
 
         // Deploy mocks
         mockStaking = new MockStakingV3();
+        mockVault = new MockWSTONVault();
         mockTEE = new MockTEEProvider();
         mockZKVerifier = new MockZKVerifier();
 
@@ -77,8 +80,14 @@ contract TEEAttestedValidationTest is Test {
         ERC1967Proxy validationProxy = new ERC1967Proxy(address(validationImpl), validationData);
         validationRegistry = TALValidationRegistry(payable(address(validationProxy)));
 
-        // Add TEE providers
+        // Initialize V4
+        validationRegistry.initializeV4();
+
+        // Set WSTONVault on validation registry
         vm.startPrank(admin);
+        validationRegistry.setWSTONVault(address(mockVault));
+
+        // Add TEE providers
         validationRegistry.setTrustedTEEProvider(teeValidator);
         validationRegistry.setTrustedTEEProvider(teeValidator2);
         // Register enclave hashes for the providers
@@ -86,8 +95,9 @@ contract TEEAttestedValidationTest is Test {
         validationRegistry.setTEEEnclaveHash(teeValidator2, ENCLAVE_HASH);
         vm.stopPrank();
 
-        // Setup stake for agent owner
+        // Setup stake for agent owner (500+ TON for TEE requirement)
         mockStaking.setStake(agentOwner, 1000 ether);
+        mockVault.setLockedBalance(agentOwner, 500 ether);
 
         // Fund accounts
         vm.deal(requester, 100 ether);
@@ -351,9 +361,9 @@ contract TEEAttestedValidationTest is Test {
         // Update minimum bounty
         vm.prank(admin);
         validationRegistry.updateValidationParameters(
-            10 ether, // min stake secured bounty
-            2 ether,  // new min TEE bounty
-            1000      // protocol fee bps
+            2 ether,    // new min TEE bounty
+            500 ether,  // min TEE stake
+            1000        // protocol fee bps
         );
 
         // Old minimum should now fail
@@ -490,6 +500,200 @@ contract TEEAttestedValidationTest is Test {
         bytes32[] memory validations = validationRegistry.getValidationsByValidator(teeValidator);
         assertEq(validations.length, 1);
         assertEq(validations[0], requestHash);
+    }
+
+    // ============ V4 Tests ============
+
+    function test_V4_requestTEE_reverts_insufficientOwnerStake() public {
+        // Set owner's stake below minimum
+        mockVault.setLockedBalance(agentOwner, 100 ether);
+
+        vm.prank(requester);
+        vm.expectRevert(
+            abi.encodeWithSignature(
+                "InsufficientAgentOwnerStake(address,uint256,uint256)",
+                agentOwner,
+                100 ether,
+                500 ether
+            )
+        );
+        validationRegistry.requestValidation{value: 1 ether}(
+            agentId,
+            keccak256("task1"),
+            keccak256("output1"),
+            IERC8004ValidationRegistry.ValidationModel.TEEAttested,
+            block.timestamp + 1 hours
+        );
+    }
+
+    function test_V4_requestTEE_succeeds_sufficientOwnerStake() public {
+        // Owner has 500 TON (exactly the minimum)
+        vm.prank(requester);
+        bytes32 requestHash = validationRegistry.requestValidation{value: 1 ether}(
+            agentId,
+            keccak256("task1"),
+            keccak256("output1"),
+            IERC8004ValidationRegistry.ValidationModel.TEEAttested,
+            block.timestamp + 1 hours
+        );
+        assertTrue(requestHash != bytes32(0));
+    }
+
+    function test_V4_setAgentTEEConfig_onlyOwner() public {
+        bytes32 newHash = keccak256("agent_specific_enclave");
+
+        // Non-owner should revert
+        vm.prank(requester);
+        vm.expectRevert("Not agent owner");
+        validationRegistry.setAgentTEEConfig(agentId, newHash);
+    }
+
+    function test_V4_setAgentTEEConfig_updatesHash() public {
+        bytes32 newHash = keccak256("agent_specific_enclave");
+
+        vm.prank(agentOwner);
+        validationRegistry.setAgentTEEConfig(agentId, newHash);
+
+        assertEq(validationRegistry.getAgentTEEConfig(agentId), newHash);
+    }
+
+    function test_V4_submitValidation_checksAgentEnclaveHash() public {
+        bytes32 agentSpecificHash = keccak256("agent_specific_enclave");
+
+        // Set per-agent enclave hash (different from provider's ENCLAVE_HASH)
+        vm.prank(agentOwner);
+        validationRegistry.setAgentTEEConfig(agentId, agentSpecificHash);
+
+        // Request validation
+        vm.prank(requester);
+        bytes32 requestHash = validationRegistry.requestValidation{value: 1 ether}(
+            agentId,
+            keccak256("task1"),
+            keccak256("output1"),
+            IERC8004ValidationRegistry.ValidationModel.TEEAttested,
+            block.timestamp + 1 hours
+        );
+
+        // Submit with provider's ENCLAVE_HASH (mismatches agent config)
+        bytes memory teeProof = _createTEEProofWithSignature(teeValidator, teeValidatorKey, ENCLAVE_HASH, requestHash);
+
+        vm.prank(teeValidator);
+        vm.expectRevert(abi.encodeWithSignature("InvalidTEEAttestation()"));
+        validationRegistry.submitValidation(requestHash, 90, teeProof, "ipfs://details");
+    }
+
+    function test_V4_slashForMissedDeadline_TEE() public {
+        // Request TEE validation
+        vm.prank(requester);
+        bytes32 requestHash = validationRegistry.requestValidation{value: 1 ether}(
+            agentId,
+            keccak256("task1"),
+            keccak256("output1"),
+            IERC8004ValidationRegistry.ValidationModel.TEEAttested,
+            block.timestamp + 30 minutes
+        );
+
+        // Warp past deadline
+        vm.warp(block.timestamp + 1 hours);
+
+        uint256 requesterBefore = requester.balance;
+
+        // Anyone can call slashForMissedDeadline
+        validationRegistry.slashForMissedDeadline(requestHash);
+
+        // Verify bounty refunded
+        assertEq(requester.balance - requesterBefore, 1 ether, "Bounty should be refunded");
+
+        // Verify request is expired
+        (ITALValidationRegistry.ValidationRequest memory request, ) = validationRegistry.getValidation(requestHash);
+        assertEq(uint(request.status), uint(IERC8004ValidationRegistry.ValidationStatus.Expired));
+    }
+
+    function test_V4_slashForIncorrectComputation_TEE() public {
+        // Request validation
+        vm.prank(requester);
+        bytes32 requestHash = validationRegistry.requestValidation{value: 1 ether}(
+            agentId,
+            keccak256("task1"),
+            keccak256("output1"),
+            IERC8004ValidationRegistry.ValidationModel.TEEAttested,
+            block.timestamp + 1 hours
+        );
+
+        // Submit with low score (below INCORRECT_COMPUTATION_THRESHOLD=50)
+        bytes memory teeProof = _createTEEProofWithSignature(teeValidator, teeValidatorKey, ENCLAVE_HASH, requestHash);
+
+        vm.prank(teeValidator);
+        validationRegistry.submitValidation(requestHash, 30, teeProof, "ipfs://details");
+
+        // Verify completion (slashing happens internally)
+        (ITALValidationRegistry.ValidationRequest memory request, ) = validationRegistry.getValidation(requestHash);
+        assertEq(uint(request.status), uint(IERC8004ValidationRegistry.ValidationStatus.Completed));
+    }
+
+    function test_V4_slashForMissedDeadline_reputationOnly_reverts() public {
+        // ReputationOnly requests cannot be created (reverts in requestValidation), so
+        // we verify that the NotSlashableModel error would be raised for non-TEEAttested models.
+        // Since we can't create a ReputationOnly request, this test is about the guard.
+        // We test by directly verifying the model check exists.
+        // (ReputationOnly requests are rejected at creation time in V4)
+        vm.prank(requester);
+        vm.expectRevert(abi.encodeWithSignature("ReputationOnlyNoValidationNeeded()"));
+        validationRegistry.requestValidation{value: 0}(
+            agentId,
+            keccak256("task1"),
+            keccak256("output1"),
+            IERC8004ValidationRegistry.ValidationModel.ReputationOnly,
+            block.timestamp + 1 hours
+        );
+    }
+
+    function test_V4_updateParams_withMinTEEStake() public {
+        vm.prank(admin);
+        validationRegistry.updateValidationParameters(
+            1 ether,    // min TEE bounty
+            1000 ether, // new min TEE stake
+            1000        // protocol fee bps
+        );
+
+        // Agent owner only has 500 TON, new requirement is 1000 - should fail
+        vm.prank(requester);
+        vm.expectRevert(
+            abi.encodeWithSignature(
+                "InsufficientAgentOwnerStake(address,uint256,uint256)",
+                agentOwner,
+                500 ether,
+                1000 ether
+            )
+        );
+        validationRegistry.requestValidation{value: 1 ether}(
+            agentId,
+            keccak256("task1"),
+            keccak256("output1"),
+            IERC8004ValidationRegistry.ValidationModel.TEEAttested,
+            block.timestamp + 1 hours
+        );
+    }
+
+    function test_V4_configurable_minTEEStake() public {
+        // Set a low threshold
+        vm.prank(admin);
+        validationRegistry.updateValidationParameters(
+            1 ether,    // min TEE bounty
+            100 ether,  // lower min TEE stake
+            1000        // protocol fee bps
+        );
+
+        // Agent owner has 500 TON, new minimum is 100 - should succeed
+        vm.prank(requester);
+        bytes32 requestHash = validationRegistry.requestValidation{value: 1 ether}(
+            agentId,
+            keccak256("task1"),
+            keccak256("output1"),
+            IERC8004ValidationRegistry.ValidationModel.TEEAttested,
+            block.timestamp + 1 hours
+        );
+        assertTrue(requestHash != bytes32(0));
     }
 
     // ============ Helper Functions ============

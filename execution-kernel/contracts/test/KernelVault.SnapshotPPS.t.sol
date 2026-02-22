@@ -46,10 +46,10 @@ contract KernelVaultSnapshotPPSTest is Test {
         token = new MockERC20("Test Token", "TEST", 18);
 
         // Deploy ERC20 vault
-        vault = new KernelVault(address(token), address(mockVerifier), AGENT_ID, IMAGE_ID);
+        vault = new KernelVault(address(token), address(mockVerifier), AGENT_ID, IMAGE_ID, address(this));
 
         // Deploy ETH vault
-        ethVault = new KernelVault(address(0), address(mockVerifier), AGENT_ID, IMAGE_ID);
+        ethVault = new KernelVault(address(0), address(mockVerifier), AGENT_ID, IMAGE_ID, address(this));
 
         // Fund users
         token.mint(userA, 1000 ether);

@@ -2,6 +2,7 @@ import { type PublicClient, type WalletClient } from 'viem';
 import { TALValidationRegistryABI } from '../abi/TALValidationRegistry';
 import { TALValidationRegistryV2ABI } from '../abi/TALValidationRegistryV2';
 import { TALValidationRegistryV3ABI } from '../abi/TALValidationRegistryV3';
+import { TALValidationRegistryV4ABI } from '../abi/TALValidationRegistryV4';
 import type {
   Address,
   Bytes32,
@@ -12,7 +13,7 @@ import type {
   ValidationModel,
   ValidationStatus,
   ValidationStats,
-  DualStakingStatus,
+  TEEStakingStatus,
   TransactionResult,
 } from '../types';
 import { ValidationModel as VM } from '../types';
@@ -323,13 +324,13 @@ export class ValidationClient {
   }
 
   // ==========================================
-  // V3 METHODS — Deadline Slashing & Dual Staking
+  // V3 METHODS — Deadline Slashing
   // ==========================================
 
   /**
-   * Slash a validator who missed a deadline on a StakeSecured request.
-   * Anyone can call this after the deadline has passed for a pending request
-   * that has a selected validator.
+   * Slash an agent owner for a missed TEEAttested validation deadline.
+   * Anyone can call this after the deadline has passed for a pending TEEAttested request.
+   * Slashes 10% of the agent owner's stake and refunds the bounty to the requester.
    */
   async slashForMissedDeadline(
     requestHash: Bytes32,
@@ -352,13 +353,14 @@ export class ValidationClient {
   }
 
   /**
-   * Check dual staking status for an agent (owner + operator stakes).
-   * Requires identityRegistryAddress and stakingBridgeAddress to be configured.
+   * Check TEE staking status for an agent owner.
+   * Returns the owner's stake, whether it meets the minimum, and the minimum required.
+   * Requires identityRegistryAddress to be configured.
    */
-  async checkDualStakingStatus(agentId: bigint): Promise<DualStakingStatus> {
-    if (!this.identityRegistryAddress || !this.stakingBridgeAddress) {
+  async checkTEEStakingStatus(agentId: bigint): Promise<TEEStakingStatus> {
+    if (!this.identityRegistryAddress) {
       throw new Error(
-        'identityRegistryAddress and stakingBridgeAddress must be configured to check dual staking status',
+        'identityRegistryAddress must be configured to check TEE staking status',
       );
     }
 
@@ -378,71 +380,114 @@ export class ValidationClient {
       args: [agentId],
     }) as Address;
 
-    // Get MIN_AGENT_OWNER_STAKE from V3 contract
-    const minOwnerStake = await this.publicClient.readContract({
+    // Get minTEEStake from V4 contract
+    const minimumRequired = await this.publicClient.readContract({
       address: this.contractAddress,
-      abi: TALValidationRegistryV3ABI,
-      functionName: 'MIN_AGENT_OWNER_STAKE',
+      abi: TALValidationRegistryV4ABI,
+      functionName: 'MIN_TEE_STAKE',
     }) as bigint;
 
-    // Get owner's stake from staking bridge
-    const ownerStake = await this.publicClient.readContract({
-      address: this.stakingBridgeAddress,
+    // Get owner's locked balance from WSTONVault via the validation registry
+    // The contract checks wstonVault.getLockedBalance(owner) internally,
+    // but we need the wstonVault address. Read it from the contract.
+    const wstonVault = await this.publicClient.readContract({
+      address: this.contractAddress,
       abi: [
         {
           type: 'function',
-          name: 'getOperatorStake',
-          inputs: [{ name: 'operator', type: 'address', internalType: 'address' }],
-          outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+          name: 'wstonVault',
+          inputs: [],
+          outputs: [{ name: '', type: 'address', internalType: 'address' }],
           stateMutability: 'view',
         },
       ],
-      functionName: 'getOperatorStake',
-      args: [owner],
-    }) as bigint;
+      functionName: 'wstonVault',
+    }) as Address;
 
-    // Get operators from identity registry
-    const operators = await this.publicClient.readContract({
-      address: this.identityRegistryAddress,
-      abi: [
-        {
-          type: 'function',
-          name: 'getOperators',
-          inputs: [{ name: 'agentId', type: 'uint256', internalType: 'uint256' }],
-          outputs: [{ name: '', type: 'address[]', internalType: 'address[]' }],
-          stateMutability: 'view',
-        },
-      ],
-      functionName: 'getOperators',
-      args: [agentId],
-    }) as Address[];
-
-    // Sum operator stakes
-    let operatorStake = 0n;
-    for (const op of operators) {
-      const stake = await this.publicClient.readContract({
-        address: this.stakingBridgeAddress,
+    let ownerStake = 0n;
+    const zeroAddress = '0x0000000000000000000000000000000000000000';
+    if (wstonVault !== zeroAddress) {
+      ownerStake = await this.publicClient.readContract({
+        address: wstonVault,
         abi: [
           {
             type: 'function',
-            name: 'getOperatorStake',
-            inputs: [{ name: 'operator', type: 'address', internalType: 'address' }],
+            name: 'getLockedBalance',
+            inputs: [{ name: 'account', type: 'address', internalType: 'address' }],
             outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
             stateMutability: 'view',
           },
         ],
-        functionName: 'getOperatorStake',
-        args: [op],
+        functionName: 'getLockedBalance',
+        args: [owner],
       }) as bigint;
-      operatorStake += stake;
     }
 
     return {
       ownerStake,
-      ownerMeetsMinimum: ownerStake >= minOwnerStake,
-      operatorStake,
-      operatorMeetsMinimum: operatorStake >= minOwnerStake,
+      ownerMeetsMinimum: ownerStake >= minimumRequired,
+      minimumRequired,
     };
+  }
+
+  /** @deprecated Use checkTEEStakingStatus instead */
+  async checkDualStakingStatus(agentId: bigint): Promise<TEEStakingStatus> {
+    return this.checkTEEStakingStatus(agentId);
+  }
+
+  // ==========================================
+  // V4 METHODS — Agent TEE Configuration
+  // ==========================================
+
+  /**
+   * Set per-agent TEE enclave hash (agent owner only).
+   * This restricts which enclave hash is accepted for TEE validations of this agent.
+   */
+  async setAgentTEEConfig(
+    agentId: bigint,
+    enclaveHash: Bytes32,
+  ): Promise<TransactionResult> {
+    this.requireWallet();
+    const hash = await this.walletClient!.writeContract({
+      address: this.contractAddress,
+      abi: TALValidationRegistryV4ABI,
+      functionName: 'setAgentTEEConfig',
+      args: [agentId, enclaveHash],
+      chain: this.walletClient!.chain,
+      account: this.walletClient!.account!,
+    });
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+    return {
+      hash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 'success' ? 'success' : 'reverted',
+    };
+  }
+
+  /**
+   * Get per-agent TEE enclave hash.
+   * Returns bytes32(0) if not configured (any trusted provider enclave accepted).
+   */
+  async getAgentTEEConfig(agentId: bigint): Promise<Bytes32> {
+    const result = await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALValidationRegistryV4ABI,
+      functionName: 'getAgentTEEConfig',
+      args: [agentId],
+    });
+    return result as Bytes32;
+  }
+
+  /**
+   * Get the minimum TEE stake requirement (configurable by admin).
+   */
+  async getMinTEEStake(): Promise<bigint> {
+    const result = await this.publicClient.readContract({
+      address: this.contractAddress,
+      abi: TALValidationRegistryV4ABI,
+      functionName: 'MIN_TEE_STAKE',
+    });
+    return result as bigint;
   }
 
   private requireWallet(): void {

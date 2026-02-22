@@ -1229,6 +1229,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
+name = "backtest"
+version = "0.1.0"
+dependencies = [
+ "constraints",
+ "kernel-sdk",
+ "perp-trader",
+]
+
+[[package]]
 name = "backtrace"
 version = "0.3.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3788,6 +3797,16 @@ name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
+
+[[package]]
+name = "perp-trader"
+version = "0.1.0"
+dependencies = [
+ "constraints",
+ "kernel-guest",
+ "kernel-sdk",
+ "sha2",
+]
 
 [[package]]
 name = "pest"

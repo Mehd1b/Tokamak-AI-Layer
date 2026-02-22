@@ -28,7 +28,7 @@ import type {
   ValidationRequestParams,
   ValidationDetails,
   ValidationStats,
-  DualStakingStatus,
+  TEEStakingStatus,
   AgentSearchQuery,
   AgentSearchResult,
   ProtocolStats,
@@ -448,11 +448,11 @@ export class TALClient {
   }
 
   // ==========================================
-  // V3 VALIDATION CONVENIENCE METHODS
+  // V3/V4 VALIDATION CONVENIENCE METHODS
   // ==========================================
 
   /**
-   * Slash a validator who missed a deadline on a StakeSecured request.
+   * Slash an agent owner for a missed TEEAttested validation deadline.
    */
   async slashForMissedDeadline(
     requestHash: Bytes32,
@@ -461,10 +461,32 @@ export class TALClient {
   }
 
   /**
-   * Check dual staking status (owner + operator stakes) for an agent.
+   * Check TEE staking status for an agent owner.
    */
-  async checkDualStakingStatus(agentId: bigint): Promise<DualStakingStatus> {
-    return this.validation.checkDualStakingStatus(agentId);
+  async checkTEEStakingStatus(agentId: bigint): Promise<TEEStakingStatus> {
+    return this.validation.checkTEEStakingStatus(agentId);
+  }
+
+  /** @deprecated Use checkTEEStakingStatus instead */
+  async checkDualStakingStatus(agentId: bigint): Promise<TEEStakingStatus> {
+    return this.validation.checkTEEStakingStatus(agentId);
+  }
+
+  /**
+   * Set per-agent TEE enclave hash (agent owner only).
+   */
+  async setAgentTEEConfig(
+    agentId: bigint,
+    enclaveHash: Bytes32,
+  ): Promise<TransactionResult> {
+    return this.validation.setAgentTEEConfig(agentId, enclaveHash);
+  }
+
+  /**
+   * Get per-agent TEE enclave hash.
+   */
+  async getAgentTEEConfig(agentId: bigint): Promise<Bytes32> {
+    return this.validation.getAgentTEEConfig(agentId);
   }
 
   // ==========================================

@@ -6,6 +6,7 @@ import "../src/core/TALIdentityRegistry.sol";
 import "../src/core/TALReputationRegistry.sol";
 import "../src/core/TALValidationRegistry.sol";
 import "../src/interfaces/IERC8004ValidationRegistry.sol";
+import "../src/interfaces/ITALValidationRegistry.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
@@ -24,7 +25,9 @@ contract GasBenchmarks is Test {
     address public admin = address(0x1);
     address public user = address(0x2);
     address public client = address(0x3);
-    address public validator = address(0x4);
+    address public validator;
+    uint256 public validatorKey = 0x4;
+    bytes32 public constant ENCLAVE_HASH = keccak256("benchmark_enclave");
 
     // Gas targets (adjusted from spec for realistic string storage costs)
     uint256 constant GAS_TARGET_REGISTER = 200_000;
@@ -32,6 +35,8 @@ contract GasBenchmarks is Test {
     uint256 constant GAS_TARGET_REQUEST_VALIDATION = 300_000;
 
     function setUp() public {
+        validator = vm.addr(validatorKey);
+
         // Deploy Identity Registry
         TALIdentityRegistry identityImpl = new TALIdentityRegistry();
         bytes memory identityData = abi.encodeWithSelector(
@@ -66,6 +71,12 @@ contract GasBenchmarks is Test {
         );
         ERC1967Proxy validationProxy = new ERC1967Proxy(address(validationImpl), validationData);
         validationRegistry = TALValidationRegistry(payable(address(validationProxy)));
+
+        // Setup TEE provider for benchmarks
+        vm.startPrank(admin);
+        validationRegistry.setTrustedTEEProvider(validator);
+        validationRegistry.setTEEEnclaveHash(validator, ENCLAVE_HASH);
+        vm.stopPrank();
 
         // Register validator
         vm.prank(validator);
@@ -236,28 +247,6 @@ contract GasBenchmarks is Test {
         assertLt(gasUsed, GAS_TARGET_REQUEST_VALIDATION * 120 / 100, "requestValidation() exceeds gas target");
     }
 
-    function test_gas_requestValidation_stake() public {
-        vm.prank(user);
-        uint256 agentId = identityRegistry.register("ipfs://QmTestAgent");
-
-        vm.deal(user, 20 ether);
-
-        uint256 gasBefore = gasleft();
-        vm.prank(user);
-        validationRegistry.requestValidation{value: 10 ether}(
-            agentId,
-            keccak256("task data"),
-            keccak256("output data"),
-            IERC8004ValidationRegistry.ValidationModel.StakeSecured,
-            block.timestamp + 1 days
-        );
-        uint256 gasUsed = gasBefore - gasleft();
-
-        console.log("requestValidation(StakeSecured) gas used:", gasUsed);
-        // StakeSecured uses ~10% more gas due to bounty handling
-        assertLt(gasUsed, GAS_TARGET_REQUEST_VALIDATION * 120 / 100, "requestValidation(StakeSecured) exceeds gas target");
-    }
-
     function test_gas_submitValidation() public {
         vm.prank(user);
         uint256 agentId = identityRegistry.register("ipfs://QmTestAgent");
@@ -265,26 +254,29 @@ contract GasBenchmarks is Test {
         vm.deal(user, 20 ether);
 
         vm.prank(user);
-        bytes32 requestHash = validationRegistry.requestValidation{value: 10 ether}(
+        bytes32 requestHash = validationRegistry.requestValidation{value: 1 ether}(
             agentId,
             keccak256("task data"),
             keccak256("output data"),
-            IERC8004ValidationRegistry.ValidationModel.StakeSecured,
+            IERC8004ValidationRegistry.ValidationModel.TEEAttested,
             block.timestamp + 1 days
         );
+
+        bytes memory teeProof = _createTEEProofWithSignature(validator, validatorKey, ENCLAVE_HASH, requestHash);
 
         uint256 gasBefore = gasleft();
         vm.prank(validator);
         validationRegistry.submitValidation(
             requestHash,
             80, // score
-            hex"deadbeef", // proof
+            teeProof,
             "ipfs://QmResultData"
         );
         uint256 gasUsed = gasBefore - gasleft();
 
         console.log("submitValidation() gas used:", gasUsed);
-        assertLt(gasUsed, 300_000, "submitValidation() exceeds expected gas");
+        // TEEAttested submitValidation includes ECRECOVER for attestation signature verification
+        assertLt(gasUsed, 500_000, "submitValidation() exceeds expected gas");
     }
 
     // ============ Summary Report ============
@@ -332,5 +324,28 @@ contract GasBenchmarks is Test {
 
         console.log("");
         console.log("=================================");
+    }
+
+    // ============ Helpers ============
+
+    function _createTEEProofWithSignature(
+        address provider,
+        uint256 providerKey,
+        bytes32 enclaveHash,
+        bytes32 requestHash
+    ) internal view returns (bytes memory) {
+        uint256 timestamp = block.timestamp;
+
+        (ITALValidationRegistry.ValidationRequest memory request, ) = validationRegistry.getValidation(requestHash);
+
+        bytes32 messageHash = keccak256(abi.encodePacked(
+            enclaveHash, request.taskHash, request.outputHash, requestHash, timestamp
+        ));
+        bytes32 ethSignedHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash));
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(providerKey, ethSignedHash);
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        return abi.encode(enclaveHash, provider, timestamp, signature);
     }
 }

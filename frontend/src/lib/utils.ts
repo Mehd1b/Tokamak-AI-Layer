@@ -33,9 +33,7 @@ export function formatDate(date: Date): string {
 export function getValidationModelLabel(model: number): string {
   switch (model) {
     case 0: return 'Reputation Only';
-    case 1: return 'Stake Secured';
-    case 2: return 'TEE Attested';
-    case 3: return 'Hybrid';
+    case 1: return 'TEE Attested';
     default: return 'Unknown';
   }
 }
@@ -61,9 +59,7 @@ export function getAgentStatusColor(status: number): string {
 export function getValidationModelColor(model: number): string {
   switch (model) {
     case 0: return 'badge-info';
-    case 1: return 'badge-warning';
-    case 2: return 'badge-success';
-    case 3: return 'badge-error';
+    case 1: return 'badge bg-[#38BDF8]/10 text-[#38BDF8] border border-[#38BDF8]/20';
     default: return 'badge-info';
   }
 }

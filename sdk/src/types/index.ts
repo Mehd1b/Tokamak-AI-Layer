@@ -26,7 +26,7 @@ export interface AgentRegistrationFile {
     email?: string;
     [key: string]: string | undefined;
   };
-  supportedTrust?: Array<"reputation" | "crypto-economic" | "tee-attestation">;
+  supportedTrust?: Array<"reputation" | "tee-attestation">;
   x402Support?: boolean;
   registrations?: Array<{
     agentId: string;
@@ -50,6 +50,7 @@ export interface AgentRegistrationFile {
       provider: "sgx" | "nitro" | "trustzone";
       enclaveHash: string;
       attestationEndpoint?: string;
+      repoUrl?: string;
     };
     pricing?: {
       currency: "TON" | "USD";
@@ -160,8 +161,7 @@ export enum AgentStatus {
 
 export enum AgentValidationModel {
   ReputationOnly = 0,
-  StakeSecured = 1,
-  Hybrid = 2,
+  TEEAttested = 1,
 }
 
 export interface OperatorConsentData {
@@ -211,12 +211,11 @@ export interface ValidationStats {
 }
 
 // ============================================
-// VALIDATION V3 TYPES — Dual Staking & Deadline Slashing
+// VALIDATION V3/V4 TYPES — TEE Staking & Deadline Slashing
 // ============================================
 
 export interface StakingRequirements {
   minAgentOwnerStake: bigint;
-  minOperatorStake: bigint;
 }
 
 export interface DeadlineSlashResult {
@@ -227,12 +226,14 @@ export interface DeadlineSlashResult {
   tx: TransactionResult;
 }
 
-export interface DualStakingStatus {
+export interface TEEStakingStatus {
   ownerStake: bigint;
   ownerMeetsMinimum: boolean;
-  operatorStake: bigint;
-  operatorMeetsMinimum: boolean;
+  minimumRequired: bigint;
 }
+
+/** @deprecated Use TEEStakingStatus instead */
+export type DualStakingStatus = TEEStakingStatus;
 
 // ============================================
 // ESCROW TYPES
@@ -259,9 +260,8 @@ export interface TaskEscrowData {
 export enum ValidationModel {
   /** No validation required - outputs are valid by default */
   ReputationOnly = 0,
-  StakeSecured = 1,
-  TEEAttested = 2,
-  Hybrid = 3,
+  /** TEE hardware attestation with staking requirement (500 TON minimum) */
+  TEEAttested = 1,
 }
 
 export enum ValidationStatus {
@@ -343,7 +343,7 @@ export interface AgentSearchQuery {
   minStake?: bigint;
   verifiedOperatorOnly?: boolean;
   zkIdentityOnly?: boolean;
-  supportedTrust?: Array<"reputation" | "crypto-economic" | "tee-attestation">;
+  supportedTrust?: Array<"reputation" | "tee-attestation">;
   first?: number;
   skip?: number;
   orderBy?: "reputation" | "validations" | "stake" | "registeredAt";

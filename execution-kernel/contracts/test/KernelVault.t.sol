@@ -47,7 +47,7 @@ contract KernelVaultTest is Test {
         token = new MockERC20("Test Token", "TEST", 18);
 
         // Deploy KernelVault with trustedImageId
-        vault = new KernelVault(address(token), address(executionVerifier), TEST_AGENT_ID, TEST_IMAGE_ID);
+        vault = new KernelVault(address(token), address(executionVerifier), TEST_AGENT_ID, TEST_IMAGE_ID, address(this));
 
         // Mint tokens to user
         token.mint(user, INITIAL_BALANCE);
@@ -499,7 +499,7 @@ contract KernelVaultTest is Test {
 
     function test_constructor_zeroImageId_reverts() public {
         vm.expectRevert(KernelVault.InvalidTrustedImageId.selector);
-        new KernelVault(address(token), address(executionVerifier), TEST_AGENT_ID, bytes32(0));
+        new KernelVault(address(token), address(executionVerifier), TEST_AGENT_ID, bytes32(0), address(this));
     }
 
     function test_execute_usesVerifyAndParseWithImageId() public {

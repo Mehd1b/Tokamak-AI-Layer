@@ -25,7 +25,7 @@ describe('RegistrationBuilder', () => {
         .setActive(true)
         .addService('A2A', 'https://agent.example.com/a2a')
         .addService('MCP', 'https://agent.example.com/mcp')
-        .setSupportedTrust(['reputation', 'crypto-economic'])
+        .setSupportedTrust(['reputation', 'tee-attestation'])
         .setX402Support(true)
         .addRegistration('1', '0x1234567890abcdef', 11155420)
         .addCapability({
@@ -50,7 +50,7 @@ describe('RegistrationBuilder', () => {
       expect(file.name).toBe('Full Agent');
       expect(file.services?.A2A).toBe('https://agent.example.com/a2a');
       expect(file.services?.MCP).toBe('https://agent.example.com/mcp');
-      expect(file.supportedTrust).toEqual(['reputation', 'crypto-economic']);
+      expect(file.supportedTrust).toEqual(['reputation', 'tee-attestation']);
       expect(file.x402Support).toBe(true);
       expect(file.registrations).toHaveLength(1);
       expect(file.registrations![0].chainId).toBe(11155420);

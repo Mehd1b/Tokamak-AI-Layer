@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 /**
  * @title IERC8004ValidationRegistry
  * @notice ERC-8004 standard interface for agent task validation
- * @dev Supports multiple validation models: ReputationOnly, StakeSecured, TEEAttested, Hybrid
+ * @dev Supports two validation models: ReputationOnly and TEEAttested (with staking requirement)
  */
 interface IERC8004ValidationRegistry {
     /**
@@ -22,9 +22,7 @@ interface IERC8004ValidationRegistry {
      */
     enum ValidationModel {
         ReputationOnly, // No bounty, instant reputation check
-        StakeSecured,   // Requires stake, DRB validator selection
-        TEEAttested,    // TEE hardware attestation
-        Hybrid          // Both TEE + stake-secured consensus
+        TEEAttested     // TEE hardware attestation with staking requirement
     }
 
     /**

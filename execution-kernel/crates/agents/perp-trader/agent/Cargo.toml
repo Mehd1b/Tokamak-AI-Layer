@@ -1,0 +1,20 @@
+[package]
+name = "perp-trader"
+version = "0.1.0"
+edition = "2021"
+description = "Perpetual futures trading agent targeting Hyperliquid with SMA/RSI/funding strategy"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+kernel-sdk = { path = "../../../sdk/kernel-sdk" }
+kernel-guest = { path = "../../../runtime/kernel-guest" }
+constraints = { path = "../../../protocol/constraints" }
+
+[dev-dependencies]
+kernel-sdk = { path = "../../../sdk/kernel-sdk", features = ["testing", "std"] }
+
+[build-dependencies]
+sha2 = "0.10"

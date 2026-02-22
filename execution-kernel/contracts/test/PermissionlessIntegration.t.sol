@@ -128,6 +128,7 @@ contract PermissionlessIntegrationTest is Test {
         uint256 recipientBefore = token.balanceOf(recipient);
         uint256 vaultBefore = token.balanceOf(address(vault));
 
+        vm.prank(author);
         vault.execute(DUMMY_JOURNAL, DUMMY_SEAL, agentOutput);
 
         // Verify transfer occurred
@@ -173,6 +174,7 @@ contract PermissionlessIntegrationTest is Test {
         mockVerifier.setExecutionNonce(1);
 
         // Execute should succeed with original imageId
+        vm.prank(author);
         vault.execute(DUMMY_JOURNAL, DUMMY_SEAL, agentOutput);
         assertEq(vault.lastExecutionNonce(), 1);
     }
@@ -192,6 +194,7 @@ contract PermissionlessIntegrationTest is Test {
 
         // Execute should revert because vault's trustedImageId (IMAGE_ID)
         // doesn't match the mock's expected imageId (wrongImageId)
+        vm.prank(author);
         vm.expectRevert(
             abi.encodeWithSelector(
                 MockKernelExecutionVerifier.ImageIdMismatch.selector, wrongImageId, IMAGE_ID

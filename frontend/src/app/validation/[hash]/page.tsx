@@ -569,16 +569,16 @@ export default function ValidationDetailPage() {
         </div>
       )}
 
-      {/* Slash for Missed Deadline (for expired StakeSecured requests with a selected validator) */}
-      {validation && validation[0].status === 2 && (validation[0].model === 1 || validation[0].model === 3) && hasSelectedValidator && (
+      {/* Slash for Missed Deadline (for expired TEEAttested requests) */}
+      {validation && validation[0].status === 2 && validation[0].model === 1 && hasSelectedValidator && (
         <div className="mt-6 rounded-2xl border border-red-500/20 bg-red-500/5 p-6 backdrop-blur-sm">
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-400" />
             <div className="flex-1">
-              <h3 className="font-medium text-white">Validator Missed Deadline</h3>
+              <h3 className="font-medium text-white">Validation Deadline Missed</h3>
               <p className="mt-1 text-sm text-white/40">
-                The selected validator ({selectedValidator ? shortenAddress(selectedValidator) : '...'}) failed to submit validation before the deadline.
-                You can slash the validator and get the bounty refunded.
+                The TEE Attested validation was not completed before the deadline.
+                You can slash the agent owner (10% of their stake) and get the bounty refunded.
               </p>
               <div className="mt-3 flex items-center gap-3">
                 <button
@@ -616,9 +616,9 @@ export default function ValidationDetailPage() {
                   <div className="flex items-start gap-2">
                     <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-400" />
                     <div>
-                      <h4 className="text-sm font-semibold text-emerald-400">Validator Slashed</h4>
+                      <h4 className="text-sm font-semibold text-emerald-400">Agent Owner Slashed</h4>
                       <p className="mt-1 text-xs text-emerald-300">
-                        The validator has been slashed and the bounty has been refunded.
+                        The agent owner has been slashed (10% of stake) and the bounty has been refunded.
                       </p>
                       <a
                         href={`${explorerUrl}/tx/${slashHash}`}

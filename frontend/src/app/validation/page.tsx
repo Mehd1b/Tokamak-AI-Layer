@@ -79,7 +79,7 @@ export default function ValidationPage() {
       <div className="w-full h-px mb-10" style={{ background: 'linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.3), transparent)' }} />
 
       {/* Trust Model Overview */}
-      <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2">
         {[
           {
             model: 0,
@@ -91,23 +91,9 @@ export default function ValidationPage() {
           {
             model: 1,
             icon: Shield,
-            color: 'text-blue-400',
-            bg: 'bg-blue-500/10',
-            desc: 'Secured by staked TON collateral',
-          },
-          {
-            model: 2,
-            icon: Clock,
             color: 'text-[#38BDF8]',
             bg: 'bg-[#38BDF8]/10',
-            desc: 'Hardware-attested execution environment',
-          },
-          {
-            model: 3,
-            icon: AlertTriangle,
-            color: 'text-amber-400',
-            bg: 'bg-amber-500/10',
-            desc: 'Combines multiple trust models',
+            desc: 'Hardware-attested execution verification with stake-backed security',
           },
         ].map(({ model, icon: Icon, color, bg, desc }) => (
           <div key={model} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 transition-all duration-300 hover:border-[#38BDF8]/20">
@@ -171,7 +157,7 @@ export default function ValidationPage() {
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-zinc-500">Model:</span>
               <div className="flex gap-1">
-                {([['all', 'All'], [0, 'Reputation'], [1, 'Stake'], [2, 'TEE'], [3, 'Hybrid']] as const).map(([value, label]) => (
+                {([['all', 'All'], [0, 'Reputation'], [1, 'TEE']] as const).map(([value, label]) => (
                   <button
                     key={String(value)}
                     onClick={() => setModelFilter(value)}

@@ -20,16 +20,15 @@ import "./WSTONVault.sol";
  *
  * Features:
  * - ERC-8004 compliant validation request and submission
- * - Multiple validation models: StakeSecured, TEEAttested, Hybrid
- *   (ReputationOnly is REJECTED)
- * - DRB-based validator selection for fair assignment
+ * - Two validation models: ReputationOnly (rejected) and TEEAttested (with staking)
  * - TEE attestation verification with trusted provider whitelisting
+ * - Per-agent TEE enclave hash configuration
  * - Bounty distribution with configurable fee splits
  * - Dispute mechanism for challenging validation results
  * - Epoch-based validation stats (30-day epochs)
- * - Dual-staking: agent owner must have >= 1000 TON staked for StakeSecured/Hybrid
+ * - TEE staking: agent owner must have >= minTEEStake staked for TEEAttested
  * - Automated slashing for incorrect computation (score < 50 -> 50% agent owner stake)
- * - Permissionless slashing for missed deadlines (10% of validator operator stake)
+ * - Permissionless slashing for missed deadlines (10% of agent owner stake)
  * - WSTONVault integration for stake verification and slashing
  *
  * Architecture:
@@ -61,9 +60,6 @@ contract TALValidationRegistry is
 
     /// @notice Role for DRB integration (validator selection)
     bytes32 public constant DRB_ROLE = keccak256("DRB_ROLE");
-
-    /// @notice Minimum bounty for StakeSecured validation (10 TON)
-    uint256 public constant override MIN_STAKE_SECURED_BOUNTY = 10 ether;
 
     /// @notice Minimum bounty for TEEAttested validation (1 TON)
     uint256 public constant override MIN_TEE_BOUNTY = 1 ether;
@@ -207,6 +203,17 @@ contract TALValidationRegistry is
     /// @dev V3 storage gap (reduced by 2 for new variables)
     uint256[34] private __gapV3;
 
+    // ============ V4 Storage ============
+
+    /// @notice Per-agent TEE enclave hash for validation verification
+    mapping(uint256 => bytes32) public agentEnclaveHash;
+
+    /// @notice Configurable minimum stake for TEEAttested agents (default 500 TON)
+    uint256 public minTEEStake;
+
+    /// @dev V4 storage gap
+    uint256[32] private __gapV4;
+
     // ============ Events ============
 
     event ValidationStatsUpdated(
@@ -267,11 +274,18 @@ contract TALValidationRegistry is
         treasury = _treasury;
 
         // Initialize configurable parameters with defaults
-        minStakeSecuredBounty = MIN_STAKE_SECURED_BOUNTY;
         minTEEBounty = MIN_TEE_BOUNTY;
         protocolFeeBps = PROTOCOL_FEE_BPS;
 
         _requestNonce = 1; // Start from 1
+    }
+
+    /**
+     * @notice Initialize V4 storage
+     * @dev Sets default minTEEStake to 500 TON
+     */
+    function initializeV4() external reinitializer(4) {
+        minTEEStake = 500 ether;
     }
 
     // ============ ERC-8004 Validation Functions ============
@@ -279,7 +293,7 @@ contract TALValidationRegistry is
     /**
      * @inheritdoc IERC8004ValidationRegistry
      * @dev Creates a validation request. ReputationOnly is REJECTED.
-     *      For StakeSecured/Hybrid, the agent owner must have >= MIN_AGENT_OWNER_STAKE staked.
+     *      For TEEAttested, the agent owner must have >= minTEEStake staked.
      */
     function requestValidation(
         uint256 agentId,
@@ -301,9 +315,9 @@ contract TALValidationRegistry is
         // Validate agent exists
         _validateAgent(agentId);
 
-        // Enforce dual-staking for StakeSecured/Hybrid
-        if (model == ValidationModel.StakeSecured || model == ValidationModel.Hybrid) {
-            _validateDualStaking(agentId);
+        // Enforce TEE staking requirement
+        if (model == ValidationModel.TEEAttested) {
+            _validateTEEStaking(agentId);
         }
 
         // Validate bounty requirements based on model
@@ -378,21 +392,8 @@ contract TALValidationRegistry is
             revert InvalidScore(score);
         }
 
-        // Model-specific validation (ReputationOnly branch removed - unreachable due to requestValidation guard)
-        if (request.model == ValidationModel.StakeSecured) {
-            address selectedValidator = _selectedValidators[requestHash];
-            if (selectedValidator != address(0) && selectedValidator != msg.sender) {
-                revert NotSelectedValidator(requestHash, msg.sender);
-            }
-            _verifyValidatorStake(msg.sender);
-        } else if (request.model == ValidationModel.TEEAttested) {
-            _verifyTEEAttestation(proof, requestHash);
-        } else if (request.model == ValidationModel.Hybrid) {
-            address selectedValidator = _selectedValidators[requestHash];
-            if (selectedValidator != address(0) && selectedValidator != msg.sender) {
-                revert NotSelectedValidator(requestHash, msg.sender);
-            }
-            _verifyValidatorStake(msg.sender);
+        // Model-specific validation
+        if (request.model == ValidationModel.TEEAttested) {
             _verifyTEEAttestation(proof, requestHash);
         }
 
@@ -419,11 +420,8 @@ contract TALValidationRegistry is
         // Epoch stats tracking
         _recordValidationStats(request.agentId, score);
 
-        // Automated slashing for incorrect computation
-        if (
-            score < INCORRECT_COMPUTATION_THRESHOLD &&
-            (request.model == ValidationModel.StakeSecured || request.model == ValidationModel.Hybrid)
-        ) {
+        // Automated slashing for incorrect computation (TEEAttested only)
+        if (score < INCORRECT_COMPUTATION_THRESHOLD && request.model == ValidationModel.TEEAttested) {
             _slashAgentOwnerForIncorrectComputation(request.agentId, requestHash);
         }
 
@@ -731,7 +729,7 @@ contract TALValidationRegistry is
 
     /**
      * @inheritdoc ITALValidationRegistry
-     * @dev Permissionless slashing for missed deadlines. Uses WSTONVault.
+     * @dev Permissionless slashing for missed deadlines. Slashes agent owner's stake.
      */
     function slashForMissedDeadline(bytes32 requestHash) external override whenNotPaused nonReentrant {
         ValidationRequest storage request = _requests[requestHash];
@@ -748,18 +746,17 @@ contract TALValidationRegistry is
             revert DeadlineNotPassed(requestHash);
         }
 
-        if (request.model != ValidationModel.StakeSecured && request.model != ValidationModel.Hybrid) {
+        if (request.model != ValidationModel.TEEAttested) {
             revert NotSlashableModel(requestHash);
-        }
-
-        address operator = _selectedValidators[requestHash];
-        if (operator == address(0)) {
-            revert NoValidatorSelected(requestHash);
         }
 
         if (_deadlineSlashExecuted[requestHash]) {
             revert AlreadySlashedForDeadline(requestHash);
         }
+
+        // Get agent owner (responsible for TEE infrastructure)
+        address agentOwner = _getAgentOwner(request.agentId);
+        require(agentOwner != address(0), "No agent owner");
 
         // Mark as expired
         request.status = ValidationStatus.Expired;
@@ -771,25 +768,25 @@ contract TALValidationRegistry is
 
         _deadlineSlashExecuted[requestHash] = true;
 
-        // Slash 10% of operator stake via WSTONVault
+        // Slash 10% of agent owner's stake via WSTONVault
         if (wstonVault != address(0)) {
-            uint256 operatorStake = WSTONVault(wstonVault).getLockedBalance(operator);
-            uint256 slashAmount = (operatorStake * SLASH_MISSED_DEADLINE_PCT) / 100;
+            uint256 ownerStake = WSTONVault(wstonVault).getLockedBalance(agentOwner);
+            uint256 slashAmount = (ownerStake * SLASH_MISSED_DEADLINE_PCT) / 100;
 
             if (slashAmount > 0) {
-                try WSTONVault(wstonVault).slash(operator, slashAmount) {
+                try WSTONVault(wstonVault).slash(agentOwner, slashAmount) {
                 } catch {
-                    emit SlashAttemptFailed(operator, slashAmount);
+                    emit SlashAttemptFailed(agentOwner, slashAmount);
                 }
             }
         }
 
-        // H-1 fix: Use pull-payment for safe refund
+        // Refund bounty to requester
         if (request.bounty > 0) {
             _safeSendETH(request.requester, request.bounty);
         }
 
-        emit OperatorSlashedForDeadline(requestHash, operator);
+        emit OperatorSlashedForDeadline(requestHash, agentOwner);
     }
 
     // ============ View Functions ============
@@ -866,17 +863,17 @@ contract TALValidationRegistry is
 
     /// @inheritdoc ITALValidationRegistry
     function updateValidationParameters(
-        uint256 _minStakeSecuredBounty,
         uint256 _minTEEBounty,
+        uint256 _minTEEStake,
         uint256 _protocolFeeBps
     ) external override onlyRole(DEFAULT_ADMIN_ROLE) {
         require(_protocolFeeBps <= BPS_DENOMINATOR, "Invalid protocol fee");
 
-        minStakeSecuredBounty = _minStakeSecuredBounty;
         minTEEBounty = _minTEEBounty;
+        minTEEStake = _minTEEStake;
         protocolFeeBps = _protocolFeeBps;
 
-        emit ValidationParametersUpdated(_minStakeSecuredBounty, _minTEEBounty, _protocolFeeBps);
+        emit ValidationParametersUpdated(_minTEEBounty, _minTEEStake, _protocolFeeBps);
     }
 
     function pause() external onlyRole(PAUSER_ROLE) {
@@ -941,18 +938,9 @@ contract TALValidationRegistry is
     function _validateBounty(ValidationModel model, uint256 bounty) internal view {
         if (model == ValidationModel.ReputationOnly) {
             return;
-        } else if (model == ValidationModel.StakeSecured) {
-            if (bounty < minStakeSecuredBounty) {
-                revert InsufficientBounty(bounty, minStakeSecuredBounty);
-            }
         } else if (model == ValidationModel.TEEAttested) {
             if (bounty < minTEEBounty) {
                 revert InsufficientBounty(bounty, minTEEBounty);
-            }
-        } else if (model == ValidationModel.Hybrid) {
-            uint256 requiredBounty = minStakeSecuredBounty > minTEEBounty ? minStakeSecuredBounty : minTEEBounty;
-            if (bounty < requiredBounty) {
-                revert InsufficientBounty(bounty, requiredBounty);
             }
         }
     }
@@ -1003,6 +991,13 @@ contract TALValidationRegistry is
         }
 
         if (teeEnclaveHashes[teeSigner] != enclaveHash) {
+            revert InvalidTEEAttestation();
+        }
+
+        // V4: Check per-agent enclave hash if configured
+        ValidationRequest storage req2 = _requests[requestHash];
+        bytes32 agentHash = agentEnclaveHash[req2.agentId];
+        if (agentHash != bytes32(0) && agentHash != enclaveHash) {
             revert InvalidTEEAttestation();
         }
 
@@ -1138,6 +1133,70 @@ contract TALValidationRegistry is
             pendingWithdrawals[recipient] += amount;
             emit WithdrawalPending(recipient, amount);
         }
+    }
+
+    // ============ V4 TEE Configuration Functions ============
+
+    /**
+     * @notice Get the minimum TEE stake (configurable, defaults to minTEEStake state variable)
+     */
+    function MIN_TEE_STAKE() external view override returns (uint256) {
+        return minTEEStake;
+    }
+
+    /**
+     * @notice Set per-agent TEE enclave hash (agent owner only)
+     * @param agentId The agent to configure
+     * @param enclaveHash The expected enclave hash for TEE validation
+     */
+    function setAgentTEEConfig(uint256 agentId, bytes32 enclaveHash) external override whenNotPaused {
+        address owner = _getAgentOwner(agentId);
+        require(owner == msg.sender, "Not agent owner");
+
+        agentEnclaveHash[agentId] = enclaveHash;
+        emit AgentTEEConfigUpdated(agentId, enclaveHash);
+    }
+
+    /**
+     * @notice Get per-agent TEE enclave hash
+     * @param agentId The agent to query
+     * @return The configured enclave hash (bytes32(0) if not set)
+     */
+    function getAgentTEEConfig(uint256 agentId) external view override returns (bytes32) {
+        return agentEnclaveHash[agentId];
+    }
+
+    // ============ V4 Internal Functions ============
+
+    /**
+     * @notice Validate TEE staking requirement for agent owner
+     * @dev Uses WSTONVault for stake verification against configurable minTEEStake
+     */
+    function _validateTEEStaking(uint256 agentId) internal view {
+        if (identityRegistry == address(0)) return;
+        if (wstonVault == address(0)) return;
+
+        address ownerAddress = _getAgentOwner(agentId);
+        if (ownerAddress == address(0)) return;
+
+        uint256 ownerStake = WSTONVault(wstonVault).getLockedBalance(ownerAddress);
+
+        if (ownerStake < minTEEStake) {
+            revert InsufficientAgentOwnerStake(ownerAddress, ownerStake, minTEEStake);
+        }
+    }
+
+    /**
+     * @notice Get the owner of an agent from the identity registry
+     */
+    function _getAgentOwner(uint256 agentId) internal view returns (address) {
+        if (identityRegistry == address(0)) return address(0);
+
+        (bool ownerSuccess, bytes memory ownerData) = identityRegistry.staticcall(
+            abi.encodeWithSignature("ownerOf(uint256)", agentId)
+        );
+        if (!ownerSuccess || ownerData.length < 32) return address(0);
+        return abi.decode(ownerData, (address));
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}

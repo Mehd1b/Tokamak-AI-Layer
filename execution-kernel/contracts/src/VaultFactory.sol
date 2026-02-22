@@ -115,7 +115,7 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         }
 
         // Compute CREATE2 address
-        bytes memory bytecode = _getCreationBytecode(asset, agentId, agentInfo.imageId);
+        bytes memory bytecode = _getCreationBytecode(asset, agentId, agentInfo.imageId, owner_);
         bytes32 bytecodeHash = keccak256(bytecode);
 
         vault = address(
@@ -149,8 +149,8 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         // Compute CREATE2 salt
         bytes32 salt = _computeSalt(msg.sender, agentId, asset, userSalt);
 
-        // Get creation bytecode with constructor args
-        bytes memory bytecode = _getCreationBytecode(asset, agentId, agentInfo.imageId);
+        // Get creation bytecode with constructor args (owner = agent author = msg.sender)
+        bytes memory bytecode = _getCreationBytecode(asset, agentId, agentInfo.imageId, msg.sender);
 
         // Deploy with CREATE2
         assembly {
@@ -207,15 +207,17 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     /// @param asset The asset address
     /// @param agentId The agent ID
     /// @param imageId The trusted image ID
+    /// @param vaultOwner The vault owner (agent author)
     /// @return The creation bytecode
     function _getCreationBytecode(
         address asset,
         bytes32 agentId,
-        bytes32 imageId
+        bytes32 imageId,
+        address vaultOwner
     ) internal view returns (bytes memory) {
         return abi.encodePacked(
             type(KernelVault).creationCode,
-            abi.encode(asset, _verifier, agentId, imageId)
+            abi.encode(asset, _verifier, agentId, imageId, vaultOwner)
         );
     }
 }

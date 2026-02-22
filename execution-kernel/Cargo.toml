@@ -16,10 +16,12 @@ members = [
     "crates/agents/example-yield-agent/risc0-methods",
     "crates/agents/defi-yield-farmer/agent",
     "crates/agents/defi-yield-farmer/risc0-methods",
+    "crates/agents/perp-trader/agent",
 
     # Testing crates
     "crates/testing/kernel-host-tests",
     "crates/testing/e2e-tests",
+    "crates/testing/backtest",
 
     # Tools
     "crates/agent-pack",

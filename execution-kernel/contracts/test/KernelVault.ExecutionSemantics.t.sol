@@ -55,7 +55,7 @@ contract KernelVaultExecutionSemanticsTest is Test {
         token = new MockERC20("Test Token", "TEST", 18);
 
         // Deploy KernelVault with mock verifier and trustedImageId
-        vault = new KernelVault(address(token), address(mockVerifier), AGENT_ID, IMAGE_ID);
+        vault = new KernelVault(address(token), address(mockVerifier), AGENT_ID, IMAGE_ID, address(this));
 
         // Deploy mock call target
         callTarget = new MockCallTarget();

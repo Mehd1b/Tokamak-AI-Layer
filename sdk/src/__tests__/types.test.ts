@@ -10,9 +10,12 @@ describe('Types and Constants', () => {
   describe('ValidationModel enum', () => {
     it('has correct values', () => {
       expect(ValidationModel.ReputationOnly).toBe(0);
-      expect(ValidationModel.StakeSecured).toBe(1);
-      expect(ValidationModel.TEEAttested).toBe(2);
-      expect(ValidationModel.Hybrid).toBe(3);
+      expect(ValidationModel.TEEAttested).toBe(1);
+    });
+
+    it('only has two models', () => {
+      const values = Object.values(ValidationModel).filter(v => typeof v === 'number');
+      expect(values).toHaveLength(2);
     });
   });
 
