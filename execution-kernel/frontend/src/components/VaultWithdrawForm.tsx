@@ -1,17 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { parseEther } from 'viem';
+import { parseUnits } from 'viem';
 import { useWithdraw } from '@/hooks/useKernelVault';
 
-export function VaultWithdrawForm({ vaultAddress }: { vaultAddress: `0x${string}` }) {
+export function VaultWithdrawForm({ vaultAddress, assetDecimals = 18 }: { vaultAddress: `0x${string}`; assetDecimals?: number }) {
   const [shares, setShares] = useState('');
   const { withdraw, isPending, isConfirming, isSuccess, error } = useWithdraw(vaultAddress);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!shares || parseFloat(shares) <= 0) return;
-    withdraw(parseEther(shares));
+    withdraw(parseUnits(shares, assetDecimals));
   };
 
   return (

@@ -12,8 +12,16 @@ export const SEPOLIA_ADDRESSES: DeploymentAddresses = {
   riscZeroVerifierRouter: '0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187',
 } as const;
 
-export const DEPLOYMENTS: Record<string, DeploymentAddresses> = {
-  sepolia: SEPOLIA_ADDRESSES,
+export const HYPEREVM_TESTNET_ADDRESSES: DeploymentAddresses = {
+  agentRegistry: '0x09447147C6E75a60A449f38532F06E19F5F632F3',
+  vaultFactory: '0xc7Fc0dD5f1B03E3De0C313eE0D3b06Cb2Dc017BB',
+  kernelExecutionVerifier: '0x0052258E517835081c94c0B685409f2EfC4D502b',
+  riscZeroVerifierRouter: '0x0000000000000000000000000000000000000000',
 } as const;
 
-export const DEFAULT_CHAIN_ID = 11155420; // Optimism Sepolia
+export const DEPLOYMENTS: Record<number, DeploymentAddresses> = {
+  11155111: SEPOLIA_ADDRESSES,
+  998: HYPEREVM_TESTNET_ADDRESSES,
+} as const;
+
+export const DEFAULT_CHAIN_ID = 11155111; // Sepolia

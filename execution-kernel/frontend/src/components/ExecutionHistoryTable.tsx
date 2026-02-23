@@ -1,6 +1,7 @@
 'use client';
 
 import { truncateBytes32 } from '@/lib/utils';
+import { useNetwork } from '@/lib/NetworkContext';
 
 interface ExecutionEvent {
   executionNonce: string;
@@ -12,6 +13,8 @@ interface ExecutionEvent {
 }
 
 export function ExecutionHistoryTable({ executions }: { executions: ExecutionEvent[] }) {
+  const { explorerUrl } = useNetwork();
+
   if (executions.length === 0) {
     return (
       <div className="card text-center py-12">
@@ -42,7 +45,7 @@ export function ExecutionHistoryTable({ executions }: { executions: ExecutionEve
               <td className="py-3 px-4">
                 {exec.transactionHash ? (
                   <a
-                    href={`https://sepolia.etherscan.io/tx/${exec.transactionHash}`}
+                    href={`${explorerUrl}/tx/${exec.transactionHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[#A855F7] hover:underline"

@@ -102,7 +102,7 @@ const features = [
     title: 'Verifiable Execution',
     description:
       'RISC Zero zkVM generates cryptographic proofs that agent computations were executed correctly.',
-    href: '/verify',
+    href: '/vaults',
     number: '01',
   },
   {
@@ -126,7 +126,7 @@ const features = [
     title: 'On-Chain Settlement',
     description:
       'Proofs are verified on Ethereum. State roots are updated atomically with each execution.',
-    href: '/executions',
+    href: '/vaults',
     number: '04',
   },
 ];

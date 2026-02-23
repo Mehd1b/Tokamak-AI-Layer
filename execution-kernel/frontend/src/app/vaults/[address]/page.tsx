@@ -4,11 +4,15 @@ import { useParams } from 'next/navigation';
 import { useAccount } from 'wagmi';
 import { useVaultInfo, useVaultShares } from '@/hooks/useKernelVault';
 import { useVaultHistory } from '@/hooks/useVaultHistory';
+import { useVaultExecutions } from '@/hooks/useVaultExecutions';
 import { VaultDepositForm } from '@/components/VaultDepositForm';
 import { VaultWithdrawForm } from '@/components/VaultWithdrawForm';
 import { VaultChart } from '@/components/VaultChart';
 import { ExecutionSubmitForm } from '@/components/ExecutionSubmitForm';
+import { ExecutionHistoryTable } from '@/components/ExecutionHistoryTable';
 import { formatBytes32, formatEther, timestampToDate, truncateAddress } from '@/lib/utils';
+import { useNetwork } from '@/lib/NetworkContext';
+import { NetworkBadge } from '@/components/NetworkLogo';
 import Link from 'next/link';
 
 export default function VaultDetailPage() {
@@ -16,9 +20,11 @@ export default function VaultDetailPage() {
   const vaultAddress = params.address as `0x${string}`;
   const { address: userAddress } = useAccount();
 
+  const { explorerUrl } = useNetwork();
   const vault = useVaultInfo(vaultAddress);
   const { data: userShares } = useVaultShares(vaultAddress, userAddress);
-  const { tvl, pps, isLoading: historyLoading } = useVaultHistory(vaultAddress);
+  const { tvl, pps, isLoading: historyLoading } = useVaultHistory(vaultAddress, vault.assetDecimals);
+  const { executions, isLoading: executionsLoading } = useVaultExecutions(vaultAddress);
 
   if (vault.isLoading) {
     return (
@@ -60,9 +66,12 @@ export default function VaultDetailPage() {
             <h1 className="text-2xl font-light text-white" style={{ fontFamily: 'var(--font-serif), serif' }}>
               Vault Detail
             </h1>
-            <span className="badge-info">
-              {truncateAddress(vaultAddress, 6)}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="badge-info">
+                {truncateAddress(vaultAddress, 6)}
+              </span>
+              <NetworkBadge />
+            </div>
           </div>
         </div>
 
@@ -71,7 +80,7 @@ export default function VaultDetailPage() {
           <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
             <span className="text-gray-500 text-sm">Address</span>
             <a
-              href={`https://sepolia.etherscan.io/address/${vaultAddress}`}
+              href={`${explorerUrl}/address/${vaultAddress}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-[#A855F7] text-sm hover:underline break-all"
@@ -93,15 +102,15 @@ export default function VaultDetailPage() {
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
             <span className="text-gray-500 text-sm">Total Value Locked</span>
-            <span className="text-gray-300 text-sm">{vault.totalValueLocked !== undefined ? formatEther(vault.totalValueLocked) : '-'}</span>
+            <span className="text-gray-300 text-sm">{vault.totalValueLocked !== undefined ? `${formatEther(vault.totalValueLocked, vault.assetDecimals)} ${vault.assetSymbol}` : '-'}</span>
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
             <span className="text-gray-500 text-sm">Vault Balance</span>
-            <span className="text-gray-300 text-sm">{vault.totalAssets !== undefined ? formatEther(vault.totalAssets) : '-'}</span>
+            <span className="text-gray-300 text-sm">{vault.totalAssets !== undefined ? `${formatEther(vault.totalAssets, vault.assetDecimals)} ${vault.assetSymbol}` : '-'}</span>
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
             <span className="text-gray-500 text-sm">Total Shares</span>
-            <span className="text-gray-300 text-sm">{vault.totalShares !== undefined ? formatEther(vault.totalShares) : '-'}</span>
+            <span className="text-gray-300 text-sm">{vault.totalShares !== undefined ? formatEther(vault.totalShares, vault.assetDecimals) : '-'}</span>
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
             <span className="text-gray-500 text-sm">Last Execution Nonce</span>
@@ -118,9 +127,33 @@ export default function VaultDetailPage() {
         {userAddress && userShares !== undefined && (
           <div className="mt-6 p-4 rounded-lg border border-[#A855F7]/20 bg-[#A855F7]/5">
             <span className="text-gray-400 text-sm font-mono">Your Shares: </span>
-            <span className="text-[#A855F7] text-sm font-mono">{formatEther(userShares)}</span>
+            <span className="text-[#A855F7] text-sm font-mono">{formatEther(userShares, vault.assetDecimals)}</span>
           </div>
         )}
+      </div>
+
+      {/* Actions grid */}
+      <div className="grid md:grid-cols-2 gap-6 mb-8">
+        {/* Deposit */}
+        <div className="card">
+          <h2 className="text-lg font-light text-white mb-4" style={{ fontFamily: 'var(--font-serif), serif' }}>
+            Deposit
+          </h2>
+          <VaultDepositForm
+            vaultAddress={vaultAddress}
+            isEthVault={vault.isEthVault}
+            assetDecimals={vault.assetDecimals}
+            assetSymbol={vault.assetSymbol}
+          />
+        </div>
+
+        {/* Withdraw */}
+        <div className="card">
+          <h2 className="text-lg font-light text-white mb-4" style={{ fontFamily: 'var(--font-serif), serif' }}>
+            Withdraw
+          </h2>
+          <VaultWithdrawForm vaultAddress={vaultAddress} assetDecimals={vault.assetDecimals} />
+        </div>
       </div>
 
       {/* TVL & PPS Charts */}
@@ -129,7 +162,7 @@ export default function VaultDetailPage() {
           title="Total Value Locked"
           data={tvl}
           type="area"
-          valueSuffix="ETH"
+          valueSuffix={vault.assetSymbol}
           precision={4}
           isLoading={historyLoading}
           height={300}
@@ -144,34 +177,23 @@ export default function VaultDetailPage() {
         />
       </div>
 
-      {/* Actions grid */}
-      <div className="grid md:grid-cols-2 gap-6 mb-8">
-        {/* Deposit */}
-        <div className="card">
-          <h2 className="text-lg font-light text-white mb-4" style={{ fontFamily: 'var(--font-serif), serif' }}>
-            Deposit
-          </h2>
-          <VaultDepositForm vaultAddress={vaultAddress} />
-        </div>
-
-        {/* Withdraw */}
-        <div className="card">
-          <h2 className="text-lg font-light text-white mb-4" style={{ fontFamily: 'var(--font-serif), serif' }}>
-            Withdraw
-          </h2>
-          <VaultWithdrawForm vaultAddress={vaultAddress} />
-        </div>
-      </div>
-
-      {/* Execute */}
-      <div className="card">
+      {/* Execution History */}
+      <div className="card mb-8">
         <h2 className="text-lg font-light text-white mb-4" style={{ fontFamily: 'var(--font-serif), serif' }}>
-          Submit Execution
+          Execution History
         </h2>
         <p className="text-gray-500 text-sm font-mono mb-4">
-          Submit a ZK proof (journal + seal) and agent output to execute a verified state transition.
+          Last 10 verified executions for this vault.
         </p>
-        <ExecutionSubmitForm vaultAddress={vaultAddress} />
+        {executionsLoading ? (
+          <div className="animate-pulse space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-10 bg-white/5 rounded" />
+            ))}
+          </div>
+        ) : (
+          <ExecutionHistoryTable executions={executions} />
+        )}
       </div>
     </div>
   );

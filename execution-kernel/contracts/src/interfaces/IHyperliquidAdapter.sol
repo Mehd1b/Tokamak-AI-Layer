@@ -80,6 +80,18 @@ interface IHyperliquidAdapter {
     /// @return subAccount The deployed TradingSubAccount address
     function registerVault(address vault, uint32 perpAsset) external returns (address subAccount);
 
+    /// @notice Zero deposit amount provided
+    error ZeroDeposit();
+
+    // ============ Margin Management ============
+
+    /// @notice Deposit USDC from a vault into its sub-account's HyperCore perp margin.
+    /// @dev Callable by the vault owner. Pulls USDC from the vault and deposits to HyperCore
+    ///      via the sub-account. This seeds initial margin so the agent sees non-zero equity.
+    /// @param vault The registered vault to pull USDC from
+    /// @param amount The amount of USDC to deposit
+    function depositMargin(address vault, uint256 amount) external;
+
     // ============ Core Functions (selectors preserved) ============
 
     /// @notice Open a perpetual position on Hyperliquid

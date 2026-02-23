@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useDeployVault, useIsDeployedVault, useDeployedVaultsList } from '@/hooks/useVaultFactory';
 import { VaultCard } from '@/components/VaultCard';
 import { isValidBytes32 } from '@/lib/utils';
+import { useNetwork } from '@/lib/NetworkContext';
 import Link from 'next/link';
 
 export default function VaultsPage() {
@@ -12,6 +13,7 @@ export default function VaultsPage() {
   const [asset, setAsset] = useState('');
   const [userSalt, setUserSalt] = useState('');
   const [searchAddress, setSearchAddress] = useState('');
+  const { explorerUrl } = useNetwork();
   const { deploy, isPending, isConfirming, isSuccess, hash, error } = useDeployVault();
   const { data: deployedVaults, isLoading: isLoadingVaults, error: vaultsError } = useDeployedVaultsList();
 
@@ -143,7 +145,7 @@ export default function VaultsPage() {
               <div className="text-emerald-400 text-sm font-mono">
                 Vault deployed!{' '}
                 <a
-                  href={`https://sepolia.etherscan.io/tx/${hash}`}
+                  href={`${explorerUrl}/tx/${hash}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="underline hover:text-emerald-300"
@@ -189,6 +191,8 @@ export default function VaultsPage() {
                     totalAssets={v.totalAssets}
                     totalShares={v.totalShares}
                     totalValueLocked={v.totalValueLocked}
+                    assetDecimals={v.assetDecimals}
+                    assetSymbol={v.assetSymbol}
                   />
                 ))}
               </div>

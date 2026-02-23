@@ -3,10 +3,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WagmiProvider, createConfig, http } from 'wagmi';
 import { sepolia } from 'wagmi/chains';
+import { hyperEvmTestnet } from '@/lib/chains';
 import { RainbowKitProvider, connectorsForWallets } from '@rainbow-me/rainbowkit';
 import { metaMaskWallet } from '@rainbow-me/rainbowkit/wallets';
 import '@rainbow-me/rainbowkit/styles.css';
 import { useState, type ReactNode } from 'react';
+import { NetworkProvider } from '@/lib/NetworkContext';
 
 const connectors = connectorsForWallets(
   [
@@ -23,9 +25,10 @@ const connectors = connectorsForWallets(
 
 const config = createConfig({
   connectors,
-  chains: [sepolia],
+  chains: [sepolia, hyperEvmTestnet],
   transports: {
     [sepolia.id]: http(process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL),
+    [hyperEvmTestnet.id]: http('https://rpc.hyperliquid-testnet.xyz/evm'),
   },
   multiInjectedProviderDiscovery: false,
   ssr: true,
@@ -47,7 +50,9 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider>{children}</RainbowKitProvider>
+        <RainbowKitProvider>
+          <NetworkProvider>{children}</NetworkProvider>
+        </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );

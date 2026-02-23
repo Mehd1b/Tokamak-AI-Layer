@@ -132,22 +132,6 @@ export function Footer() {
                 Vaults
                 <span className="absolute bottom-0 left-0 w-0 h-[1px] bg-[#A855F7] group-hover:w-full transition-all duration-300" />
               </Link>
-              <Link
-                href="/executions"
-                className="text-gray-500 hover:text-[#A855F7] transition-colors duration-300 relative group"
-                style={{ fontFamily: 'var(--font-mono), monospace' }}
-              >
-                Executions
-                <span className="absolute bottom-0 left-0 w-0 h-[1px] bg-[#A855F7] group-hover:w-full transition-all duration-300" />
-              </Link>
-              <Link
-                href="/verify"
-                className="text-gray-500 hover:text-[#A855F7] transition-colors duration-300 relative group"
-                style={{ fontFamily: 'var(--font-mono), monospace' }}
-              >
-                Verify
-                <span className="absolute bottom-0 left-0 w-0 h-[1px] bg-[#A855F7] group-hover:w-full transition-all duration-300" />
-              </Link>
               <a
                 href="https://tokagent.network"
                 target="_blank"

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { truncateAddress, truncateBytes32, formatEther } from '@/lib/utils';
+import { NetworkBadge } from '@/components/NetworkLogo';
 
 interface VaultCardProps {
   address: string;
@@ -10,9 +11,11 @@ interface VaultCardProps {
   totalAssets: bigint;
   totalShares: bigint;
   totalValueLocked?: bigint;
+  assetDecimals: number;
+  assetSymbol: string;
 }
 
-export function VaultCard({ address, agentId, asset, totalAssets, totalShares, totalValueLocked }: VaultCardProps) {
+export function VaultCard({ address, agentId, asset, totalAssets, totalShares, totalValueLocked, assetDecimals, assetSymbol }: VaultCardProps) {
   return (
     <Link href={`/vaults/${address}`}>
       <div className="card-hover cursor-pointer group">
@@ -28,7 +31,10 @@ export function VaultCard({ address, agentId, asset, totalAssets, totalShares, t
               <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
             </svg>
           </div>
-          <span className="badge-info">Vault</span>
+          <div className="flex items-center gap-2">
+            <NetworkBadge />
+            <span className="badge-info">Vault</span>
+          </div>
         </div>
 
         <h3
@@ -49,15 +55,15 @@ export function VaultCard({ address, agentId, asset, totalAssets, totalShares, t
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">TVL</span>
-            <span>{formatEther(totalValueLocked ?? totalAssets)}</span>
+            <span>{formatEther(totalValueLocked ?? totalAssets, assetDecimals)} {assetSymbol}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">Vault Balance</span>
-            <span>{formatEther(totalAssets)}</span>
+            <span>{formatEther(totalAssets, assetDecimals)} {assetSymbol}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">Total Shares</span>
-            <span>{formatEther(totalShares)}</span>
+            <span>{formatEther(totalShares, assetDecimals)}</span>
           </div>
         </div>
 

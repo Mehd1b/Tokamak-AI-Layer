@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ConnectWalletButton } from '@/components/ConnectWalletButton';
+import { NetworkSelector } from '@/components/NetworkSelector';
 import { clsx } from 'clsx';
 import { useState, useEffect, useRef, useCallback } from 'react';
 
@@ -40,8 +41,6 @@ const SOCIAL_ICONS = {
 const PROTOCOL_LINKS: DropdownLink[] = [
   { title: 'Agents', description: 'Browse registered kernel agents', href: '/agents', internal: true },
   { title: 'Vaults', description: 'Explore and deploy vaults', href: '/vaults', internal: true },
-  { title: 'Executions', description: 'View execution history', href: '/executions', internal: true },
-  { title: 'Verify', description: 'Verify proofs on-chain', href: '/verify', internal: true },
 ];
 
 // Socials dropdown links
@@ -466,6 +465,7 @@ export function Navbar() {
           >
             TAL
           </a>
+          <NetworkSelector />
           <div className="ml-4">
             <ConnectButton />
           </div>
@@ -473,6 +473,7 @@ export function Navbar() {
 
         {/* Mobile Menu Button */}
         <div className="flex items-center gap-3 md:hidden">
+          <NetworkSelector />
           <ConnectButton />
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}

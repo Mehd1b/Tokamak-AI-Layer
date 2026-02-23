@@ -128,6 +128,20 @@ contract TradingSubAccount {
 
     // ============ Execution Functions ============
 
+    /// @notice Deposit USDC into HyperCore perp margin without placing an order.
+    /// @dev Used to seed the sub-account with initial margin so the agent sees
+    ///      non-zero equity on HyperCore and can begin evaluating trade signals.
+    ///      USDC must already be in this sub-account (transferred by the adapter).
+    /// @param amount The amount of USDC to deposit
+    function executeDepositMargin(uint256 amount) external onlyAdapter {
+        // 1. Approve CoreDepositWallet to spend USDC
+        IERC20(usdc).approve(coreDepositWallet, amount);
+
+        // 2. Deposit USDC to HyperCore perp margin
+        ICoreDepositWallet(coreDepositWallet).deposit(amount, DEST_DEX_PERP);
+        emit MarginDeposited(amount);
+    }
+
     /// @notice Open a perpetual position on Hyperliquid
     /// @dev USDC must already be in this sub-account (transferred by the adapter).
     ///      Approves CoreDepositWallet, deposits margin, places GTC limit order.

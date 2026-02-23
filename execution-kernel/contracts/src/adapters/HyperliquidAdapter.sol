@@ -132,6 +132,26 @@ contract HyperliquidAdapter is IHyperliquidAdapter {
         emit VaultRegistered(vault, subAccount, perpAsset);
     }
 
+    // ============ Margin Management ============
+
+    /// @inheritdoc IHyperliquidAdapter
+    function depositMargin(address vault, uint256 amount) external override {
+        if (amount == 0) revert ZeroDeposit();
+
+        VaultConfig memory config = vaultConfigs[vault];
+        if (config.subAccount == address(0)) revert VaultNotRegistered();
+
+        // Only vault owner can deposit margin
+        if (msg.sender != IKernelVaultOwner(vault).owner()) revert NotVaultOwner();
+
+        // Pull USDC from vault to sub-account
+        bool success = IERC20(usdc).transferFrom(vault, config.subAccount, amount);
+        if (!success) revert USDCTransferFailed();
+
+        // Deposit into HyperCore margin (no order placed)
+        TradingSubAccount(config.subAccount).executeDepositMargin(amount);
+    }
+
     // ============ Core Functions ============
 
     /// @inheritdoc IHyperliquidAdapter

@@ -17,6 +17,7 @@ members = [
     "crates/agents/defi-yield-farmer/agent",
     "crates/agents/defi-yield-farmer/risc0-methods",
     "crates/agents/perp-trader/agent",
+    "crates/agents/perp-trader/risc0-methods",
     "crates/agents/perp-trader/host",
 
     # Testing crates

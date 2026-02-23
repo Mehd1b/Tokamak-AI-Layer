@@ -6,6 +6,8 @@ import { useAgent, useUnregisterAgent } from '@/hooks/useKernelAgent';
 import { useVaultsForAgent } from '@/hooks/useVaultFactory';
 import { VaultCard } from '@/components/VaultCard';
 import { formatBytes32, truncateAddress } from '@/lib/utils';
+import { useNetwork } from '@/lib/NetworkContext';
+import { NetworkBadge } from '@/components/NetworkLogo';
 import Link from 'next/link';
 import { useEffect } from 'react';
 
@@ -24,7 +26,9 @@ export default function AgentDetailPage() {
     error: unregError,
   } = useUnregisterAgent();
 
+  const { explorerUrl } = useNetwork();
   const isAuthor = userAddress && agent && userAddress.toLowerCase() === (agent.author as string).toLowerCase();
+  const hasVaultDeposits = associatedVaults && associatedVaults.some((v) => v.totalAssets > BigInt(0));
 
   useEffect(() => {
     if (isUnregSuccess) {
@@ -86,9 +90,12 @@ export default function AgentDetailPage() {
             <h1 className="text-2xl font-light text-white" style={{ fontFamily: 'var(--font-serif), serif' }}>
               Agent Detail
             </h1>
-            <span className={agent.exists ? 'badge-success' : 'badge-error'}>
-              {agent.exists ? 'Active' : 'Inactive'}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className={agent.exists ? 'badge-success' : 'badge-error'}>
+                {agent.exists ? 'Active' : 'Inactive'}
+              </span>
+              <NetworkBadge />
+            </div>
           </div>
         </div>
 
@@ -100,7 +107,7 @@ export default function AgentDetailPage() {
           <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
             <span className="text-gray-500 text-sm">Author</span>
             <a
-              href={`https://sepolia.etherscan.io/address/${agent.author}`}
+              href={`${explorerUrl}/address/${agent.author}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-gray-300 text-sm hover:text-[#A855F7] transition-colors"
@@ -134,6 +141,10 @@ export default function AgentDetailPage() {
 
           {isUnregSuccess ? (
             <p className="text-green-400 font-mono text-sm">Agent unregistered. Redirecting...</p>
+          ) : hasVaultDeposits ? (
+            <p className="text-yellow-400/80 font-mono text-sm">
+              Cannot unregister: one or more vaults still have active deposits. Withdraw all funds first.
+            </p>
           ) : (
             <>
               <button
@@ -182,6 +193,8 @@ export default function AgentDetailPage() {
                 totalAssets={v.totalAssets}
                 totalShares={v.totalShares}
                 totalValueLocked={v.totalValueLocked}
+                assetDecimals={v.assetDecimals}
+                assetSymbol={v.assetSymbol}
               />
             ))}
           </div>

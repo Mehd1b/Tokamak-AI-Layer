@@ -7,8 +7,8 @@ interface DeploymentAddresses {
     riscZeroVerifierRouter: `0x${string}`;
 }
 declare const SEPOLIA_ADDRESSES: DeploymentAddresses;
-declare const DEPLOYMENTS: Record<string, DeploymentAddresses>;
-declare const DEFAULT_CHAIN_ID = 11155420;
+declare const DEPLOYMENTS: Record<number, DeploymentAddresses>;
+declare const DEFAULT_CHAIN_ID = 11155111;
 
 declare enum KernelActionType {
     CALL = 2,

@@ -3863,6 +3863,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "perp-trader-risc0-methods"
+version = "0.1.0"
+dependencies = [
+ "risc0-build",
+]
+
+[[package]]
 name = "pest"
 version = "2.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"

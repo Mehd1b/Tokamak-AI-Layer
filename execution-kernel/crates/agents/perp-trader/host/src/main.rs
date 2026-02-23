@@ -49,10 +49,19 @@ fn main() -> anyhow::Result<()> {
 
     // 3. Fetch market data
     let hl_client = hyperliquid::client::HyperliquidClient::new(&cli.hl_url);
-    let snapshot = hl_client.fetch_snapshot(&cli.asset, &cli.sub_account, cli.candles_needed())?;
+    let mut snapshot = hl_client.fetch_snapshot(&cli.asset, &cli.sub_account, cli.candles_needed())?;
+
+    // Override account equity with vault's on-chain USDC balance.
+    // The agent should see the vault's available capital, not the sub-account's
+    // HyperCore margin (which is only populated after openPosition deposits USDC).
+    // USDC has 6 decimals, so total_assets / 1e6 gives the human-readable amount.
+    let vault_equity = vault_state.total_assets as f64 / 1_000_000.0;
+    snapshot.account_equity = vault_equity;
+    snapshot.available_balance = vault_equity - snapshot.margin_used;
+
     if !cli.json {
         eprintln!(
-            "[3/8] Market data: mark={:.2}, pos={:.4}, equity={:.2}",
+            "[3/8] Market data: mark={:.2}, pos={:.4}, equity={:.2} (vault balance)",
             snapshot.mark_price, snapshot.position_size, snapshot.account_equity
         );
     }
@@ -106,16 +115,36 @@ fn main() -> anyhow::Result<()> {
     // 7. Reconstruct agent output
     let (agent_output_bytes, action_commitment) =
         output_reconstruct::reconstruct_output(&kernel_input, &input_bytes)?;
+    let action_count = kernel_core::AgentOutput::decode(&agent_output_bytes)
+        .map(|o| o.actions.len())
+        .unwrap_or(0);
     if !cli.json {
         eprintln!(
             "[7/8] Output reconstructed: {} bytes, {} actions, commitment=0x{}",
             agent_output_bytes.len(),
-            // Count actions by decoding
-            kernel_core::AgentOutput::decode(&agent_output_bytes)
-                .map(|o| o.actions.len())
-                .unwrap_or(0),
+            action_count,
             hex::encode(&action_commitment[..4])
         );
+    }
+
+    // No-op gate: skip proving and on-chain submission when the agent has no actions.
+    // Steps 1–7 are cheap (~500ms). Proving (step 8) and submitting are expensive.
+    // This enables high-frequency scheduling (e.g. every 30s) with negligible cost
+    // on cycles where the strategy produces no signal.
+    if action_count == 0 {
+        if cli.json {
+            let result = serde_json::json!({
+                "status": "no_op",
+                "actions": 0,
+                "mark_price": snapshot.mark_price,
+                "position_size": snapshot.position_size,
+                "account_equity": snapshot.account_equity,
+            });
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        } else {
+            eprintln!("No action signal. Skipping proof generation and on-chain submission.");
+        }
+        return Ok(());
     }
 
     // 8. Generate proof (if prove feature enabled)

@@ -75,24 +75,6 @@ export function ConnectWalletButton() {
 
               return (
                 <div className="flex items-center gap-2">
-                  {/* Chain button */}
-                  <button
-                    onClick={openChainModal}
-                    className="group flex items-center gap-1.5 rounded-full px-3 py-2 text-xs border border-white/10 bg-white/5 hover:border-[#A855F7]/30 hover:bg-[#A855F7]/5 transition-all duration-300"
-                    style={{ fontFamily: 'var(--font-mono), monospace' }}
-                  >
-                    {chain.hasIcon && chain.iconUrl && (
-                      <img
-                        alt={chain.name ?? 'Chain'}
-                        src={chain.iconUrl}
-                        className="w-4 h-4 rounded-full"
-                      />
-                    )}
-                    <span className="text-zinc-400 group-hover:text-[#A855F7] transition-colors hidden sm:inline">
-                      {chain.name}
-                    </span>
-                  </button>
-
                   {/* Account button */}
                   <button
                     onClick={openAccountModal}
