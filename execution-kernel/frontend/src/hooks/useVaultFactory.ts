@@ -53,9 +53,9 @@ export function useComputeVaultAddress(
 }
 
 export function useDeployVault() {
-  const { contracts } = useNetwork();
+  const { contracts, selectedChainId } = useNetwork();
   const { data: hash, writeContract, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: selectedChainId });
 
   const deploy = (agentId: `0x${string}`, asset: `0x${string}`, userSalt: `0x${string}`) => {
     writeContract({
@@ -63,6 +63,7 @@ export function useDeployVault() {
       abi: VaultFactoryABI,
       functionName: 'deployVault',
       args: [agentId, asset, userSalt],
+      chainId: selectedChainId,
     });
   };
 

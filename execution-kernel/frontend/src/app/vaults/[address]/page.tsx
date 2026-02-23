@@ -48,6 +48,31 @@ export default function VaultDetailPage() {
         Back to Vaults
       </Link>
 
+      {/* Actions grid */}
+      <div className="grid md:grid-cols-2 gap-6 mb-8">
+        {/* Deposit */}
+        <div className="card">
+          <h2 className="text-lg font-light text-white mb-4" style={{ fontFamily: 'var(--font-serif), serif' }}>
+            Deposit
+          </h2>
+          <VaultDepositForm
+            vaultAddress={vaultAddress}
+            isEthVault={vault.isEthVault}
+            assetDecimals={vault.assetDecimals}
+            assetSymbol={vault.assetSymbol}
+            assetAddress={vault.asset as `0x${string}` | undefined}
+          />
+        </div>
+
+        {/* Withdraw */}
+        <div className="card">
+          <h2 className="text-lg font-light text-white mb-4" style={{ fontFamily: 'var(--font-serif), serif' }}>
+            Withdraw
+          </h2>
+          <VaultWithdrawForm vaultAddress={vaultAddress} assetDecimals={vault.assetDecimals} />
+        </div>
+      </div>
+
       {/* Vault header */}
       <div className="card mb-8">
         <div className="flex items-center gap-4 mb-6">
@@ -90,19 +115,15 @@ export default function VaultDetailPage() {
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
             <span className="text-gray-500 text-sm">Agent ID</span>
-            <span className="text-gray-300 text-sm">{vault.agentId ? formatBytes32(vault.agentId) : '-'}</span>
+            <span className="text-gray-300 text-sm break-all">{vault.agentId ? String(vault.agentId) : '-'}</span>
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
             <span className="text-gray-500 text-sm">Asset</span>
-            <span className="text-gray-300 text-sm">{vault.asset ? truncateAddress(vault.asset) : '-'}</span>
+            <span className="text-gray-300 text-sm break-all">{vault.asset ? String(vault.asset) : '-'}</span>
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
             <span className="text-gray-500 text-sm">Trusted Image ID</span>
-            <span className="text-gray-300 text-sm">{vault.trustedImageId ? formatBytes32(vault.trustedImageId) : '-'}</span>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
-            <span className="text-gray-500 text-sm">Total Value Locked</span>
-            <span className="text-gray-300 text-sm">{vault.totalValueLocked !== undefined ? `${formatEther(vault.totalValueLocked, vault.assetDecimals)} ${vault.assetSymbol}` : '-'}</span>
+            <span className="text-gray-300 text-sm break-all">{vault.trustedImageId ? String(vault.trustedImageId) : '-'}</span>
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
             <span className="text-gray-500 text-sm">Vault Balance</span>
@@ -130,30 +151,6 @@ export default function VaultDetailPage() {
             <span className="text-[#A855F7] text-sm font-mono">{formatEther(userShares, vault.assetDecimals)}</span>
           </div>
         )}
-      </div>
-
-      {/* Actions grid */}
-      <div className="grid md:grid-cols-2 gap-6 mb-8">
-        {/* Deposit */}
-        <div className="card">
-          <h2 className="text-lg font-light text-white mb-4" style={{ fontFamily: 'var(--font-serif), serif' }}>
-            Deposit
-          </h2>
-          <VaultDepositForm
-            vaultAddress={vaultAddress}
-            isEthVault={vault.isEthVault}
-            assetDecimals={vault.assetDecimals}
-            assetSymbol={vault.assetSymbol}
-          />
-        </div>
-
-        {/* Withdraw */}
-        <div className="card">
-          <h2 className="text-lg font-light text-white mb-4" style={{ fontFamily: 'var(--font-serif), serif' }}>
-            Withdraw
-          </h2>
-          <VaultWithdrawForm vaultAddress={vaultAddress} assetDecimals={vault.assetDecimals} />
-        </div>
       </div>
 
       {/* TVL & PPS Charts */}

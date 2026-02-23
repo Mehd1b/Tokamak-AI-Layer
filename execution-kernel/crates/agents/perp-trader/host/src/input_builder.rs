@@ -78,7 +78,7 @@ fn encode_state_snapshot(vault_state: &VaultState, snapshot: &MarketSnapshot) ->
     buf.extend_from_slice(&1u32.to_le_bytes()); // snapshot_version
     buf.extend_from_slice(&vault_state.last_execution_ts.to_le_bytes()); // last_execution_ts
     buf.extend_from_slice(&snapshot.timestamp.to_le_bytes()); // current_ts
-    buf.extend_from_slice(&to_scaled_u64(snapshot.account_equity).to_le_bytes()); // current_equity
+    buf.extend_from_slice(&(snapshot.account_equity as u64).to_le_bytes()); // current_equity (raw USDC units)
     buf.extend_from_slice(&vault_state.peak_equity.to_le_bytes()); // peak_equity
     buf
 }
@@ -119,10 +119,11 @@ fn encode_perp_input(
     buf.extend_from_slice(&pnl_abs.to_le_bytes());
     buf.push(if pnl_neg { 1 } else { 0 });
 
-    // Account state (24 bytes)
-    buf.extend_from_slice(&to_scaled_u64(snapshot.available_balance.max(0.0)).to_le_bytes());
-    buf.extend_from_slice(&to_scaled_u64(snapshot.account_equity).to_le_bytes());
-    buf.extend_from_slice(&to_scaled_u64(snapshot.margin_used).to_le_bytes());
+    // Account state (24 bytes) — equity/balance in USDC raw units (6 decimals),
+    // NOT 1e8 scaled, because the agent passes size directly to openPosition().
+    buf.extend_from_slice(&(snapshot.available_balance.max(0.0) as u64).to_le_bytes());
+    buf.extend_from_slice(&(snapshot.account_equity as u64).to_le_bytes());
+    buf.extend_from_slice(&(snapshot.margin_used as u64).to_le_bytes());
 
     // Indicators (36 bytes, pre-computed)
     buf.extend_from_slice(&to_scaled_u64(indicators.sma_fast).to_le_bytes());
@@ -140,7 +141,7 @@ fn encode_perp_input(
     // Strategy config (17 bytes)
     buf.extend_from_slice(&3_000u32.to_le_bytes()); // rsi_oversold_bps (RSI 30)
     buf.extend_from_slice(&7_000u32.to_le_bytes()); // rsi_overbought_bps (RSI 70)
-    buf.extend_from_slice(&10_000u64.to_le_bytes()); // funding_threshold (0.01%)
+    buf.extend_from_slice(&500u64.to_le_bytes()); // funding_threshold (0.0005%) — lowered for testnet
     buf.push(cli.action_flag);
 
     // Liquidation (8 bytes)

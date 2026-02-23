@@ -130,8 +130,9 @@ export function useVaultShares(vaultAddress: `0x${string}` | undefined, deposito
 }
 
 export function useDepositETH(vaultAddress: `0x${string}` | undefined) {
+  const { selectedChainId } = useNetwork();
   const { data: hash, writeContract, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: selectedChainId });
 
   const deposit = (ethAmount: string) => {
     if (!vaultAddress) return;
@@ -140,6 +141,7 @@ export function useDepositETH(vaultAddress: `0x${string}` | undefined) {
       abi: KernelVaultABI,
       functionName: 'depositETH',
       value: parseEther(ethAmount),
+      chainId: selectedChainId,
     });
   };
 
@@ -147,8 +149,9 @@ export function useDepositETH(vaultAddress: `0x${string}` | undefined) {
 }
 
 export function useDepositERC20(vaultAddress: `0x${string}` | undefined) {
+  const { selectedChainId } = useNetwork();
   const { data: hash, writeContract, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: selectedChainId });
 
   const deposit = (amount: bigint) => {
     if (!vaultAddress) return;
@@ -157,6 +160,7 @@ export function useDepositERC20(vaultAddress: `0x${string}` | undefined) {
       abi: KernelVaultABI,
       functionName: 'depositERC20Tokens',
       args: [amount],
+      chainId: selectedChainId,
     });
   };
 
@@ -164,8 +168,9 @@ export function useDepositERC20(vaultAddress: `0x${string}` | undefined) {
 }
 
 export function useWithdraw(vaultAddress: `0x${string}` | undefined) {
+  const { selectedChainId } = useNetwork();
   const { data: hash, writeContract, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: selectedChainId });
 
   const withdraw = (shareAmount: bigint) => {
     if (!vaultAddress) return;
@@ -174,6 +179,7 @@ export function useWithdraw(vaultAddress: `0x${string}` | undefined) {
       abi: KernelVaultABI,
       functionName: 'withdraw',
       args: [shareAmount],
+      chainId: selectedChainId,
     });
   };
 
@@ -181,8 +187,9 @@ export function useWithdraw(vaultAddress: `0x${string}` | undefined) {
 }
 
 export function useExecute(vaultAddress: `0x${string}` | undefined) {
+  const { selectedChainId } = useNetwork();
   const { data: hash, writeContract, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: selectedChainId });
 
   const execute = (journal: `0x${string}`, seal: `0x${string}`, agentOutputBytes: `0x${string}`) => {
     if (!vaultAddress) return;
@@ -191,6 +198,7 @@ export function useExecute(vaultAddress: `0x${string}` | undefined) {
       abi: KernelVaultABI,
       functionName: 'execute',
       args: [journal, seal, agentOutputBytes],
+      chainId: selectedChainId,
     });
   };
 

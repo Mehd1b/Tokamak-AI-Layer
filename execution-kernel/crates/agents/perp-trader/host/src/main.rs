@@ -18,6 +18,34 @@ use config::Cli;
 use kernel_core::CanonicalDecode;
 use market::MarketDataProvider;
 
+/// Persistent state between single-shot cycles to track open positions.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct PositionState {
+    /// Nonce at which the position was opened.
+    nonce: u64,
+    /// Unix timestamp when the position was opened.
+    opened_at: u64,
+}
+
+/// Read position state from file (returns None if file doesn't exist or is invalid).
+fn read_position_state(path: &str) -> Option<PositionState> {
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+}
+
+/// Write position state to file.
+fn write_position_state(path: &str, state: &PositionState) -> anyhow::Result<()> {
+    let json = serde_json::to_string(state)?;
+    std::fs::write(path, json)?;
+    Ok(())
+}
+
+/// Clear position state file.
+fn clear_position_state(path: &str) {
+    let _ = std::fs::remove_file(path);
+}
+
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
@@ -51,13 +79,77 @@ fn main() -> anyhow::Result<()> {
     let hl_client = hyperliquid::client::HyperliquidClient::new(&cli.hl_url);
     let mut snapshot = hl_client.fetch_snapshot(&cli.asset, &cli.sub_account, cli.candles_needed())?;
 
-    // Override account equity with vault's on-chain USDC balance.
-    // The agent should see the vault's available capital, not the sub-account's
-    // HyperCore margin (which is only populated after openPosition deposits USDC).
-    // USDC has 6 decimals, so total_assets / 1e6 gives the human-readable amount.
-    let vault_equity = vault_state.total_assets as f64 / 1_000_000.0;
-    snapshot.account_equity = vault_equity;
-    snapshot.available_balance = vault_equity - snapshot.margin_used;
+    // Position state guard: if we previously opened a position and it hasn't
+    // appeared in the Hyperliquid API yet, skip this cycle to avoid re-entry.
+    // HyperCore settles asynchronously — positions may not be visible for minutes.
+    if let Some(pos_state) = read_position_state(&cli.state_file) {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let age = now.saturating_sub(pos_state.opened_at);
+
+        if snapshot.position_size == 0.0 && age < cli.position_timeout {
+            // Position was opened but not yet visible on HyperCore
+            if cli.json {
+                let result = serde_json::json!({
+                    "status": "no_op",
+                    "reason": "position_pending_settlement",
+                    "actions": 0,
+                    "opened_nonce": pos_state.nonce,
+                    "age_seconds": age,
+                    "timeout_seconds": cli.position_timeout,
+                    "vault_balance": vault_state.total_assets,
+                });
+                println!("{}", serde_json::to_string_pretty(&result)?);
+            } else {
+                eprintln!(
+                    "Position pending settlement (nonce={}, age={}s). Skipping.",
+                    pos_state.nonce, age
+                );
+            }
+            return Ok(());
+        }
+
+        // Position is now visible OR timed out — clear state and proceed
+        if !cli.json {
+            if snapshot.position_size != 0.0 {
+                eprintln!("Position now visible on HyperCore (size={:.4}). Resuming.", snapshot.position_size);
+            } else {
+                eprintln!("Position state timed out after {}s. Clearing and resuming.", age);
+            }
+        }
+        clear_position_state(&cli.state_file);
+    }
+
+    // Minimum balance guard: skip execution if vault balance is below threshold.
+    // Prevents dust-level re-entry loops after position has been opened.
+    if vault_state.total_assets < cli.min_balance {
+        if cli.json {
+            let result = serde_json::json!({
+                "status": "no_op",
+                "reason": "vault_balance_below_minimum",
+                "actions": 0,
+                "vault_balance": vault_state.total_assets,
+                "min_balance": cli.min_balance,
+            });
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        } else {
+            eprintln!(
+                "Vault balance {} < min_balance {}. Skipping execution.",
+                vault_state.total_assets, cli.min_balance
+            );
+        }
+        return Ok(());
+    }
+
+    // Override account equity with vault's on-chain USDC balance in raw units (6 decimals).
+    // The agent passes size directly to openPosition() which does a USDC transfer,
+    // so equity/balance must be in USDC's native denomination (1e6), NOT 1e8 scaled.
+    // This way compute_position_size() output matches what the adapter expects.
+    let vault_equity_raw = vault_state.total_assets as f64; // raw USDC units (6 decimals)
+    snapshot.account_equity = vault_equity_raw;
+    snapshot.available_balance = vault_equity_raw - snapshot.margin_used;
 
     if !cli.json {
         eprintln!(
@@ -147,6 +239,26 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    // In dry-run mode, skip proving and on-chain submission — just report the signal.
+    if cli.dry_run {
+        if cli.json {
+            let result = serde_json::json!({
+                "status": "dry_run",
+                "actions": action_count,
+                "mark_price": snapshot.mark_price,
+                "position_size": snapshot.position_size,
+                "account_equity": snapshot.account_equity,
+                "agent_output_hex": hex::encode(&agent_output_bytes),
+                "action_commitment": hex::encode(action_commitment),
+                "execution_nonce": kernel_input.execution_nonce,
+            });
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        } else {
+            eprintln!("Dry run complete. {} actions detected. Skipping proof + submission.", action_count);
+        }
+        return Ok(());
+    }
+
     // 8. Generate proof (if prove feature enabled)
     let proof_result = prove::generate_proof(&bundle, &input_bytes, cli.dev_mode)?;
     if !cli.json {
@@ -166,23 +278,7 @@ fn main() -> anyhow::Result<()> {
         ));
     }
 
-    // Submit on-chain (unless dry-run)
-    if cli.dry_run {
-        if cli.json {
-            let result = serde_json::json!({
-                "status": "dry_run",
-                "journal_hex": hex::encode(&proof_result.journal_bytes),
-                "seal_hex": hex::encode(&proof_result.seal_bytes),
-                "agent_output_hex": hex::encode(&agent_output_bytes),
-                "oracle_signature_hex": hex::encode(&signed_feed.onchain_signature),
-                "action_commitment": hex::encode(action_commitment),
-                "execution_nonce": kernel_input.execution_nonce,
-            });
-            println!("{}", serde_json::to_string_pretty(&result)?);
-        } else {
-            eprintln!("Dry run complete. Skipping on-chain submission.");
-        }
-    } else {
+    {
         #[cfg(feature = "onchain")]
         {
             let pk = Cli::resolve_key(&cli.pk)?;
@@ -196,6 +292,20 @@ fn main() -> anyhow::Result<()> {
                 &agent_output_bytes,
                 &signed_feed.onchain_signature,
             ))?;
+
+            // Record open position state so next cycle doesn't re-enter.
+            // Only write state if the transaction succeeded and had actions
+            // (which means a position was opened).
+            if tx_result.success {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                let _ = write_position_state(&cli.state_file, &PositionState {
+                    nonce: kernel_input.execution_nonce,
+                    opened_at: now,
+                });
+            }
 
             if cli.json {
                 let result = serde_json::json!({

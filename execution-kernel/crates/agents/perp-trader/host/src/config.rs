@@ -85,6 +85,22 @@ pub struct Cli {
     #[arg(long, env = "USDC_ADDRESS")]
     pub usdc_address: String,
 
+    /// Minimum vault balance (raw USDC units, 6 decimals) to proceed with execution.
+    /// If vault balance is below this, the host returns no_op immediately.
+    /// Default: 1_000_000 (1 USDC). Prevents dust-level re-entry loops.
+    #[arg(long, default_value_t = 1_000_000)]
+    pub min_balance: u64,
+
+    /// State file path for tracking open positions between cycles.
+    /// Prevents re-entry when HyperCore hasn't settled the previous position.
+    #[arg(long, default_value = "/tmp/perp-trader-state.json")]
+    pub state_file: String,
+
+    /// Timeout (seconds) for position pending state. If the state file is older
+    /// than this, assume the position settled or failed and clear it.
+    #[arg(long, default_value_t = 1800)]
+    pub position_timeout: u64,
+
     // ---- Execution modes ----
     /// Use dev-mode proving (fast, not on-chain verifiable)
     #[arg(long, default_value_t = false)]
