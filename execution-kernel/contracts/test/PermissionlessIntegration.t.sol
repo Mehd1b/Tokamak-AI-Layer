@@ -10,6 +10,7 @@ import { MockKernelExecutionVerifier } from "./mocks/MockKernelExecutionVerifier
 import { MockERC20 } from "./mocks/MockERC20.sol";
 import { IAgentRegistry } from "../src/interfaces/IAgentRegistry.sol";
 import { IVaultFactory } from "../src/interfaces/IVaultFactory.sol";
+import { VaultCreationCodeStore } from "../src/VaultCreationCodeStore.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /// @title Permissionless Integration Tests
@@ -48,11 +49,14 @@ contract PermissionlessIntegrationTest is Test {
         );
         registry = AgentRegistry(address(registryProxy));
 
+        // Deploy VaultCreationCodeStore
+        VaultCreationCodeStore codeStore = new VaultCreationCodeStore();
+
         // Deploy VaultFactory via proxy
         VaultFactory factoryImpl = new VaultFactory();
         ERC1967Proxy factoryProxy = new ERC1967Proxy(
             address(factoryImpl),
-            abi.encodeCall(VaultFactory.initialize, (address(registry), address(mockVerifier), address(this)))
+            abi.encodeCall(VaultFactory.initialize, (address(registry), address(mockVerifier), address(this), address(codeStore)))
         );
         factory = VaultFactory(address(factoryProxy));
 

@@ -10,6 +10,7 @@ import { MockVerifier } from "./mocks/MockVerifier.sol";
 import { MockERC20 } from "./mocks/MockERC20.sol";
 import { IVaultFactory } from "../src/interfaces/IVaultFactory.sol";
 import { IAgentRegistry } from "../src/interfaces/IAgentRegistry.sol";
+import { VaultCreationCodeStore } from "../src/VaultCreationCodeStore.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /// @title VaultFactory Tests
@@ -51,11 +52,14 @@ contract VaultFactoryTest is Test {
         );
         verifier = KernelExecutionVerifier(address(verifierProxy));
 
+        // Deploy VaultCreationCodeStore
+        VaultCreationCodeStore codeStore = new VaultCreationCodeStore();
+
         // Deploy VaultFactory via proxy
         VaultFactory factoryImpl = new VaultFactory();
         ERC1967Proxy factoryProxy = new ERC1967Proxy(
             address(factoryImpl),
-            abi.encodeCall(VaultFactory.initialize, (address(registry), address(verifier), address(this)))
+            abi.encodeCall(VaultFactory.initialize, (address(registry), address(verifier), address(this), address(codeStore)))
         );
         factory = VaultFactory(address(factoryProxy));
 

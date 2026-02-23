@@ -1,0 +1,45 @@
+{
+  "agent_name": "perp-trader",
+  "version": "0.1.0",
+  "description": "Perpetual futures trading agent targeting Hyperliquid with SMA/RSI/funding strategy",
+  "agent_id": "0xTODO_COMPUTE_FROM_BUILD_OUTPUT",
+  "image_id": "0xTODO_BUILD_WITH_RISC0_FIRST",
+  "elf_path": "guest.elf",
+  "inputs": {
+    "format": "StateSnapshotV1 (36B) + OraclePriceFeed (variable, 111..607B) + PerpInput (238B)",
+    "state_snapshot_size": 36,
+    "perp_input_size": 238
+  },
+  "actions_profile": {
+    "description": "CALL actions targeting HyperliquidAdapter contract on HyperEVM",
+    "actions": [
+      "ERC20.approve(adapter, amount)",
+      "HyperliquidAdapter.openPosition(bool isBuy, uint256 size, uint256 limitPrice)",
+      "HyperliquidAdapter.closePosition()",
+      "HyperliquidAdapter.withdrawToVault()"
+    ]
+  },
+  "networks": {
+    "hyperevm_testnet": {
+      "chain_id": 998,
+      "rpc": "https://rpc.hyperliquid-testnet.xyz/evm",
+      "note": "Deploy KernelExecutionVerifier + RiscZeroVerifierRouter on HyperEVM testnet before use"
+    },
+    "hyperevm_mainnet": {
+      "chain_id": 999,
+      "rpc": "https://rpc.hyperliquid.xyz/evm",
+      "note": "Deploy KernelExecutionVerifier + RiscZeroVerifierRouter on HyperEVM mainnet before use"
+    }
+  },
+  "hyperliquid": {
+    "api_testnet": "https://api.hyperliquid-testnet.xyz",
+    "api_mainnet": "https://api.hyperliquid.xyz",
+    "bridge_arbitrum": "0x2df1c51e09aecf9cacb7bc98cb1742757f163df7",
+    "usdc_arbitrum": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+    "core_writer": "0x3333333333333333333333333333333333333333"
+  },
+  "build": {
+    "command": "cd crates/agents/perp-trader/risc0-methods && RISC0_USE_DOCKER=1 cargo build --release",
+    "notes": "After build, copy ELF from target/riscv-guest/riscv32im-risc0-zkvm-elf/release/zkvm-guest to bundle/guest.elf and update agent_id and image_id from build output"
+  }
+}

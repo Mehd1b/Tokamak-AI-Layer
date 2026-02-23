@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import { IVaultFactory } from "./interfaces/IVaultFactory.sol";
 import { IAgentRegistry } from "./interfaces/IAgentRegistry.sol";
-import { KernelVault } from "./KernelVault.sol";
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 
@@ -30,8 +29,11 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     /// @notice Contract owner (authorized to upgrade)
     address private _owner;
 
+    /// @notice Contract whose runtime bytecode is KernelVault creation code
+    address public _vaultCreationCodeStore;
+
     /// @notice Storage gap for future upgrades
-    uint256[46] private __gap;
+    uint256[45] private __gap;
 
     // ============ Errors ============
 
@@ -64,13 +66,15 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     /// @param registry_ The AgentRegistry contract address
     /// @param verifier_ The KernelExecutionVerifier contract address
     /// @param initialOwner The address that will own this contract
-    function initialize(address registry_, address verifier_, address initialOwner)
+    /// @param vaultCodeStore_ The VaultCreationCodeStore contract address
+    function initialize(address registry_, address verifier_, address initialOwner, address vaultCodeStore_)
         external
         initializer
     {
         _registry = IAgentRegistry(registry_);
         _verifier = verifier_;
         _owner = initialOwner;
+        _vaultCreationCodeStore = vaultCodeStore_;
         emit OwnershipTransferred(address(0), initialOwner);
     }
 
@@ -96,6 +100,11 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     /// @inheritdoc IVaultFactory
     function verifier() external view returns (address) {
         return _verifier;
+    }
+
+    /// @inheritdoc IVaultFactory
+    function vaultCreationCodeStore() external view returns (address) {
+        return _vaultCreationCodeStore;
     }
 
     /// @inheritdoc IVaultFactory
@@ -216,7 +225,7 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         address vaultOwner
     ) internal view returns (bytes memory) {
         return abi.encodePacked(
-            type(KernelVault).creationCode,
+            _vaultCreationCodeStore.code,
             abi.encode(asset, _verifier, agentId, imageId, vaultOwner)
         );
     }

@@ -55,6 +55,10 @@ interface IVaultFactory {
     /// @return All vault addresses as an array
     function getAllVaults() external view returns (address[] memory);
 
+    /// @notice Get the VaultCreationCodeStore address
+    /// @return The code store contract whose runtime bytecode is KernelVault creation code
+    function vaultCreationCodeStore() external view returns (address);
+
     /// @notice Emitted when a vault is deployed
     event VaultDeployed(
         address indexed vault,

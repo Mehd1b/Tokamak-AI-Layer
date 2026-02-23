@@ -1,0 +1,27 @@
+# RISC Zero Guest Wrapper for perp-trader
+#
+# This is a minimal wrapper crate that allows risc0-build to compile
+# the perp-trader agent as a zkVM guest program. It provides the main()
+# entry point that delegates to the agent's kernel_main function.
+
+[package]
+name = "zkvm-guest"
+version = "0.1.0"
+edition = "2021"
+
+# Required for risc0-build to recognize this as a standalone guest
+[workspace]
+
+[dependencies]
+# Agent crate (generates kernel_main via agent_entrypoint! macro)
+perp-trader = { path = "../../agent" }
+
+# RISC Zero zkVM guest runtime
+risc0-zkvm = { version = "3.0", default-features = false, features = ["std"] }
+
+[features]
+default = []
+
+[profile.release]
+debug = 1
+lto = true
