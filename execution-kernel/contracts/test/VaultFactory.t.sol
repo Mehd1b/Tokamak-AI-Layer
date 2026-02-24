@@ -368,6 +368,55 @@ contract VaultFactoryTest is Test {
         assertEq(vaults[1], vault2, "Second deployed vault should be at index 1");
     }
 
+    // ============ getAgentVaults Tests ============
+
+    function test_getAgentVaults_initiallyEmpty() public view {
+        address[] memory vaults = factory.getAgentVaults(agentId);
+        assertEq(vaults.length, 0, "Initially should return empty array");
+    }
+
+    function test_getAgentVaults_afterOneDeployment() public {
+        vm.prank(author);
+        address vault = factory.deployVault(agentId, address(token), USER_SALT);
+
+        address[] memory vaults = factory.getAgentVaults(agentId);
+        assertEq(vaults.length, 1, "Should return 1 vault");
+        assertEq(vaults[0], vault, "Vault address should match");
+    }
+
+    function test_getAgentVaults_afterMultipleDeployments() public {
+        vm.startPrank(author);
+        address vault1 = factory.deployVault(agentId, address(token), USER_SALT);
+        address vault2 = factory.deployVault(agentId, address(token), bytes32(uint256(0x9999)));
+        address vault3 = factory.deployVault(agentId, address(0), USER_SALT);
+        vm.stopPrank();
+
+        address[] memory vaults = factory.getAgentVaults(agentId);
+        assertEq(vaults.length, 3, "Should return 3 vaults");
+        assertEq(vaults[0], vault1, "First vault should match");
+        assertEq(vaults[1], vault2, "Second vault should match");
+        assertEq(vaults[2], vault3, "Third vault should match");
+    }
+
+    function test_getAgentVaults_differentAgents_independent() public {
+        // Register a second agent
+        vm.prank(author);
+        bytes32 agentId2 = registry.register(bytes32(uint256(0x2)), IMAGE_ID, CODE_HASH);
+
+        vm.startPrank(author);
+        address vault1 = factory.deployVault(agentId, address(token), USER_SALT);
+        address vault2 = factory.deployVault(agentId2, address(token), USER_SALT);
+        vm.stopPrank();
+
+        address[] memory vaults1 = factory.getAgentVaults(agentId);
+        address[] memory vaults2 = factory.getAgentVaults(agentId2);
+
+        assertEq(vaults1.length, 1, "Agent 1 should have 1 vault");
+        assertEq(vaults1[0], vault1, "Agent 1 vault should match");
+        assertEq(vaults2.length, 1, "Agent 2 should have 1 vault");
+        assertEq(vaults2[0], vault2, "Agent 2 vault should match");
+    }
+
     // ============ UUPS Tests ============
 
     function test_owner_isSetCorrectly() public view {

@@ -1,34 +1,52 @@
 import type { Log } from 'viem';
 
-// Max block range per getLogs call
-const MAX_BLOCK_RANGE = BigInt(500_000);
-
-// Lookback windows for vault deploy search (tried in order, first success wins).
-// Covers ~2 days, ~2 weeks, ~3 months on 12s block-time chains.
-// Most vaults will be found in the first window.
-const LOOKBACK_WINDOWS = [
-  BigInt(15_000),     // ~2 days
-  BigInt(100_000),    // ~2 weeks
-  BigInt(500_000),    // ~2 months
-  BigInt(2_000_000),  // ~9 months
-];
+// Block range tiers — tried large-to-small until the RPC accepts one.
+// HyperEVM supports max 1000; Sepolia/mainnet support 500K+.
+const BLOCK_RANGE_TIERS = [BigInt(500_000), BigInt(10_000), BigInt(1_000)];
 
 /**
- * Paginated getLogs that splits large ranges into MAX_BLOCK_RANGE chunks.
+ * Paginated getLogs that auto-discovers the max block range the RPC supports.
+ * Caps total calls to `maxCalls` to avoid hammering limited RPCs.
  */
 export async function paginatedGetLogs(
   client: any,
   params: { address: `0x${string}`; event: any; args?: any; fromBlock: bigint; toBlock: bigint },
+  maxCalls = 80,
 ): Promise<Log[]> {
   const { fromBlock, toBlock, ...rest } = params;
   const results: Log[] = [];
 
-  let cursor = fromBlock;
-  while (cursor <= toBlock) {
-    const end = cursor + MAX_BLOCK_RANGE > toBlock ? toBlock : cursor + MAX_BLOCK_RANGE;
+  // Discover the largest chunk size the RPC accepts
+  let chunkSize = BLOCK_RANGE_TIERS[BLOCK_RANGE_TIERS.length - 1];
+  let discovered = false;
+  for (const tier of BLOCK_RANGE_TIERS) {
+    const testEnd = fromBlock + tier > toBlock ? toBlock : fromBlock + tier;
+    try {
+      const logs = await client.getLogs({ ...rest, fromBlock, toBlock: testEnd });
+      results.push(...(logs as Log[]));
+      chunkSize = tier;
+      discovered = true;
+      if (testEnd >= toBlock) return results;
+      break;
+    } catch {
+      // Tier too large for this RPC, try smaller
+    }
+  }
+
+  // If even the smallest tier failed, throw
+  if (!discovered) {
+    throw new Error('getLogs not supported by this RPC');
+  }
+
+  // Paginate the rest with the discovered chunk size
+  let cursor = fromBlock + chunkSize + BigInt(1);
+  let callCount = 1;
+  while (cursor <= toBlock && callCount < maxCalls) {
+    const end = cursor + chunkSize > toBlock ? toBlock : cursor + chunkSize;
     const logs = await client.getLogs({ ...rest, fromBlock: cursor, toBlock: end });
     results.push(...(logs as Log[]));
     cursor = end + BigInt(1);
+    callCount++;
   }
 
   return results;
@@ -80,9 +98,8 @@ export const withdrawEvent = {
 
 /**
  * Find the block at which a vault was deployed via VaultDeployed event.
- * Uses expanding lookback windows to minimize RPC calls — most vaults are
- * recent, so the first small window usually hits.
- * Falls back to full-chain scan as last resort.
+ * Uses expanding lookback windows to minimize RPC calls.
+ * Caps each window scan to avoid excessive calls on RPCs with small max range.
  */
 export async function findVaultDeployBlock(
   client: any,
@@ -90,41 +107,26 @@ export async function findVaultDeployBlock(
   vaultAddress: `0x${string}`,
   currentBlock: bigint,
 ): Promise<bigint> {
-  // Try expanding lookback windows (fast path for recent vaults)
-  for (const window of LOOKBACK_WINDOWS) {
+  // Lookback windows — sized for 12s block chains.
+  // On fast chains (HyperEVM ~0.5s blocks), the maxCalls cap in
+  // paginatedGetLogs prevents excessive requests.
+  const LOOKBACK = [BigInt(15_000), BigInt(100_000), BigInt(500_000), BigInt(2_000_000)];
+
+  for (const window of LOOKBACK) {
     const from = currentBlock > window ? currentBlock - window : BigInt(0);
     try {
-      const logs = await paginatedGetLogs(client, {
-        address: factoryAddress,
-        event: vaultDeployedEvent,
-        args: { vault: vaultAddress },
-        fromBlock: from,
-        toBlock: currentBlock,
-      });
+      const logs = await paginatedGetLogs(
+        client,
+        { address: factoryAddress, event: vaultDeployedEvent, args: { vault: vaultAddress }, fromBlock: from, toBlock: currentBlock },
+        30, // cap at 30 calls per window
+      );
       if (logs.length > 0 && logs[0].blockNumber != null) {
         return logs[0].blockNumber;
       }
     } catch {
-      // This window failed, try the next one
+      // Window failed
     }
-    // If we already scanned from 0, stop
     if (from === BigInt(0)) return BigInt(0);
-  }
-
-  // Final fallback: full scan from block 0
-  try {
-    const logs = await paginatedGetLogs(client, {
-      address: factoryAddress,
-      event: vaultDeployedEvent,
-      args: { vault: vaultAddress },
-      fromBlock: BigInt(0),
-      toBlock: currentBlock,
-    });
-    if (logs.length > 0 && logs[0].blockNumber != null) {
-      return logs[0].blockNumber;
-    }
-  } catch {
-    // Full scan failed
   }
 
   return BigInt(0);

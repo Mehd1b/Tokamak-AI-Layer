@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import { IAgentRegistry } from "./interfaces/IAgentRegistry.sol";
+import { IVaultFactory } from "./interfaces/IVaultFactory.sol";
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 
@@ -28,8 +29,11 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
     /// @notice Contract owner (authorized to upgrade)
     address private _owner;
 
+    /// @notice VaultFactory address (for querying agent vaults during unregister)
+    address private _factory;
+
     /// @notice Storage gap for future upgrades
-    uint256[48] private __gap;
+    uint256[47] private __gap;
 
     // ============ Errors ============
 
@@ -70,6 +74,17 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
     /// @notice Returns the current owner
     function owner() external view returns (address) {
         return _owner;
+    }
+
+    /// @notice Returns the VaultFactory address
+    function factory() external view returns (address) {
+        return _factory;
+    }
+
+    /// @notice Set the VaultFactory address (for querying agent vaults during unregister)
+    /// @param factory_ The VaultFactory contract address
+    function setFactory(address factory_) external onlyOwner {
+        _factory = factory_;
     }
 
     // ============ UUPS ============
@@ -148,25 +163,18 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
     }
 
     /// @inheritdoc IAgentRegistry
-    function unregister(bytes32 agentId, address[] calldata vaults) external {
+    function unregister(bytes32 agentId) external {
         AgentInfo storage agent = _agents[agentId];
         if (!agent.exists) revert AgentNotFound(agentId);
         if (msg.sender != agent.author) revert NotAgentAuthor(agentId, msg.sender, agent.author);
 
-        // Verify all provided vaults are empty
-        for (uint256 i = 0; i < vaults.length; i++) {
-            address vault = vaults[i];
-
-            // Must be a deployed contract
-            if (vault.code.length == 0) revert VaultNotDeployed(vault);
-
-            // Must belong to this agent
-            bytes32 vaultAgentId = IKernelVaultView(vault).agentId();
-            if (vaultAgentId != agentId) revert VaultAgentIdMismatch(vault, agentId, vaultAgentId);
-
-            // Must have zero deposits
-            uint256 assets = IKernelVaultView(vault).totalAssets();
-            if (assets > 0) revert VaultHasDeposits(vault, assets);
+        // Query factory for all vaults deployed for this agent
+        if (_factory != address(0)) {
+            address[] memory vaults = IVaultFactory(_factory).getAgentVaults(agentId);
+            for (uint256 i = 0; i < vaults.length; i++) {
+                uint256 assets = IKernelVaultView(vaults[i]).totalAssets();
+                if (assets > 0) revert VaultHasDeposits(vaults[i], assets);
+            }
         }
 
         // Save author for event before deletion

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { parseUnits } from 'viem';
 import { useWithdraw } from '@/hooks/useKernelVault';
+import { parseVaultError } from '@/lib/vaultErrors';
 
 export function VaultWithdrawForm({ vaultAddress, assetDecimals = 18 }: { vaultAddress: `0x${string}`; assetDecimals?: number }) {
   const [shares, setShares] = useState('');
@@ -41,7 +42,7 @@ export function VaultWithdrawForm({ vaultAddress, assetDecimals = 18 }: { vaultA
         <p className="text-emerald-400 text-sm font-mono">Withdrawal successful!</p>
       )}
       {error && (
-        <p className="text-red-400 text-sm font-mono">{error.message.slice(0, 100)}</p>
+        <p className="text-red-400 text-sm font-mono">{parseVaultError(error)}</p>
       )}
     </form>
   );

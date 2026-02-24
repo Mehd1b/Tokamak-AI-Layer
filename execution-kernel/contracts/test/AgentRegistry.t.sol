@@ -21,10 +21,24 @@ contract MockVaultForUnregister {
     }
 }
 
+/// @notice Mock VaultFactory that returns preset agent vaults
+contract MockVaultFactory {
+    mapping(bytes32 => address[]) internal _agentVaults;
+
+    function setAgentVaults(bytes32 agentId, address[] memory vaults) external {
+        _agentVaults[agentId] = vaults;
+    }
+
+    function getAgentVaults(bytes32 agentId) external view returns (address[] memory) {
+        return _agentVaults[agentId];
+    }
+}
+
 /// @title AgentRegistry Tests
 /// @notice Comprehensive test suite for AgentRegistry
 contract AgentRegistryTest is Test {
     AgentRegistry public registry;
+    MockVaultFactory public mockFactory;
 
     address public author1 = address(0x1111111111111111111111111111111111111111);
     address public author2 = address(0x2222222222222222222222222222222222222222);
@@ -44,6 +58,10 @@ contract AgentRegistryTest is Test {
             abi.encodeCall(AgentRegistry.initialize, (address(this)))
         );
         registry = AgentRegistry(address(proxy));
+
+        // Deploy and configure mock factory
+        mockFactory = new MockVaultFactory();
+        registry.setFactory(address(mockFactory));
     }
 
     // ============ computeAgentId Tests ============
@@ -339,10 +357,8 @@ contract AgentRegistryTest is Test {
         vm.prank(author1);
         bytes32 agentId = registry.register(SALT_1, IMAGE_ID_1, CODE_HASH_1);
 
-        address[] memory vaults = new address[](0);
-
         vm.prank(author1);
-        registry.unregister(agentId, vaults);
+        registry.unregister(agentId);
 
         // Agent should no longer exist
         assertFalse(registry.agentExists(agentId), "Agent should not exist after unregister");
@@ -353,14 +369,14 @@ contract AgentRegistryTest is Test {
         vm.prank(author1);
         bytes32 agentId = registry.register(SALT_1, IMAGE_ID_1, CODE_HASH_1);
 
-        // Deploy mock vault with 0 assets
+        // Deploy mock vault with 0 assets and register in factory
         MockVaultForUnregister mockVault = new MockVaultForUnregister(agentId, 0);
-
         address[] memory vaults = new address[](1);
         vaults[0] = address(mockVault);
+        mockFactory.setAgentVaults(agentId, vaults);
 
         vm.prank(author1);
-        registry.unregister(agentId, vaults);
+        registry.unregister(agentId);
 
         assertFalse(registry.agentExists(agentId), "Agent should not exist after unregister");
     }
@@ -369,23 +385,19 @@ contract AgentRegistryTest is Test {
         vm.prank(author1);
         bytes32 agentId = registry.register(SALT_1, IMAGE_ID_1, CODE_HASH_1);
 
-        address[] memory vaults = new address[](0);
-
         vm.expectEmit(true, true, false, true);
         emit IAgentRegistry.AgentUnregistered(agentId, author1);
 
         vm.prank(author1);
-        registry.unregister(agentId, vaults);
+        registry.unregister(agentId);
     }
 
     function test_unregister_cleansUpMapping() public {
         vm.prank(author1);
         bytes32 agentId = registry.register(SALT_1, IMAGE_ID_1, CODE_HASH_1);
 
-        address[] memory vaults = new address[](0);
-
         vm.prank(author1);
-        registry.unregister(agentId, vaults);
+        registry.unregister(agentId);
 
         // get() should return default values
         IAgentRegistry.AgentInfo memory info = registry.get(agentId);
@@ -407,10 +419,8 @@ contract AgentRegistryTest is Test {
         bytes32 id3 = registry.register(SALT_2, IMAGE_ID_2, CODE_HASH_2);
 
         // Unregister the first agent (id1) — last element (id3) should swap into its position
-        address[] memory vaults = new address[](0);
-
         vm.prank(author1);
-        registry.unregister(id1, vaults);
+        registry.unregister(id1);
 
         assertEq(registry.agentCount(), 2, "Should have 2 agents");
         assertEq(registry.agentAt(0), id3, "id3 should have swapped into index 0");
@@ -425,10 +435,8 @@ contract AgentRegistryTest is Test {
         bytes32 id2 = registry.register(SALT_1, IMAGE_ID_2, CODE_HASH_2);
 
         // Unregister the last element
-        address[] memory vaults = new address[](0);
-
         vm.prank(author2);
-        registry.unregister(id2, vaults);
+        registry.unregister(id2);
 
         assertEq(registry.agentCount(), 1, "Should have 1 agent");
         assertEq(registry.agentAt(0), id1, "id1 should still be at index 0");
@@ -438,76 +446,38 @@ contract AgentRegistryTest is Test {
         vm.prank(author1);
         bytes32 agentId = registry.register(SALT_1, IMAGE_ID_1, CODE_HASH_1);
 
-        address[] memory vaults = new address[](0);
-
         vm.prank(author2);
         vm.expectRevert(
             abi.encodeWithSelector(
                 IAgentRegistry.NotAgentAuthor.selector, agentId, author2, author1
             )
         );
-        registry.unregister(agentId, vaults);
+        registry.unregister(agentId);
     }
 
     function test_unregister_nonExistentAgent_reverts() public {
         bytes32 fakeAgentId = bytes32(uint256(0xDEAD));
-        address[] memory vaults = new address[](0);
 
         vm.prank(author1);
         vm.expectRevert(abi.encodeWithSelector(IAgentRegistry.AgentNotFound.selector, fakeAgentId));
-        registry.unregister(fakeAgentId, vaults);
+        registry.unregister(fakeAgentId);
     }
 
     function test_unregister_vaultHasDeposits_reverts() public {
         vm.prank(author1);
         bytes32 agentId = registry.register(SALT_1, IMAGE_ID_1, CODE_HASH_1);
 
-        // Deploy mock vault with 1000 assets
+        // Deploy mock vault with 1000 assets and register in factory
         MockVaultForUnregister mockVault = new MockVaultForUnregister(agentId, 1000);
-
         address[] memory vaults = new address[](1);
         vaults[0] = address(mockVault);
+        mockFactory.setAgentVaults(agentId, vaults);
 
         vm.prank(author1);
         vm.expectRevert(
             abi.encodeWithSelector(IAgentRegistry.VaultHasDeposits.selector, address(mockVault), 1000)
         );
-        registry.unregister(agentId, vaults);
-    }
-
-    function test_unregister_vaultAgentIdMismatch_reverts() public {
-        vm.prank(author1);
-        bytes32 agentId = registry.register(SALT_1, IMAGE_ID_1, CODE_HASH_1);
-
-        // Deploy mock vault with a different agentId
-        bytes32 wrongAgentId = bytes32(uint256(0xBEEF));
-        MockVaultForUnregister mockVault = new MockVaultForUnregister(wrongAgentId, 0);
-
-        address[] memory vaults = new address[](1);
-        vaults[0] = address(mockVault);
-
-        vm.prank(author1);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAgentRegistry.VaultAgentIdMismatch.selector, address(mockVault), agentId, wrongAgentId
-            )
-        );
-        registry.unregister(agentId, vaults);
-    }
-
-    function test_unregister_vaultNotDeployed_reverts() public {
-        vm.prank(author1);
-        bytes32 agentId = registry.register(SALT_1, IMAGE_ID_1, CODE_HASH_1);
-
-        // Use an EOA address (no code)
-        address eoa = address(0x9999999999999999999999999999999999999999);
-
-        address[] memory vaults = new address[](1);
-        vaults[0] = eoa;
-
-        vm.prank(author1);
-        vm.expectRevert(abi.encodeWithSelector(IAgentRegistry.VaultNotDeployed.selector, eoa));
-        registry.unregister(agentId, vaults);
+        registry.unregister(agentId);
     }
 
     function test_unregister_multipleVaults_allEmpty_success() public {
@@ -520,9 +490,10 @@ contract AgentRegistryTest is Test {
         address[] memory vaults = new address[](2);
         vaults[0] = address(vault1);
         vaults[1] = address(vault2);
+        mockFactory.setAgentVaults(agentId, vaults);
 
         vm.prank(author1);
-        registry.unregister(agentId, vaults);
+        registry.unregister(agentId);
 
         assertFalse(registry.agentExists(agentId));
     }
@@ -537,22 +508,21 @@ contract AgentRegistryTest is Test {
         address[] memory vaults = new address[](2);
         vaults[0] = address(vault1);
         vaults[1] = address(vault2);
+        mockFactory.setAgentVaults(agentId, vaults);
 
         vm.prank(author1);
         vm.expectRevert(
             abi.encodeWithSelector(IAgentRegistry.VaultHasDeposits.selector, address(vault2), 500)
         );
-        registry.unregister(agentId, vaults);
+        registry.unregister(agentId);
     }
 
     function test_unregister_canReRegisterAfter() public {
         vm.prank(author1);
         bytes32 agentId = registry.register(SALT_1, IMAGE_ID_1, CODE_HASH_1);
 
-        address[] memory vaults = new address[](0);
-
         vm.prank(author1);
-        registry.unregister(agentId, vaults);
+        registry.unregister(agentId);
 
         // Re-register with same salt
         vm.prank(author1);
@@ -561,6 +531,26 @@ contract AgentRegistryTest is Test {
         assertEq(newAgentId, agentId, "Re-registration should produce same agentId");
         assertTrue(registry.agentExists(newAgentId));
         assertEq(registry.agentCount(), 1);
+    }
+
+    // ============ setFactory Tests ============
+
+    function test_setFactory_success() public {
+        address newFactory = address(0xFACE);
+        registry.setFactory(newFactory);
+        assertEq(registry.factory(), newFactory, "Factory should be updated");
+    }
+
+    function test_setFactory_notOwner_reverts() public {
+        vm.prank(author1);
+        vm.expectRevert(
+            abi.encodeWithSelector(AgentRegistry.OwnableUnauthorizedAccount.selector, author1)
+        );
+        registry.setFactory(address(0xFACE));
+    }
+
+    function test_factory_returnsAddress() public view {
+        assertEq(registry.factory(), address(mockFactory), "Factory should match mock");
     }
 
     // ============ UUPS Tests ============

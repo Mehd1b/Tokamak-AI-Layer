@@ -55,6 +55,11 @@ interface IVaultFactory {
     /// @return All vault addresses as an array
     function getAllVaults() external view returns (address[] memory);
 
+    /// @notice Get all vault addresses deployed for a specific agent
+    /// @param agentIdQuery The agent ID to query
+    /// @return All vault addresses for that agent
+    function getAgentVaults(bytes32 agentIdQuery) external view returns (address[] memory);
+
     /// @notice Get the VaultCreationCodeStore address
     /// @return The code store contract whose runtime bytecode is KernelVault creation code
     function vaultCreationCodeStore() external view returns (address);

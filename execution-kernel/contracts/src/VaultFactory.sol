@@ -32,8 +32,11 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     /// @notice Contract whose runtime bytecode is KernelVault creation code
     address public _vaultCreationCodeStore;
 
+    /// @notice Mapping from agentId to all vault addresses deployed for that agent
+    mapping(bytes32 => address[]) internal _agentVaults;
+
     /// @notice Storage gap for future upgrades
-    uint256[45] private __gap;
+    uint256[44] private __gap;
 
     // ============ Errors ============
 
@@ -174,6 +177,7 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         // Track deployment
         isDeployedVault[vault] = true;
         _deployedVaults.push(vault);
+        _agentVaults[agentId].push(vault);
 
         emit VaultDeployed(vault, msg.sender, agentId, asset, agentInfo.imageId, salt);
 
@@ -193,6 +197,11 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     /// @inheritdoc IVaultFactory
     function getAllVaults() external view returns (address[] memory) {
         return _deployedVaults;
+    }
+
+    /// @inheritdoc IVaultFactory
+    function getAgentVaults(bytes32 agentIdQuery) external view returns (address[] memory) {
+        return _agentVaults[agentIdQuery];
     }
 
     // ============ Internal Functions ============

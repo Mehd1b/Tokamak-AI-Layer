@@ -70,6 +70,59 @@ export function useDeployVault() {
   return { deploy, hash, isPending, isConfirming, isSuccess, error };
 }
 
+/** Batch an array of multicall contracts into chunks to avoid RPC size limits. */
+async function batchedMulticall(client: any, contracts: any[], batchSize = 20): Promise<any[]> {
+  const results: any[] = [];
+  for (let i = 0; i < contracts.length; i += batchSize) {
+    const batch = contracts.slice(i, i + batchSize);
+    const batchResults = await client.multicall({ contracts: batch });
+    results.push(...batchResults);
+  }
+  return results;
+}
+
+/** Fetch vault info for a single vault via individual reads (no multicall). */
+async function fetchVaultInfoDirect(client: any, vaultAddress: `0x${string}`): Promise<VaultInfo> {
+  const [agentId, asset, totalAssets, totalShares] = await Promise.all([
+    client.readContract({ address: vaultAddress, abi: KernelVaultABI, functionName: 'agentId' }).catch(() => '0x'),
+    client.readContract({ address: vaultAddress, abi: KernelVaultABI, functionName: 'asset' }).catch(() => '0x'),
+    client.readContract({ address: vaultAddress, abi: KernelVaultABI, functionName: 'totalAssets' }).catch(() => BigInt(0)),
+    client.readContract({ address: vaultAddress, abi: KernelVaultABI, functionName: 'totalShares' }).catch(() => BigInt(0)),
+  ]);
+
+  let totalValueLocked: bigint;
+  try {
+    totalValueLocked = await client.readContract({ address: vaultAddress, abi: KernelVaultABI, functionName: 'totalValueLocked' }) as bigint;
+  } catch {
+    totalValueLocked = totalAssets as bigint;
+  }
+
+  const isEth = (asset as string) === ZERO_ADDRESS;
+  let assetDecimals = 18;
+  let assetSymbol = isEth ? 'ETH' : 'TOKEN';
+  if (!isEth) {
+    try {
+      const [dec, sym] = await Promise.all([
+        client.readContract({ address: asset as `0x${string}`, abi: ERC20_METADATA_ABI, functionName: 'decimals' }),
+        client.readContract({ address: asset as `0x${string}`, abi: ERC20_METADATA_ABI, functionName: 'symbol' }),
+      ]);
+      assetDecimals = Number(dec);
+      assetSymbol = String(sym);
+    } catch {}
+  }
+
+  return {
+    address: vaultAddress,
+    agentId: agentId as string,
+    asset: asset as string,
+    totalAssets: totalAssets as bigint,
+    totalShares: totalShares as bigint,
+    totalValueLocked,
+    assetDecimals,
+    assetSymbol,
+  };
+}
+
 export function useDeployedVaultsList() {
   const { contracts, selectedChainId } = useNetwork();
   const client = usePublicClient({ chainId: selectedChainId });
@@ -87,7 +140,7 @@ export function useDeployedVaultsList() {
 
       if (vaultAddresses.length === 0) return [];
 
-      // Try multicall first, fall back to individual reads (some chains lack multicall3)
+      // Try batched multicall first, fall back to sequential individual reads
       try {
         const calls = vaultAddresses.flatMap((vaultAddress) => [
           { address: vaultAddress, abi: KernelVaultABI, functionName: 'agentId' as const },
@@ -96,7 +149,7 @@ export function useDeployedVaultsList() {
           { address: vaultAddress, abi: KernelVaultABI, functionName: 'totalShares' as const },
         ]);
 
-        const results = await client.multicall({ contracts: calls });
+        const results = await batchedMulticall(client, calls);
 
         const tvlCalls = vaultAddresses.map((vaultAddress) => ({
           address: vaultAddress,
@@ -104,7 +157,7 @@ export function useDeployedVaultsList() {
           functionName: 'totalValueLocked' as const,
         }));
 
-        const tvlResults = await client.multicall({ contracts: tvlCalls });
+        const tvlResults = await batchedMulticall(client, tvlCalls);
 
         // Fetch ERC-20 metadata (decimals, symbol) for each vault's asset
         const metaCalls = vaultAddresses.flatMap((_, i) => {
@@ -116,7 +169,7 @@ export function useDeployedVaultsList() {
           ];
         });
         let metaResults: any[] = [];
-        try { metaResults = await client.multicall({ contracts: metaCalls }); } catch {}
+        try { metaResults = await batchedMulticall(client, metaCalls); } catch {}
 
         return vaultAddresses.map((vaultAddress, i) => {
           const base = i * 4;
@@ -135,49 +188,15 @@ export function useDeployedVaultsList() {
           return { address: vaultAddress, agentId, asset, totalAssets, totalShares, totalValueLocked, assetDecimals, assetSymbol };
         });
       } catch {
-        // Fallback: individual reads (for chains without multicall3)
-        const vaults = await Promise.all(
-          vaultAddresses.map(async (vaultAddress) => {
-            const [agentId, asset, totalAssets, totalShares] = await Promise.all([
-              client.readContract({ address: vaultAddress, abi: KernelVaultABI, functionName: 'agentId' }).catch(() => '0x'),
-              client.readContract({ address: vaultAddress, abi: KernelVaultABI, functionName: 'asset' }).catch(() => '0x'),
-              client.readContract({ address: vaultAddress, abi: KernelVaultABI, functionName: 'totalAssets' }).catch(() => BigInt(0)),
-              client.readContract({ address: vaultAddress, abi: KernelVaultABI, functionName: 'totalShares' }).catch(() => BigInt(0)),
-            ]);
-
-            let totalValueLocked: bigint;
-            try {
-              totalValueLocked = await client.readContract({ address: vaultAddress, abi: KernelVaultABI, functionName: 'totalValueLocked' }) as bigint;
-            } catch {
-              totalValueLocked = totalAssets as bigint;
-            }
-
-            const isEth = (asset as string) === ZERO_ADDRESS;
-            let assetDecimals = 18;
-            let assetSymbol = isEth ? 'ETH' : 'TOKEN';
-            if (!isEth) {
-              try {
-                const [dec, sym] = await Promise.all([
-                  client.readContract({ address: asset as `0x${string}`, abi: ERC20_METADATA_ABI, functionName: 'decimals' }),
-                  client.readContract({ address: asset as `0x${string}`, abi: ERC20_METADATA_ABI, functionName: 'symbol' }),
-                ]);
-                assetDecimals = Number(dec);
-                assetSymbol = String(sym);
-              } catch {}
-            }
-
-            return {
-              address: vaultAddress,
-              agentId: agentId as string,
-              asset: asset as string,
-              totalAssets: totalAssets as bigint,
-              totalShares: totalShares as bigint,
-              totalValueLocked,
-              assetDecimals,
-              assetSymbol,
-            };
-          }),
-        );
+        // Fallback: sequential individual reads (for RPCs with strict limits)
+        const vaults: VaultInfo[] = [];
+        for (const vaultAddress of vaultAddresses) {
+          try {
+            vaults.push(await fetchVaultInfoDirect(client, vaultAddress));
+          } catch {
+            // Skip vaults that fail to load
+          }
+        }
         return vaults;
       }
     },

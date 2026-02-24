@@ -41,10 +41,9 @@ interface IAgentRegistry {
     ) external;
 
     /// @notice Unregister an agent (author only)
-    /// @dev All vaults for this agent must have zero total assets before unregistration.
+    /// @dev All vaults for this agent (queried from VaultFactory) must have zero total assets.
     /// @param agentId The agent ID to unregister
-    /// @param vaults All vault addresses deployed for this agent (caller must provide all)
-    function unregister(bytes32 agentId, address[] calldata vaults) external;
+    function unregister(bytes32 agentId) external;
 
     /// @notice Get agent information
     /// @param agentId The agent ID to query

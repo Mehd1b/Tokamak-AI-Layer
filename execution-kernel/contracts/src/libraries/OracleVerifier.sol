@@ -20,19 +20,33 @@ library OracleVerifier {
     /// @notice Recovered signer does not match expected oracle signer
     error SignerMismatch(address recovered, address expected);
 
+    /// @notice Oracle data is stale (too old)
+    error OracleDataStale(uint64 oracleTimestamp, uint64 maxAge, uint256 blockTimestamp);
+
     // ============ Functions ============
 
     /// @notice Verify an ECDSA signature over a feed hash (view, does not revert)
     /// @param feedHash SHA-256 hash of the oracle price feed body
     /// @param signature 65-byte ECDSA signature (r[32] || s[32] || v[1])
     /// @param expectedSigner The trusted oracle signer address
+    /// @param oracleTimestamp Timestamp of the oracle data
+    /// @param chainId Chain ID to bind the signature to
+    /// @param vaultAddress Vault address to bind the signature to
+    /// @param maxOracleAge Maximum age of oracle data in seconds (0 = no age check)
     /// @return True if the signature is valid and matches expectedSigner
     function verifyOracleSignature(
         bytes32 feedHash,
         bytes memory signature,
-        address expectedSigner
-    ) internal pure returns (bool) {
+        address expectedSigner,
+        uint64 oracleTimestamp,
+        uint256 chainId,
+        address vaultAddress,
+        uint64 maxOracleAge
+    ) internal view returns (bool) {
         if (signature.length != 65) return false;
+
+        // Check freshness
+        if (maxOracleAge > 0 && block.timestamp - oracleTimestamp > maxOracleAge) return false;
 
         bytes32 r;
         bytes32 s;
@@ -45,8 +59,10 @@ library OracleVerifier {
 
         if (v != 27 && v != 28) return false;
 
+        // Include timestamp, chainId, and vaultAddress in signed message to prevent replay
+        bytes32 domainFeedHash = keccak256(abi.encodePacked(feedHash, oracleTimestamp, chainId, vaultAddress));
         bytes32 ethSignedHash = keccak256(
-            abi.encodePacked("\x19Ethereum Signed Message:\n32", feedHash)
+            abi.encodePacked("\x19Ethereum Signed Message:\n32", domainFeedHash)
         );
 
         address recovered = ecrecover(ethSignedHash, v, r, s);
@@ -59,13 +75,26 @@ library OracleVerifier {
     /// @param feedHash SHA-256 hash of the oracle price feed body
     /// @param signature 65-byte ECDSA signature (r[32] || s[32] || v[1])
     /// @param expectedSigner The trusted oracle signer address
+    /// @param oracleTimestamp Timestamp of the oracle data
+    /// @param chainId Chain ID to bind the signature to
+    /// @param vaultAddress Vault address to bind the signature to
+    /// @param maxOracleAge Maximum age of oracle data in seconds (0 = no age check)
     function requireValidOracleSignature(
         bytes32 feedHash,
         bytes memory signature,
-        address expectedSigner
-    ) internal pure {
+        address expectedSigner,
+        uint64 oracleTimestamp,
+        uint256 chainId,
+        address vaultAddress,
+        uint64 maxOracleAge
+    ) internal view {
         if (signature.length != 65) {
             revert InvalidSignatureLength(signature.length);
+        }
+
+        // Check freshness
+        if (maxOracleAge > 0 && block.timestamp - oracleTimestamp > maxOracleAge) {
+            revert OracleDataStale(oracleTimestamp, maxOracleAge, block.timestamp);
         }
 
         bytes32 r;
@@ -81,8 +110,10 @@ library OracleVerifier {
             revert InvalidRecoveryId(v);
         }
 
+        // Include timestamp, chainId, and vaultAddress in signed message to prevent replay
+        bytes32 domainFeedHash = keccak256(abi.encodePacked(feedHash, oracleTimestamp, chainId, vaultAddress));
         bytes32 ethSignedHash = keccak256(
-            abi.encodePacked("\x19Ethereum Signed Message:\n32", feedHash)
+            abi.encodePacked("\x19Ethereum Signed Message:\n32", domainFeedHash)
         );
 
         address recovered = ecrecover(ethSignedHash, v, r, s);

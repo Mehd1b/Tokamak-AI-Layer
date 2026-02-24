@@ -5,17 +5,20 @@ import { Test, console2 } from "forge-std/Test.sol";
 import { KernelVault } from "../src/KernelVault.sol";
 import { KernelOutputParser } from "../src/KernelOutputParser.sol";
 import { MockKernelExecutionVerifier } from "./mocks/MockKernelExecutionVerifier.sol";
+import { MockCallTarget } from "./mocks/MockCallTarget.sol";
 import { MockERC20 } from "./mocks/MockERC20.sol";
 
 /// @title KernelVault Snapshot PPS Tests
 /// @notice Tests for yield dilution protection via snapshot PPS accounting
-/// @dev Validates that CALL actions reducing tracked asset balance trigger PPS snapshots,
-///      preventing new depositors from minting shares at artificially low prices.
+/// @dev Validates that TRANSFER_ERC20 and CALL actions reducing tracked asset balance trigger
+///      PPS snapshots, preventing new depositors from minting shares at artificially low prices.
+///      Share amounts reflect the 1000x virtual offset (first deposit of X → X*1000 shares).
 contract KernelVaultSnapshotPPSTest is Test {
     KernelVault public vault;
     KernelVault public ethVault;
     MockKernelExecutionVerifier public mockVerifier;
     MockERC20 public token;
+    MockCallTarget public callTarget;
 
     address public userA = address(0x1111111111111111111111111111111111111111);
     address public userB = address(0x2222222222222222222222222222222222222222);
@@ -26,6 +29,9 @@ contract KernelVaultSnapshotPPSTest is Test {
 
     bytes public constant DUMMY_JOURNAL = hex"00";
     bytes public constant DUMMY_SEAL = hex"00";
+
+    /// @dev Virtual offset multiplier — first deposit of X assets yields X * OFFSET shares
+    uint256 internal constant OFFSET = 1000;
 
     uint64 public nextNonce = 1;
 
@@ -51,6 +57,9 @@ contract KernelVaultSnapshotPPSTest is Test {
         // Deploy ETH vault
         ethVault = new KernelVault(address(0), address(mockVerifier), AGENT_ID, IMAGE_ID, address(this));
 
+        // Deploy mock call target (for tests that need a non-asset CALL target)
+        callTarget = new MockCallTarget();
+
         // Fund users
         token.mint(userA, 1000 ether);
         token.mint(userB, 1000 ether);
@@ -63,20 +72,17 @@ contract KernelVaultSnapshotPPSTest is Test {
 
     // ============ Helpers ============
 
-    /// @notice Build a CALL action that transfers ERC20 tokens from vault to an external address
-    /// @dev Simulates vault calling token.transfer(to, amount) — reducing tracked asset balance
-    function _buildTokenTransferCall(address to, uint256 amount)
+    /// @notice Build a TRANSFER_ERC20 action that sends vault asset tokens to an external address
+    function _buildTransferAction(address to, uint256 amount)
         internal
         view
         returns (bytes memory)
     {
-        bytes memory callData =
-            abi.encodeWithSignature("transfer(address,uint256)", to, amount);
-        bytes memory payload = abi.encode(uint256(0), callData);
+        bytes memory payload = abi.encode(address(token), to, amount);
 
         KernelOutputParser.Action[] memory actions = new KernelOutputParser.Action[](1);
         actions[0] = KernelOutputParser.Action({
-            actionType: KernelOutputParser.ACTION_TYPE_CALL,
+            actionType: KernelOutputParser.ACTION_TYPE_TRANSFER_ERC20,
             target: bytes32(uint256(uint160(address(token)))),
             payload: payload
         });
@@ -102,27 +108,34 @@ contract KernelVaultSnapshotPPSTest is Test {
         return KernelOutputParser.encodeAgentOutput(actions);
     }
 
-    /// @notice Build two CALL actions in one execution
-    function _buildTwoTokenTransferCalls(address to1, uint256 amount1, address to2, uint256 amount2)
+    /// @notice Build two TRANSFER_ERC20 actions in one execution
+    function _buildTwoTransferActions(address to1, uint256 amount1, address to2, uint256 amount2)
         internal
         view
         returns (bytes memory)
     {
-        bytes memory callData1 =
-            abi.encodeWithSignature("transfer(address,uint256)", to1, amount1);
-        bytes memory callData2 =
-            abi.encodeWithSignature("transfer(address,uint256)", to2, amount2);
-
         KernelOutputParser.Action[] memory actions = new KernelOutputParser.Action[](2);
         actions[0] = KernelOutputParser.Action({
-            actionType: KernelOutputParser.ACTION_TYPE_CALL,
+            actionType: KernelOutputParser.ACTION_TYPE_TRANSFER_ERC20,
             target: bytes32(uint256(uint160(address(token)))),
-            payload: abi.encode(uint256(0), callData1)
+            payload: abi.encode(address(token), to1, amount1)
         });
         actions[1] = KernelOutputParser.Action({
-            actionType: KernelOutputParser.ACTION_TYPE_CALL,
+            actionType: KernelOutputParser.ACTION_TYPE_TRANSFER_ERC20,
             target: bytes32(uint256(uint160(address(token)))),
-            payload: abi.encode(uint256(0), callData2)
+            payload: abi.encode(address(token), to2, amount2)
+        });
+
+        return KernelOutputParser.encodeAgentOutput(actions);
+    }
+
+    /// @notice Build a NO_OP action (for testing non-balance-changing executions)
+    function _buildNoOpAction() internal pure returns (bytes memory) {
+        KernelOutputParser.Action[] memory actions = new KernelOutputParser.Action[](1);
+        actions[0] = KernelOutputParser.Action({
+            actionType: KernelOutputParser.ACTION_TYPE_NO_OP,
+            target: bytes32(0),
+            payload: ""
         });
 
         return KernelOutputParser.encodeAgentOutput(actions);
@@ -139,16 +152,16 @@ contract KernelVaultSnapshotPPSTest is Test {
 
     // ============ Core: Yield Dilution Prevention ============
 
-    /// @notice Exact attack scenario from the plan — verify fair share distribution
-    function test_yieldDilution_snapshotPrevents() public {
-        // Step 1: User A deposits 100 ETH worth of tokens → 100 shares (PPS=1.0)
+    /// @notice Exact attack scenario — deposits blocked during strategy prevent yield dilution
+    function test_yieldDilution_depositsBlockedDuringStrategy() public {
+        // Step 1: User A deposits 100 tokens → 100_000 shares (virtual offset: 100 * 1000)
         vm.prank(userA);
         vault.depositERC20Tokens(100 ether);
-        assertEq(vault.shares(userA), 100 ether);
+        assertEq(vault.shares(userA), 100 ether * OFFSET);
         assertEq(vault.totalAssets(), 100 ether);
 
-        // Step 2: CALL stakes 90 tokens externally → vault has 10 tokens + 90 elsewhere
-        bytes memory agentOutput = _buildTokenTransferCall(externalProtocol, 90 ether);
+        // Step 2: TRANSFER_ERC20 sends 90 tokens externally → vault has 10 tokens + 90 elsewhere
+        bytes memory agentOutput = _buildTransferAction(externalProtocol, 90 ether);
         _executeWithCommitment(vault, agentOutput);
 
         // Verify state: totalAssets dropped but strategy is active with snapshot
@@ -157,69 +170,58 @@ contract KernelVaultSnapshotPPSTest is Test {
         assertEq(vault.snapshotTotalAssets(), 100 ether);
         assertEq(vault.effectiveTotalAssets(), 100 ether);
 
-        // Step 3: User B deposits 100 tokens — should get ~100 shares (not 1000!)
+        // Step 3: User B tries to deposit — BLOCKED
         vm.prank(userB);
-        uint256 userBShares = vault.depositERC20Tokens(100 ether);
+        vm.expectRevert(KernelVault.DepositsLockedDuringStrategy.selector);
+        vault.depositERC20Tokens(100 ether);
 
-        // shares = 100 * 100 / 100 = 100 (fair price, NOT 100 * 100 / 10 = 1000)
-        assertEq(userBShares, 100 ether);
-
-        // Step 4: Assets return (simulate unstaking — 90 tokens + 30 yield = 120 return)
+        // Step 4: Assets return with profit (90 principal + 10 yield = 100 returned)
         token.mint(address(vault), 90 ether);
-        // Now vault has 10 + 100 (userB) + 90 (returned) = 200 tokens
-        // Snapshot updated to 200 (100 original + 100 userB deposit), settle
         vault.settle();
 
-        assertEq(vault.totalAssets(), 200 ether);
-        assertEq(vault.totalShares(), 200 ether);
+        assertEq(vault.totalAssets(), 100 ether);
+        assertEq(vault.totalShares(), 100 ether * OFFSET);
         assertFalse(vault.strategyActive());
 
-        // Step 5: Both users withdraw — fair distribution
+        // Step 5: User A withdraws all — gets full amount (no dilution)
         vm.prank(userA);
-        uint256 userAOut = vault.withdraw(100 ether);
-        vm.prank(userB);
-        uint256 userBOut = vault.withdraw(100 ether);
-
-        // Both get 100 tokens each (1:1 PPS since no yield in this scenario)
+        uint256 userAOut = vault.withdraw(100 ether * OFFSET);
         assertEq(userAOut, 100 ether);
-        assertEq(userBOut, 100 ether);
+
+        // Vault is now empty (totalAssets=0, totalShares=0)
+        assertEq(vault.totalShares(), 0);
+        assertEq(vault.totalAssets(), 0);
+
+        // Step 6: User B deposits into empty vault at 1:OFFSET
+        vm.prank(userB);
+        uint256 userBShares = vault.depositERC20Tokens(100 ether);
+        assertEq(userBShares, 100 ether * OFFSET);
     }
 
     // ============ Strategy Activation ============
 
-    /// @notice Strategy becomes active when CALL reduces tracked asset balance
-    function test_strategyActive_afterCallReducesBalance() public {
+    /// @notice Strategy becomes active when TRANSFER_ERC20 reduces tracked asset balance
+    function test_strategyActive_afterTransferReducesBalance() public {
         vm.prank(userA);
         vault.depositERC20Tokens(100 ether);
 
         assertFalse(vault.strategyActive());
 
-        bytes memory agentOutput = _buildTokenTransferCall(externalProtocol, 50 ether);
+        bytes memory agentOutput = _buildTransferAction(externalProtocol, 50 ether);
         _executeWithCommitment(vault, agentOutput);
 
         assertTrue(vault.strategyActive());
         assertEq(vault.snapshotTotalAssets(), 100 ether);
-        assertEq(vault.snapshotTotalShares(), 100 ether);
+        assertEq(vault.snapshotTotalShares(), 100 ether * OFFSET);
     }
 
-    /// @notice Strategy does NOT activate when CALL doesn't reduce balance
-    function test_strategyNotActive_whenCallDoesntReduceBalance() public {
+    /// @notice Strategy does NOT activate when a non-balance-changing action is executed
+    function test_strategyNotActive_whenNoBalanceChange() public {
         vm.prank(userA);
         vault.depositERC20Tokens(100 ether);
 
-        // Build a CALL action that transfers 0 tokens (balance unchanged)
-        bytes memory callData =
-            abi.encodeWithSignature("transfer(address,uint256)", externalProtocol, uint256(0));
-        bytes memory payload = abi.encode(uint256(0), callData);
-
-        KernelOutputParser.Action[] memory actions = new KernelOutputParser.Action[](1);
-        actions[0] = KernelOutputParser.Action({
-            actionType: KernelOutputParser.ACTION_TYPE_CALL,
-            target: bytes32(uint256(uint160(address(token)))),
-            payload: payload
-        });
-        bytes memory agentOutput = KernelOutputParser.encodeAgentOutput(actions);
-
+        // Execute a NO_OP action (balance unchanged)
+        bytes memory agentOutput = _buildNoOpAction();
         _executeWithCommitment(vault, agentOutput);
 
         // Balance unchanged, strategy should NOT activate
@@ -229,76 +231,69 @@ contract KernelVaultSnapshotPPSTest is Test {
 
     // ============ Deposits During Strategy ============
 
-    /// @notice Deposits during active strategy use snapshot PPS (not artificially low live PPS)
-    function test_deposit_duringStrategy_usesSnapshotPPS() public {
-        // User A deposits 200 tokens → 200 shares
+    /// @notice Deposits during active strategy are blocked entirely
+    function test_deposit_duringStrategy_reverts() public {
+        // User A deposits 200 tokens → 200_000 shares
         vm.prank(userA);
         vault.depositERC20Tokens(200 ether);
 
-        // CALL sends 150 tokens externally → totalAssets = 50, but snapshot = 200
-        bytes memory agentOutput = _buildTokenTransferCall(externalProtocol, 150 ether);
+        // TRANSFER_ERC20 sends 150 tokens externally → totalAssets = 50, but snapshot = 200
+        bytes memory agentOutput = _buildTransferAction(externalProtocol, 150 ether);
         _executeWithCommitment(vault, agentOutput);
 
         assertTrue(vault.strategyActive());
-        assertEq(vault.effectiveTotalAssets(), 200 ether);
 
-        // User B deposits 100 tokens
-        // Without snapshot: shares = 100 * 200 / 50 = 400 (BAD - dilution!)
-        // With snapshot: shares = 100 * 200 / 200 = 100 (FAIR)
+        // User B tries to deposit — BLOCKED
         vm.prank(userB);
-        uint256 sharesMinted = vault.depositERC20Tokens(100 ether);
-        assertEq(sharesMinted, 100 ether);
-
-        // Snapshot should be updated to include new deposit
-        assertEq(vault.snapshotTotalAssets(), 300 ether); // 200 + 100
-        assertEq(vault.snapshotTotalShares(), 300 ether); // 200 + 100
+        vm.expectRevert(KernelVault.DepositsLockedDuringStrategy.selector);
+        vault.depositERC20Tokens(100 ether);
     }
 
     // ============ Withdrawals During Strategy ============
 
     /// @notice Withdrawals during active strategy use snapshot PPS
     function test_withdraw_duringStrategy_usesSnapshotPPS() public {
-        // User A deposits 100 tokens → 100 shares
+        // User A deposits 100 tokens → 100_000 shares
         vm.prank(userA);
         vault.depositERC20Tokens(100 ether);
 
-        // CALL sends 80 tokens externally
-        bytes memory agentOutput = _buildTokenTransferCall(externalProtocol, 80 ether);
+        // TRANSFER_ERC20 sends 80 tokens externally
+        bytes memory agentOutput = _buildTransferAction(externalProtocol, 80 ether);
         _executeWithCommitment(vault, agentOutput);
 
         assertTrue(vault.strategyActive());
         // totalAssets = 20, effectiveTotalAssets = 100
 
-        // User A withdraws 10 shares
-        // With snapshot PPS: assetsOut = 10 * 100 / 100 = 10 tokens (fair)
+        // User A withdraws 10_000 shares (10 ether worth at snapshot PPS)
+        // With snapshot PPS + offset: assetsOut = 10_000 * (100 + 1) / (100_000 + 1000) = 10 tokens
         vm.prank(userA);
-        uint256 assetsOut = vault.withdraw(10 ether);
+        uint256 assetsOut = vault.withdraw(10 ether * OFFSET);
         assertEq(assetsOut, 10 ether);
 
         // Snapshot should be updated
         assertEq(vault.snapshotTotalAssets(), 90 ether); // 100 - 10
-        assertEq(vault.snapshotTotalShares(), 90 ether); // 100 - 10
+        assertEq(vault.snapshotTotalShares(), 90 ether * OFFSET); // 100_000 - 10_000
     }
 
     /// @notice Withdrawal reverts if requested amount exceeds available balance
     function test_withdraw_duringStrategy_capsToAvailableBalance() public {
-        // User A deposits 100 tokens → 100 shares
+        // User A deposits 100 tokens → 100_000 shares
         vm.prank(userA);
         vault.depositERC20Tokens(100 ether);
 
-        // CALL sends 90 tokens externally → only 10 available
-        bytes memory agentOutput = _buildTokenTransferCall(externalProtocol, 90 ether);
+        // TRANSFER_ERC20 sends 90 tokens externally → only 10 available
+        bytes memory agentOutput = _buildTransferAction(externalProtocol, 90 ether);
         _executeWithCommitment(vault, agentOutput);
 
         assertTrue(vault.strategyActive());
         assertEq(vault.totalAssets(), 10 ether);
 
-        // Try to withdraw 50 shares → PPS says 50 tokens, but only 10 available
+        // Try to withdraw 50_000 shares → PPS says 50 tokens, but only 10 available
         vm.prank(userA);
         vm.expectRevert(
             abi.encodeWithSelector(KernelVault.InsufficientAvailableAssets.selector, 50 ether, 10 ether)
         );
-        vault.withdraw(50 ether);
+        vault.withdraw(50 ether * OFFSET);
     }
 
     // ============ Settlement ============
@@ -308,7 +303,7 @@ contract KernelVaultSnapshotPPSTest is Test {
         vm.prank(userA);
         vault.depositERC20Tokens(100 ether);
 
-        bytes memory agentOutput = _buildTokenTransferCall(externalProtocol, 60 ether);
+        bytes memory agentOutput = _buildTransferAction(externalProtocol, 60 ether);
         _executeWithCommitment(vault, agentOutput);
 
         assertTrue(vault.strategyActive());
@@ -327,48 +322,33 @@ contract KernelVaultSnapshotPPSTest is Test {
         assertEq(vault.effectiveTotalAssets(), vault.totalAssets());
     }
 
-    /// @notice Auto-settle when CALL returns balance to >= snapshot level
-    function test_settle_autoOnBalanceRecovery() public {
+    /// @notice No auto-settle — strategy stays active even when balance recovers
+    function test_noAutoSettle_balanceRecoveryDoesNotSettle() public {
         vm.prank(userA);
         vault.depositERC20Tokens(100 ether);
 
-        // CALL sends 50 tokens externally
-        bytes memory agentOutput1 = _buildTokenTransferCall(externalProtocol, 50 ether);
+        // TRANSFER_ERC20 sends 50 tokens externally
+        bytes memory agentOutput1 = _buildTransferAction(externalProtocol, 50 ether);
         _executeWithCommitment(vault, agentOutput1);
 
         assertTrue(vault.strategyActive());
         assertEq(vault.snapshotTotalAssets(), 100 ether);
 
-        // Simulate tokens returning to vault externally
+        // Simulate tokens returning to vault
         token.mint(address(vault), 60 ether);
-        // Now totalAssets = 50 + 60 - 50 (sent) = 110 > 100 (snapshot)
-        // Wait, let me recalculate: after first call, vault has 50. Then we mint 60 → vault has 110.
         assertEq(vault.totalAssets(), 110 ether);
 
-        // Next CALL action (even a no-balance-change one) should trigger auto-settle
-        // since balance (110) >= snapshot (100)
-        // Build a CALL that doesn't change ERC20 balance (calls external protocol with 0 value)
-        // Actually, we need a CALL action that goes through _executeCall
-        // The simplest: call external protocol to set storage (no token movement)
-        // But we need externalProtocol to be a contract. Let's use a different approach:
-        // Transfer 0 tokens via CALL
-        bytes memory callData =
-            abi.encodeWithSignature("transfer(address,uint256)", externalProtocol, uint256(0));
-        bytes memory payload = abi.encode(uint256(0), callData);
-
-        KernelOutputParser.Action[] memory actions = new KernelOutputParser.Action[](1);
-        actions[0] = KernelOutputParser.Action({
-            actionType: KernelOutputParser.ACTION_TYPE_CALL,
-            target: bytes32(uint256(uint160(address(token)))),
-            payload: payload
-        });
-        bytes memory agentOutput2 = KernelOutputParser.encodeAgentOutput(actions);
+        // Execute a NO_OP — strategy should NOT auto-settle
+        bytes memory agentOutput2 = _buildNoOpAction();
         _executeWithCommitment(vault, agentOutput2);
 
-        // Should have auto-settled since balance (110) >= snapshot (100)
+        // Strategy stays active — owner must call settle() explicitly
+        assertTrue(vault.strategyActive());
+        assertEq(vault.snapshotTotalAssets(), 100 ether);
+
+        // Owner settles
+        vault.settle();
         assertFalse(vault.strategyActive());
-        assertEq(vault.snapshotTotalAssets(), 0);
-        assertEq(vault.snapshotTotalShares(), 0);
     }
 
     /// @notice settle() reverts when strategy is not active
@@ -382,38 +362,56 @@ contract KernelVaultSnapshotPPSTest is Test {
         vault.settle();
     }
 
-    // ============ Multiple Calls ============
-
-    /// @notice Multiple CALL actions in one execution — snapshot taken once (on first decrease)
-    function test_multipleCallsInExecution_snapshotOnce() public {
+    /// @notice settle() reverts when called by non-owner (prevents griefing to bypass deposit lock)
+    function test_settle_revertsWhenNotOwner() public {
         vm.prank(userA);
         vault.depositERC20Tokens(100 ether);
 
-        // Build two CALL actions: first sends 30, second sends 20
+        bytes memory agentOutput = _buildTransferAction(externalProtocol, 50 ether);
+        _executeWithCommitment(vault, agentOutput);
+        assertTrue(vault.strategyActive());
+
+        // Non-owner tries to settle to bypass deposit lock — BLOCKED
+        vm.prank(userB);
+        vm.expectRevert(KernelVault.NotOwner.selector);
+        vault.settle();
+
+        // Strategy still active, deposits still locked
+        assertTrue(vault.strategyActive());
+    }
+
+    // ============ Multiple Transfers ============
+
+    /// @notice Multiple TRANSFER_ERC20 actions in one execution — snapshot taken once (on first decrease)
+    function test_multipleTransfersInExecution_snapshotOnce() public {
+        vm.prank(userA);
+        vault.depositERC20Tokens(100 ether);
+
+        // Build two TRANSFER_ERC20 actions: first sends 30, second sends 20
         bytes memory agentOutput =
-            _buildTwoTokenTransferCalls(externalProtocol, 30 ether, externalProtocol, 20 ether);
+            _buildTwoTransferActions(externalProtocol, 30 ether, externalProtocol, 20 ether);
         _executeWithCommitment(vault, agentOutput);
 
         assertTrue(vault.strategyActive());
-        // Snapshot should capture state BEFORE first decrease (100 tokens, 100 shares)
+        // Snapshot should capture state BEFORE first decrease (100 tokens, 100_000 shares)
         assertEq(vault.snapshotTotalAssets(), 100 ether);
-        assertEq(vault.snapshotTotalShares(), 100 ether);
+        assertEq(vault.snapshotTotalShares(), 100 ether * OFFSET);
         // Actual balance is 50 (100 - 30 - 20)
         assertEq(vault.totalAssets(), 50 ether);
     }
 
     // ============ ETH Vault ============
 
-    /// @notice Snapshot PPS works for ETH vaults
-    function test_ethVault_snapshotPPS() public {
+    /// @notice ETH deposits blocked during active strategy
+    function test_ethVault_depositBlocked_duringStrategy() public {
         // Fund users with ETH
         vm.deal(userA, 100 ether);
         vm.deal(userB, 100 ether);
 
-        // User A deposits 100 ETH
+        // User A deposits 100 ETH → 100_000 shares
         vm.prank(userA);
         ethVault.depositETH{ value: 100 ether }();
-        assertEq(ethVault.shares(userA), 100 ether);
+        assertEq(ethVault.shares(userA), 100 ether * OFFSET);
 
         // CALL sends 80 ETH to external protocol
         bytes memory agentOutput = _buildETHSendCall(externalProtocol, 80 ether);
@@ -423,10 +421,10 @@ contract KernelVaultSnapshotPPSTest is Test {
         assertEq(ethVault.snapshotTotalAssets(), 100 ether);
         assertEq(address(ethVault).balance, 20 ether);
 
-        // User B deposits 100 ETH — should get 100 shares (not 500)
+        // User B tries to deposit ETH — BLOCKED
         vm.prank(userB);
-        uint256 sharesMinted = ethVault.depositETH{ value: 100 ether }();
-        assertEq(sharesMinted, 100 ether);
+        vm.expectRevert(KernelVault.DepositsLockedDuringStrategy.selector);
+        ethVault.depositETH{ value: 100 ether }();
     }
 
     // ============ Convert Functions During Strategy ============
@@ -436,15 +434,80 @@ contract KernelVaultSnapshotPPSTest is Test {
         vm.prank(userA);
         vault.depositERC20Tokens(100 ether);
 
-        // CALL sends 80 tokens externally
-        bytes memory agentOutput = _buildTokenTransferCall(externalProtocol, 80 ether);
+        // TRANSFER_ERC20 sends 80 tokens externally
+        bytes memory agentOutput = _buildTransferAction(externalProtocol, 80 ether);
         _executeWithCommitment(vault, agentOutput);
 
         assertTrue(vault.strategyActive());
 
-        // Without snapshot: convertToShares(100) = 100 * 100 / 20 = 500 (wrong)
-        // With snapshot: convertToShares(100) = 100 * 100 / 100 = 100 (correct)
-        assertEq(vault.convertToShares(100 ether), 100 ether);
+        // With snapshot (effective=100): convertToShares(100) = 100 * (100_000 + 1000) / (100 + 1)
+        // = 100 * 101_000 / 101 = 100_000 shares (exact)
+        assertEq(vault.convertToShares(100 ether), 100 ether * OFFSET);
+    }
+
+    /// @notice Deposit succeeds after strategy settles at correct post-profit PPS
+    function test_deposit_afterSettlement_succeeds() public {
+        // User A deposits 100 tokens → 100_000 shares
+        vm.prank(userA);
+        vault.depositERC20Tokens(100 ether);
+
+        // TRANSFER_ERC20 sends 80 tokens externally
+        bytes memory agentOutput = _buildTransferAction(externalProtocol, 80 ether);
+        _executeWithCommitment(vault, agentOutput);
+        assertTrue(vault.strategyActive());
+
+        // Assets return with profit: 80 principal + 20 yield = 100 returned
+        token.mint(address(vault), 100 ether);
+        // Vault now has 20 (remaining) + 100 (returned) = 120 tokens
+        vault.settle();
+
+        assertFalse(vault.strategyActive());
+        assertEq(vault.totalAssets(), 120 ether);
+        assertEq(vault.totalShares(), 100 ether * OFFSET);
+        // PPS = 120/100_000 → 1.2 per 1000 shares
+
+        // User B deposits 120 tokens → gets ~100_000 shares
+        // shares = 120 * (100_000 + 1000) / (120 + 1) = 120 * 101_000 / 121
+        vm.prank(userB);
+        uint256 sharesMinted = vault.depositERC20Tokens(120 ether);
+        // Should be very close to 100_000 ether (approximately, due to virtual offset rounding)
+        assertApproxEqAbs(sharesMinted, 100 ether * OFFSET, 1e3);
+    }
+
+    /// @notice Full yield dilution prevention scenario end-to-end
+    function test_yieldDilution_prevented_fullScenario() public {
+        // Step 1: User A deposits 10 tokens → 10_000 shares
+        vm.prank(userA);
+        vault.depositERC20Tokens(10 ether);
+
+        // Step 2: Operator deploys all 10 tokens to external protocol
+        bytes memory agentOutput = _buildTransferAction(externalProtocol, 10 ether);
+        _executeWithCommitment(vault, agentOutput);
+        assertTrue(vault.strategyActive());
+        assertEq(vault.totalAssets(), 0);
+
+        // Step 3: User B tries to front-run settlement — BLOCKED
+        vm.prank(userB);
+        vm.expectRevert(KernelVault.DepositsLockedDuringStrategy.selector);
+        vault.depositERC20Tokens(10 ether);
+
+        // Step 4: Operator returns with profit (10 + 2 = 12)
+        token.mint(address(vault), 12 ether);
+        vault.settle();
+
+        assertFalse(vault.strategyActive());
+        assertEq(vault.totalAssets(), 12 ether);
+        assertEq(vault.totalShares(), 10 ether * OFFSET);
+        // PPS = 12/10_000
+
+        // Step 5: User A withdraws — gets FULL profit (1 wei rounding from virtual offset)
+        vm.prank(userA);
+        uint256 userAOut = vault.withdraw(10 ether * OFFSET);
+        assertApproxEqAbs(userAOut, 12 ether, 1); // All 12 tokens go to A (no dilution!)
+
+        // Vault is nearly empty (≤1 wei rounding dust)
+        assertEq(vault.totalShares(), 0);
+        assertLe(vault.totalAssets(), 1);
     }
 
     /// @notice convertToAssets uses effectiveTotalAssets during active strategy
@@ -452,14 +515,14 @@ contract KernelVaultSnapshotPPSTest is Test {
         vm.prank(userA);
         vault.depositERC20Tokens(100 ether);
 
-        // CALL sends 80 tokens externally
-        bytes memory agentOutput = _buildTokenTransferCall(externalProtocol, 80 ether);
+        // TRANSFER_ERC20 sends 80 tokens externally
+        bytes memory agentOutput = _buildTransferAction(externalProtocol, 80 ether);
         _executeWithCommitment(vault, agentOutput);
 
         assertTrue(vault.strategyActive());
 
-        // Without snapshot: convertToAssets(100) = 100 * 20 / 100 = 20 (wrong)
-        // With snapshot: convertToAssets(100) = 100 * 100 / 100 = 100 (correct)
-        assertEq(vault.convertToAssets(100 ether), 100 ether);
+        // With snapshot (effective=100): convertToAssets(100_000) = 100_000 * (100 + 1) / (100_000 + 1000)
+        // = 100_000 * 101 / 101_000 = 100 (exact)
+        assertEq(vault.convertToAssets(100 ether * OFFSET), 100 ether);
     }
 }

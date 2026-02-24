@@ -1,14 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { parseEther, parseUnits } from 'viem';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { formatUnits, parseEther, parseUnits } from 'viem';
+import { useAccount, useBalance, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useDepositETH, useDepositERC20 } from '@/hooks/useKernelVault';
 import { useNetwork } from '@/lib/NetworkContext';
+import { parseVaultError } from '@/lib/vaultErrors';
 
 const ERC20_ABI = [
   { type: 'function', name: 'allowance', inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }], outputs: [{ type: 'uint256' }], stateMutability: 'view' },
   { type: 'function', name: 'approve', inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ type: 'bool' }], stateMutability: 'nonpayable' },
+  { type: 'function', name: 'balanceOf', inputs: [{ name: 'account', type: 'address' }], outputs: [{ type: 'uint256' }], stateMutability: 'view' },
 ] as const;
 
 interface VaultDepositFormProps {
@@ -27,6 +29,25 @@ export function VaultDepositForm({ vaultAddress, isEthVault = true, assetDecimal
   const ethDeposit = useDepositETH(vaultAddress);
   const erc20Deposit = useDepositERC20(vaultAddress);
 
+  // Fetch user balance — native for ETH vaults, ERC-20 balanceOf otherwise
+  const { data: nativeBalance } = useBalance({
+    address: userAddress,
+    chainId: selectedChainId,
+    query: { enabled: isEthVault && !!userAddress },
+  });
+  const { data: rawTokenBalance } = useReadContract({
+    address: assetAddress,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: userAddress ? [userAddress] : undefined,
+    chainId: selectedChainId,
+    query: { enabled: !isEthVault && !!assetAddress && !!userAddress },
+  });
+
+  const userBalance = isEthVault
+    ? (nativeBalance ? formatUnits(nativeBalance.value, assetDecimals) : undefined)
+    : (typeof rawTokenBalance === 'bigint' ? formatUnits(rawTokenBalance, assetDecimals) : undefined);
+
   // Parse the entered amount safely
   let parsedAmount = BigInt(0);
   try {
@@ -35,8 +56,8 @@ export function VaultDepositForm({ vaultAddress, isEthVault = true, assetDecimal
     }
   } catch {}
 
-  // Check ERC-20 allowance
-  const { data: allowance, refetch: refetchAllowance } = useReadContract({
+  // Check ERC-20 allowance (only for non-ETH vaults)
+  const { data: rawAllowance, isLoading: isAllowanceLoading, refetch: refetchAllowance } = useReadContract({
     address: assetAddress,
     abi: ERC20_ABI,
     functionName: 'allowance',
@@ -45,7 +66,8 @@ export function VaultDepositForm({ vaultAddress, isEthVault = true, assetDecimal
     query: { enabled: !isEthVault && !!assetAddress && !!userAddress },
   });
 
-  const needsApproval = !isEthVault && parsedAmount > BigInt(0) && (allowance === undefined || (allowance as bigint) < parsedAmount);
+  const allowance = typeof rawAllowance === 'bigint' ? rawAllowance : BigInt(0);
+  const hasSufficientAllowance = !isAllowanceLoading && parsedAmount > BigInt(0) && allowance >= parsedAmount;
 
   // Approve transaction
   const { data: approveHash, writeContract: writeApprove, isPending: isApprovePending, error: approveError } = useWriteContract();
@@ -60,8 +82,10 @@ export function VaultDepositForm({ vaultAddress, isEthVault = true, assetDecimal
 
   const { isPending, isConfirming, isSuccess, error } = isEthVault ? ethDeposit : erc20Deposit;
 
+  const hasValidAmount = !!amount && parseFloat(amount) > 0;
+
   const handleApprove = () => {
-    if (!assetAddress) return;
+    if (!assetAddress || !hasValidAmount) return;
     writeApprove({
       address: assetAddress,
       abi: ERC20_ABI,
@@ -73,7 +97,9 @@ export function VaultDepositForm({ vaultAddress, isEthVault = true, assetDecimal
 
   const handleDeposit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || parseFloat(amount) <= 0) return;
+    if (!hasValidAmount) return;
+    // Guard: never submit ERC-20 deposit without sufficient allowance
+    if (!isEthVault && !hasSufficientAllowance) return;
     if (isEthVault) {
       ethDeposit.deposit(amount);
     } else {
@@ -81,12 +107,66 @@ export function VaultDepositForm({ vaultAddress, isEthVault = true, assetDecimal
     }
   };
 
+  const balanceLabel = userBalance !== undefined
+    ? `Balance: ${Number(userBalance).toFixed(6)} ${assetSymbol}`
+    : null;
+
+  const handleMax = () => {
+    if (userBalance !== undefined) setAmount(userBalance);
+  };
+
+  // --- ETH vault: single Deposit button ---
+  if (isEthVault) {
+    return (
+      <form onSubmit={handleDeposit} className="space-y-4">
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-sm text-gray-400" style={{ fontFamily: 'var(--font-mono), monospace' }}>
+              {assetSymbol} Amount
+            </label>
+            {balanceLabel && (
+              <button type="button" onClick={handleMax} className="text-xs text-[#A855F7] hover:underline font-mono">
+                {balanceLabel}
+              </button>
+            )}
+          </div>
+          <input
+            type="number"
+            step="any"
+            min="0"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.1"
+            className="input-dark font-mono"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={!hasValidAmount || isPending || isConfirming}
+          className="btn-primary w-full"
+        >
+          {isPending ? 'Signing...' : isConfirming ? 'Confirming...' : `Deposit ${assetSymbol}`}
+        </button>
+        {isSuccess && <p className="text-emerald-400 text-sm font-mono">Deposit successful!</p>}
+        {error && <p className="text-red-400 text-sm font-mono">{parseVaultError(error)}</p>}
+      </form>
+    );
+  }
+
+  // --- ERC-20 vault: two-step Approve → Deposit ---
   return (
     <form onSubmit={handleDeposit} className="space-y-4">
       <div>
-        <label className="block text-sm text-gray-400 mb-1" style={{ fontFamily: 'var(--font-mono), monospace' }}>
-          {assetSymbol} Amount
-        </label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-sm text-gray-400" style={{ fontFamily: 'var(--font-mono), monospace' }}>
+            {assetSymbol} Amount
+          </label>
+          {balanceLabel && (
+            <button type="button" onClick={handleMax} className="text-xs text-[#A855F7] hover:underline font-mono">
+              {balanceLabel}
+            </button>
+          )}
+        </div>
         <input
           type="number"
           step="any"
@@ -98,36 +178,41 @@ export function VaultDepositForm({ vaultAddress, isEthVault = true, assetDecimal
         />
       </div>
 
-      {needsApproval ? (
+      <div className="space-y-2">
+        {/* Step 1: Approve */}
         <button
           type="button"
           onClick={handleApprove}
-          disabled={!amount || parseFloat(amount) <= 0 || isApprovePending || isApproveConfirming}
+          disabled={!hasValidAmount || hasSufficientAllowance || isApprovePending || isApproveConfirming}
           className="btn-secondary w-full"
         >
-          {isApprovePending ? 'Signing approval...' : isApproveConfirming ? 'Approving...' : `Approve ${assetSymbol}`}
+          {isApprovePending
+            ? 'Signing approval...'
+            : isApproveConfirming
+              ? 'Approving...'
+              : hasSufficientAllowance
+                ? `${assetSymbol} Approved`
+                : `1. Approve ${assetSymbol}`}
         </button>
-      ) : (
+
+        {/* Step 2: Deposit (disabled until allowance is sufficient) */}
         <button
           type="submit"
-          disabled={!amount || parseFloat(amount) <= 0 || isPending || isConfirming}
+          disabled={!hasValidAmount || !hasSufficientAllowance || isPending || isConfirming}
           className="btn-primary w-full"
         >
-          {isPending ? 'Signing...' : isConfirming ? 'Confirming...' : `Deposit ${assetSymbol}`}
+          {isPending ? 'Signing...' : isConfirming ? 'Confirming...' : `2. Deposit ${assetSymbol}`}
         </button>
-      )}
+      </div>
 
       {approveError && (
-        <p className="text-red-400 text-sm font-mono">{approveError.message.slice(0, 100)}</p>
-      )}
-      {isApproveSuccess && !needsApproval && (
-        <p className="text-emerald-400 text-sm font-mono">Approved! Now click Deposit.</p>
+        <p className="text-red-400 text-sm font-mono">{parseVaultError(approveError)}</p>
       )}
       {isSuccess && (
         <p className="text-emerald-400 text-sm font-mono">Deposit successful!</p>
       )}
       {error && (
-        <p className="text-red-400 text-sm font-mono">{error.message.slice(0, 100)}</p>
+        <p className="text-red-400 text-sm font-mono">{parseVaultError(error)}</p>
       )}
     </form>
   );

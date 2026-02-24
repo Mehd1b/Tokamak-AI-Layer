@@ -75,8 +75,7 @@ contract PermissionlessIntegrationTest is Test {
         mockVerifier.setEssentials(agentId, 1, bytes32(0)); // commitment set per test
         mockVerifier.setExpectedImageId(IMAGE_ID, true); // Enable imageId validation
 
-        // Fund vault and user
-        token.mint(address(vaultAddr), 1000 ether);
+        // Fund user (vault gets funded via deposits)
         token.mint(user, 1000 ether);
 
         // Approve vault for user deposits
@@ -118,8 +117,8 @@ contract PermissionlessIntegrationTest is Test {
         vm.prank(user);
         vault.depositERC20Tokens(100 ether);
 
-        assertEq(vault.shares(user), 100 ether, "User should have shares");
-        assertEq(vault.totalShares(), 100 ether, "Total shares should be updated");
+        assertEq(vault.shares(user), 100 ether * 1000, "User should have shares (with virtual offset)");
+        assertEq(vault.totalShares(), 100 ether * 1000, "Total shares should be updated (with virtual offset)");
 
         // Step 4: Execute with valid proof
         uint256 transferAmount = 50 ether;
@@ -150,6 +149,10 @@ contract PermissionlessIntegrationTest is Test {
     /// @notice Test that registry updates don't affect existing vaults
     function test_registryUpdate_doesNotAffectExistingVault() public {
         KernelVault vault = KernelVault(payable(vaultAddr));
+
+        // Fund vault via deposit so execute has tokens to transfer
+        vm.prank(user);
+        vault.depositERC20Tokens(100 ether);
 
         // Verify initial imageId
         assertEq(vault.trustedImageId(), IMAGE_ID, "Initial imageId should match");

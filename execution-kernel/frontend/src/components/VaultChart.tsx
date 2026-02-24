@@ -12,7 +12,7 @@ import {
 } from 'lightweight-charts';
 import type { TimeSeriesPoint } from '@/hooks/useVaultHistory';
 
-type TimeRange = '1W' | '1M' | '3M' | '1Y' | 'All';
+type TimeRange = '1H' | '6H' | '1D' | '1W' | 'All';
 
 interface VaultChartProps {
   title: string;
@@ -25,10 +25,10 @@ interface VaultChartProps {
 }
 
 const TIME_RANGES: { label: TimeRange; seconds: number }[] = [
+  { label: '1H', seconds: 60 * 60 },
+  { label: '6H', seconds: 6 * 60 * 60 },
+  { label: '1D', seconds: 24 * 60 * 60 },
   { label: '1W', seconds: 7 * 24 * 60 * 60 },
-  { label: '1M', seconds: 30 * 24 * 60 * 60 },
-  { label: '3M', seconds: 90 * 24 * 60 * 60 },
-  { label: '1Y', seconds: 365 * 24 * 60 * 60 },
 ];
 
 function filterByRange(data: TimeSeriesPoint[], range: TimeRange): TimeSeriesPoint[] {

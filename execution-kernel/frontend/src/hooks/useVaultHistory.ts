@@ -87,32 +87,27 @@ export function useVaultHistory(vaultAddress: `0x${string}` | undefined, assetDe
       try {
         const currentBlock = await client.getBlockNumber();
 
-        // Find vault deploy block dynamically — works on any chain
+        // Fetch events — try primary path (deploy block + paginated), fallback to small-range direct query
+        let depositLogs: any[] = [];
+        let withdrawLogs: any[] = [];
+        let executionLogs: any[] = [];
+
+        const fetchEvents = async (fromBlock: bigint, toBlock: bigint) => {
+          const [d, w, e] = await Promise.all([
+            paginatedGetLogs(client, { address: vaultAddress, event: depositEvent, fromBlock, toBlock }),
+            paginatedGetLogs(client, { address: vaultAddress, event: withdrawEvent, fromBlock, toBlock }),
+            paginatedGetLogs(client, { address: vaultAddress, event: executionAppliedEvent, fromBlock, toBlock }),
+          ]);
+          return { d, w, e };
+        };
+
         const fromBlock = await findVaultDeployBlock(
           client, contracts.vaultFactory, vaultAddress, currentBlock,
         );
-
-        // Fetch Deposit, Withdraw, ExecutionApplied events in parallel
-        const [depositLogs, withdrawLogs, executionLogs] = await Promise.all([
-          paginatedGetLogs(client, {
-            address: vaultAddress,
-            event: depositEvent,
-            fromBlock,
-            toBlock: currentBlock,
-          }),
-          paginatedGetLogs(client, {
-            address: vaultAddress,
-            event: withdrawEvent,
-            fromBlock,
-            toBlock: currentBlock,
-          }),
-          paginatedGetLogs(client, {
-            address: vaultAddress,
-            event: executionAppliedEvent,
-            fromBlock,
-            toBlock: currentBlock,
-          }),
-        ]);
+        const result = await fetchEvents(fromBlock, currentBlock);
+        depositLogs = result.d;
+        withdrawLogs = result.w;
+        executionLogs = result.e;
 
         // Merge and sort all events by (blockNumber, logIndex)
         type TaggedLog = { type: 'deposit' | 'withdraw' | 'execution'; log: Log };

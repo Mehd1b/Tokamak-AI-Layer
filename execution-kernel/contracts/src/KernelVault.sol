@@ -2,7 +2,8 @@
 pragma solidity ^0.8.24;
 
 import { IKernelExecutionVerifier } from "./interfaces/IKernelExecutionVerifier.sol";
-import { IERC20 } from "./interfaces/IERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { KernelOutputParser } from "./KernelOutputParser.sol";
 import { OracleVerifier } from "./libraries/OracleVerifier.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -16,6 +17,8 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 ///      4. Verifies action commitment and parses actions from AgentOutput bytes
 ///      5. Share price adjusts automatically based on totalAssets/totalShares ratio
 contract KernelVault is ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     // ============ Constants ============
 
     /// @notice Action type for generic contract call
@@ -26,6 +29,10 @@ contract KernelVault is ReentrancyGuard {
 
     /// @notice Action type for no-op
     uint32 public constant ACTION_TYPE_NO_OP = 0x00000004;
+
+    /// @notice Virtual offset for share/asset math (prevents inflation/donation attacks)
+    /// @dev Equivalent to OpenZeppelin ERC4626's _decimalsOffset() = 3 → 10**3 = 1000
+    uint256 internal constant _DECIMALS_OFFSET = 1e3;
 
     /// @notice Maximum allowed gap between nonces for liveness (prevents stuck execution)
     /// @dev Allows operators to skip intermediate executions if needed (e.g., if nonce N is lost/stuck,
@@ -197,6 +204,12 @@ contract KernelVault is ReentrancyGuard {
     /// @notice Insufficient available assets for withdrawal during active strategy
     error InsufficientAvailableAssets(uint256 requested, uint256 available);
 
+    /// @notice Deposits are locked while a strategy is active (prevents yield dilution)
+    error DepositsLockedDuringStrategy();
+
+    /// @notice CALL action targets the vault's asset or the vault itself (blocked)
+    error InvalidCallTarget(address target);
+
     // ============ Constructor ============
 
     /// @notice Initialize the vault
@@ -231,46 +244,36 @@ contract KernelVault is ReentrancyGuard {
     /// @notice Deposit ERC20 tokens and receive shares based on current PPS
     /// @param assets Amount of ERC20 tokens to deposit
     /// @return sharesMinted Number of shares minted based on current exchange rate
-    /// @dev MVP uses simple PPS math. First deposit is 1:1, subsequent deposits use
-    ///      shares = assets * totalShares / totalAssets.
+    /// @dev Uses balance-before/after pattern to support fee-on-transfer tokens.
+    ///      Share calculation uses virtual offset formula (ERC4626) for inflation protection.
     function depositERC20Tokens(uint256 assets)
         external
         nonReentrant
         returns (uint256 sharesMinted)
     {
+        if (strategyActive) revert DepositsLockedDuringStrategy();
         if (address(asset) == address(0)) revert WrongDepositFunction();
         if (assets == 0) revert ZeroDeposit();
 
-        // Calculate shares BEFORE transfer using effective total assets
-        uint256 supply = totalShares;
+        // Capture effectiveAssets BEFORE transfer for share calculation
         uint256 effectiveAssets = effectiveTotalAssets();
 
-        if (supply == 0) {
-            // First deposit: 1:1 ratio
-            sharesMinted = assets;
-        } else {
-            // Subsequent deposits: standard PPS calculation
-            if (effectiveAssets == 0) revert ZeroAssets();
-            sharesMinted = (assets * supply) / effectiveAssets;
-            if (sharesMinted == 0) revert ZeroShares();
-        }
+        // Measure actual received (supports fee-on-transfer tokens)
+        uint256 balanceBefore = asset.balanceOf(address(this));
+        asset.safeTransferFrom(msg.sender, address(this), assets);
+        uint256 actualReceived = asset.balanceOf(address(this)) - balanceBefore;
 
-        // Transfer tokens from sender
-        bool success = asset.transferFrom(msg.sender, address(this), assets);
-        if (!success) revert TransferFailed();
+        // Calculate shares using actual received amount and virtual offset formula
+        // shares = actualReceived * (totalShares + OFFSET) / (effectiveAssets + 1)
+        sharesMinted = (actualReceived * (totalShares + _DECIMALS_OFFSET)) / (effectiveAssets + 1);
+        if (sharesMinted == 0) revert ZeroShares();
 
-        // Update state
+        // Update state with actual received amount
         shares[msg.sender] += sharesMinted;
         totalShares += sharesMinted;
-        totalDeposited += assets;
+        totalDeposited += actualReceived;
 
-        // Update snapshot to include new deposit
-        if (strategyActive) {
-            snapshotTotalAssets += assets;
-            snapshotTotalShares += sharesMinted;
-        }
-
-        emit Deposit(msg.sender, assets, sharesMinted);
+        emit Deposit(msg.sender, actualReceived, sharesMinted);
     }
 
     /// @notice Deposit ETH and receive shares based on current PPS
@@ -279,35 +282,23 @@ contract KernelVault is ReentrancyGuard {
     ///      shares = msg.value * totalShares / totalAssets.
     ///      Only works when vault asset is address(0) (ETH vault).
     function depositETH() external payable nonReentrant returns (uint256 sharesMinted) {
+        if (strategyActive) revert DepositsLockedDuringStrategy();
         if (address(asset) != address(0)) revert WrongDepositFunction();
         if (msg.value == 0) revert ZeroDeposit();
 
-        // Calculate shares using effective total assets
+        // Calculate shares using virtual offset formula (ERC4626)
         // For non-strategy: msg.value is already in balance, subtract it for pre-transfer calculation
-        uint256 supply = totalShares;
         uint256 effectiveAssets =
             strategyActive ? snapshotTotalAssets : (address(this).balance - msg.value);
 
-        if (supply == 0) {
-            // First deposit: 1:1 ratio
-            sharesMinted = msg.value;
-        } else {
-            // Subsequent deposits: standard PPS calculation
-            if (effectiveAssets == 0) revert ZeroAssets();
-            sharesMinted = (msg.value * supply) / effectiveAssets;
-            if (sharesMinted == 0) revert ZeroShares();
-        }
+        // shares = assets * (totalShares + OFFSET) / (effectiveAssets + 1)
+        sharesMinted = (msg.value * (totalShares + _DECIMALS_OFFSET)) / (effectiveAssets + 1);
+        if (sharesMinted == 0) revert ZeroShares();
 
         // Update state
         shares[msg.sender] += sharesMinted;
         totalShares += sharesMinted;
         totalDeposited += msg.value;
-
-        // Update snapshot to include new deposit
-        if (strategyActive) {
-            snapshotTotalAssets += msg.value;
-            snapshotTotalShares += sharesMinted;
-        }
 
         emit Deposit(msg.sender, msg.value, sharesMinted);
     }
@@ -321,12 +312,10 @@ contract KernelVault is ReentrancyGuard {
             revert InsufficientShares(shareAmount, shares[msg.sender]);
         }
 
-        // Calculate assets using effective total assets (snapshot PPS if strategy active)
+        // Calculate assets using virtual offset formula (ERC4626)
+        // assets = shares * (effectiveAssets + 1) / (totalShares + OFFSET)
         uint256 effectiveAssets = effectiveTotalAssets();
-        uint256 supply = totalShares;
-        if (supply == 0) revert ZeroShares();
-
-        assetsOut = (shareAmount * effectiveAssets) / supply;
+        assetsOut = (shareAmount * (effectiveAssets + 1)) / (totalShares + _DECIMALS_OFFSET);
         if (assetsOut == 0) revert ZeroAssetsOut();
 
         // Cap to actual available balance during active strategy
@@ -352,8 +341,7 @@ contract KernelVault is ReentrancyGuard {
             (bool success,) = msg.sender.call{ value: assetsOut }("");
             if (!success) revert ETHTransferFailed();
         } else {
-            bool success = asset.transfer(msg.sender, assetsOut);
-            if (!success) revert TransferFailed();
+            asset.safeTransfer(msg.sender, assetsOut);
         }
 
         emit Withdraw(msg.sender, assetsOut, shareAmount);
@@ -369,7 +357,7 @@ contract KernelVault is ReentrancyGuard {
         external
         nonReentrant
     {
-        _execute(journal, seal, agentOutputBytes, "");
+        _execute(journal, seal, agentOutputBytes, "", 0);
     }
 
     /// @notice Execute with oracle signature verification
@@ -377,13 +365,15 @@ contract KernelVault is ReentrancyGuard {
     /// @param seal The RISC Zero proof seal
     /// @param agentOutputBytes The agent output bytes containing actions
     /// @param oracleSignature 65-byte ECDSA signature over the feed hash (journal.inputRoot)
+    /// @param oracleTimestamp Timestamp of the oracle data (included in signed message)
     function executeWithOracle(
         bytes calldata journal,
         bytes calldata seal,
         bytes calldata agentOutputBytes,
-        bytes calldata oracleSignature
+        bytes calldata oracleSignature,
+        uint64 oracleTimestamp
     ) external nonReentrant {
-        _execute(journal, seal, agentOutputBytes, oracleSignature);
+        _execute(journal, seal, agentOutputBytes, oracleSignature, oracleTimestamp);
     }
 
     /// @notice Internal execution logic shared by execute() and executeWithOracle()
@@ -391,7 +381,8 @@ contract KernelVault is ReentrancyGuard {
         bytes calldata journal,
         bytes calldata seal,
         bytes calldata agentOutputBytes,
-        bytes memory oracleSignature
+        bytes memory oracleSignature,
+        uint64 oracleTimestamp
     ) internal {
         if (msg.sender != owner) revert NotOwner();
         // 1. Verify proof and parse journal using pinned trustedImageId
@@ -408,7 +399,11 @@ contract KernelVault is ReentrancyGuard {
             OracleVerifier.requireValidOracleSignature(
                 parsed.inputRoot,
                 oracleSignature,
-                oracleSigner
+                oracleSigner,
+                oracleTimestamp,
+                block.chainid,
+                address(this),
+                maxOracleAge
             );
         }
 
@@ -476,7 +471,8 @@ contract KernelVault is ReentrancyGuard {
 
     /// @notice Execute a TRANSFER_ERC20 action (also handles ETH if token is address(0))
     /// @dev Payload format: abi.encode(address token, address to, uint256 amount)
-    ///      MVP: only allows transfers of the vault's single asset
+    ///      MVP: only allows transfers of the vault's single asset.
+    ///      Snapshots PPS on first balance-reducing transfer to prevent yield dilution.
     function _executeTransferERC20(uint256 index, KernelOutputParser.Action memory action)
         internal
     {
@@ -493,6 +489,9 @@ contract KernelVault is ReentrancyGuard {
             revert InvalidTransferPayload();
         }
 
+        // Capture balance before transfer for strategy snapshot detection
+        uint256 balanceBefore = totalAssets();
+
         // Execute transfer (ETH or ERC20)
         if (token == address(0)) {
             // ETH transfer
@@ -500,8 +499,16 @@ contract KernelVault is ReentrancyGuard {
             if (!success) revert ETHTransferFailed();
         } else {
             // ERC20 transfer
-            bool success = IERC20(token).transfer(to, amount);
-            if (!success) revert TransferFailed();
+            IERC20(token).safeTransfer(to, amount);
+        }
+
+        // Snapshot PPS if balance decreased and no strategy is active yet
+        uint256 balanceAfter = totalAssets();
+        if (!strategyActive && balanceAfter < balanceBefore) {
+            snapshotTotalAssets = balanceBefore;
+            snapshotTotalShares = totalShares;
+            strategyActive = true;
+            emit StrategyActivated(balanceBefore, totalShares);
         }
 
         // Emit detailed transfer event (includes recipient `to` for better observability)
@@ -527,6 +534,9 @@ contract KernelVault is ReentrancyGuard {
         // Convert target bytes32 to address (safe after validation above)
         address target = address(uint160(uint256(action.target)));
 
+        // Block dangerous CALL targets: vault's asset (use TRANSFER_ERC20 instead) and self
+        if (target == address(asset) || target == address(this)) revert InvalidCallTarget(target);
+
         // Capture balance before call for snapshot detection
         uint256 balanceBefore = totalAssets();
 
@@ -543,9 +553,6 @@ contract KernelVault is ReentrancyGuard {
             snapshotTotalShares = totalShares;
             strategyActive = true;
             emit StrategyActivated(balanceBefore, totalShares);
-        } else if (strategyActive && balanceAfter >= snapshotTotalAssets) {
-            // Auto-settle when balance recovers to snapshot level
-            _settle();
         }
 
         emit ActionExecuted(index, action.actionType, action.target, true);
@@ -553,9 +560,11 @@ contract KernelVault is ReentrancyGuard {
 
     // ============ Settlement ============
 
-    /// @notice Permissionless settlement — clears strategy and restores live PPS accounting
-    /// @dev Anyone can call this when assets have returned to the vault
+    /// @notice Owner-only settlement — clears strategy and restores live PPS accounting
+    /// @dev Restricted to owner to prevent griefing: an attacker could settle mid-strategy
+    ///      to bypass the deposit lock, then deposit at artificially low PPS.
     function settle() external {
+        if (msg.sender != owner) revert NotOwner();
         if (!strategyActive) revert StrategyNotActive();
         _settle();
     }
@@ -597,27 +606,18 @@ contract KernelVault is ReentrancyGuard {
         return totalDeposited - totalWithdrawn;
     }
 
-    /// @notice Convert assets to shares using current exchange rate
+    /// @notice Convert assets to shares using current exchange rate (virtual offset)
     /// @param assets Amount of assets to convert
-    /// @return shares Amount of shares that would be minted
+    /// @return Amount of shares that would be minted
     function convertToShares(uint256 assets) public view returns (uint256) {
-        uint256 supply = totalShares;
-        if (supply == 0) return assets;
-
-        uint256 effectiveAssets = effectiveTotalAssets();
-        if (effectiveAssets == 0) return 0; // Prevent division by zero
-        return (assets * supply) / effectiveAssets;
+        return (assets * (totalShares + _DECIMALS_OFFSET)) / (effectiveTotalAssets() + 1);
     }
 
-    /// @notice Convert shares to assets using current exchange rate
+    /// @notice Convert shares to assets using current exchange rate (virtual offset)
     /// @param _shares Amount of shares to convert
-    /// @return assets Amount of assets that would be returned
+    /// @return Amount of assets that would be returned
     function convertToAssets(uint256 _shares) public view returns (uint256) {
-        uint256 supply = totalShares;
-        if (supply == 0) {
-            return _shares; // 1:1 when empty
-        }
-        return (_shares * effectiveTotalAssets()) / supply;
+        return (_shares * (effectiveTotalAssets() + 1)) / (totalShares + _DECIMALS_OFFSET);
     }
 
     /// @notice Allow receiving ETH for CALL actions with value

@@ -31,6 +31,9 @@ contract KernelVaultTest is Test {
     uint256 public constant INITIAL_BALANCE = 1000 ether;
     uint256 public constant DEPOSIT_AMOUNT = 100 ether;
 
+    /// @dev Virtual offset multiplier — first deposit of X assets yields X * OFFSET shares
+    uint256 internal constant OFFSET = 1000;
+
     function setUp() public {
         // Deploy mock RISC Zero verifier
         mockRiscZeroVerifier = new MockVerifier();
@@ -178,9 +181,9 @@ contract KernelVaultTest is Test {
         vm.prank(user);
         uint256 sharesMinted = vault.depositERC20Tokens(DEPOSIT_AMOUNT);
 
-        assertEq(sharesMinted, DEPOSIT_AMOUNT);
-        assertEq(vault.shares(user), DEPOSIT_AMOUNT);
-        assertEq(vault.totalShares(), DEPOSIT_AMOUNT);
+        assertEq(sharesMinted, DEPOSIT_AMOUNT * OFFSET);
+        assertEq(vault.shares(user), DEPOSIT_AMOUNT * OFFSET);
+        assertEq(vault.totalShares(), DEPOSIT_AMOUNT * OFFSET);
         assertEq(token.balanceOf(address(vault)), DEPOSIT_AMOUNT);
         assertEq(token.balanceOf(user), INITIAL_BALANCE - DEPOSIT_AMOUNT);
     }
@@ -199,8 +202,8 @@ contract KernelVaultTest is Test {
 
         vm.stopPrank();
 
-        assertEq(vault.shares(user), DEPOSIT_AMOUNT * 2);
-        assertEq(vault.totalShares(), DEPOSIT_AMOUNT * 2);
+        assertEq(vault.shares(user), DEPOSIT_AMOUNT * 2 * OFFSET);
+        assertEq(vault.totalShares(), DEPOSIT_AMOUNT * 2 * OFFSET);
     }
 
     // ============ Withdraw Tests ============
@@ -210,7 +213,7 @@ contract KernelVaultTest is Test {
         vault.depositERC20Tokens(DEPOSIT_AMOUNT);
 
         uint256 balanceBefore = token.balanceOf(user);
-        uint256 amount = vault.withdraw(DEPOSIT_AMOUNT);
+        uint256 amount = vault.withdraw(DEPOSIT_AMOUNT * OFFSET);
         vm.stopPrank();
 
         assertEq(amount, DEPOSIT_AMOUNT);
@@ -223,11 +226,11 @@ contract KernelVaultTest is Test {
         vm.startPrank(user);
         vault.depositERC20Tokens(DEPOSIT_AMOUNT);
 
-        uint256 withdrawAmount = DEPOSIT_AMOUNT / 2;
-        vault.withdraw(withdrawAmount);
+        uint256 withdrawShares = DEPOSIT_AMOUNT * OFFSET / 2;
+        vault.withdraw(withdrawShares);
         vm.stopPrank();
 
-        assertEq(vault.shares(user), DEPOSIT_AMOUNT - withdrawAmount);
+        assertEq(vault.shares(user), DEPOSIT_AMOUNT * OFFSET - withdrawShares);
     }
 
     function test_withdraw_zeroAmount_reverts() public {
@@ -242,10 +245,10 @@ contract KernelVaultTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                KernelVault.InsufficientShares.selector, DEPOSIT_AMOUNT + 1, DEPOSIT_AMOUNT
+                KernelVault.InsufficientShares.selector, DEPOSIT_AMOUNT * OFFSET + 1, DEPOSIT_AMOUNT * OFFSET
             )
         );
-        vault.withdraw(DEPOSIT_AMOUNT + 1);
+        vault.withdraw(DEPOSIT_AMOUNT * OFFSET + 1);
         vm.stopPrank();
     }
 
@@ -542,48 +545,48 @@ contract KernelVaultTest is Test {
         assertEq(vault.totalAssets(), token.balanceOf(address(vault)));
     }
 
-    function test_convertToShares_whenEmpty_returnsOneToOne() public view {
-        // When totalShares == 0, should return 1:1
-        assertEq(vault.convertToShares(100 ether), 100 ether);
-        assertEq(vault.convertToShares(1), 1);
+    function test_convertToShares_whenEmpty_returnsWithOffset() public view {
+        // When totalShares == 0: shares = assets * OFFSET / 1
+        assertEq(vault.convertToShares(100 ether), 100 ether * OFFSET);
+        assertEq(vault.convertToShares(1), OFFSET);
     }
 
-    function test_convertToAssets_whenEmpty_returnsOneToOne() public view {
-        // When totalShares == 0, should return 1:1
-        assertEq(vault.convertToAssets(100 ether), 100 ether);
-        assertEq(vault.convertToAssets(1), 1);
+    function test_convertToAssets_whenEmpty_returnsWithOffset() public view {
+        // When totalShares == 0: assets = shares * 1 / OFFSET
+        // Round-trip: convertToAssets(convertToShares(X)) ≈ X
+        assertEq(vault.convertToAssets(100 ether * OFFSET), 100 ether);
+        assertEq(vault.convertToAssets(OFFSET), 1);
     }
 
-    function test_deposit_whenEmpty_mintsOneToOne() public {
-        // totalShares=0, deposit 100 → 100 shares (1:1)
+    function test_deposit_whenEmpty_mintsWithOffset() public {
+        // totalShares=0, deposit 100 → 100 * OFFSET shares
         vm.prank(user);
         uint256 sharesMinted = vault.depositERC20Tokens(100 ether);
 
-        assertEq(sharesMinted, 100 ether);
-        assertEq(vault.shares(user), 100 ether);
-        assertEq(vault.totalShares(), 100 ether);
+        assertEq(sharesMinted, 100 ether * OFFSET);
+        assertEq(vault.shares(user), 100 ether * OFFSET);
+        assertEq(vault.totalShares(), 100 ether * OFFSET);
         assertEq(vault.totalAssets(), 100 ether);
     }
 
     function test_deposit_withYield_mintsPPS() public {
-        // User1 deposits 100 assets → gets 100 shares (1:1 when empty)
+        // User1 deposits 100 assets → gets 100_000 shares (100 * OFFSET when empty)
         vm.prank(user);
         vault.depositERC20Tokens(100 ether);
 
-        assertEq(vault.shares(user), 100 ether);
-        assertEq(vault.totalShares(), 100 ether);
+        assertEq(vault.shares(user), 100 ether * OFFSET);
+        assertEq(vault.totalShares(), 100 ether * OFFSET);
         assertEq(vault.totalAssets(), 100 ether);
 
         // Simulate yield: mint 100 tokens directly to vault (doubling assets)
         token.mint(address(vault), 100 ether);
 
-        // Now totalAssets = 200 ether, totalShares = 100 ether
-        // PPS = 200/100 = 2
+        // Now totalAssets = 200 ether, totalShares = 100_000 ether
         assertEq(vault.totalAssets(), 200 ether);
-        assertEq(vault.totalShares(), 100 ether);
+        assertEq(vault.totalShares(), 100 ether * OFFSET);
 
-        // User2 deposits 100 assets → should get 50 shares
-        // shares = assets * totalShares / totalAssets = 100 * 100 / 200 = 50
+        // User2 deposits 100 assets → should get ~50_000 shares
+        // shares = 100 * (100_000 + 1000) / (200 + 1) ≈ 50_000
         address user2 = address(0x3333333333333333333333333333333333333333);
         token.mint(user2, 100 ether);
         vm.startPrank(user2);
@@ -591,68 +594,66 @@ contract KernelVaultTest is Test {
         uint256 sharesMinted = vault.depositERC20Tokens(100 ether);
         vm.stopPrank();
 
-        assertEq(sharesMinted, 50 ether);
-        assertEq(vault.shares(user2), 50 ether);
-        assertEq(vault.totalShares(), 150 ether);
+        assertApproxEqAbs(sharesMinted, 50 ether * OFFSET, OFFSET);
+        assertApproxEqAbs(vault.shares(user2), 50 ether * OFFSET, OFFSET);
+        assertApproxEqAbs(vault.totalShares(), 150 ether * OFFSET, OFFSET);
         assertEq(vault.totalAssets(), 300 ether);
     }
 
     function test_withdraw_reflectsPPS() public {
-        // User1 deposits 100 assets → gets 100 shares
+        // User1 deposits 100 assets → gets 100_000 shares
         vm.prank(user);
         vault.depositERC20Tokens(100 ether);
 
         // Simulate yield: double the assets
         token.mint(address(vault), 100 ether);
 
-        // Now totalAssets = 200, totalShares = 100
+        // Now totalAssets = 200, totalShares = 100_000
         assertEq(vault.totalAssets(), 200 ether);
-        assertEq(vault.totalShares(), 100 ether);
+        assertEq(vault.totalShares(), 100 ether * OFFSET);
 
-        // User1 withdraws 100 shares → should get 200 assets
-        // assets = shares * totalAssets / totalShares = 100 * 200 / 100 = 200
+        // User1 withdraws all shares → should get ~200 assets (1 wei rounding from offset)
         uint256 balanceBefore = token.balanceOf(user);
         vm.prank(user);
-        uint256 assetsOut = vault.withdraw(100 ether);
+        uint256 assetsOut = vault.withdraw(100 ether * OFFSET);
 
-        assertEq(assetsOut, 200 ether);
-        assertEq(token.balanceOf(user), balanceBefore + 200 ether);
+        assertApproxEqAbs(assetsOut, 200 ether, 1);
+        assertApproxEqAbs(token.balanceOf(user), balanceBefore + 200 ether, 1);
         assertEq(vault.shares(user), 0);
         assertEq(vault.totalShares(), 0);
-        assertEq(vault.totalAssets(), 0);
+        assertLe(vault.totalAssets(), 1); // ≤1 wei rounding dust
     }
 
     function test_withdraw_partialAfterYield() public {
-        // User deposits 100 assets → gets 100 shares
+        // User deposits 100 assets → gets 100_000 shares
         vm.prank(user);
         vault.depositERC20Tokens(100 ether);
 
         // Simulate yield: double the assets
         token.mint(address(vault), 100 ether);
 
-        // Now totalAssets = 200, totalShares = 100
-        // User withdraws 50 shares → should get 100 assets
-        // assets = 50 * 200 / 100 = 100
+        // Now totalAssets = 200, totalShares = 100_000
+        // User withdraws 50_000 shares → should get ~100 assets
         uint256 balanceBefore = token.balanceOf(user);
         vm.prank(user);
-        uint256 assetsOut = vault.withdraw(50 ether);
+        uint256 assetsOut = vault.withdraw(50 ether * OFFSET);
 
-        assertEq(assetsOut, 100 ether);
-        assertEq(token.balanceOf(user), balanceBefore + 100 ether);
-        assertEq(vault.shares(user), 50 ether);
-        assertEq(vault.totalShares(), 50 ether);
-        assertEq(vault.totalAssets(), 100 ether);
+        assertApproxEqAbs(assetsOut, 100 ether, 1);
+        assertApproxEqAbs(token.balanceOf(user), balanceBefore + 100 ether, 1);
+        assertEq(vault.shares(user), 50 ether * OFFSET);
+        assertEq(vault.totalShares(), 50 ether * OFFSET);
+        assertApproxEqAbs(vault.totalAssets(), 100 ether, 1);
     }
 
     function test_execute_changesPPS_notShares() public {
-        // User deposits 100 assets → gets 100 shares
+        // User deposits 100 assets → gets 100_000 shares
         vm.prank(user);
         vault.depositERC20Tokens(100 ether);
 
-        assertEq(vault.totalShares(), 100 ether);
+        assertEq(vault.totalShares(), 100 ether * OFFSET);
         assertEq(vault.totalAssets(), 100 ether);
 
-        // Execute transfers 40 tokens out of vault
+        // Execute transfers 40 tokens out of vault (activates strategy via TRANSFER_ERC20)
         uint256 transferAmount = 40 ether;
         bytes memory agentOutputBytes =
             _buildTransferAction(address(token), recipient, transferAmount);
@@ -664,61 +665,64 @@ contract KernelVaultTest is Test {
         vault.execute(journal, seal, agentOutputBytes);
 
         // Shares should NOT change
-        assertEq(vault.totalShares(), 100 ether);
-        assertEq(vault.shares(user), 100 ether);
+        assertEq(vault.totalShares(), 100 ether * OFFSET);
+        assertEq(vault.shares(user), 100 ether * OFFSET);
 
-        // Assets should decrease
+        // Assets should decrease, strategy should be active
         assertEq(vault.totalAssets(), 60 ether);
+        assertTrue(vault.strategyActive());
 
-        // User withdraws all 100 shares → should get only 60 assets
-        // assets = 100 * 60 / 100 = 60
+        // Settle the strategy so user can withdraw at current PPS
+        vault.settle();
+
+        // User withdraws all shares → should get 60 assets (loss from transfer)
         uint256 balanceBefore = token.balanceOf(user);
         vm.prank(user);
-        uint256 assetsOut = vault.withdraw(100 ether);
+        uint256 assetsOut = vault.withdraw(100 ether * OFFSET);
 
         assertEq(assetsOut, 60 ether);
         assertEq(token.balanceOf(user), balanceBefore + 60 ether);
     }
 
     function test_convertToShares_afterYield() public {
-        // User deposits 100 assets → gets 100 shares
+        // User deposits 100 assets → gets 100_000 shares
         vm.prank(user);
         vault.depositERC20Tokens(100 ether);
 
         // Simulate yield: double the assets
         token.mint(address(vault), 100 ether);
 
-        // Now totalAssets = 200, totalShares = 100
-        // convertToShares(100) = 100 * 100 / 200 = 50
-        assertEq(vault.convertToShares(100 ether), 50 ether);
-        assertEq(vault.convertToShares(200 ether), 100 ether);
-        assertEq(vault.convertToShares(50 ether), 25 ether);
+        // Now totalAssets = 200, totalShares = 100_000
+        // convertToShares(100) ≈ 100 * (100_000 + 1000) / (200 + 1) ≈ 50_000
+        assertApproxEqAbs(vault.convertToShares(100 ether), 50 ether * OFFSET, OFFSET);
+        assertApproxEqAbs(vault.convertToShares(200 ether), 100 ether * OFFSET, OFFSET);
+        assertApproxEqAbs(vault.convertToShares(50 ether), 25 ether * OFFSET, OFFSET);
     }
 
     function test_convertToAssets_afterYield() public {
-        // User deposits 100 assets → gets 100 shares
+        // User deposits 100 assets → gets 100_000 shares
         vm.prank(user);
         vault.depositERC20Tokens(100 ether);
 
         // Simulate yield: double the assets
         token.mint(address(vault), 100 ether);
 
-        // Now totalAssets = 200, totalShares = 100
-        // convertToAssets(100) = 100 * 200 / 100 = 200
-        assertEq(vault.convertToAssets(100 ether), 200 ether);
-        assertEq(vault.convertToAssets(50 ether), 100 ether);
-        assertEq(vault.convertToAssets(25 ether), 50 ether);
+        // Now totalAssets = 200, totalShares = 100_000
+        // convertToAssets(100_000) ≈ 100_000 * (200+1) / (100_000+1000) ≈ 200
+        assertApproxEqAbs(vault.convertToAssets(100 ether * OFFSET), 200 ether, 1);
+        assertApproxEqAbs(vault.convertToAssets(50 ether * OFFSET), 100 ether, 1);
+        assertApproxEqAbs(vault.convertToAssets(25 ether * OFFSET), 50 ether, 1);
     }
 
     function test_pps_multipleUsersWithYield() public {
-        // User1 deposits 100 assets → gets 100 shares
+        // User1 deposits 100 assets → gets 100_000 shares
         vm.prank(user);
         vault.depositERC20Tokens(100 ether);
 
-        // Yield: +50 assets (now 150 assets, 100 shares, PPS = 1.5)
+        // Yield: +50 assets (now 150 assets, 100_000 shares)
         token.mint(address(vault), 50 ether);
 
-        // User2 deposits 150 assets → gets 100 shares (150 * 100 / 150 = 100)
+        // User2 deposits 150 assets → gets ~100_000 shares (150 * (100_000+1000) / (150+1) ≈ 100_000)
         address user2 = address(0x4444444444444444444444444444444444444444);
         token.mint(user2, 150 ether);
         vm.startPrank(user2);
@@ -726,36 +730,36 @@ contract KernelVaultTest is Test {
         uint256 user2Shares = vault.depositERC20Tokens(150 ether);
         vm.stopPrank();
 
-        assertEq(user2Shares, 100 ether);
+        assertApproxEqAbs(user2Shares, 100 ether * OFFSET, OFFSET);
 
-        // State: totalAssets = 300, totalShares = 200, PPS = 1.5
+        // State: totalAssets = 300, totalShares ≈ 200_000
         assertEq(vault.totalAssets(), 300 ether);
-        assertEq(vault.totalShares(), 200 ether);
+        assertApproxEqAbs(vault.totalShares(), 200 ether * OFFSET, OFFSET);
 
-        // More yield: +60 assets (now 360 assets, 200 shares, PPS = 1.8)
+        // More yield: +60 assets (now 360 assets, ~200_000 shares)
         token.mint(address(vault), 60 ether);
 
-        // User1 withdraws 100 shares → gets 180 assets (100 * 360 / 200 = 180)
+        // User1 withdraws 100_000 shares → gets ~180 assets
         uint256 user1BalanceBefore = token.balanceOf(user);
         vm.prank(user);
-        uint256 user1Out = vault.withdraw(100 ether);
-        assertEq(user1Out, 180 ether);
-        assertEq(token.balanceOf(user), user1BalanceBefore + 180 ether);
+        uint256 user1Out = vault.withdraw(100 ether * OFFSET);
+        assertApproxEqAbs(user1Out, 180 ether, 1);
+        assertApproxEqAbs(token.balanceOf(user), user1BalanceBefore + 180 ether, 1);
 
-        // User2 withdraws 100 shares → gets 180 assets (100 * 180 / 100 = 180)
+        // User2 withdraws all shares → gets ~180 assets
         uint256 user2BalanceBefore = token.balanceOf(user2);
         vm.prank(user2);
-        uint256 user2Out = vault.withdraw(100 ether);
-        assertEq(user2Out, 180 ether);
-        assertEq(token.balanceOf(user2), user2BalanceBefore + 180 ether);
+        uint256 user2Out = vault.withdraw(user2Shares);
+        assertApproxEqAbs(user2Out, 180 ether, 1);
+        assertApproxEqAbs(token.balanceOf(user2), user2BalanceBefore + 180 ether, 1);
 
-        // Vault should be empty
-        assertEq(vault.totalAssets(), 0);
+        // Vault should be nearly empty (≤2 wei rounding dust)
+        assertLe(vault.totalAssets(), 2);
         assertEq(vault.totalShares(), 0);
     }
 
     function test_execute_assetsIncrease_ppsGoesUp() public {
-        // User deposits 100 assets → gets 100 shares
+        // User deposits 100 assets → gets 100_000 shares
         vm.prank(user);
         vault.depositERC20Tokens(100 ether);
 
@@ -763,13 +767,13 @@ contract KernelVaultTest is Test {
         // We'll do this by minting directly (simulating a profitable trade)
         token.mint(address(vault), 50 ether);
 
-        // Now totalAssets = 150, totalShares = 100
-        // User's 100 shares are now worth 150 assets
-        assertEq(vault.convertToAssets(100 ether), 150 ether);
+        // Now totalAssets = 150, totalShares = 100_000
+        // User's 100_000 shares are now worth ~150 assets
+        assertApproxEqAbs(vault.convertToAssets(100 ether * OFFSET), 150 ether, 1);
 
         vm.prank(user);
-        uint256 assetsOut = vault.withdraw(100 ether);
-        assertEq(assetsOut, 150 ether);
+        uint256 assetsOut = vault.withdraw(100 ether * OFFSET);
+        assertApproxEqAbs(assetsOut, 150 ether, 1);
     }
 
     // ============ TVL Tracking Tests ============
@@ -793,7 +797,7 @@ contract KernelVaultTest is Test {
         vm.startPrank(user);
         vault.depositERC20Tokens(DEPOSIT_AMOUNT);
 
-        uint256 withdrawShares = DEPOSIT_AMOUNT / 2;
+        uint256 withdrawShares = DEPOSIT_AMOUNT * OFFSET / 2;
         uint256 assetsOut = vault.withdraw(withdrawShares);
         vm.stopPrank();
 
@@ -847,12 +851,12 @@ contract KernelVaultTest is Test {
         // Simulate yield: double the assets
         token.mint(address(vault), DEPOSIT_AMOUNT);
 
-        // Withdraw all shares — assetsOut will be 200 (> totalDeposited of 100)
+        // Withdraw all shares — assetsOut will be ~200 (> totalDeposited of 100)
         vm.prank(user);
-        uint256 assetsOut = vault.withdraw(DEPOSIT_AMOUNT);
-        assertEq(assetsOut, 200 ether);
+        uint256 assetsOut = vault.withdraw(DEPOSIT_AMOUNT * OFFSET);
+        assertApproxEqAbs(assetsOut, 200 ether, 1);
 
-        // totalWithdrawn (200) > totalDeposited (100) — should return 0, not underflow
+        // totalWithdrawn (~200) > totalDeposited (100) — should return 0, not underflow
         assertEq(vault.totalValueLocked(), 0);
     }
 
@@ -867,8 +871,8 @@ contract KernelVaultTest is Test {
         vault.depositERC20Tokens(50 ether);
         assertEq(vault.totalValueLocked(), 100 ether);
 
-        // Withdraw 25 shares (25 assets at 1:1 PPS)
-        vault.withdraw(25 ether);
+        // Withdraw 25_000 shares (25 assets at 1:OFFSET PPS)
+        vault.withdraw(25 ether * OFFSET);
         assertEq(vault.totalValueLocked(), 75 ether);
 
         vm.stopPrank();
@@ -893,7 +897,7 @@ contract KernelVaultTest is Test {
         uint256 sharesMinted = vault.depositERC20Tokens(100 ether);
         vm.stopPrank();
 
-        // shares should be slightly less than 100 ether due to rounding
-        assertLt(sharesMinted, 100 ether);
+        // shares should be slightly less than 100_000 ether due to rounding
+        assertLt(sharesMinted, 100 ether * OFFSET);
     }
 }

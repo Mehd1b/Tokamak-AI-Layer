@@ -271,6 +271,36 @@ contract KernelVaultExecutionSemanticsTest is Test {
         vault.execute(DUMMY_JOURNAL, DUMMY_SEAL, agentOutput);
     }
 
+    // ============ CALL Target Restriction Tests ============
+
+    /// @notice Test: CALL to the vault's asset token is blocked (must use TRANSFER_ERC20)
+    function test_call_blockAssetTarget() public {
+        bytes memory callData = abi.encodeCall(MockERC20.transfer, (recipient, 10 ether));
+        bytes memory agentOutput = _buildCallAction(address(token), 0, callData);
+        bytes32 commitment = sha256(agentOutput);
+        mockVerifier.setActionCommitment(commitment);
+        mockVerifier.setExecutionNonce(1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(KernelVault.InvalidCallTarget.selector, address(token))
+        );
+        vault.execute(DUMMY_JOURNAL, DUMMY_SEAL, agentOutput);
+    }
+
+    /// @notice Test: CALL to the vault itself is blocked
+    function test_call_blockSelfTarget() public {
+        bytes memory callData = abi.encodeCall(KernelVault.settle, ());
+        bytes memory agentOutput = _buildCallAction(address(vault), 0, callData);
+        bytes32 commitment = sha256(agentOutput);
+        mockVerifier.setActionCommitment(commitment);
+        mockVerifier.setExecutionNonce(1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(KernelVault.InvalidCallTarget.selector, address(vault))
+        );
+        vault.execute(DUMMY_JOURNAL, DUMMY_SEAL, agentOutput);
+    }
+
     // ============ NO_OP Tests ============
 
     /// @notice Test: NO_OP does not change balances

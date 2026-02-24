@@ -196,7 +196,7 @@ contract TradingSubAccount {
         } else {
             // Short position -> buy to close
             isBuy = true;
-            sz = uint64(-szi);
+            sz = uint64(uint256(-int256(szi)));
             px = MAX_PRICE;
         }
 

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useExecute } from '@/hooks/useKernelVault';
 import { isValidHex } from '@/lib/utils';
+import { parseVaultError } from '@/lib/vaultErrors';
 
 export function ExecutionSubmitForm({ vaultAddress }: { vaultAddress: `0x${string}` }) {
   const [journal, setJournal] = useState('');
@@ -68,7 +69,7 @@ export function ExecutionSubmitForm({ vaultAddress }: { vaultAddress: `0x${strin
         <p className="text-emerald-400 text-sm font-mono">Execution applied successfully!</p>
       )}
       {error && (
-        <p className="text-red-400 text-sm font-mono">{error.message.slice(0, 100)}</p>
+        <p className="text-red-400 text-sm font-mono">{parseVaultError(error)}</p>
       )}
     </form>
   );
