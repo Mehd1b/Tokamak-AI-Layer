@@ -6,20 +6,22 @@ export interface SessionData {
   address?: string;
 }
 
-if (!process.env.SESSION_SECRET) {
-  throw new Error('SESSION_SECRET environment variable is required');
+function getSessionOptions(): SessionOptions {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) {
+    throw new Error('SESSION_SECRET environment variable is required');
+  }
+  return {
+    password: secret,
+    cookieName: 'ek-siwe-session',
+    cookieOptions: {
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      sameSite: 'lax' as const,
+    },
+  };
 }
 
-const sessionOptions: SessionOptions = {
-  password: process.env.SESSION_SECRET,
-  cookieName: 'ek-siwe-session',
-  cookieOptions: {
-    secure: process.env.NODE_ENV === 'production',
-    httpOnly: true,
-    sameSite: 'lax' as const,
-  },
-};
-
 export async function getSession() {
-  return getIronSession<SessionData>(await cookies(), sessionOptions);
+  return getIronSession<SessionData>(await cookies(), getSessionOptions());
 }
