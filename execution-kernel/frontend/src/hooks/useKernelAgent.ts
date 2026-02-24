@@ -5,18 +5,6 @@ import { useQuery } from '@tanstack/react-query';
 import { AgentRegistryABI } from '@/lib/contracts';
 import { useNetwork } from '@/lib/NetworkContext';
 
-export function useAgentExists(agentId: `0x${string}` | undefined) {
-  const { contracts, selectedChainId } = useNetwork();
-  return useReadContract({
-    address: contracts.agentRegistry,
-    abi: AgentRegistryABI,
-    functionName: 'agentExists',
-    args: agentId ? [agentId] : undefined,
-    chainId: selectedChainId,
-    query: { enabled: !!agentId },
-  });
-}
-
 export function useAgent(agentId: `0x${string}` | undefined) {
   const { contracts, selectedChainId } = useNetwork();
   return useReadContract({
@@ -27,35 +15,6 @@ export function useAgent(agentId: `0x${string}` | undefined) {
     chainId: selectedChainId,
     query: { enabled: !!agentId },
   });
-}
-
-export function useComputeAgentId(author: `0x${string}` | undefined, salt: `0x${string}` | undefined) {
-  const { contracts, selectedChainId } = useNetwork();
-  return useReadContract({
-    address: contracts.agentRegistry,
-    abi: AgentRegistryABI,
-    functionName: 'computeAgentId',
-    args: author && salt ? [author, salt] : undefined,
-    chainId: selectedChainId,
-    query: { enabled: !!author && !!salt },
-  });
-}
-
-export function useRegisterAgent() {
-  const { contracts } = useNetwork();
-  const { data: hash, writeContract, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
-
-  const register = (salt: `0x${string}`, imageId: `0x${string}`, agentCodeHash: `0x${string}`) => {
-    writeContract({
-      address: contracts.agentRegistry,
-      abi: AgentRegistryABI,
-      functionName: 'register',
-      args: [salt, imageId, agentCodeHash],
-    });
-  };
-
-  return { register, hash, isPending, isConfirming, isSuccess, error };
 }
 
 export function useUnregisterAgent() {

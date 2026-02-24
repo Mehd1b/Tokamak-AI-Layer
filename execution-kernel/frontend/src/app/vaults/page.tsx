@@ -1,38 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { useDeployVault, useIsDeployedVault, useDeployedVaultsList } from '@/hooks/useVaultFactory';
+import { useIsDeployedVault, useDeployedVaultsList } from '@/hooks/useVaultFactory';
 import { VaultCard } from '@/components/VaultCard';
-import { isValidBytes32 } from '@/lib/utils';
-import { useNetwork } from '@/lib/NetworkContext';
 import Link from 'next/link';
 
 export default function VaultsPage() {
-  const [showDeploy, setShowDeploy] = useState(false);
-  const [agentId, setAgentId] = useState('');
-  const [asset, setAsset] = useState('');
-  const [userSalt, setUserSalt] = useState('');
   const [searchAddress, setSearchAddress] = useState('');
-  const { explorerUrl } = useNetwork();
-  const { deploy, isPending, isConfirming, isSuccess, hash, error } = useDeployVault();
   const { data: deployedVaults, isLoading: isLoadingVaults, error: vaultsError } = useDeployedVaultsList();
 
   const vaultHex = searchAddress.startsWith('0x') && searchAddress.length === 42
     ? (searchAddress as `0x${string}`)
     : undefined;
   const { data: isDeployed, isLoading: isCheckingVault } = useIsDeployedVault(vaultHex);
-
-  const canDeploy = isValidBytes32(agentId) && asset.startsWith('0x') && asset.length === 42 && isValidBytes32(userSalt);
-
-  const handleDeploy = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canDeploy) return;
-    deploy(
-      agentId as `0x${string}`,
-      asset as `0x${string}`,
-      userSalt as `0x${string}`,
-    );
-  };
 
   return (
     <div className="max-w-7xl mx-auto px-6 lg:px-12 py-12">
@@ -51,25 +31,19 @@ export default function VaultsPage() {
           <span className="italic text-[#A855F7]">Execution</span> Vaults
         </h1>
         <p className="text-gray-400 max-w-2xl" style={{ fontFamily: 'var(--font-mono), monospace' }}>
-          Deploy and manage vaults for verifiable agent execution with ZK proofs.
+          Browse and manage vaults for verifiable agent execution with ZK proofs.
         </p>
       </div>
 
-      {/* Search + Deploy toggle */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-8">
+      {/* Search */}
+      <div className="mb-8">
         <input
           type="text"
           value={searchAddress}
           onChange={(e) => setSearchAddress(e.target.value)}
           placeholder="Search by vault address (0x...)..."
-          className="input-dark font-mono flex-1"
+          className="input-dark font-mono w-full"
         />
-        <button
-          onClick={() => setShowDeploy(!showDeploy)}
-          className={showDeploy ? 'btn-secondary' : 'btn-primary'}
-        >
-          {showDeploy ? 'Cancel' : 'Deploy Vault'}
-        </button>
       </div>
 
       {/* Search result */}
@@ -94,75 +68,8 @@ export default function VaultsPage() {
         </div>
       )}
 
-      {/* Deploy form */}
-      {showDeploy && (
-        <div className="card mb-8">
-          <h2
-            className="text-xl font-light mb-6 text-white"
-            style={{ fontFamily: 'var(--font-serif), serif' }}
-          >
-            Deploy New Vault
-          </h2>
-          <form onSubmit={handleDeploy} className="space-y-4">
-            <div>
-              <label className="block text-sm text-gray-400 mb-1 font-mono">Agent ID (bytes32)</label>
-              <input
-                type="text"
-                value={agentId}
-                onChange={(e) => setAgentId(e.target.value)}
-                placeholder="0x..."
-                className="input-dark font-mono"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1 font-mono">Asset Address</label>
-              <input
-                type="text"
-                value={asset}
-                onChange={(e) => setAsset(e.target.value)}
-                placeholder="0x... (use 0x0000...0000 for native ETH)"
-                className="input-dark font-mono"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1 font-mono">Salt (bytes32)</label>
-              <input
-                type="text"
-                value={userSalt}
-                onChange={(e) => setUserSalt(e.target.value)}
-                placeholder="0x..."
-                className="input-dark font-mono"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={!canDeploy || isPending || isConfirming}
-              className="btn-primary w-full"
-            >
-              {isPending ? 'Signing...' : isConfirming ? 'Deploying...' : 'Deploy Vault'}
-            </button>
-            {isSuccess && hash && (
-              <div className="text-emerald-400 text-sm font-mono">
-                Vault deployed!{' '}
-                <a
-                  href={`${explorerUrl}/tx/${hash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline hover:text-emerald-300"
-                >
-                  View transaction
-                </a>
-              </div>
-            )}
-            {error && (
-              <p className="text-red-400 text-sm font-mono">{error.message.slice(0, 100)}</p>
-            )}
-          </form>
-        </div>
-      )}
-
       {/* On-chain deployed vaults */}
-      {!vaultHex && !showDeploy && (
+      {!vaultHex && (
         <>
           {isLoadingVaults && (
             <div className="card text-center py-12">
@@ -208,8 +115,7 @@ export default function VaultsPage() {
                   <circle cx="32" cy="32" r="3" fill="#A855F7" fillOpacity="0.5" />
                 </svg>
               </div>
-              <p className="text-gray-500 font-mono text-sm mb-2">No vaults deployed yet</p>
-              <p className="text-gray-600 font-mono text-xs">Deploy the first vault above</p>
+              <p className="text-gray-500 font-mono text-sm">No vaults deployed yet</p>
             </div>
           )}
         </>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
+import { useReadContract, usePublicClient } from 'wagmi';
 import { useQuery } from '@tanstack/react-query';
 import { VaultFactoryABI, KernelVaultABI } from '@/lib/contracts';
 import { useNetwork } from '@/lib/NetworkContext';
@@ -35,40 +35,6 @@ export function useIsDeployedVault(vaultAddress: `0x${string}` | undefined) {
   });
 }
 
-export function useComputeVaultAddress(
-  owner: `0x${string}` | undefined,
-  agentId: `0x${string}` | undefined,
-  asset: `0x${string}` | undefined,
-  userSalt: `0x${string}` | undefined,
-) {
-  const { contracts, selectedChainId } = useNetwork();
-  return useReadContract({
-    address: contracts.vaultFactory,
-    abi: VaultFactoryABI,
-    functionName: 'computeVaultAddress',
-    args: owner && agentId && asset && userSalt ? [owner, agentId, asset, userSalt] : undefined,
-    chainId: selectedChainId,
-    query: { enabled: !!owner && !!agentId && !!asset && !!userSalt },
-  });
-}
-
-export function useDeployVault() {
-  const { contracts, selectedChainId } = useNetwork();
-  const { data: hash, writeContract, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: selectedChainId });
-
-  const deploy = (agentId: `0x${string}`, asset: `0x${string}`, userSalt: `0x${string}`) => {
-    writeContract({
-      address: contracts.vaultFactory,
-      abi: VaultFactoryABI,
-      functionName: 'deployVault',
-      args: [agentId, asset, userSalt],
-      chainId: selectedChainId,
-    });
-  };
-
-  return { deploy, hash, isPending, isConfirming, isSuccess, error };
-}
 
 /** Batch an array of multicall contracts into chunks to avoid RPC size limits. */
 async function batchedMulticall(client: any, contracts: any[], batchSize = 20): Promise<any[]> {

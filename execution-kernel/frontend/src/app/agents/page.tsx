@@ -1,13 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { RegisterAgentForm } from '@/components/RegisterAgentForm';
 import { useAgent, useRegisteredAgents } from '@/hooks/useKernelAgent';
 import { AgentCard } from '@/components/AgentCard';
 import { isValidBytes32 } from '@/lib/utils';
 
 export default function AgentsPage() {
-  const [showRegister, setShowRegister] = useState(false);
   const [searchId, setSearchId] = useState('');
 
   const agentIdHex = isValidBytes32(searchId) ? (searchId as `0x${string}`) : undefined;
@@ -31,39 +29,20 @@ export default function AgentsPage() {
           <span className="italic text-[#A855F7]">Registered</span> Agents
         </h1>
         <p className="text-gray-400 max-w-2xl" style={{ fontFamily: 'var(--font-mono), monospace' }}>
-          Browse and register agents with RISC Zero zkVM image IDs for verifiable execution.
+          Browse agents with RISC Zero zkVM image IDs for verifiable execution.
         </p>
       </div>
 
-      {/* Search + Register toggle */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-8">
+      {/* Search */}
+      <div className="mb-8">
         <input
           type="text"
           value={searchId}
           onChange={(e) => setSearchId(e.target.value)}
           placeholder="Search by Agent ID (bytes32)..."
-          className="input-dark font-mono flex-1"
+          className="input-dark font-mono w-full"
         />
-        <button
-          onClick={() => setShowRegister(!showRegister)}
-          className={showRegister ? 'btn-secondary' : 'btn-primary'}
-        >
-          {showRegister ? 'Cancel' : 'Register Agent'}
-        </button>
       </div>
-
-      {/* Register form */}
-      {showRegister && (
-        <div className="card mb-8">
-          <h2
-            className="text-xl font-light mb-6 text-white"
-            style={{ fontFamily: 'var(--font-serif), serif' }}
-          >
-            Register New Agent
-          </h2>
-          <RegisterAgentForm />
-        </div>
-      )}
 
       {/* Search results */}
       {isLoading && agentIdHex && (
@@ -93,7 +72,7 @@ export default function AgentsPage() {
       )}
 
       {/* On-chain registered agents */}
-      {!agentIdHex && !showRegister && (
+      {!agentIdHex && (
         <>
           {isLoadingAgents && (
             <div className="card text-center py-12">
@@ -135,8 +114,7 @@ export default function AgentsPage() {
                   <circle cx="32" cy="32" r="4" fill="#A855F7" fillOpacity="0.5" />
                 </svg>
               </div>
-              <p className="text-gray-500 font-mono text-sm mb-2">No agents registered yet</p>
-              <p className="text-gray-600 font-mono text-xs">Register the first agent above</p>
+              <p className="text-gray-500 font-mono text-sm">No agents registered yet</p>
             </div>
           )}
         </>
