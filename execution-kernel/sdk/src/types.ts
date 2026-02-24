@@ -76,6 +76,7 @@ export interface DeployVaultParams {
   agentId: `0x${string}`;
   asset: `0x${string}`;
   userSalt: `0x${string}`;
+  expectedImageId: `0x${string}`;
 }
 
 export interface ExecuteParams {

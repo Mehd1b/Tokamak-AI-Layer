@@ -2,15 +2,15 @@
 //!
 //! See `spec/codec.md` for encoding specification.
 //!
-//! # Canonical Ordering
+//! # Action Ordering
 //!
-//! Actions in `AgentOutput` are treated as an **unordered set** for commitment
-//! purposes. The kernel sorts actions into canonical order before encoding to
-//! ensure deterministic `action_commitment` regardless of agent-provided order.
+//! The codec preserves the agent's action order as-is. **No sorting is performed
+//! by the kernel.** Agents are responsible for producing actions in a deterministic
+//! order so that the `action_commitment` (SHA-256 of the encoded output) is
+//! reproducible across identical executions.
 //!
-//! **Implication**: Agents cannot rely on action ordering for "do X then Y"
-//! semantics. The constraint engine evaluates actions in canonical sorted order,
-//! and `violation_action_index` refers to the position in that sorted order.
+//! **Implication**: The `violation_action_index` in constraint violations refers
+//! to the position in the agent-provided order.
 
 use crate::types::*;
 use crate::{KERNEL_VERSION, MAX_AGENT_INPUT_BYTES, MAX_AGENT_OUTPUT_BYTES, PROTOCOL_VERSION};
@@ -576,15 +576,11 @@ impl CanonicalDecode for ActionV1 {
 ///   - action_len: u32 (4 bytes) - length of the following action encoding
 ///   - action: ActionV1 encoding (variable)
 ///
-/// # Canonical Ordering
+/// # Action Ordering
 ///
-/// Actions are automatically sorted into canonical order before encoding.
-/// This ensures deterministic `action_commitment` regardless of the order
-/// agents produce actions.
-///
-/// **Important**: Encoding preserves the agent's action order. The agent is responsible
-/// for deterministic ordering of actions. This ensures commitment values are reproducible
-/// when the agent produces the same output.
+/// Encoding preserves the agent's action order. **No sorting is performed.**
+/// The agent is responsible for producing actions in a deterministic order so
+/// that the `action_commitment` is reproducible across identical executions.
 impl CanonicalEncode for AgentOutput {
     fn encoded_len(&self) -> Result<usize, CodecError> {
         let n = self.actions.len();

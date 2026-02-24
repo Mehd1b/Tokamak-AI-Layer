@@ -878,6 +878,67 @@ contract KernelVaultTest is Test {
         vm.stopPrank();
     }
 
+    // ============ Emergency Withdraw Tests ============
+
+    function test_emergencyWithdraw_success() public {
+        // Deposit
+        vm.prank(user);
+        vault.depositERC20Tokens(DEPOSIT_AMOUNT);
+
+        // Pause the vault
+        vault.pause();
+
+        // Warp past emergency withdraw delay
+        vm.warp(block.timestamp + 14 days + 1);
+
+        // Emergency withdraw
+        uint256 balanceBefore = token.balanceOf(user);
+        vm.prank(user);
+        uint256 assetsOut = vault.emergencyWithdraw(DEPOSIT_AMOUNT * OFFSET);
+
+        assertEq(assetsOut, DEPOSIT_AMOUNT);
+        assertEq(token.balanceOf(user), balanceBefore + DEPOSIT_AMOUNT);
+        assertEq(vault.shares(user), 0);
+    }
+
+    function test_emergencyWithdraw_tooEarly_reverts() public {
+        vm.prank(user);
+        vault.depositERC20Tokens(DEPOSIT_AMOUNT);
+
+        vault.pause();
+
+        // Try before delay expires
+        vm.prank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                KernelVault.EmergencyWithdrawTooEarly.selector,
+                block.timestamp + 14 days,
+                block.timestamp
+            )
+        );
+        vault.emergencyWithdraw(DEPOSIT_AMOUNT * OFFSET);
+    }
+
+    function test_emergencyWithdraw_notPaused_reverts() public {
+        vm.prank(user);
+        vault.depositERC20Tokens(DEPOSIT_AMOUNT);
+
+        vm.prank(user);
+        vm.expectRevert("not paused");
+        vault.emergencyWithdraw(DEPOSIT_AMOUNT * OFFSET);
+    }
+
+    function test_pausedAt_tracksTimestamp() public {
+        assertEq(vault.pausedAt(), 0);
+
+        vm.warp(1000);
+        vault.pause();
+        assertEq(vault.pausedAt(), 1000);
+
+        vault.unpause();
+        assertEq(vault.pausedAt(), 0);
+    }
+
     function test_rounding_depositorGetsFewer() public {
         // User1 deposits 100 assets → gets 100 shares
         vm.prank(user);

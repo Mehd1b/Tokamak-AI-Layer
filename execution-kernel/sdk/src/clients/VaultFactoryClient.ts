@@ -59,7 +59,7 @@ export class VaultFactoryClient {
       address: this.address,
       abi: VaultFactoryABI,
       functionName: 'deployVault',
-      args: [params.agentId, params.asset, params.userSalt],
+      args: [params.agentId, params.asset, params.userSalt, params.expectedImageId],
     });
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
     // Parse VaultDeployed event to get vault address

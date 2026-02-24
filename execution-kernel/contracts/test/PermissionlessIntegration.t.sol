@@ -69,7 +69,7 @@ contract PermissionlessIntegrationTest is Test {
 
         // Step 2: Deploy vault via VaultFactory (only author can deploy)
         vm.prank(author);
-        vaultAddr = factory.deployVault(agentId, address(token), USER_SALT);
+        vaultAddr = factory.deployVault(agentId, address(token), USER_SALT, IMAGE_ID);
 
         // Configure mock verifier with agent info
         mockVerifier.setEssentials(agentId, 1, bytes32(0)); // commitment set per test
@@ -220,7 +220,7 @@ contract PermissionlessIntegrationTest is Test {
         // Author deploys a NEW vault (different salt)
         bytes32 newUserSalt = bytes32(uint256(0xBEEF));
         vm.prank(author);
-        address newVaultAddr = factory.deployVault(agentId, address(token), newUserSalt);
+        address newVaultAddr = factory.deployVault(agentId, address(token), newUserSalt, newImageId);
 
         KernelVault newVault = KernelVault(payable(newVaultAddr));
 
@@ -254,7 +254,7 @@ contract PermissionlessIntegrationTest is Test {
 
         // Author deploys vault for second agent
         vm.prank(author);
-        address vault2Addr = factory.deployVault(agent2Id, address(token), USER_SALT);
+        address vault2Addr = factory.deployVault(agent2Id, address(token), USER_SALT, agent2ImageId);
 
         KernelVault vault1 = KernelVault(payable(vaultAddr));
         KernelVault vault2 = KernelVault(payable(vault2Addr));
@@ -298,7 +298,7 @@ contract PermissionlessIntegrationTest is Test {
                 IVaultFactory.NotAgentAuthor.selector, agentId, randomUser, author
             )
         );
-        factory.deployVault(agentId, address(token), bytes32(uint256(0x999)));
+        factory.deployVault(agentId, address(token), bytes32(uint256(0x999)), IMAGE_ID);
     }
 
     /// @notice Test author can deploy their own vault after registering
@@ -315,7 +315,7 @@ contract PermissionlessIntegrationTest is Test {
 
         // New author can deploy vault for their agent
         vm.prank(newAuthor);
-        address newVaultAddr = factory.deployVault(newAgentId, address(token), bytes32(uint256(0x999)));
+        address newVaultAddr = factory.deployVault(newAgentId, address(token), bytes32(uint256(0x999)), bytes32(uint256(0x7890)));
 
         assertTrue(factory.isDeployedVault(newVaultAddr), "Vault should be deployed");
 

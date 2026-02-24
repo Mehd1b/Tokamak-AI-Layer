@@ -157,7 +157,8 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     function deployVault(
         bytes32 agentId,
         address asset,
-        bytes32 userSalt
+        bytes32 userSalt,
+        bytes32 expectedImageId
     ) external returns (address vault) {
         // Get agent info from registry
         IAgentRegistry.AgentInfo memory agentInfo = _registry.get(agentId);
@@ -168,6 +169,11 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         // Only the agent author can deploy vaults for their agent
         if (msg.sender != agentInfo.author) {
             revert NotAgentAuthor(agentId, msg.sender, agentInfo.author);
+        }
+
+        // Verify imageId hasn't changed since computeVaultAddress was called
+        if (agentInfo.imageId != expectedImageId) {
+            revert ImageIdChanged(expectedImageId, agentInfo.imageId);
         }
 
         // Compute CREATE2 salt

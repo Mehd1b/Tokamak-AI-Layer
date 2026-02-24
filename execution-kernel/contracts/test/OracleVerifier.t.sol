@@ -307,6 +307,45 @@ contract OracleVerifierTest is Test {
         );
     }
 
+    // ============ Future Timestamp Tests ============
+
+    function test_futureTimestamp_verify_returnsFalse() public view {
+        bytes32 feedHash = sha256("test feed data");
+        // Sign with a future timestamp (2000 > block.timestamp 1100)
+        uint64 futureTimestamp = 2000;
+        bytes memory sig = _signFeedHash(feedHash, ORACLE_PK, futureTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT);
+
+        // With maxOracleAge > 0, future timestamp should return false (not underflow)
+        assertFalse(
+            wrapper.verify(feedHash, sig, oracleSigner, futureTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 200),
+            "Future timestamp should fail verification (not underflow)"
+        );
+    }
+
+    function test_futureTimestamp_requireValid_reverts() public {
+        bytes32 feedHash = sha256("test feed data");
+        uint64 futureTimestamp = 2000;
+        bytes memory sig = _signFeedHash(feedHash, ORACLE_PK, futureTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT);
+
+        // Should revert with OracleDataStale, not underflow panic
+        vm.expectRevert(
+            abi.encodeWithSelector(OracleVerifier.OracleDataStale.selector, futureTimestamp, 200, 1100)
+        );
+        wrapper.requireValid(feedHash, sig, oracleSigner, futureTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 200);
+    }
+
+    function test_futureTimestamp_zeroMaxAge_succeeds() public view {
+        bytes32 feedHash = sha256("test feed data");
+        uint64 futureTimestamp = 2000;
+        bytes memory sig = _signFeedHash(feedHash, ORACLE_PK, futureTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT);
+
+        // maxOracleAge=0 means no age check, so future timestamp should pass
+        assertTrue(
+            wrapper.verify(feedHash, sig, oracleSigner, futureTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0),
+            "Zero maxAge should skip staleness check even with future timestamp"
+        );
+    }
+
     function test_allBitsFeedHash() public view {
         bytes32 feedHash = bytes32(type(uint256).max);
         bytes memory sig = _signFeedHashDefault(feedHash, ORACLE_PK);

@@ -70,10 +70,28 @@ export const AgentRegistryABI = [
   {
     type: 'function',
     name: 'unregister',
-    inputs: [
-      { name: 'agentId', type: 'bytes32' },
-      { name: 'vaults', type: 'address[]' },
-    ],
+    inputs: [{ name: 'agentId', type: 'bytes32' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'transferOwnership',
+    inputs: [{ name: 'newOwner', type: 'address' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'factory',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'setFactory',
+    inputs: [{ name: 'factory_', type: 'address' }],
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -160,5 +178,34 @@ export const AgentRegistryABI = [
     type: 'error',
     name: 'InvalidAgentCodeHash',
     inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'VaultHasDeposits',
+    inputs: [
+      { name: 'vault', type: 'address' },
+      { name: 'assets', type: 'uint256' },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'OwnableUnauthorizedAccount',
+    inputs: [{ name: 'account', type: 'address' }],
+  },
+  {
+    type: 'event',
+    name: 'OwnershipTransferred',
+    inputs: [
+      { name: 'previousOwner', type: 'address', indexed: true },
+      { name: 'newOwner', type: 'address', indexed: true },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'FactoryUpdated',
+    inputs: [
+      { name: 'previousFactory', type: 'address', indexed: true },
+      { name: 'newFactory', type: 'address', indexed: true },
+    ],
   },
 ] as const;

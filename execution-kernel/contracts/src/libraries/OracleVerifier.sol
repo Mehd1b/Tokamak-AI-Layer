@@ -48,8 +48,8 @@ library OracleVerifier {
     ) internal view returns (bool) {
         if (signature.length != 65) return false;
 
-        // Check freshness
-        if (maxOracleAge > 0 && block.timestamp - oracleTimestamp > maxOracleAge) return false;
+        // Check freshness (guard against future timestamps to prevent underflow)
+        if (maxOracleAge > 0 && (oracleTimestamp > block.timestamp || block.timestamp - oracleTimestamp > maxOracleAge)) return false;
 
         bytes32 r;
         bytes32 s;
@@ -98,8 +98,8 @@ library OracleVerifier {
             revert InvalidSignatureLength(signature.length);
         }
 
-        // Check freshness
-        if (maxOracleAge > 0 && block.timestamp - oracleTimestamp > maxOracleAge) {
+        // Check freshness (guard against future timestamps to prevent underflow)
+        if (maxOracleAge > 0 && (oracleTimestamp > block.timestamp || block.timestamp - oracleTimestamp > maxOracleAge)) {
             revert OracleDataStale(oracleTimestamp, maxOracleAge, block.timestamp);
         }
 

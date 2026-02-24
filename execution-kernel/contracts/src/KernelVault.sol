@@ -44,6 +44,9 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @notice Delay after which anyone can emergency-settle a stuck strategy
     uint256 public constant EMERGENCY_SETTLE_DELAY = 7 days;
 
+    /// @notice Delay after which depositors can emergency-withdraw while paused
+    uint256 public constant EMERGENCY_WITHDRAW_DELAY = 14 days;
+
     // ============ Immutables ============
 
     /// @notice The ERC20 asset this vault holds
@@ -100,6 +103,9 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
     /// @notice Maximum age of oracle data in seconds (0 = no age check)
     uint64 public maxOracleAge;
+
+    /// @notice Timestamp when the vault was paused (for emergency withdraw delay)
+    uint256 public pausedAt;
 
     // ============ Events ============
 
@@ -214,14 +220,14 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @notice Deposits are locked while a strategy is active (prevents yield dilution)
     error DepositsLockedDuringStrategy();
 
-    /// @notice CALL action targets the vault's asset or the vault itself (blocked)
+    /// @notice CALL action targets the vault itself (blocked)
     error InvalidCallTarget(address target);
-
-    /// @notice CALL action uses a blocked ERC20 selector (use TRANSFER_ERC20 instead)
-    error BlockedCallSelector(bytes4 selector);
 
     /// @notice Emergency settlement called too early
     error EmergencySettleTooEarly(uint256 earliest, uint256 current);
+
+    /// @notice Emergency withdrawal called too early
+    error EmergencyWithdrawTooEarly(uint256 earliest, uint256 current);
 
     // ============ Constructor ============
 
@@ -552,25 +558,8 @@ contract KernelVault is ReentrancyGuard, Pausable {
         // Convert target bytes32 to address (safe after validation above)
         address target = address(uint160(uint256(action.target)));
 
-        // Block dangerous CALL targets: vault's asset (use TRANSFER_ERC20 instead) and self
-        if (target == address(asset) || target == address(this)) revert InvalidCallTarget(target);
-
-        // Block dangerous ERC20 selectors on ANY target to prevent token draining via approve/transfer
-        if (callData.length >= 4) {
-            bytes4 selector;
-            assembly {
-                selector := mload(add(callData, 32))
-            }
-            if (
-                selector == bytes4(0x095ea7b3) || // approve(address,uint256)
-                selector == bytes4(0xa9059cbb) || // transfer(address,uint256)
-                selector == bytes4(0x23b872dd) || // transferFrom(address,address,uint256)
-                selector == bytes4(0x39509351) || // increaseAllowance(address,uint256)
-                selector == bytes4(0xa457c2d7)    // decreaseAllowance(address,uint256)
-            ) {
-                revert BlockedCallSelector(selector);
-            }
-        }
+        // Block CALL to self (prevents agent from calling vault functions like pause/settle)
+        if (target == address(this)) revert InvalidCallTarget(target);
 
         // Capture balance before call for snapshot detection
         uint256 balanceBefore = totalAssets();
@@ -628,6 +617,66 @@ contract KernelVault is ReentrancyGuard, Pausable {
     function unpause() external {
         if (msg.sender != owner) revert NotOwner();
         _unpause();
+    }
+
+    /// @notice Override _pause to track pause timestamp
+    function _pause() internal override {
+        super._pause();
+        pausedAt = block.timestamp;
+    }
+
+    /// @notice Override _unpause to clear pause timestamp
+    function _unpause() internal override {
+        super._unpause();
+        pausedAt = 0;
+    }
+
+    /// @notice Emergency withdraw bypassing pause after EMERGENCY_WITHDRAW_DELAY
+    /// @dev Allows depositors to exit if the vault is paused and the owner disappears
+    /// @param shareAmount Number of shares to burn
+    /// @return assetsOut Amount of tokens returned
+    function emergencyWithdraw(uint256 shareAmount) external nonReentrant returns (uint256 assetsOut) {
+        require(paused(), "not paused");
+        uint256 earliest = pausedAt + EMERGENCY_WITHDRAW_DELAY;
+        if (block.timestamp < earliest) revert EmergencyWithdrawTooEarly(earliest, block.timestamp);
+
+        if (shareAmount == 0) revert ZeroWithdraw();
+        if (shares[msg.sender] < shareAmount) {
+            revert InsufficientShares(shareAmount, shares[msg.sender]);
+        }
+
+        // Calculate assets using virtual offset formula (ERC4626)
+        uint256 effectiveAssets = effectiveTotalAssets();
+        assetsOut = (shareAmount * (effectiveAssets + 1)) / (totalShares + _DECIMALS_OFFSET);
+        if (assetsOut == 0) revert ZeroAssetsOut();
+
+        // Cap to actual available balance during active strategy
+        uint256 available = totalAssets();
+        if (assetsOut > available) {
+            revert InsufficientAvailableAssets(assetsOut, available);
+        }
+
+        // Burn shares
+        shares[msg.sender] -= shareAmount;
+        totalShares -= shareAmount;
+        totalWithdrawn += assetsOut;
+
+        // Update snapshot to reflect withdrawal
+        if (strategyActive) {
+            snapshotTotalAssets -= assetsOut;
+            snapshotTotalShares -= shareAmount;
+        }
+
+        // Transfer tokens or ETH
+        bool isETH = address(asset) == address(0);
+        if (isETH) {
+            (bool success,) = msg.sender.call{ value: assetsOut }("");
+            if (!success) revert ETHTransferFailed();
+        } else {
+            asset.safeTransfer(msg.sender, assetsOut);
+        }
+
+        emit Withdraw(msg.sender, assetsOut, shareAmount);
     }
 
     /// @notice Internal settlement logic (used by settle() and auto-settlement in _executeCall)

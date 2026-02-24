@@ -32,8 +32,11 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
     /// @notice VaultFactory address (for querying agent vaults during unregister)
     address private _factory;
 
+    /// @notice Mapping from agentId to its index in _agentIds array (for O(1) removal)
+    mapping(bytes32 => uint256) internal _agentIdIndex;
+
     /// @notice Storage gap for future upgrades
-    uint256[47] private __gap;
+    uint256[46] private __gap;
 
     // ============ Errors ============
 
@@ -44,6 +47,9 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
 
     /// @notice Emitted when ownership is transferred
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+    /// @notice Emitted when the factory address is updated
+    event FactoryUpdated(address indexed previousFactory, address indexed newFactory);
 
     // ============ Modifiers ============
 
@@ -93,7 +99,10 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
     /// @notice Set the VaultFactory address (for querying agent vaults during unregister)
     /// @param factory_ The VaultFactory contract address
     function setFactory(address factory_) external onlyOwner {
+        require(factory_ != address(0), "zero factory");
+        address previous = _factory;
         _factory = factory_;
+        emit FactoryUpdated(previous, factory_);
     }
 
     // ============ UUPS ============
@@ -135,7 +144,8 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
             exists: true
         });
 
-        // Track agent ID for enumeration
+        // Track agent ID for enumeration (store index for O(1) removal)
+        _agentIdIndex[agentId] = _agentIds.length;
         _agentIds.push(agentId);
 
         emit AgentRegistered(agentId, msg.sender, imageId, agentCodeHash);
@@ -178,12 +188,11 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
         if (msg.sender != agent.author) revert NotAgentAuthor(agentId, msg.sender, agent.author);
 
         // Query factory for all vaults deployed for this agent
-        if (_factory != address(0)) {
-            address[] memory vaults = IVaultFactory(_factory).getAgentVaults(agentId);
-            for (uint256 i = 0; i < vaults.length; i++) {
-                uint256 assets = IKernelVaultView(vaults[i]).totalAssets();
-                if (assets > 0) revert VaultHasDeposits(vaults[i], assets);
-            }
+        require(_factory != address(0), "factory not set");
+        address[] memory vaults = IVaultFactory(_factory).getAgentVaults(agentId);
+        for (uint256 i = 0; i < vaults.length; i++) {
+            uint256 assets = IKernelVaultView(vaults[i]).totalAssets();
+            if (assets > 0) revert VaultHasDeposits(vaults[i], assets);
         }
 
         // Save author for event before deletion
@@ -192,15 +201,16 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
         // Remove from agents mapping
         delete _agents[agentId];
 
-        // Remove from _agentIds array (swap-and-pop)
-        uint256 len = _agentIds.length;
-        for (uint256 i = 0; i < len; i++) {
-            if (_agentIds[i] == agentId) {
-                _agentIds[i] = _agentIds[len - 1];
-                _agentIds.pop();
-                break;
-            }
+        // Remove from _agentIds array using O(1) swap-and-pop with stored index
+        uint256 idx = _agentIdIndex[agentId];
+        uint256 lastIdx = _agentIds.length - 1;
+        if (idx != lastIdx) {
+            bytes32 lastId = _agentIds[lastIdx];
+            _agentIds[idx] = lastId;
+            _agentIdIndex[lastId] = idx;
         }
+        _agentIds.pop();
+        delete _agentIdIndex[agentId];
 
         emit AgentUnregistered(agentId, author);
     }

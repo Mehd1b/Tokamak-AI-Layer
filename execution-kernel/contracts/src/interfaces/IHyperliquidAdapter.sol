@@ -85,12 +85,11 @@ interface IHyperliquidAdapter {
 
     // ============ Margin Management ============
 
-    /// @notice Deposit USDC from a vault into its sub-account's HyperCore perp margin.
-    /// @dev Callable by the vault owner. Pulls USDC from the vault and deposits to HyperCore
-    ///      via the sub-account. This seeds initial margin so the agent sees non-zero equity.
-    /// @param vault The registered vault to pull USDC from
+    /// @notice Deposit USDC from the calling vault into its sub-account's HyperCore perp margin.
+    /// @dev Callable only by a registered vault (via CALL action in the ZK-verified execute path).
+    ///      Pulls USDC from msg.sender (the vault) and deposits to HyperCore via the sub-account.
     /// @param amount The amount of USDC to deposit
-    function depositMargin(address vault, uint256 amount) external;
+    function depositMargin(uint256 amount) external;
 
     // ============ Core Functions (selectors preserved) ============
 

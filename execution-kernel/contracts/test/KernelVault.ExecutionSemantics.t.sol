@@ -273,18 +273,23 @@ contract KernelVaultExecutionSemanticsTest is Test {
 
     // ============ CALL Target Restriction Tests ============
 
-    /// @notice Test: CALL to the vault's asset token is blocked (must use TRANSFER_ERC20)
-    function test_call_blockAssetTarget() public {
+    /// @notice Test: CALL to the vault's asset token is now allowed (ZK-verified actions)
+    function test_call_allowsAssetTarget() public {
+        // Agent can now approve/transfer the vault's asset via CALL (needed for adapter integration)
         bytes memory callData = abi.encodeCall(MockERC20.transfer, (recipient, 10 ether));
         bytes memory agentOutput = _buildCallAction(address(token), 0, callData);
-        bytes32 commitment = sha256(agentOutput);
-        mockVerifier.setActionCommitment(commitment);
-        mockVerifier.setExecutionNonce(1);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(KernelVault.InvalidCallTarget.selector, address(token))
-        );
-        vault.execute(DUMMY_JOURNAL, DUMMY_SEAL, agentOutput);
+        uint256 recipientBefore = token.balanceOf(recipient);
+        _executeWithCommitment(agentOutput, 1);
+        assertEq(token.balanceOf(recipient), recipientBefore + 10 ether, "transfer should succeed");
+    }
+
+    /// @notice Test: CALL with approve selector is now allowed (needed for adapter integration)
+    function test_call_allowsApprove() public {
+        bytes memory callData = abi.encodeCall(MockERC20.approve, (address(0xBEEF), 100 ether));
+        bytes memory agentOutput = _buildCallAction(address(token), 0, callData);
+        _executeWithCommitment(agentOutput, 1);
+        // Should succeed without revert
     }
 
     /// @notice Test: CALL to the vault itself is blocked

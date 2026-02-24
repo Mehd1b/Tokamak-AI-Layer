@@ -536,9 +536,21 @@ contract AgentRegistryTest is Test {
     // ============ setFactory Tests ============
 
     function test_setFactory_success() public {
-        address newFactory = address(0xFACE);
-        registry.setFactory(newFactory);
-        assertEq(registry.factory(), newFactory, "Factory should be updated");
+        MockVaultFactory newFactory = new MockVaultFactory();
+        registry.setFactory(address(newFactory));
+        assertEq(registry.factory(), address(newFactory), "Factory should be updated");
+    }
+
+    function test_setFactory_zeroAddress_reverts() public {
+        vm.expectRevert("zero factory");
+        registry.setFactory(address(0));
+    }
+
+    function test_setFactory_emitsEvent() public {
+        MockVaultFactory newFactory = new MockVaultFactory();
+        vm.expectEmit(true, true, false, true);
+        emit AgentRegistry.FactoryUpdated(address(mockFactory), address(newFactory));
+        registry.setFactory(address(newFactory));
     }
 
     function test_setFactory_notOwner_reverts() public {
@@ -551,6 +563,23 @@ contract AgentRegistryTest is Test {
 
     function test_factory_returnsAddress() public view {
         assertEq(registry.factory(), address(mockFactory), "Factory should match mock");
+    }
+
+    function test_unregister_factoryNotSet_reverts() public {
+        // Deploy a fresh registry without factory set
+        AgentRegistry impl = new AgentRegistry();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(impl),
+            abi.encodeCall(AgentRegistry.initialize, (address(this)))
+        );
+        AgentRegistry freshRegistry = AgentRegistry(address(proxy));
+
+        vm.prank(author1);
+        bytes32 agentId = freshRegistry.register(SALT_1, IMAGE_ID_1, CODE_HASH_1);
+
+        vm.prank(author1);
+        vm.expectRevert("factory not set");
+        freshRegistry.unregister(agentId);
     }
 
     // ============ UUPS Tests ============

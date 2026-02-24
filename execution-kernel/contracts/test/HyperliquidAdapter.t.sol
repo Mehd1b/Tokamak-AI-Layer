@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import { HyperliquidAdapter } from "../src/adapters/HyperliquidAdapter.sol";
 import { TradingSubAccount } from "../src/adapters/TradingSubAccount.sol";
 import { IHyperliquidAdapter } from "../src/interfaces/IHyperliquidAdapter.sol";
-import { IERC20 } from "../src/interfaces/IERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // ============================================================================
 // Mock Contracts

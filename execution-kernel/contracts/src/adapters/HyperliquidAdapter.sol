@@ -3,7 +3,9 @@ pragma solidity ^0.8.24;
 
 import { IHyperliquidAdapter } from "../interfaces/IHyperliquidAdapter.sol";
 import { IVaultFactory } from "../interfaces/IVaultFactory.sol";
-import { IERC20 } from "../interfaces/IERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { TradingSubAccount } from "./TradingSubAccount.sol";
 
 /// @title IKernelVaultOwner
@@ -50,7 +52,8 @@ interface IKernelVaultOwner {
 ///        openPosition(bool,uint256,uint256)  => 0xe3255731
 ///        closePosition()                     => 0xc393d0e3
 ///        withdrawToVault()                   => 0x84f22721
-contract HyperliquidAdapter is IHyperliquidAdapter {
+contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
+    using SafeERC20 for IERC20;
     // ============ Immutables ============
 
     /// @notice The native USDC token address on HyperEVM
@@ -97,6 +100,7 @@ contract HyperliquidAdapter is IHyperliquidAdapter {
     function registerVault(address vault, uint32 perpAsset)
         external
         override
+        nonReentrant
         returns (address subAccount)
     {
         // 1. Verify vault is not zero address
@@ -135,18 +139,14 @@ contract HyperliquidAdapter is IHyperliquidAdapter {
     // ============ Margin Management ============
 
     /// @inheritdoc IHyperliquidAdapter
-    function depositMargin(address vault, uint256 amount) external override {
+    function depositMargin(uint256 amount) external override nonReentrant {
         if (amount == 0) revert ZeroDeposit();
 
-        VaultConfig memory config = vaultConfigs[vault];
+        VaultConfig memory config = vaultConfigs[msg.sender];
         if (config.subAccount == address(0)) revert VaultNotRegistered();
 
-        // Only vault owner can deposit margin
-        if (msg.sender != IKernelVaultOwner(vault).owner()) revert NotVaultOwner();
-
-        // Pull USDC from vault to sub-account
-        bool success = IERC20(usdc).transferFrom(vault, config.subAccount, amount);
-        if (!success) revert USDCTransferFailed();
+        // Pull USDC from vault (msg.sender) to sub-account — requires vault to have approved adapter
+        IERC20(usdc).safeTransferFrom(msg.sender, config.subAccount, amount);
 
         // Deposit into HyperCore margin (no order placed)
         TradingSubAccount(config.subAccount).executeDepositMargin(amount);
@@ -158,6 +158,7 @@ contract HyperliquidAdapter is IHyperliquidAdapter {
     function openPosition(bool isBuy, uint256 size, uint256 limitPrice)
         external
         override
+        nonReentrant
         onlyRegisteredVault
     {
         if (size > type(uint64).max) revert SizeOverflow(size);
@@ -166,21 +167,20 @@ contract HyperliquidAdapter is IHyperliquidAdapter {
         VaultConfig memory config = vaultConfigs[msg.sender];
 
         // Pull USDC from vault directly to sub-account
-        bool success = IERC20(usdc).transferFrom(msg.sender, config.subAccount, size);
-        if (!success) revert USDCTransferFailed();
+        IERC20(usdc).safeTransferFrom(msg.sender, config.subAccount, size);
 
         // Delegate execution to sub-account
         TradingSubAccount(config.subAccount).executeOpen(isBuy, uint64(size), uint64(limitPrice));
     }
 
     /// @inheritdoc IHyperliquidAdapter
-    function closePosition() external override onlyRegisteredVault {
+    function closePosition() external override nonReentrant onlyRegisteredVault {
         VaultConfig memory config = vaultConfigs[msg.sender];
         TradingSubAccount(config.subAccount).executeClose();
     }
 
     /// @inheritdoc IHyperliquidAdapter
-    function withdrawToVault() external override onlyRegisteredVault {
+    function withdrawToVault() external override nonReentrant onlyRegisteredVault {
         VaultConfig memory config = vaultConfigs[msg.sender];
         TradingSubAccount(config.subAccount).executeWithdraw(msg.sender);
     }

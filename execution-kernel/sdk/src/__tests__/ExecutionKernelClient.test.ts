@@ -175,6 +175,7 @@ describe('ExecutionKernelClient', () => {
         agentId,
         asset,
         userSalt: salt,
+        expectedImageId: imageId,
       });
 
       expect(result.txHash).toBe(txHash);

@@ -52,6 +52,7 @@ export const VaultFactoryABI = [
       { name: 'agentId', type: 'bytes32' },
       { name: 'asset', type: 'address' },
       { name: 'userSalt', type: 'bytes32' },
+      { name: 'expectedImageId', type: 'bytes32' },
     ],
     outputs: [{ name: 'vault', type: 'address' }],
     stateMutability: 'nonpayable',
@@ -128,5 +129,26 @@ export const VaultFactoryABI = [
     type: 'error',
     name: 'VaultAlreadyExists',
     inputs: [{ name: 'vault', type: 'address' }],
+  },
+  {
+    type: 'error',
+    name: 'ImageIdChanged',
+    inputs: [
+      { name: 'expected', type: 'bytes32' },
+      { name: 'actual', type: 'bytes32' },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'OwnableUnauthorizedAccount',
+    inputs: [{ name: 'account', type: 'address' }],
+  },
+  {
+    type: 'event',
+    name: 'OwnershipTransferred',
+    inputs: [
+      { name: 'previousOwner', type: 'address', indexed: true },
+      { name: 'newOwner', type: 'address', indexed: true },
+    ],
   },
 ] as const;

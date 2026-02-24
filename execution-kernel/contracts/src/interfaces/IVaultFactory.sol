@@ -22,12 +22,17 @@ interface IVaultFactory {
     /// @param agentId The agent ID from AgentRegistry
     /// @param asset The ERC20 asset address (or address(0) for ETH)
     /// @param userSalt A unique salt for deterministic deployment
+    /// @param expectedImageId The expected imageId (must match registry to prevent race conditions)
     /// @return vault The deployed vault address
     function deployVault(
         bytes32 agentId,
         address asset,
-        bytes32 userSalt
+        bytes32 userSalt,
+        bytes32 expectedImageId
     ) external returns (address vault);
+
+    /// @notice Image ID changed between computeVaultAddress and deployVault
+    error ImageIdChanged(bytes32 expected, bytes32 actual);
 
     /// @notice Get the AgentRegistry address
     /// @return The registry contract address

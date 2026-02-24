@@ -115,13 +115,14 @@ describe('VaultFactoryClient', () => {
         agentId: MOCK_AGENT_ID,
         asset: MOCK_ASSET,
         userSalt: MOCK_SALT,
+        expectedImageId: MOCK_IMAGE_ID,
       });
 
       expect(walletClient.writeContract).toHaveBeenCalledWith(
         expect.objectContaining({
           address: FACTORY_ADDRESS,
           functionName: 'deployVault',
-          args: [MOCK_AGENT_ID, MOCK_ASSET, MOCK_SALT],
+          args: [MOCK_AGENT_ID, MOCK_ASSET, MOCK_SALT, MOCK_IMAGE_ID],
         }),
       );
       expect(result.txHash).toBe(txHash);
@@ -135,6 +136,7 @@ describe('VaultFactoryClient', () => {
           agentId: MOCK_AGENT_ID,
           asset: MOCK_ASSET,
           userSalt: MOCK_SALT,
+          expectedImageId: MOCK_IMAGE_ID,
         }),
       ).rejects.toThrow('WalletClient required for write operations');
     });

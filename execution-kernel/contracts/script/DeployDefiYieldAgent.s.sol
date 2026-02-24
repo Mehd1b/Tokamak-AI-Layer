@@ -48,7 +48,7 @@ contract DeployDefiYieldAgent is Script {
         console.logBytes32(agentId);
 
         // Step 2: Deploy vault via factory
-        address vault = factory.deployVault(agentId, asset, userSalt);
+        address vault = factory.deployVault(agentId, asset, userSalt, imageId);
         console.log("Vault deployed at:", vault);
 
         vm.stopBroadcast();

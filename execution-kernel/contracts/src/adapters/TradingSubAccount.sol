@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.24;
 
-import { IERC20 } from "../interfaces/IERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title ICoreWriter
 /// @notice Minimal interface for Hyperliquid's CoreWriter system contract
@@ -23,6 +24,8 @@ interface ICoreDepositWallet {
 /// @dev Only the canonical HyperliquidAdapter can call execution functions.
 ///      The sub-account holds the HyperCore identity for its vault's positions.
 contract TradingSubAccount {
+    using SafeERC20 for IERC20;
+
     // ============ Hyperliquid System Addresses ============
 
     /// @notice CoreWriter system contract for submitting actions to HyperCore
@@ -135,7 +138,7 @@ contract TradingSubAccount {
     /// @param amount The amount of USDC to deposit
     function executeDepositMargin(uint256 amount) external onlyAdapter {
         // 1. Approve CoreDepositWallet to spend USDC
-        IERC20(usdc).approve(coreDepositWallet, amount);
+        IERC20(usdc).forceApprove(coreDepositWallet, amount);
 
         // 2. Deposit USDC to HyperCore perp margin
         ICoreDepositWallet(coreDepositWallet).deposit(amount, DEST_DEX_PERP);
@@ -152,7 +155,7 @@ contract TradingSubAccount {
         uint256 size = uint256(sz);
 
         // 1. Approve CoreDepositWallet to spend USDC
-        IERC20(usdc).approve(coreDepositWallet, size);
+        IERC20(usdc).forceApprove(coreDepositWallet, size);
 
         // 2. Deposit USDC to HyperCore perp margin
         ICoreDepositWallet(coreDepositWallet).deposit(size, DEST_DEX_PERP);
@@ -216,8 +219,7 @@ contract TradingSubAccount {
         uint256 balance = IERC20(usdc).balanceOf(address(this));
         if (balance == 0) revert NoBalanceToWithdraw();
 
-        bool success = IERC20(usdc).transfer(to, balance);
-        if (!success) revert USDCTransferFailed();
+        IERC20(usdc).safeTransfer(to, balance);
 
         emit WithdrawnToVault(balance);
     }
