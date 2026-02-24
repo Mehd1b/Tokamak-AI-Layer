@@ -65,6 +65,7 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
     /// @notice Initialize the registry (called once via proxy)
     /// @param initialOwner The address that will own this contract
     function initialize(address initialOwner) external initializer {
+        require(initialOwner != address(0), "zero owner");
         _owner = initialOwner;
         emit OwnershipTransferred(address(0), initialOwner);
     }
@@ -74,6 +75,14 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
     /// @notice Returns the current owner
     function owner() external view returns (address) {
         return _owner;
+    }
+
+    /// @notice Transfer ownership to a new address
+    /// @param newOwner The address of the new owner
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "zero owner");
+        emit OwnershipTransferred(_owner, newOwner);
+        _owner = newOwner;
     }
 
     /// @notice Returns the VaultFactory address

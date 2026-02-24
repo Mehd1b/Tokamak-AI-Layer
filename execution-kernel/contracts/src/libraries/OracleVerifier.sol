@@ -14,6 +14,9 @@ library OracleVerifier {
     /// @notice Recovery ID (v) is not 27 or 28
     error InvalidRecoveryId(uint8 v);
 
+    /// @notice Signature s value is in the upper half (EIP-2 malleability protection)
+    error InvalidSValue();
+
     /// @notice ecrecover returned address(0)
     error ECRecoverFailed();
 
@@ -58,6 +61,9 @@ library OracleVerifier {
         }
 
         if (v != 27 && v != 28) return false;
+
+        // EIP-2: reject upper-range s values to prevent signature malleability
+        if (uint256(s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) return false;
 
         // Include timestamp, chainId, and vaultAddress in signed message to prevent replay
         bytes32 domainFeedHash = keccak256(abi.encodePacked(feedHash, oracleTimestamp, chainId, vaultAddress));
@@ -108,6 +114,11 @@ library OracleVerifier {
 
         if (v != 27 && v != 28) {
             revert InvalidRecoveryId(v);
+        }
+
+        // EIP-2: reject upper-range s values to prevent signature malleability
+        if (uint256(s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
+            revert InvalidSValue();
         }
 
         // Include timestamp, chainId, and vaultAddress in signed message to prevent replay

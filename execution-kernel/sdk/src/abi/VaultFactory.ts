@@ -85,6 +85,20 @@ export const VaultFactoryABI = [
     stateMutability: 'view',
   },
   {
+    type: 'function',
+    name: 'getAgentVaults',
+    inputs: [{ name: 'agentId', type: 'bytes32' }],
+    outputs: [{ name: '', type: 'address[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'transferOwnership',
+    inputs: [{ name: 'newOwner', type: 'address' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
     type: 'event',
     name: 'VaultDeployed',
     inputs: [

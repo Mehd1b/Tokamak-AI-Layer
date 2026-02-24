@@ -57,8 +57,8 @@ describe('Types and Constants', () => {
   });
 
   describe('DEFAULT_CHAIN_ID', () => {
-    it('is Optimism Sepolia', () => {
-      expect(DEFAULT_CHAIN_ID).toBe(11155420);
+    it('is Ethereum Sepolia', () => {
+      expect(DEFAULT_CHAIN_ID).toBe(11155111);
     });
   });
 });

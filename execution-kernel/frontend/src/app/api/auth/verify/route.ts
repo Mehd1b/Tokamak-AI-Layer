@@ -12,14 +12,21 @@ export async function POST(req: NextRequest) {
 
     const session = await getSession();
 
+    // Capture and immediately clear the nonce to prevent replay attacks
+    const nonce = session.nonce;
+    if (!nonce) {
+      return NextResponse.json({ error: 'No nonce in session' }, { status: 400 });
+    }
+    session.nonce = undefined;
+    await session.save();
+
     const siweMessage = new SiweMessage(message);
     const { data: fields } = await siweMessage.verify({
       signature,
-      nonce: session.nonce,
+      nonce,
     });
 
     session.address = fields.address;
-    session.nonce = undefined;
     await session.save();
 
     return NextResponse.json({ address: fields.address });

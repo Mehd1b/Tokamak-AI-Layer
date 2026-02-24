@@ -7,6 +7,7 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { KernelOutputParser } from "./KernelOutputParser.sol";
 import { OracleVerifier } from "./libraries/OracleVerifier.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
 /// @title KernelVault
 /// @notice MVP vault that executes agent actions verified by RISC Zero proofs
@@ -16,7 +17,7 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 ///      3. Executes agent actions only when valid proof + journal are provided
 ///      4. Verifies action commitment and parses actions from AgentOutput bytes
 ///      5. Share price adjusts automatically based on totalAssets/totalShares ratio
-contract KernelVault is ReentrancyGuard {
+contract KernelVault is ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
     // ============ Constants ============
@@ -39,6 +40,9 @@ contract KernelVault is ReentrancyGuard {
     ///      executions N+1 through N+MAX_NONCE_GAP can still proceed). This weakens strict ordering
     ///      but improves liveness. Document: skipped nonces are permanently lost.
     uint64 public constant MAX_NONCE_GAP = 100;
+
+    /// @notice Delay after which anyone can emergency-settle a stuck strategy
+    uint256 public constant EMERGENCY_SETTLE_DELAY = 7 days;
 
     // ============ Immutables ============
 
@@ -87,6 +91,9 @@ contract KernelVault is ReentrancyGuard {
 
     /// @notice Snapshot of totalShares at time strategy was activated
     uint256 public snapshotTotalShares;
+
+    /// @notice Timestamp when strategy was activated (for emergency settlement)
+    uint256 public strategyActivatedAt;
 
     /// @notice Trusted oracle signer address (address(0) = oracle verification disabled)
     address public oracleSigner;
@@ -210,6 +217,12 @@ contract KernelVault is ReentrancyGuard {
     /// @notice CALL action targets the vault's asset or the vault itself (blocked)
     error InvalidCallTarget(address target);
 
+    /// @notice CALL action uses a blocked ERC20 selector (use TRANSFER_ERC20 instead)
+    error BlockedCallSelector(bytes4 selector);
+
+    /// @notice Emergency settlement called too early
+    error EmergencySettleTooEarly(uint256 earliest, uint256 current);
+
     // ============ Constructor ============
 
     /// @notice Initialize the vault
@@ -220,6 +233,8 @@ contract KernelVault is ReentrancyGuard {
     /// @param _owner The vault owner (agent author) who can submit executions
     constructor(address _asset, address _verifier, bytes32 _agentId, bytes32 _trustedImageId, address _owner) {
         if (_trustedImageId == bytes32(0)) revert InvalidTrustedImageId();
+        require(_verifier != address(0), "zero verifier");
+        require(_owner != address(0), "zero owner");
         asset = IERC20(_asset);
         verifier = IKernelExecutionVerifier(_verifier);
         agentId = _agentId;
@@ -249,6 +264,7 @@ contract KernelVault is ReentrancyGuard {
     function depositERC20Tokens(uint256 assets)
         external
         nonReentrant
+        whenNotPaused
         returns (uint256 sharesMinted)
     {
         if (strategyActive) revert DepositsLockedDuringStrategy();
@@ -281,7 +297,7 @@ contract KernelVault is ReentrancyGuard {
     /// @dev MVP uses simple PPS math. First deposit is 1:1, subsequent deposits use
     ///      shares = msg.value * totalShares / totalAssets.
     ///      Only works when vault asset is address(0) (ETH vault).
-    function depositETH() external payable nonReentrant returns (uint256 sharesMinted) {
+    function depositETH() external payable nonReentrant whenNotPaused returns (uint256 sharesMinted) {
         if (strategyActive) revert DepositsLockedDuringStrategy();
         if (address(asset) != address(0)) revert WrongDepositFunction();
         if (msg.value == 0) revert ZeroDeposit();
@@ -306,7 +322,7 @@ contract KernelVault is ReentrancyGuard {
     /// @notice Withdraw tokens (or ETH if asset is address(0)) by burning shares based on current PPS
     /// @param shareAmount Number of shares to burn
     /// @return assetsOut Amount of tokens returned based on current exchange rate
-    function withdraw(uint256 shareAmount) external nonReentrant returns (uint256 assetsOut) {
+    function withdraw(uint256 shareAmount) external nonReentrant whenNotPaused returns (uint256 assetsOut) {
         if (shareAmount == 0) revert ZeroWithdraw();
         if (shares[msg.sender] < shareAmount) {
             revert InsufficientShares(shareAmount, shares[msg.sender]);
@@ -356,6 +372,7 @@ contract KernelVault is ReentrancyGuard {
     function execute(bytes calldata journal, bytes calldata seal, bytes calldata agentOutputBytes)
         external
         nonReentrant
+        whenNotPaused
     {
         _execute(journal, seal, agentOutputBytes, "", 0);
     }
@@ -372,7 +389,7 @@ contract KernelVault is ReentrancyGuard {
         bytes calldata agentOutputBytes,
         bytes calldata oracleSignature,
         uint64 oracleTimestamp
-    ) external nonReentrant {
+    ) external nonReentrant whenNotPaused {
         _execute(journal, seal, agentOutputBytes, oracleSignature, oracleTimestamp);
     }
 
@@ -508,6 +525,7 @@ contract KernelVault is ReentrancyGuard {
             snapshotTotalAssets = balanceBefore;
             snapshotTotalShares = totalShares;
             strategyActive = true;
+            strategyActivatedAt = block.timestamp;
             emit StrategyActivated(balanceBefore, totalShares);
         }
 
@@ -537,6 +555,23 @@ contract KernelVault is ReentrancyGuard {
         // Block dangerous CALL targets: vault's asset (use TRANSFER_ERC20 instead) and self
         if (target == address(asset) || target == address(this)) revert InvalidCallTarget(target);
 
+        // Block dangerous ERC20 selectors on ANY target to prevent token draining via approve/transfer
+        if (callData.length >= 4) {
+            bytes4 selector;
+            assembly {
+                selector := mload(add(callData, 32))
+            }
+            if (
+                selector == bytes4(0x095ea7b3) || // approve(address,uint256)
+                selector == bytes4(0xa9059cbb) || // transfer(address,uint256)
+                selector == bytes4(0x23b872dd) || // transferFrom(address,address,uint256)
+                selector == bytes4(0x39509351) || // increaseAllowance(address,uint256)
+                selector == bytes4(0xa457c2d7)    // decreaseAllowance(address,uint256)
+            ) {
+                revert BlockedCallSelector(selector);
+            }
+        }
+
         // Capture balance before call for snapshot detection
         uint256 balanceBefore = totalAssets();
 
@@ -552,6 +587,7 @@ contract KernelVault is ReentrancyGuard {
             snapshotTotalAssets = balanceBefore;
             snapshotTotalShares = totalShares;
             strategyActive = true;
+            strategyActivatedAt = block.timestamp;
             emit StrategyActivated(balanceBefore, totalShares);
         }
 
@@ -569,6 +605,31 @@ contract KernelVault is ReentrancyGuard {
         _settle();
     }
 
+    /// @notice Emergency settlement — callable by anyone after EMERGENCY_SETTLE_DELAY
+    /// @dev Prevents funds from being locked indefinitely if the owner disappears
+    function emergencySettle() external {
+        if (!strategyActive) revert StrategyNotActive();
+        uint256 earliest = strategyActivatedAt + EMERGENCY_SETTLE_DELAY;
+        if (block.timestamp < earliest) {
+            revert EmergencySettleTooEarly(earliest, block.timestamp);
+        }
+        _settle();
+    }
+
+    // ============ Pause ============
+
+    /// @notice Pause the vault (owner only) — blocks deposits, withdrawals, and executions
+    function pause() external {
+        if (msg.sender != owner) revert NotOwner();
+        _pause();
+    }
+
+    /// @notice Unpause the vault (owner only)
+    function unpause() external {
+        if (msg.sender != owner) revert NotOwner();
+        _unpause();
+    }
+
     /// @notice Internal settlement logic (used by settle() and auto-settlement in _executeCall)
     function _settle() internal {
         uint256 settledAssets = snapshotTotalAssets;
@@ -577,6 +638,7 @@ contract KernelVault is ReentrancyGuard {
         strategyActive = false;
         snapshotTotalAssets = 0;
         snapshotTotalShares = 0;
+        strategyActivatedAt = 0;
 
         emit StrategySettled(settledAssets, currentAssets);
     }

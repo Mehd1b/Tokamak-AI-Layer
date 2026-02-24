@@ -74,6 +74,10 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         external
         initializer
     {
+        require(registry_ != address(0), "zero registry");
+        require(verifier_ != address(0), "zero verifier");
+        require(initialOwner != address(0), "zero owner");
+        require(vaultCodeStore_ != address(0), "zero vaultCodeStore");
         _registry = IAgentRegistry(registry_);
         _verifier = verifier_;
         _owner = initialOwner;
@@ -86,6 +90,14 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     /// @notice Returns the current owner
     function owner() external view returns (address) {
         return _owner;
+    }
+
+    /// @notice Transfer ownership to a new address
+    /// @param newOwner The address of the new owner
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "zero owner");
+        emit OwnershipTransferred(_owner, newOwner);
+        _owner = newOwner;
     }
 
     // ============ UUPS ============

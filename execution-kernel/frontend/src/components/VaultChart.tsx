@@ -155,10 +155,15 @@ export function VaultChart({
         minute: '2-digit',
       });
 
-      tooltipRef.current.innerHTML = `
-        <div style="font-size:11px;color:#9ca3af">${dateStr} ${timeStr}</div>
-        <div style="font-size:13px;color:#fff;margin-top:2px">${formatValue(price.value)}</div>
-      `;
+      tooltipRef.current.textContent = '';
+      const dateDiv = document.createElement('div');
+      dateDiv.style.cssText = 'font-size:11px;color:#9ca3af';
+      dateDiv.textContent = `${dateStr} ${timeStr}`;
+      const valueDiv = document.createElement('div');
+      valueDiv.style.cssText = 'font-size:13px;color:#fff;margin-top:2px';
+      valueDiv.textContent = formatValue(price.value);
+      tooltipRef.current.appendChild(dateDiv);
+      tooltipRef.current.appendChild(valueDiv);
       tooltipRef.current.style.display = 'block';
 
       const containerWidth = containerRef.current?.clientWidth ?? 0;

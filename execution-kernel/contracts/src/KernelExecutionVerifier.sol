@@ -97,6 +97,8 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
     /// @param _verifier Address of the RISC Zero verifier contract
     /// @param initialOwner The address that will own this contract
     function initialize(address _verifier, address initialOwner) external initializer {
+        require(_verifier != address(0), "zero verifier");
+        require(initialOwner != address(0), "zero owner");
         verifier = IRiscZeroVerifier(_verifier);
         _owner = initialOwner;
         emit OwnershipTransferred(address(0), initialOwner);
@@ -107,6 +109,14 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
     /// @notice Returns the current owner
     function owner() external view returns (address) {
         return _owner;
+    }
+
+    /// @notice Transfer ownership to a new address
+    /// @param newOwner The address of the new owner
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "zero owner");
+        emit OwnershipTransferred(_owner, newOwner);
+        _owner = newOwner;
     }
 
     // ============ UUPS ============
