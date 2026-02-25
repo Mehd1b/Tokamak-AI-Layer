@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { useAccount, useChainId } from 'wagmi';
 import { mainnet, sepolia } from 'wagmi/chains';
 import { hyperEvmMainnet, hyperEvmTestnet } from '@/lib/chains';
 import { DEPLOYMENTS, DEFAULT_CHAIN_ID, type DeploymentAddresses } from '@ek-sdk/addresses';
@@ -16,6 +17,7 @@ interface NetworkContextValue {
 const STORAGE_KEY = 'ek-selected-chain-id';
 
 const SUPPORTED_CHAINS = [mainnet, hyperEvmMainnet, sepolia, hyperEvmTestnet];
+const SUPPORTED_CHAIN_IDS = new Set<number>(SUPPORTED_CHAINS.map((c) => c.id));
 
 function getExplorerUrl(chainId: number): string {
   const chain = SUPPORTED_CHAINS.find((c) => c.id === chainId);
@@ -31,7 +33,10 @@ const NetworkContext = createContext<NetworkContextValue | undefined>(undefined)
 
 export function NetworkProvider({ children }: { children: ReactNode }) {
   const [selectedChainId, setSelectedChainIdState] = useState<number>(DEFAULT_CHAIN_ID);
+  const walletChainId = useChainId();
+  const { isConnected } = useAccount();
 
+  // Load from localStorage on mount
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -41,6 +46,14 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
       }
     }
   }, []);
+
+  // Sync app state when wallet chain changes (wallet → app)
+  useEffect(() => {
+    if (isConnected && walletChainId && SUPPORTED_CHAIN_IDS.has(walletChainId) && (walletChainId as number) in DEPLOYMENTS) {
+      setSelectedChainIdState(walletChainId);
+      localStorage.setItem(STORAGE_KEY, String(walletChainId));
+    }
+  }, [walletChainId, isConnected]);
 
   const setSelectedChainId = (id: number) => {
     setSelectedChainIdState(id);
