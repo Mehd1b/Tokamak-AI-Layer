@@ -149,8 +149,7 @@ export default function AgentDetailPage() {
             <>
               <button
                 onClick={() => {
-                  const vaultAddresses = (associatedVaults ?? []).map((v) => v.address as `0x${string}`);
-                  unregisterAgent(agentId, vaultAddresses);
+                  unregisterAgent(agentId);
                 }}
                 disabled={isUnregPending || isUnregConfirming}
                 className="px-6 py-2.5 rounded-lg font-mono text-sm transition-all duration-200 bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/40 disabled:opacity-50 disabled:cursor-not-allowed"

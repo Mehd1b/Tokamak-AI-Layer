@@ -22,12 +22,12 @@ export function useUnregisterAgent() {
   const { data: hash, writeContract, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  const unregisterAgent = (agentId: `0x${string}`, vaults: `0x${string}`[]) => {
+  const unregisterAgent = (agentId: `0x${string}`) => {
     writeContract({
       address: contracts.agentRegistry,
       abi: AgentRegistryABI,
       functionName: 'unregister',
-      args: [agentId, vaults],
+      args: [agentId],
     });
   };
 

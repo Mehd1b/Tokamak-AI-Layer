@@ -8,7 +8,7 @@ interface DeploymentAddresses {
 }
 declare const SEPOLIA_ADDRESSES: DeploymentAddresses;
 declare const DEPLOYMENTS: Record<number, DeploymentAddresses>;
-declare const DEFAULT_CHAIN_ID = 11155111;
+declare const DEFAULT_CHAIN_ID = 1;
 
 declare enum KernelActionType {
     CALL = 2,
@@ -70,6 +70,7 @@ interface DeployVaultParams {
     agentId: `0x${string}`;
     asset: `0x${string}`;
     userSalt: `0x${string}`;
+    expectedImageId: `0x${string}`;
 }
 interface ExecuteParams {
     journal: `0x${string}`;
@@ -321,9 +322,33 @@ declare const AgentRegistryABI: readonly [{
     readonly inputs: readonly [{
         readonly name: "agentId";
         readonly type: "bytes32";
-    }, {
-        readonly name: "vaults";
-        readonly type: "address[]";
+    }];
+    readonly outputs: readonly [];
+    readonly stateMutability: "nonpayable";
+}, {
+    readonly type: "function";
+    readonly name: "transferOwnership";
+    readonly inputs: readonly [{
+        readonly name: "newOwner";
+        readonly type: "address";
+    }];
+    readonly outputs: readonly [];
+    readonly stateMutability: "nonpayable";
+}, {
+    readonly type: "function";
+    readonly name: "factory";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly name: "";
+        readonly type: "address";
+    }];
+    readonly stateMutability: "view";
+}, {
+    readonly type: "function";
+    readonly name: "setFactory";
+    readonly inputs: readonly [{
+        readonly name: "factory_";
+        readonly type: "address";
     }];
     readonly outputs: readonly [];
     readonly stateMutability: "nonpayable";
@@ -452,6 +477,47 @@ declare const AgentRegistryABI: readonly [{
     readonly type: "error";
     readonly name: "InvalidAgentCodeHash";
     readonly inputs: readonly [];
+}, {
+    readonly type: "error";
+    readonly name: "VaultHasDeposits";
+    readonly inputs: readonly [{
+        readonly name: "vault";
+        readonly type: "address";
+    }, {
+        readonly name: "assets";
+        readonly type: "uint256";
+    }];
+}, {
+    readonly type: "error";
+    readonly name: "OwnableUnauthorizedAccount";
+    readonly inputs: readonly [{
+        readonly name: "account";
+        readonly type: "address";
+    }];
+}, {
+    readonly type: "event";
+    readonly name: "OwnershipTransferred";
+    readonly inputs: readonly [{
+        readonly name: "previousOwner";
+        readonly type: "address";
+        readonly indexed: true;
+    }, {
+        readonly name: "newOwner";
+        readonly type: "address";
+        readonly indexed: true;
+    }];
+}, {
+    readonly type: "event";
+    readonly name: "FactoryUpdated";
+    readonly inputs: readonly [{
+        readonly name: "previousFactory";
+        readonly type: "address";
+        readonly indexed: true;
+    }, {
+        readonly name: "newFactory";
+        readonly type: "address";
+        readonly indexed: true;
+    }];
 }];
 
 declare const VaultFactoryABI: readonly [{
@@ -529,6 +595,9 @@ declare const VaultFactoryABI: readonly [{
     }, {
         readonly name: "userSalt";
         readonly type: "bytes32";
+    }, {
+        readonly name: "expectedImageId";
+        readonly type: "bytes32";
     }];
     readonly outputs: readonly [{
         readonly name: "vault";
@@ -577,6 +646,27 @@ declare const VaultFactoryABI: readonly [{
         readonly type: "address[]";
     }];
     readonly stateMutability: "view";
+}, {
+    readonly type: "function";
+    readonly name: "getAgentVaults";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "bytes32";
+    }];
+    readonly outputs: readonly [{
+        readonly name: "";
+        readonly type: "address[]";
+    }];
+    readonly stateMutability: "view";
+}, {
+    readonly type: "function";
+    readonly name: "transferOwnership";
+    readonly inputs: readonly [{
+        readonly name: "newOwner";
+        readonly type: "address";
+    }];
+    readonly outputs: readonly [];
+    readonly stateMutability: "nonpayable";
 }, {
     readonly type: "event";
     readonly name: "VaultDeployed";
@@ -631,6 +721,35 @@ declare const VaultFactoryABI: readonly [{
     readonly inputs: readonly [{
         readonly name: "vault";
         readonly type: "address";
+    }];
+}, {
+    readonly type: "error";
+    readonly name: "ImageIdChanged";
+    readonly inputs: readonly [{
+        readonly name: "expected";
+        readonly type: "bytes32";
+    }, {
+        readonly name: "actual";
+        readonly type: "bytes32";
+    }];
+}, {
+    readonly type: "error";
+    readonly name: "OwnableUnauthorizedAccount";
+    readonly inputs: readonly [{
+        readonly name: "account";
+        readonly type: "address";
+    }];
+}, {
+    readonly type: "event";
+    readonly name: "OwnershipTransferred";
+    readonly inputs: readonly [{
+        readonly name: "previousOwner";
+        readonly type: "address";
+        readonly indexed: true;
+    }, {
+        readonly name: "newOwner";
+        readonly type: "address";
+        readonly indexed: true;
     }];
 }];
 

@@ -26,6 +26,8 @@ export const HyperliquidLogo = ({ className }: { className?: string }) => (
 );
 
 const NETWORKS = [
+  { chainId: 1, name: 'Ethereum', Logo: EthereumLogo },
+  { chainId: 999, name: 'HyperEVM', Logo: HyperliquidLogo },
   { chainId: 11155111, name: 'Sepolia', Logo: EthereumLogo },
   { chainId: 998, name: 'HyperEVM Testnet', Logo: HyperliquidLogo },
 ];

@@ -118,10 +118,28 @@ var AgentRegistryABI = [
   {
     type: "function",
     name: "unregister",
-    inputs: [
-      { name: "agentId", type: "bytes32" },
-      { name: "vaults", type: "address[]" }
-    ],
+    inputs: [{ name: "agentId", type: "bytes32" }],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "transferOwnership",
+    inputs: [{ name: "newOwner", type: "address" }],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "factory",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "setFactory",
+    inputs: [{ name: "factory_", type: "address" }],
     outputs: [],
     stateMutability: "nonpayable"
   },
@@ -208,6 +226,35 @@ var AgentRegistryABI = [
     type: "error",
     name: "InvalidAgentCodeHash",
     inputs: []
+  },
+  {
+    type: "error",
+    name: "VaultHasDeposits",
+    inputs: [
+      { name: "vault", type: "address" },
+      { name: "assets", type: "uint256" }
+    ]
+  },
+  {
+    type: "error",
+    name: "OwnableUnauthorizedAccount",
+    inputs: [{ name: "account", type: "address" }]
+  },
+  {
+    type: "event",
+    name: "OwnershipTransferred",
+    inputs: [
+      { name: "previousOwner", type: "address", indexed: true },
+      { name: "newOwner", type: "address", indexed: true }
+    ]
+  },
+  {
+    type: "event",
+    name: "FactoryUpdated",
+    inputs: [
+      { name: "previousFactory", type: "address", indexed: true },
+      { name: "newFactory", type: "address", indexed: true }
+    ]
   }
 ];
 
@@ -361,7 +408,8 @@ var VaultFactoryABI = [
     inputs: [
       { name: "agentId", type: "bytes32" },
       { name: "asset", type: "address" },
-      { name: "userSalt", type: "bytes32" }
+      { name: "userSalt", type: "bytes32" },
+      { name: "expectedImageId", type: "bytes32" }
     ],
     outputs: [{ name: "vault", type: "address" }],
     stateMutability: "nonpayable"
@@ -395,6 +443,20 @@ var VaultFactoryABI = [
     stateMutability: "view"
   },
   {
+    type: "function",
+    name: "getAgentVaults",
+    inputs: [{ name: "agentId", type: "bytes32" }],
+    outputs: [{ name: "", type: "address[]" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "transferOwnership",
+    inputs: [{ name: "newOwner", type: "address" }],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
     type: "event",
     name: "VaultDeployed",
     inputs: [
@@ -424,6 +486,27 @@ var VaultFactoryABI = [
     type: "error",
     name: "VaultAlreadyExists",
     inputs: [{ name: "vault", type: "address" }]
+  },
+  {
+    type: "error",
+    name: "ImageIdChanged",
+    inputs: [
+      { name: "expected", type: "bytes32" },
+      { name: "actual", type: "bytes32" }
+    ]
+  },
+  {
+    type: "error",
+    name: "OwnableUnauthorizedAccount",
+    inputs: [{ name: "account", type: "address" }]
+  },
+  {
+    type: "event",
+    name: "OwnershipTransferred",
+    inputs: [
+      { name: "previousOwner", type: "address", indexed: true },
+      { name: "newOwner", type: "address", indexed: true }
+    ]
   }
 ];
 
@@ -468,7 +551,7 @@ var VaultFactoryClient = class {
       address: this.address,
       abi: VaultFactoryABI,
       functionName: "deployVault",
-      args: [params.agentId, params.asset, params.userSalt]
+      args: [params.agentId, params.asset, params.userSalt, params.expectedImageId]
     });
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
     let vaultAddress;
@@ -1009,6 +1092,18 @@ var VerifierClient = class {
 };
 
 // src/addresses.ts
+var ETHEREUM_MAINNET_ADDRESSES = {
+  agentRegistry: "0xFa0AAEe4482C7901653855F591B832E7E8a20727",
+  vaultFactory: "0x9cF9828Fd6253Df7C9497fd06Fa531E0CCc1d822",
+  kernelExecutionVerifier: "0xAf58D2191772bcFFB3260F5140E995ec79e4d88B",
+  riscZeroVerifierRouter: "0x8EaB2D97Dfce405A1692a21b3ff3A172d593D319"
+};
+var HYPEREVM_MAINNET_ADDRESSES = {
+  agentRegistry: "0xAf58D2191772bcFFB3260F5140E995ec79e4d88B",
+  vaultFactory: "0xc7Fc0dD5f1B03E3De0C313eE0D3b06Cb2Dc017BB",
+  kernelExecutionVerifier: "0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30",
+  riscZeroVerifierRouter: "0x9f8d4D1f7AAf06aab1640abd565A731399862Bc8"
+};
 var SEPOLIA_ADDRESSES = {
   agentRegistry: "0xED27f8fbB7D576f02D516d01593eEfBaAfe4b168",
   vaultFactory: "0x580e55fDE87fFC1cF1B6a446d6DBf8068EB07b8C",
@@ -1022,10 +1117,12 @@ var HYPEREVM_TESTNET_ADDRESSES = {
   riscZeroVerifierRouter: "0x0000000000000000000000000000000000000000"
 };
 var DEPLOYMENTS = {
+  1: ETHEREUM_MAINNET_ADDRESSES,
+  999: HYPEREVM_MAINNET_ADDRESSES,
   11155111: SEPOLIA_ADDRESSES,
   998: HYPEREVM_TESTNET_ADDRESSES
 };
-var DEFAULT_CHAIN_ID = 11155111;
+var DEFAULT_CHAIN_ID = 1;
 
 // src/types.ts
 var KernelActionType = /* @__PURE__ */ ((KernelActionType2) => {

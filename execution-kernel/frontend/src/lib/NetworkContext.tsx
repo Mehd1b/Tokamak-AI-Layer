@@ -1,8 +1,8 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { sepolia } from 'wagmi/chains';
-import { hyperEvmTestnet } from '@/lib/chains';
+import { mainnet, sepolia } from 'wagmi/chains';
+import { hyperEvmMainnet, hyperEvmTestnet } from '@/lib/chains';
 import { DEPLOYMENTS, DEFAULT_CHAIN_ID, type DeploymentAddresses } from '@ek-sdk/addresses';
 
 interface NetworkContextValue {
@@ -15,11 +15,11 @@ interface NetworkContextValue {
 
 const STORAGE_KEY = 'ek-selected-chain-id';
 
-const SUPPORTED_CHAINS = [sepolia, hyperEvmTestnet];
+const SUPPORTED_CHAINS = [mainnet, hyperEvmMainnet, sepolia, hyperEvmTestnet];
 
 function getExplorerUrl(chainId: number): string {
   const chain = SUPPORTED_CHAINS.find((c) => c.id === chainId);
-  return chain?.blockExplorers?.default?.url ?? 'https://sepolia.etherscan.io';
+  return chain?.blockExplorers?.default?.url ?? 'https://etherscan.io';
 }
 
 function getNativeCurrency(chainId: number): string {

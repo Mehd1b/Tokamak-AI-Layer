@@ -6,9 +6,26 @@ import { useNetwork } from '@/lib/NetworkContext';
 import { EthereumLogo, HyperliquidLogo } from '@/components/NetworkLogo';
 
 const NETWORKS = [
-  { chainId: 11155111, name: 'Sepolia', Logo: EthereumLogo },
-  { chainId: 998, name: 'HyperEVM Testnet', Logo: HyperliquidLogo },
+  { chainId: 1, name: 'Ethereum', Logo: EthereumLogo, isMainnet: true },
+  { chainId: 999, name: 'HyperEVM', Logo: HyperliquidLogo, isMainnet: true },
+  { chainId: 11155111, name: 'Sepolia', Logo: EthereumLogo, isMainnet: false },
+  { chainId: 998, name: 'HyperEVM Testnet', Logo: HyperliquidLogo, isMainnet: false },
 ];
+
+const mainnets = NETWORKS.filter((n) => n.isMainnet);
+const testnets = NETWORKS.filter((n) => !n.isMainnet);
+
+function NetworkBadge({ isMainnet }: { isMainnet: boolean }) {
+  return isMainnet ? (
+    <span className="ml-auto px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+      LIVE
+    </span>
+  ) : (
+    <span className="ml-auto px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-orange-500/15 text-orange-400 border border-orange-500/30">
+      TEST
+    </span>
+  );
+}
 
 export function NetworkSelector() {
   const { selectedChainId, setSelectedChainId } = useNetwork();
@@ -37,6 +54,7 @@ export function NetworkSelector() {
       >
         <current.Logo className="w-4 h-4" />
         {current.name}
+        <NetworkBadge isMainnet={current.isMainnet} />
         <svg
           className={`w-3 h-3 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
           fill="none"
@@ -49,9 +67,13 @@ export function NetworkSelector() {
 
       {isOpen && (
         <div
-          className="absolute top-full mt-2 right-0 w-48 p-2 rounded-xl border border-[#A855F7]/30 backdrop-blur-md bg-[#0a0a0f]/90 z-50"
+          className="absolute top-full mt-2 right-0 w-56 p-2 rounded-xl border border-[#A855F7]/30 backdrop-blur-md bg-[#0a0a0f]/90 z-50"
         >
-          {NETWORKS.map((network) => (
+          {/* Mainnets section */}
+          <div className="px-3 pt-1 pb-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70">Mainnets</span>
+          </div>
+          {mainnets.map((network) => (
             <button
               key={network.chainId}
               onClick={() => {
@@ -68,8 +90,42 @@ export function NetworkSelector() {
             >
               <network.Logo className="w-4 h-4" />
               {network.name}
+              <NetworkBadge isMainnet={true} />
               {network.chainId === selectedChainId && (
-                <svg className="w-3.5 h-3.5 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </button>
+          ))}
+
+          {/* Divider */}
+          <div className="my-2 border-t border-white/10" />
+
+          {/* Testnets section */}
+          <div className="px-3 pt-1 pb-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-orange-400/70">Testnets</span>
+          </div>
+          {testnets.map((network) => (
+            <button
+              key={network.chainId}
+              onClick={() => {
+                setSelectedChainId(network.chainId);
+                switchChain({ chainId: network.chainId });
+                setIsOpen(false);
+              }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                network.chainId === selectedChainId
+                  ? 'bg-[#A855F7]/10 text-[#A855F7]'
+                  : 'text-gray-300 hover:bg-white/5 hover:text-white'
+              }`}
+              style={{ fontFamily: 'var(--font-mono), monospace' }}
+            >
+              <network.Logo className="w-4 h-4" />
+              {network.name}
+              <NetworkBadge isMainnet={false} />
+              {network.chainId === selectedChainId && (
+                <svg className="w-3.5 h-3.5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               )}
