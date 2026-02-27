@@ -41,6 +41,9 @@ INTERVAL="${INTERVAL:-30}"
 STATE_FILE="${STATE_FILE:-/tmp/perp-trader-mainnet-state.json}"
 POSITION_TIMEOUT="${POSITION_TIMEOUT:-1800}"
 SZ_DECIMALS="${SZ_DECIMALS:-5}"  # BTC=5, ETH=4, SOL=2
+API_WALLET="${API_WALLET:-env:API_WALLET_KEY}"  # REST API seed trade key
+SEED_SCRIPT="${SEED_SCRIPT:-${EK_ROOT}/crates/agents/perp-trader/scripts/hl_seed_trade.py}"
+SEED_LEVERAGE="${SEED_LEVERAGE:-5}"  # Leverage for seed trades
 
 # ── Resolve sub-account ──────────────────────────────────────────────────────
 echo "Resolving sub-account for vault ${VAULT}..."
@@ -69,14 +72,16 @@ set +e  # disable exit-on-error for the loop (grep may return 1 on no match)
 CYCLE=0
 echo ""
 echo "=== Perp-Trader Bot (HyperEVM Mainnet) ==="
-echo "  Vault:      ${VAULT}"
-echo "  Asset:      ${ASSET}"
-echo "  Interval:   ${INTERVAL}s"
-echo "  Adapter:    ${ADAPTER}"
-echo "  Sub-acct:   ${SUB_ACCOUNT}"
-echo "  szDecimals: ${SZ_DECIMALS}"
-echo "  State file: ${STATE_FILE}"
-echo "==========================================="
+echo "  Vault:        ${VAULT}"
+echo "  Asset:        ${ASSET}"
+echo "  Interval:     ${INTERVAL}s"
+echo "  Adapter:      ${ADAPTER}"
+echo "  Sub-acct:     ${SUB_ACCOUNT}"
+echo "  szDecimals:   ${SZ_DECIMALS}"
+echo "  Seed lev:     ${SEED_LEVERAGE}x"
+echo "  API wallet:   ${API_WALLET:0:8}..."
+echo "  State file:   ${STATE_FILE}"
+echo "============================================="
 echo ""
 
 while true; do
@@ -101,6 +106,9 @@ while true; do
     --state-file "$STATE_FILE" \
     --position-timeout "$POSITION_TIMEOUT" \
     --sz-decimals "$SZ_DECIMALS" \
+    --api-wallet-key "$API_WALLET" \
+    --seed-script "$SEED_SCRIPT" \
+    --seed-leverage "$SEED_LEVERAGE" \
     --json 2>&1) || true
 
   # Parse status from JSON output
@@ -111,6 +119,12 @@ while true; do
     no_op)
       REASON=$(echo "$OUTPUT" | grep -o '"reason"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
       echo "[${TIMESTAMP}] No-op: ${REASON:-no signal}"
+      ;;
+    seed_trade)
+      FILL_STATUS=$(echo "$OUTPUT" | grep -o '"fill_status"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
+      AVG_PX=$(echo "$OUTPUT" | grep -o '"avg_price"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
+      TOTAL_SZ=$(echo "$OUTPUT" | grep -o '"total_size"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
+      echo "[${TIMESTAMP}] SEED TRADE: ${FILL_STATUS} ${TOTAL_SZ} ${ASSET} @ \$${AVG_PX}"
       ;;
     submitted)
       TX=$(echo "$OUTPUT" | grep -o '"tx_hash"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')

@@ -109,6 +109,23 @@ pub struct Cli {
     #[arg(long, default_value_t = 5)]
     pub sz_decimals: u8,
 
+    // ---- REST API seed trade config ----
+    /// API wallet private key for REST API seed trades (0x-prefixed hex).
+    /// Required when CoreWriter can't place orders (leverage=0, no existing position).
+    /// The API wallet must be registered on the sub-account via CoreWriter action 9.
+    #[arg(long, env = "API_WALLET_KEY")]
+    pub api_wallet_key: Option<String>,
+
+    /// Path to the Python seed trade helper script.
+    /// Defaults to scripts/hl_seed_trade.py relative to the bundle directory.
+    #[arg(long, env = "SEED_SCRIPT")]
+    pub seed_script: Option<String>,
+
+    /// Max leverage multiplier for REST API seed trades (integer, e.g., 5 for 5x).
+    /// If not set, derived from max_leverage_bps in the agent bundle config.
+    #[arg(long, default_value_t = 5)]
+    pub seed_leverage: u32,
+
     // ---- Execution modes ----
     /// Use dev-mode proving (fast, not on-chain verifiable)
     #[arg(long, default_value_t = false)]

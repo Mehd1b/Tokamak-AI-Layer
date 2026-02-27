@@ -12,6 +12,7 @@ mod oracle_signer;
 mod onchain;
 mod output_reconstruct;
 mod prove;
+mod seed_trade;
 
 use clap::Parser;
 use config::Cli;
@@ -247,6 +248,78 @@ fn main() -> anyhow::Result<()> {
             eprintln!("No-op: {}. Skipping proof generation and on-chain submission.", reason);
         }
         return Ok(());
+    }
+
+    // ── Seed trade gate ─────────────────────────────────────────────────────
+    // When no position exists (position_size == 0), the HyperCore position
+    // precompile returns leverage=0, causing ALL CoreWriter limit orders to be
+    // silently dropped. To bootstrap the first trade, we use the REST API via
+    // the API wallet to set leverage and place the opening order.
+    //
+    // Once a position exists (leverage > 0), subsequent trades go through the
+    // normal ZK-verified CoreWriter flow.
+    if snapshot.position_size == 0.0 && cli.api_wallet_key.is_some() {
+        let intent = seed_trade::parse_agent_intent(&agent_output_bytes);
+        if let seed_trade::AgentIntent::Open(params) = intent {
+            if !cli.json {
+                eprintln!("[SEED] No position exists — using REST API for opening trade");
+            }
+
+            match seed_trade::execute_seed_trade(&cli, &params) {
+                Ok(result) => {
+                    if result.status == "filled" {
+                        // Seed trade filled — record position state and return
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs();
+                        let _ = write_position_state(&cli.state_file, &PositionState {
+                            nonce: kernel_input.execution_nonce,
+                            opened_at: now,
+                        });
+
+                        if cli.json {
+                            let result_json = serde_json::json!({
+                                "status": "seed_trade",
+                                "fill_status": "filled",
+                                "avg_price": result.avg_price,
+                                "total_size": result.total_size,
+                                "is_buy": params.is_buy,
+                                "asset": cli.asset,
+                                "mark_price": snapshot.mark_price,
+                            });
+                            println!("{}", serde_json::to_string_pretty(&result_json)?);
+                        } else {
+                            eprintln!(
+                                "[SEED] Order filled: {} {} @ ${}",
+                                result.total_size.as_deref().unwrap_or("?"),
+                                cli.asset,
+                                result.avg_price.as_deref().unwrap_or("?"),
+                            );
+                        }
+                        return Ok(());
+                    } else {
+                        // Seed trade didn't fill — log and fall through to normal flow
+                        // (which will also fail via CoreWriter, but provides diagnostics)
+                        if !cli.json {
+                            eprintln!(
+                                "[SEED] Order did not fill: status={}, detail={}",
+                                result.status,
+                                result.detail.as_deref().unwrap_or("none"),
+                            );
+                        }
+                        // Fall through — the normal CoreWriter path will also fail,
+                        // but we still generate the proof for record-keeping
+                    }
+                }
+                Err(e) => {
+                    if !cli.json {
+                        eprintln!("[SEED] Seed trade failed: {}", e);
+                    }
+                    // Fall through to normal flow
+                }
+            }
+        }
     }
 
     // In dry-run mode, skip proving and on-chain submission — just report the signal.
