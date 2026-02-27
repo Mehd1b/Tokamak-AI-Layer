@@ -45,11 +45,11 @@ pub struct Cli {
 
     // ---- Strategy config ----
     /// Fast SMA period (candles)
-    #[arg(long, default_value_t = 7)]
+    #[arg(long, default_value_t = 3)]
     pub sma_fast: usize,
 
     /// Slow SMA period (candles)
-    #[arg(long, default_value_t = 25)]
+    #[arg(long, default_value_t = 8)]
     pub sma_slow: usize,
 
     /// RSI period (candles)
@@ -100,6 +100,14 @@ pub struct Cli {
     /// than this, assume the position settled or failed and clear it.
     #[arg(long, default_value_t = 1800)]
     pub position_timeout: u64,
+
+    /// Chain ID for oracle signature domain binding
+    #[arg(long, default_value_t = 999)]
+    pub chain_id: u64,
+
+    /// Hyperliquid szDecimals for the traded asset (BTC=5, ETH=4, SOL=2)
+    #[arg(long, default_value_t = 5)]
+    pub sz_decimals: u8,
 
     // ---- Execution modes ----
     /// Use dev-mode proving (fast, not on-chain verifiable)

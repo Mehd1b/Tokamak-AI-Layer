@@ -80,6 +80,7 @@ const sidebars: SidebarsConfig = {
         'onchain/solidity-integration',
         'onchain/security-considerations',
         'onchain/permissionless-system',
+        'onchain/hyperliquid-integration',
       ],
     },
     {

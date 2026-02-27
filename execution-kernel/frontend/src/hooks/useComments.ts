@@ -39,8 +39,14 @@ export function useComments(vault: string) {
         }),
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to post comment');
+        let message = 'Failed to post comment';
+        try {
+          const err = await res.json();
+          message = err.error || message;
+        } catch {
+          // Response body is empty or not JSON
+        }
+        throw new Error(message);
       }
       return res.json();
     },
@@ -53,8 +59,14 @@ export function useComments(vault: string) {
     mutationFn: async (commentId: string) => {
       const res = await fetch(`/api/comments/${commentId}`, { method: 'DELETE' });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to delete comment');
+        let message = 'Failed to delete comment';
+        try {
+          const err = await res.json();
+          message = err.error || message;
+        } catch {
+          // Response body is empty or not JSON
+        }
+        throw new Error(message);
       }
       return res.json();
     },

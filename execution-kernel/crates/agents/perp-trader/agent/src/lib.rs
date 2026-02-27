@@ -60,7 +60,7 @@
 //! # Output Actions
 //!
 //! CALL actions targeting a Hyperliquid adapter contract:
-//! - Open position: approve USDC + openPosition(bool isBuy, uint256 size, uint256 price)
+//! - Open position: approve USDC + openPosition(bool isBuy, uint256 marginAmount, uint256 orderSize, uint256 price)
 //! - Close position: closePosition() + withdrawToVault()
 
 #![no_std]
@@ -102,9 +102,10 @@ const LIQUIDATION_PROXIMITY_BPS: u64 = 300;
 /// Exit when funding rate exceeds threshold * this multiplier against position direction.
 const FUNDING_REVERSAL_MULTIPLIER: u64 = 3;
 
-/// HyperliquidAdapter.openPosition(bool isBuy, uint256 size, uint256 limitPrice)
-/// Selector: keccak256("openPosition(bool,uint256,uint256)")[:4] = 0xe3255731
-const OPEN_POSITION_SELECTOR: u32 = 0xe3255731;
+
+/// HyperliquidAdapter.openPosition(bool isBuy, uint256 marginAmount, uint256 orderSize, uint256 limitPrice)
+/// Selector: keccak256("openPosition(bool,uint256,uint256,uint256)")[:4] = 0x04ba41cb
+const OPEN_POSITION_SELECTOR: u32 = 0x04ba41cb;
 
 /// HyperliquidAdapter.closePosition()
 /// Selector: keccak256("closePosition()")[:4] = 0xc393d0e3
@@ -112,7 +113,6 @@ const CLOSE_POSITION_SELECTOR: u32 = 0xc393d0e3;
 
 /// HyperliquidAdapter.withdrawToVault()
 /// Selector: keccak256("withdrawToVault()")[:4] = 0x84f22721
-const WITHDRAW_TO_VAULT_SELECTOR: u32 = 0x84f22721;
 
 /// Action flag: evaluate market conditions and decide
 const FLAG_EVALUATE: u8 = 0;
@@ -190,6 +190,8 @@ kernel_sdk::agent_input! {
         in_drawdown_cooldown:      bool,  // Host signals: vault is in drawdown lockout
         // Strategy mode (1 byte)
         strategy_mode:             u8,    // 0 = SMA crossover, 1 = Funding rate arb
+        // Hyperliquid asset size decimals (1 byte)
+        sz_decimals:               u8,    // Asset szDecimals (BTC=5, ETH=4, SOL=2)
     }
 }
 
@@ -263,7 +265,7 @@ pub extern "Rust" fn agent_main(ctx: &AgentContext, opaque_inputs: &[u8]) -> Age
     match input.action_flag {
         FLAG_FORCE_CLOSE => {
             if has_position(&input) {
-                build_close_and_withdraw_actions(&input)
+                build_close_actions(&input)
             } else {
                 empty
             }
@@ -312,7 +314,7 @@ fn evaluate_and_act(snapshot: &StateSnapshotV1, input: &PerpInput) -> AgentOutpu
     // If we're in drawdown cooldown, only allow closing positions (no new entries)
     if input.in_drawdown_cooldown {
         if has_position(input) {
-            return build_close_and_withdraw_actions(input);
+            return build_close_actions(input);
         }
         return AgentOutput { actions: Vec::new() };
     }
@@ -324,7 +326,7 @@ fn evaluate_and_act(snapshot: &StateSnapshotV1, input: &PerpInput) -> AgentOutpu
     if snapshot.peak_equity > 0 {
         if let Some(dd) = drawdown_bps(snapshot.current_equity, snapshot.peak_equity) {
             if dd >= max_dd && has_position(input) {
-                return build_close_and_withdraw_actions(input);
+                return build_close_actions(input);
             }
             // If drawdown exceeded and no position, don't open new ones
             if dd >= max_dd {
@@ -342,7 +344,7 @@ fn evaluate_and_act(snapshot: &StateSnapshotV1, input: &PerpInput) -> AgentOutpu
         };
         if let Some(proximity) = checked_mul_div_u64(diff, BPS_DENOMINATOR, input.mark_price) {
             if proximity < LIQUIDATION_PROXIMITY_BPS {
-                return build_close_and_withdraw_actions(input);
+                return build_close_actions(input);
             }
         }
     }
@@ -363,23 +365,23 @@ fn evaluate_and_act(snapshot: &StateSnapshotV1, input: &PerpInput) -> AgentOutpu
 fn check_exit_conditions(input: &PerpInput) -> AgentOutput {
     // 1. Stop-loss
     if stop_loss_triggered(input) {
-        return build_close_and_withdraw_actions(input);
+        return build_close_actions(input);
     }
 
     // 2. Take-profit
     if take_profit_triggered(input) {
-        return build_close_and_withdraw_actions(input);
+        return build_close_actions(input);
     }
 
     // 3. Funding rate reversal (3x threshold against position)
     if funding_reversal_triggered(input) {
-        return build_close_and_withdraw_actions(input);
+        return build_close_actions(input);
     }
 
     // 4. Trend reversal (SMA cross against position direction)
     //    Only applies in SMA crossover mode
     if input.strategy_mode == STRATEGY_SMA_CROSSOVER && trend_reversal_triggered(input) {
-        return build_close_and_withdraw_actions(input);
+        return build_close_actions(input);
     }
 
     // No exit trigger -> hold position
@@ -399,9 +401,10 @@ fn check_entry_signals(input: &PerpInput) -> AgentOutput {
         && rsi_in_neutral_zone(input)
         && funding_favorable_for_long(input)
     {
-        let size = compute_position_size(input);
-        if size > 0 {
-            return build_open_long_actions(input, size);
+        let margin = compute_margin_amount(input);
+        let order_size = compute_order_size(margin, input.mark_price, input.sz_decimals, input.max_leverage_bps);
+        if margin > 0 && order_size > 0 {
+            return build_open_long_actions(input, margin, order_size);
         }
     }
 
@@ -410,9 +413,10 @@ fn check_entry_signals(input: &PerpInput) -> AgentOutput {
         && rsi_in_neutral_zone(input)
         && funding_favorable_for_short(input)
     {
-        let size = compute_position_size(input);
-        if size > 0 {
-            return build_open_short_actions(input, size);
+        let margin = compute_margin_amount(input);
+        let order_size = compute_order_size(margin, input.mark_price, input.sz_decimals, input.max_leverage_bps);
+        if margin > 0 && order_size > 0 {
+            return build_open_short_actions(input, margin, order_size);
         }
     }
 
@@ -438,17 +442,18 @@ fn check_funding_arb_entry(input: &PerpInput) -> AgentOutput {
         return AgentOutput { actions: Vec::new() };
     }
 
-    let size = compute_position_size(input);
-    if size == 0 {
+    let margin = compute_margin_amount(input);
+    let order_size = compute_order_size(margin, input.mark_price, input.sz_decimals, input.max_leverage_bps);
+    if margin == 0 || order_size == 0 {
         return AgentOutput { actions: Vec::new() };
     }
 
     if input.funding_rate_is_neg {
         // Funding is negative: shorts pay longs -> go LONG to collect
-        build_open_long_actions(input, size)
+        build_open_long_actions(input, margin, order_size)
     } else {
         // Funding is positive: longs pay shorts -> go SHORT to collect
-        build_open_short_actions(input, size)
+        build_open_short_actions(input, margin, order_size)
     }
 }
 
@@ -570,10 +575,10 @@ fn trend_reversal_triggered(input: &PerpInput) -> bool {
 // Position Sizing
 // ============================================================================
 
-/// Compute position size (USDC margin) based on equity, leverage, and risk params.
+/// Compute USDC margin amount based on equity and risk params.
 ///
 /// Formula: min(equity * max_position_bps / 10000, available_balance)
-fn compute_position_size(input: &PerpInput) -> u64 {
+fn compute_margin_amount(input: &PerpInput) -> u64 {
     let max_margin = match apply_bps(input.account_equity, input.max_position_bps as u64) {
         Some(v) => v,
         None => return 0,
@@ -583,37 +588,64 @@ fn compute_position_size(input: &PerpInput) -> u64 {
     core::cmp::min(max_margin, input.available_balance)
 }
 
+/// Convert USDC margin to base-asset order size for Hyperliquid CoreWriter.
+///
+/// Formula (using u128 to avoid overflow):
+///   order_sz = margin * max_leverage_bps * 10^(sz_decimals + 2) / (mark_price * 10_000)
+///
+/// Where:
+///   - margin is USDC in 6-decimal raw units (100 USDC = 100_000_000)
+///   - mark_price is 1e8-scaled (e.g. $97,000 = 9_700_000_000_000)
+///   - sz_decimals is Hyperliquid's szDecimals for the asset (BTC=5, ETH=4)
+///   - max_leverage_bps is leverage in bps (30_000 = 3x)
+///
+/// The factor 10^2 bridges the USDC 1e6 scale to the price 1e8 scale.
+fn compute_order_size(margin: u64, mark_price: u64, sz_decimals: u8, max_leverage_bps: u32) -> u64 {
+    if mark_price == 0 || margin == 0 {
+        return 0;
+    }
+    // Cap sz_decimals to 8 to prevent unreasonable exponent
+    let dec = if sz_decimals > 8 { 8 } else { sz_decimals };
+    let scale = 10u128.pow(dec as u32 + 2);
+    let numerator = (margin as u128) * (max_leverage_bps as u128) * scale;
+    let denominator = (mark_price as u128) * 10_000u128;
+    let result = numerator / denominator;
+    if result > u64::MAX as u128 {
+        return 0;
+    }
+    result as u64
+}
+
 // ============================================================================
 // Action Builders
 // ============================================================================
 
-/// Build actions to close the current position AND withdraw freed margin to vault.
-/// Enhancement 6: Every close is followed by withdrawToVault() so freed margin
-/// returns to the vault promptly instead of sitting idle in the adapter.
-fn build_close_and_withdraw_actions(input: &PerpInput) -> AgentOutput {
+/// Build action to close the current position.
+/// Note: withdrawToVault is NOT bundled here because HyperCore settlement is async.
+/// After closing, USDC remains on HyperCore margin — the vault owner must recover
+/// funds manually via the 3-step admin flow: transferPerpToSpot → transferSpotToEvm
+/// → withdrawToVaultAdmin.
+fn build_close_actions(input: &PerpInput) -> AgentOutput {
     let close = CallBuilder::new(input.exchange_contract)
         .selector(CLOSE_POSITION_SELECTOR)
         .build();
-    let withdraw = CallBuilder::new(input.exchange_contract)
-        .selector(WITHDRAW_TO_VAULT_SELECTOR)
-        .build();
-    let mut actions = Vec::with_capacity(2);
+    let mut actions = Vec::with_capacity(1);
     actions.push(close);
-    actions.push(withdraw);
     AgentOutput { actions }
 }
 
-/// Build actions to open a long position: approve USDC + open.
-fn build_open_long_actions(input: &PerpInput, size: u64) -> AgentOutput {
+/// Build actions to open a long position: approve USDC margin + open with base-asset order size.
+fn build_open_long_actions(input: &PerpInput, margin: u64, order_size: u64) -> AgentOutput {
     let approve = kernel_sdk::actions::erc20::approve(
         &input.usdc_token,
         &input.exchange_contract,
-        size,
+        margin,
     );
     let open = CallBuilder::new(input.exchange_contract)
         .selector(OPEN_POSITION_SELECTOR)
         .param_bool(true) // isBuy = true (long)
-        .param_u256_from_u64(size)
+        .param_u256_from_u64(margin)      // marginAmount (USDC)
+        .param_u256_from_u64(order_size)  // orderSize (base asset, szDecimals-scaled)
         .param_u256_from_u64(input.best_ask) // limit price for longs
         .build();
     let mut actions = Vec::with_capacity(2);
@@ -622,17 +654,18 @@ fn build_open_long_actions(input: &PerpInput, size: u64) -> AgentOutput {
     AgentOutput { actions }
 }
 
-/// Build actions to open a short position: approve USDC + open.
-fn build_open_short_actions(input: &PerpInput, size: u64) -> AgentOutput {
+/// Build actions to open a short position: approve USDC margin + open with base-asset order size.
+fn build_open_short_actions(input: &PerpInput, margin: u64, order_size: u64) -> AgentOutput {
     let approve = kernel_sdk::actions::erc20::approve(
         &input.usdc_token,
         &input.exchange_contract,
-        size,
+        margin,
     );
     let open = CallBuilder::new(input.exchange_contract)
         .selector(OPEN_POSITION_SELECTOR)
         .param_bool(false) // isBuy = false (short)
-        .param_u256_from_u64(size)
+        .param_u256_from_u64(margin)      // marginAmount (USDC)
+        .param_u256_from_u64(order_size)  // orderSize (base asset, szDecimals-scaled)
         .param_u256_from_u64(input.best_bid) // limit price for shorts
         .build();
     let mut actions = Vec::with_capacity(2);
@@ -743,6 +776,7 @@ mod tests {
             drawdown_cooldown_seconds: 3600, // 1 hour
             in_drawdown_cooldown: false,
             strategy_mode: STRATEGY_SMA_CROSSOVER,
+            sz_decimals: 5,                // BTC default
         }
     }
 
@@ -783,6 +817,7 @@ mod tests {
         drawdown_cooldown_seconds: u32,
         in_drawdown_cooldown: bool,
         strategy_mode: u8,
+        sz_decimals: u8,
     }
 
     impl PerpInputBuilder {
@@ -824,6 +859,7 @@ mod tests {
             buf.extend_from_slice(&self.drawdown_cooldown_seconds.to_le_bytes());
             buf.push(if self.in_drawdown_cooldown { 1 } else { 0 });
             buf.push(self.strategy_mode);
+            buf.push(self.sz_decimals);
             buf
         }
     }
@@ -864,8 +900,8 @@ mod tests {
 
     #[test]
     fn test_perp_input_encoded_size() {
-        // Original 228 + 10 new bytes = 238
-        assert_eq!(PerpInput::ENCODED_SIZE, 238);
+        // Original 228 + 10 new bytes + 1 sz_decimals = 239
+        assert_eq!(PerpInput::ENCODED_SIZE, 239);
     }
 
     #[test]

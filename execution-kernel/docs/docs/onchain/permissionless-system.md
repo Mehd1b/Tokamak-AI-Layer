@@ -15,7 +15,28 @@ The permissionless system consists of two core components:
 
 This design removes the need for a trusted operator to register agents, enabling anyone to deploy and run agents in a fully decentralized manner.
 
-## Deployed Contracts (Sepolia)
+## Deployed Contracts
+
+### Ethereum Mainnet
+
+| Contract | Address |
+|----------|---------|
+| AgentRegistry | [`0xFa0AAEe4482C7901653855F591B832E7E8a20727`](https://etherscan.io/address/0xFa0AAEe4482C7901653855F591B832E7E8a20727) |
+| VaultFactory | [`0x9cF9828Fd6253Df7C9497fd06Fa531E0CCc1d822`](https://etherscan.io/address/0x9cF9828Fd6253Df7C9497fd06Fa531E0CCc1d822) |
+| KernelExecutionVerifier | [`0xAf58D2191772bcFFB3260F5140E995ec79e4d88B`](https://etherscan.io/address/0xAf58D2191772bcFFB3260F5140E995ec79e4d88B) |
+| RISC Zero Verifier Router | [`0x8EaB2D97Dfce405A1692a21b3ff3A172d593D319`](https://etherscan.io/address/0x8EaB2D97Dfce405A1692a21b3ff3A172d593D319) |
+
+### HyperEVM Mainnet (Chain ID: 999)
+
+| Contract | Address |
+|----------|---------|
+| AgentRegistry | `0xAf58D2191772bcFFB3260F5140E995ec79e4d88B` |
+| VaultFactory | `0xc7Fc0dD5f1B03E3De0C313eE0D3b06Cb2Dc017BB` |
+| KernelExecutionVerifier | `0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30` |
+| RISC Zero Verifier Router | `0x9f8d4D1f7AAf06aab1640abd565A731399862Bc8` |
+| HyperliquidAdapter | `0xE6130FF36F1eEf239a910F025004954Ee2E37632` |
+
+### Ethereum Sepolia (Testnet)
 
 | Contract | Address |
 |----------|---------|

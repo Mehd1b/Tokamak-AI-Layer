@@ -2,28 +2,33 @@
   "format_version": "1",
   "agent_name": "perp-trader",
   "agent_version": "0.1.0",
-  "agent_id": "0x3255da9e1bb93d8da247840c5ca1cfddea5cc367348a7ba88331e1455fd92bb9",
+  "agent_id": "0x12c3edfaa17cfd9a64124afb3599e77f61b4464169a742a19c1c2f92c6a3dac3",
   "protocol_version": 1,
   "kernel_version": 1,
   "risc0_version": "3.0.4",
   "rust_toolchain": "1.75.0",
-  "agent_code_hash": "0x440ce2e762dcdc8c430e0e349b22615ac418f682f28a6dbd62273760928ed655",
-  "image_id": "0xa75c94d993116db2e2406e618fb55d06ff8d45ab667a50f56f12c308fe98b353",
+  "agent_code_hash": "0x8cb7540a4f566a90c8ad0d5a242bca5326b4f3b346032ba8c1aa0afb8a02c4c3",
+  "image_id": "0x5fec7288bacc9cd7fb21d59b6071350a992ccbd5c24af754b83cf40fe1e5a1ab",
   "artifacts": {
     "elf_path": "guest.elf",
-    "elf_sha256": "0xb6b9aaca3ed58aff37d0970f25d6f19a975ff495145b5c221389dfe14873a148"
+    "elf_sha256": "0xbe1d340d4baecc3eb94090658b20308fb65d5e335fb26da02bd3ebe527b63a4c"
   },
   "build": {
     "cargo_lock_sha256": "0x0000000000000000000000000000000000000000000000000000000000000000",
     "build_command": "cd crates/agents/perp-trader/risc0-methods && RISC0_USE_DOCKER=1 cargo build --release",
     "reproducible": true
   },
-  "inputs": "StateSnapshotV1 (36B) + OraclePriceFeed (variable, 111..607B) + PerpInput (238B)",
-  "actions_profile": "CALL actions targeting HyperliquidAdapter: openPosition, closePosition, withdrawToVault",
+  "inputs": "StateSnapshotV1 (36B) + OraclePriceFeed (variable, 111..607B) + PerpInput (239B)",
+  "actions_profile": "CALL actions targeting HyperliquidAdapter: openPosition, closePosition",
   "networks": {
     "hyperevm_testnet": {
       "verifier": "0x0052258E517835081c94c0B685409f2EfC4D502b",
       "vault": "0xdA3eb37802aAbb5c76DDb0d4730e58B5403dFcb4"
+    },
+    "hyperevm_mainnet": {
+      "verifier": "0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30",
+      "vault": "0xfe7e3907ca61d8eb333d35d94bb58743437b70f4",
+      "adapter": "0xB30eAB8E1AeEE31D0905b50133749b6894400c21"
     }
   }
 }

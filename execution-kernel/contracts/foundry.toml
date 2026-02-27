@@ -22,7 +22,7 @@ libs = ["lib"]
 solc = "0.8.24"
 optimizer = true
 optimizer_runs = 1
-via_ir = false
+via_ir = true
 
 [rpc_endpoints]
 mainnet = "${RPC_URL_MAINNET}"

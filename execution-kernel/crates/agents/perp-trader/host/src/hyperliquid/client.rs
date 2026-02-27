@@ -67,11 +67,12 @@ impl HyperliquidClient {
 
         // Each 1h candle = 3600s. Request enough history.
         let interval_ms: u64 = match interval {
+            "1m" => 60_000,
+            "15m" => 900_000,
             "1h" => 3_600_000,
             "4h" => 14_400_000,
             "1d" => 86_400_000,
-            "15m" => 900_000,
-            _ => 3_600_000,
+            _ => 60_000,
         };
         let start_time = now_ms - (count as u64 + 5) * interval_ms;
 
@@ -168,8 +169,8 @@ impl MarketDataProvider for HyperliquidClient {
         let total_margin_used = parse_decimal(&ch_state.margin_summary.total_margin_used);
         let available_balance = account_equity - total_margin_used;
 
-        // 4. Fetch candles
-        let candles = self.fetch_candles(asset, "1h", candle_count)?;
+        // 4. Fetch candles (1m for high-frequency signal response)
+        let candles = self.fetch_candles(asset, "1m", candle_count)?;
         let candle_closes: Vec<f64> = candles.iter().map(|c| parse_decimal(&c.close)).collect();
 
         // Use current time as timestamp

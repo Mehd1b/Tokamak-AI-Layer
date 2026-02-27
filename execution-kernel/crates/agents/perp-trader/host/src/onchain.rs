@@ -118,6 +118,7 @@ pub async fn execute_with_oracle(
     seal_bytes: &[u8],
     agent_output_bytes: &[u8],
     oracle_signature: &[u8],
+    oracle_timestamp: u64,
 ) -> Result<ExecuteResult> {
     use alloy::network::EthereumWallet;
     use alloy::primitives::{Address, Bytes};
@@ -133,7 +134,8 @@ pub async fn execute_with_oracle(
                 bytes calldata journal,
                 bytes calldata seal,
                 bytes calldata agentOutputBytes,
-                bytes calldata oracleSignature
+                bytes calldata oracleSignature,
+                uint64 oracleTimestamp
             ) external;
         }
     }
@@ -164,7 +166,7 @@ pub async fn execute_with_oracle(
     let oracle_sig = Bytes::copy_from_slice(oracle_signature);
 
     let tx = contract
-        .executeWithOracle(journal, seal, output, oracle_sig)
+        .executeWithOracle(journal, seal, output, oracle_sig, oracle_timestamp)
         .send()
         .await
         .map_err(|e| Error::OnChain(format!("Transaction failed: {}", e)))?;

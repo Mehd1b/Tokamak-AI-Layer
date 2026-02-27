@@ -137,10 +137,10 @@ contract MockKernelVault {
         usdc.approve(adapter, amount);
     }
 
-    function callOpenPosition(address adapter, bool isBuy, uint256 size, uint256 limitPrice)
+    function callOpenPosition(address adapter, bool isBuy, uint256 marginAmount, uint256 orderSize, uint256 limitPrice)
         external
     {
-        HyperliquidAdapter(adapter).openPosition(isBuy, size, limitPrice);
+        HyperliquidAdapter(adapter).openPosition(isBuy, marginAmount, orderSize, limitPrice);
     }
 
     function callClosePosition(address adapter) external {
@@ -172,6 +172,8 @@ contract HyperliquidAdapterTest is Test {
 
     uint32 public constant PERP_ASSET_BTC = 0;
     uint32 public constant PERP_ASSET_ETH = 1;
+    uint8 public constant SZ_DECIMALS_BTC = 5;
+    uint8 public constant SZ_DECIMALS_ETH = 4;
 
     function setUp() public {
         ownerA = address(0xA001);
@@ -226,7 +228,7 @@ contract HyperliquidAdapterTest is Test {
     /// @notice Verify the function selectors match what the zkVM agent emits
     function test_selectorOpenPosition() public pure {
         bytes4 selector = IHyperliquidAdapter.openPosition.selector;
-        assertEq(selector, bytes4(0xe3255731), "openPosition selector mismatch");
+        assertEq(selector, bytes4(0x04ba41cb), "openPosition selector mismatch");
     }
 
     function test_selectorClosePosition() public pure {
@@ -266,7 +268,7 @@ contract HyperliquidAdapterTest is Test {
 
     function test_registerVault_deploysSubAccount() public {
         vm.prank(ownerA);
-        address subAccount = adapter.registerVault(address(vaultA), PERP_ASSET_BTC);
+        address subAccount = adapter.registerVault(address(vaultA), PERP_ASSET_BTC, SZ_DECIMALS_BTC);
 
         assertTrue(subAccount != address(0), "Sub-account should be deployed");
         assertTrue(adapter.isRegistered(address(vaultA)), "Vault should be registered");
@@ -275,7 +277,7 @@ contract HyperliquidAdapterTest is Test {
 
     function test_registerVault_storesConfig() public {
         vm.prank(ownerA);
-        address subAccount = adapter.registerVault(address(vaultA), PERP_ASSET_BTC);
+        address subAccount = adapter.registerVault(address(vaultA), PERP_ASSET_BTC, SZ_DECIMALS_BTC);
 
         IHyperliquidAdapter.VaultConfig memory config = adapter.getVaultConfig(address(vaultA));
         assertEq(config.subAccount, subAccount);
@@ -289,14 +291,14 @@ contract HyperliquidAdapterTest is Test {
         emit IHyperliquidAdapter.VaultRegistered(address(vaultA), address(0), PERP_ASSET_BTC);
         // Note: The second indexed param (subAccount) won't match, but expectEmit(true, false, ...)
         // only checks the first indexed topic
-        adapter.registerVault(address(vaultA), PERP_ASSET_BTC);
+        adapter.registerVault(address(vaultA), PERP_ASSET_BTC, SZ_DECIMALS_BTC);
     }
 
     function test_registerVault_subAccountImmutables() public {
         vm.prank(ownerA);
-        address subAccountAddr = adapter.registerVault(address(vaultA), PERP_ASSET_BTC);
+        address subAccountAddr = adapter.registerVault(address(vaultA), PERP_ASSET_BTC, SZ_DECIMALS_BTC);
 
-        TradingSubAccount subAccount = TradingSubAccount(subAccountAddr);
+        TradingSubAccount subAccount = TradingSubAccount(payable(subAccountAddr));
         assertEq(subAccount.adapter(), address(adapter));
         assertEq(subAccount.vault(), address(vaultA));
         assertEq(subAccount.usdc(), address(usdc));
@@ -307,16 +309,16 @@ contract HyperliquidAdapterTest is Test {
     function test_registerVault_revertsIfNotOwner() public {
         vm.prank(nonOwner);
         vm.expectRevert(IHyperliquidAdapter.NotVaultOwner.selector);
-        adapter.registerVault(address(vaultA), PERP_ASSET_BTC);
+        adapter.registerVault(address(vaultA), PERP_ASSET_BTC, SZ_DECIMALS_BTC);
     }
 
     function test_registerVault_revertsIfAlreadyRegistered() public {
         vm.prank(ownerA);
-        adapter.registerVault(address(vaultA), PERP_ASSET_BTC);
+        adapter.registerVault(address(vaultA), PERP_ASSET_BTC, SZ_DECIMALS_BTC);
 
         vm.prank(ownerA);
         vm.expectRevert(IHyperliquidAdapter.VaultAlreadyRegistered.selector);
-        adapter.registerVault(address(vaultA), PERP_ASSET_ETH);
+        adapter.registerVault(address(vaultA), PERP_ASSET_ETH, SZ_DECIMALS_ETH);
     }
 
     function test_registerVault_revertsIfNotFactoryVault() public {
@@ -325,12 +327,12 @@ contract HyperliquidAdapterTest is Test {
 
         vm.prank(ownerA);
         vm.expectRevert(IHyperliquidAdapter.VaultNotDeployedByFactory.selector);
-        adapter.registerVault(address(fakeVault), PERP_ASSET_BTC);
+        adapter.registerVault(address(fakeVault), PERP_ASSET_BTC, SZ_DECIMALS_BTC);
     }
 
     function test_registerVault_revertsOnZeroVault() public {
         vm.expectRevert(IHyperliquidAdapter.ZeroAddress.selector);
-        adapter.registerVault(address(0), PERP_ASSET_BTC);
+        adapter.registerVault(address(0), PERP_ASSET_BTC, SZ_DECIMALS_BTC);
     }
 
     // ============ Access Control ============
@@ -339,7 +341,7 @@ contract HyperliquidAdapterTest is Test {
         // vaultA not registered yet
         vm.prank(address(vaultA));
         vm.expectRevert(IHyperliquidAdapter.VaultNotRegistered.selector);
-        adapter.openPosition(true, 10_000e6, 50_000e8);
+        adapter.openPosition(true, 10_000e6, 20_000, 50_000e8);
     }
 
     function test_closePosition_revertsIfNotRegistered() public {
@@ -356,95 +358,115 @@ contract HyperliquidAdapterTest is Test {
 
     function test_subAccount_revertsDirectAccess_executeOpen() public {
         vm.prank(ownerA);
-        address subAccountAddr = adapter.registerVault(address(vaultA), PERP_ASSET_BTC);
+        address subAccountAddr = adapter.registerVault(address(vaultA), PERP_ASSET_BTC, SZ_DECIMALS_BTC);
 
         vm.prank(nonOwner);
         vm.expectRevert(TradingSubAccount.OnlyAdapter.selector);
-        TradingSubAccount(subAccountAddr).executeOpen(true, 10_000e6, 50_000e8);
+        TradingSubAccount(payable(subAccountAddr)).executeOpen(true, 10_000e6, 20_000, 50_000e8);
     }
 
     function test_subAccount_revertsDirectAccess_executeClose() public {
         vm.prank(ownerA);
-        address subAccountAddr = adapter.registerVault(address(vaultA), PERP_ASSET_BTC);
+        address subAccountAddr = adapter.registerVault(address(vaultA), PERP_ASSET_BTC, SZ_DECIMALS_BTC);
 
         vm.prank(nonOwner);
         vm.expectRevert(TradingSubAccount.OnlyAdapter.selector);
-        TradingSubAccount(subAccountAddr).executeClose();
+        TradingSubAccount(payable(subAccountAddr)).executeClose();
     }
 
     function test_subAccount_revertsDirectAccess_executeWithdraw() public {
         vm.prank(ownerA);
-        address subAccountAddr = adapter.registerVault(address(vaultA), PERP_ASSET_BTC);
+        address subAccountAddr = adapter.registerVault(address(vaultA), PERP_ASSET_BTC, SZ_DECIMALS_BTC);
 
         vm.prank(nonOwner);
         vm.expectRevert(TradingSubAccount.OnlyAdapter.selector);
-        TradingSubAccount(subAccountAddr).executeWithdraw(nonOwner);
+        TradingSubAccount(payable(subAccountAddr)).executeWithdraw(nonOwner);
     }
 
     // ============ openPosition ============
 
     function _registerVaultA() internal returns (address) {
         vm.prank(ownerA);
-        return adapter.registerVault(address(vaultA), PERP_ASSET_BTC);
+        return adapter.registerVault(address(vaultA), PERP_ASSET_BTC, SZ_DECIMALS_BTC);
     }
 
     function _registerVaultB() internal returns (address) {
         vm.prank(ownerB);
-        return adapter.registerVault(address(vaultB), PERP_ASSET_ETH);
+        return adapter.registerVault(address(vaultB), PERP_ASSET_ETH, SZ_DECIMALS_ETH);
     }
 
     function test_openPosition_long() public {
         _registerVaultA();
 
-        uint256 size = 10_000e6;
+        uint256 marginAmount = 10_000e6;
+        uint256 orderSize = 20_000; // 0.2 BTC (szDecimals=5)
         uint256 limitPrice = 50_000e8;
 
-        vaultA.callOpenPosition(address(adapter), true, size, limitPrice);
+        vaultA.callOpenPosition(address(adapter), true, marginAmount, orderSize, limitPrice);
 
-        // Verify USDC was pulled from vault and sent to sub-account (then to CoreDeposit)
-        assertEq(usdc.balanceOf(address(vaultA)), 1_000_000e6 - size);
+        // Verify USDC margin was pulled from vault and sent to sub-account (then to CoreDeposit)
+        assertEq(usdc.balanceOf(address(vaultA)), 1_000_000e6 - marginAmount);
 
-        // Verify deposit to CoreDepositWallet
+        // Verify deposit to CoreDepositWallet uses marginAmount (not orderSize)
         assertEq(coreDeposit.depositCount(), 1);
         (uint256 depositAmount, uint32 destDex) = coreDeposit.deposits(0);
-        assertEq(depositAmount, size);
+        assertEq(depositAmount, marginAmount);
         assertEq(destDex, 0); // DEST_DEX_PERP
     }
 
     function test_openPosition_short() public {
         _registerVaultA();
 
-        uint256 size = 5_000e6;
+        uint256 marginAmount = 5_000e6;
+        uint256 orderSize = 10_000; // 0.1 BTC (szDecimals=5)
         uint256 limitPrice = 48_000e8;
 
-        vaultA.callOpenPosition(address(adapter), false, size, limitPrice);
+        vaultA.callOpenPosition(address(adapter), false, marginAmount, orderSize, limitPrice);
 
-        assertEq(usdc.balanceOf(address(vaultA)), 1_000_000e6 - size);
+        assertEq(usdc.balanceOf(address(vaultA)), 1_000_000e6 - marginAmount);
         assertEq(coreDeposit.depositCount(), 1);
     }
 
     function test_openPosition_emitsSubAccountEvents() public {
         _registerVaultA();
 
-        uint256 size = 10_000e6;
+        uint256 marginAmount = 10_000e6;
+        uint256 orderSize = 20_000;
         uint256 limitPrice = 50_000e8;
 
         vm.expectEmit(false, false, false, true);
-        emit TradingSubAccount.MarginDeposited(size);
-        vaultA.callOpenPosition(address(adapter), true, size, limitPrice);
+        emit TradingSubAccount.MarginDeposited(marginAmount);
+        vaultA.callOpenPosition(address(adapter), true, marginAmount, orderSize, limitPrice);
     }
 
-    function test_openPosition_revertsOnSizeOverflow() public {
+    function test_openPosition_revertsOnMarginOverflow() public {
         _registerVaultA();
 
         vm.prank(address(vaultA));
         vm.expectRevert(
             abi.encodeWithSelector(
-                IHyperliquidAdapter.SizeOverflow.selector,
+                IHyperliquidAdapter.MarginOverflow.selector,
                 uint256(type(uint64).max) + 1
             )
         );
-        adapter.openPosition(true, uint256(type(uint64).max) + 1, 50_000e8);
+        adapter.openPosition(true, uint256(type(uint64).max) + 1, 20_000, 50_000e8);
+    }
+
+    function test_openPosition_revertsOnOrderSizeOverflow() public {
+        _registerVaultA();
+
+        // After scaling by 10^(8 - szDecimals) = 10^3 for BTC, the scaled size overflows uint64
+        uint256 overflowSize = uint256(type(uint64).max) + 1;
+        uint256 scaledOverflow = overflowSize * (10 ** (8 - SZ_DECIMALS_BTC));
+
+        vm.prank(address(vaultA));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IHyperliquidAdapter.OrderSizeOverflow.selector,
+                scaledOverflow
+            )
+        );
+        adapter.openPosition(true, 10_000e6, overflowSize, 50_000e8);
     }
 
     function test_openPosition_revertsOnPriceOverflow() public {
@@ -457,7 +479,7 @@ contract HyperliquidAdapterTest is Test {
                 uint256(type(uint64).max) + 1
             )
         );
-        adapter.openPosition(true, 10_000e6, uint256(type(uint64).max) + 1);
+        adapter.openPosition(true, 10_000e6, 20_000, uint256(type(uint64).max) + 1);
     }
 
     // ============ closePosition ============
@@ -554,13 +576,13 @@ contract HyperliquidAdapterTest is Test {
         _registerVaultA();
         _registerVaultB();
 
-        // Vault A opens BTC long
-        vaultA.callOpenPosition(address(adapter), true, 10_000e6, 50_000e8);
+        // Vault A opens BTC long (10k USDC margin, 0.2 BTC order)
+        vaultA.callOpenPosition(address(adapter), true, 10_000e6, 20_000, 50_000e8);
 
-        // Vault B opens ETH short
-        vaultB.callOpenPosition(address(adapter), false, 5_000e6, 3_000e8);
+        // Vault B opens ETH short (5k USDC margin, 1.6667 ETH order)
+        vaultB.callOpenPosition(address(adapter), false, 5_000e6, 16_667, 3_000e8);
 
-        // Verify each vault's balance decreased independently
+        // Verify each vault's margin was deducted independently
         assertEq(usdc.balanceOf(address(vaultA)), 1_000_000e6 - 10_000e6);
         assertEq(usdc.balanceOf(address(vaultB)), 500_000e6 - 5_000e6);
 
@@ -599,15 +621,15 @@ contract HyperliquidAdapterTest is Test {
         // Vault A cannot call sub-account B directly
         vm.prank(address(vaultA));
         vm.expectRevert(TradingSubAccount.OnlyAdapter.selector);
-        TradingSubAccount(subB).executeOpen(true, 10_000e6, 50_000e8);
+        TradingSubAccount(payable(subB)).executeOpen(true, 10_000e6, 20_000, 50_000e8);
     }
 
     function test_multiVault_differentAssets() public {
         address subA = _registerVaultA(); // BTC
         address subB = _registerVaultB(); // ETH
 
-        assertEq(TradingSubAccount(subA).perpAsset(), PERP_ASSET_BTC);
-        assertEq(TradingSubAccount(subB).perpAsset(), PERP_ASSET_ETH);
+        assertEq(TradingSubAccount(payable(subA)).perpAsset(), PERP_ASSET_BTC);
+        assertEq(TradingSubAccount(payable(subB)).perpAsset(), PERP_ASSET_ETH);
     }
 
     // ============ View Functions ============
@@ -616,41 +638,52 @@ contract HyperliquidAdapterTest is Test {
         assertEq(adapter.getSubAccount(address(0xBEEF)), address(0));
     }
 
-    function test_computeSubAccountAddress_matchesActual() public {
-        // Compute before registration
-        address predicted =
-            adapter.computeSubAccountAddress(address(vaultA), PERP_ASSET_BTC);
-
-        // Register and get actual address
-        vm.prank(ownerA);
-        address actual = adapter.registerVault(address(vaultA), PERP_ASSET_BTC);
-
-        assertEq(predicted, actual, "Computed address should match actual deployment");
-    }
-
     function test_isRegistered_returnsFalseForUnregistered() public view {
         assertFalse(adapter.isRegistered(address(vaultA)));
     }
 
-    // ============ Sub-account View Functions ============
+    // ============ depositMarginAdmin ============
 
-    function test_subAccount_getPosition() public {
+    function test_depositMarginAdmin_depositsToHyperCore() public {
         address subAccount = _registerVaultA();
 
-        // Default position should be zero
-        (int64 szi, uint32 leverage, uint64 entryNtl) =
-            TradingSubAccount(subAccount).getPosition();
-        assertEq(szi, 0);
-        assertEq(leverage, 0);
-        assertEq(entryNtl, 0);
+        // Fund vault owner with USDC
+        usdc.mint(ownerA, 100e6);
+        vm.startPrank(ownerA);
+        usdc.approve(address(adapter), 100e6);
+        adapter.depositMarginAdmin(address(vaultA), 100e6);
+        vm.stopPrank();
+
+        // USDC should flow: ownerA -> subAccount -> coreDeposit
+        assertEq(usdc.balanceOf(ownerA), 0, "Owner should have 0 after deposit");
+        assertEq(usdc.balanceOf(address(coreDeposit)), 100e6, "CoreDeposit should have the USDC");
     }
 
-    function test_subAccount_getBalance() public {
-        address subAccount = _registerVaultA();
+    function test_depositMarginAdmin_revertsIfNotOwner() public {
+        _registerVaultA();
 
-        assertEq(TradingSubAccount(subAccount).getBalance(), 0);
+        usdc.mint(nonOwner, 100e6);
+        vm.startPrank(nonOwner);
+        usdc.approve(address(adapter), 100e6);
+        vm.expectRevert(IHyperliquidAdapter.NotVaultOwner.selector);
+        adapter.depositMarginAdmin(address(vaultA), 100e6);
+        vm.stopPrank();
+    }
 
-        usdc.mint(subAccount, 100_000e6);
-        assertEq(TradingSubAccount(subAccount).getBalance(), 100_000e6);
+    function test_depositMarginAdmin_revertsIfVaultNotRegistered() public {
+        address unregisteredVault = address(new MockKernelVault(ownerA, address(usdc)));
+        factory.setDeployedVault(unregisteredVault, true);
+
+        vm.prank(ownerA);
+        vm.expectRevert(IHyperliquidAdapter.VaultNotRegistered.selector);
+        adapter.depositMarginAdmin(unregisteredVault, 100e6);
+    }
+
+    function test_depositMarginAdmin_revertsOnZeroAmount() public {
+        _registerVaultA();
+
+        vm.prank(ownerA);
+        vm.expectRevert(IHyperliquidAdapter.ZeroDeposit.selector);
+        adapter.depositMarginAdmin(address(vaultA), 0);
     }
 }

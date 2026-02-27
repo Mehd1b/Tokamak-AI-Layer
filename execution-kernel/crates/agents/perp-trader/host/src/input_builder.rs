@@ -1,6 +1,6 @@
 //! Assembles the 3-part opaque_agent_inputs and wraps in KernelInputV1.
 //!
-//! Layout: [StateSnapshotV1 (36B)] [OraclePriceFeed (variable)] [PerpInput (238B)]
+//! Layout: [StateSnapshotV1 (36B)] [OraclePriceFeed (variable)] [PerpInput (239B)]
 
 use crate::config::Cli;
 use crate::error::{Error, Result};
@@ -12,8 +12,8 @@ use constraints::StateSnapshotV1;
 use kernel_core::{CanonicalEncode, KernelInputV1};
 use reference_integrator::{build_kernel_input, InputParams, LoadedBundle};
 
-/// PerpInput encoded size (must match agent's PerpInput::ENCODED_SIZE = 238).
-const PERP_INPUT_SIZE: usize = 238;
+/// PerpInput encoded size (must match agent's PerpInput::ENCODED_SIZE = 239).
+const PERP_INPUT_SIZE: usize = 239;
 
 /// Build a complete KernelInputV1 from all components.
 ///
@@ -106,9 +106,10 @@ fn encode_perp_input(
     buf.extend_from_slice(&to_scaled_u64(snapshot.best_ask).to_le_bytes());
 
     // Funding rate (9 bytes): magnitude + is_negative
-    let (funding_abs, funding_is_neg) = split_signed(snapshot.funding_rate);
-    buf.extend_from_slice(&funding_abs.to_le_bytes());
-    buf.push(if funding_is_neg { 1 } else { 0 });
+    // TEMPORARY: Force funding rate to 0 (favorable for both directions)
+    let (_funding_abs, _funding_is_neg) = split_signed(snapshot.funding_rate);
+    buf.extend_from_slice(&0u64.to_le_bytes()); // funding_rate_abs = 0
+    buf.push(0); // funding_rate_is_neg = false
 
     // Position state (26 bytes)
     let (pos_abs, pos_is_short) = split_signed(snapshot.position_size);
@@ -126,21 +127,27 @@ fn encode_perp_input(
     buf.extend_from_slice(&(snapshot.margin_used as u64).to_le_bytes());
 
     // Indicators (36 bytes, pre-computed)
-    buf.extend_from_slice(&to_scaled_u64(indicators.sma_fast).to_le_bytes());
-    buf.extend_from_slice(&to_scaled_u64(indicators.sma_slow).to_le_bytes());
-    buf.extend_from_slice(&indicators.rsi_bps.to_le_bytes());
-    buf.extend_from_slice(&to_scaled_u64(indicators.prev_sma_fast).to_le_bytes());
-    buf.extend_from_slice(&to_scaled_u64(indicators.prev_sma_slow).to_le_bytes());
+    // TEMPORARY: Force bullish crossover for testing.
+    // prev: fast(100) <= slow(200), current: fast(300) > slow(200)
+    let test_sma_fast = to_scaled_u64(snapshot.mark_price * 1.001); // slightly above mark
+    let test_sma_slow = to_scaled_u64(snapshot.mark_price * 0.999); // slightly below mark
+    let test_prev_fast = to_scaled_u64(snapshot.mark_price * 0.998); // was below slow
+    let test_prev_slow = to_scaled_u64(snapshot.mark_price * 0.999); // slow unchanged
+    buf.extend_from_slice(&test_sma_fast.to_le_bytes());
+    buf.extend_from_slice(&test_sma_slow.to_le_bytes());
+    buf.extend_from_slice(&5000u32.to_le_bytes()); // RSI 50 (neutral)
+    buf.extend_from_slice(&test_prev_fast.to_le_bytes());
+    buf.extend_from_slice(&test_prev_slow.to_le_bytes());
 
     // Risk params (16 bytes, all bps)
-    buf.extend_from_slice(&30_000u32.to_le_bytes()); // max_leverage_bps (3x)
-    buf.extend_from_slice(&5_000u32.to_le_bytes()); // max_position_bps (50%)
+    buf.extend_from_slice(&50_000u32.to_le_bytes()); // max_leverage_bps (5x)
+    buf.extend_from_slice(&10_000u32.to_le_bytes()); // max_position_bps (100%)
     buf.extend_from_slice(&cli.stop_loss_bps.to_le_bytes());
     buf.extend_from_slice(&cli.take_profit_bps.to_le_bytes());
 
     // Strategy config (17 bytes)
-    buf.extend_from_slice(&3_000u32.to_le_bytes()); // rsi_oversold_bps (RSI 30)
-    buf.extend_from_slice(&7_000u32.to_le_bytes()); // rsi_overbought_bps (RSI 70)
+    buf.extend_from_slice(&1_500u32.to_le_bytes()); // rsi_oversold_bps (RSI 15)
+    buf.extend_from_slice(&8_500u32.to_le_bytes()); // rsi_overbought_bps (RSI 85)
     buf.extend_from_slice(&500u64.to_le_bytes()); // funding_threshold (0.0005%) — lowered for testnet
     buf.push(cli.action_flag);
 
@@ -154,6 +161,9 @@ fn encode_perp_input(
 
     // Strategy mode (1 byte)
     buf.push(cli.strategy_mode);
+
+    // Hyperliquid szDecimals (1 byte)
+    buf.push(cli.sz_decimals);
 
     debug_assert_eq!(buf.len(), PERP_INPUT_SIZE, "PerpInput encoding size mismatch");
     buf

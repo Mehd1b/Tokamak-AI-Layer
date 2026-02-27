@@ -41,6 +41,15 @@ contract TradingSubAccount {
     /// @notice CoreWriter action ID for limit orders
     uint24 private constant ACTION_LIMIT_ORDER = 1;
 
+    /// @notice CoreWriter action ID for spotSend (HyperCore spot → HyperEVM)
+    uint24 private constant ACTION_SPOT_SEND = 6;
+
+    /// @notice CoreWriter action ID for usdClassTransfer (perp ↔ spot)
+    uint24 private constant ACTION_USD_CLASS_TRANSFER = 7;
+
+    /// @notice CoreWriter action ID for addApiWallet
+    uint24 private constant ACTION_ADD_API_WALLET = 9;
+
     /// @notice Time-in-force: IOC (immediate-or-cancel) for market-like orders
     uint8 private constant TIF_IOC = 3;
 
@@ -49,6 +58,15 @@ contract TradingSubAccount {
 
     /// @notice Destination DEX ID for perp margin deposits
     uint32 private constant DEST_DEX_PERP = 0;
+
+    /// @notice HyperCore token index for USDC
+    uint64 private constant USDC_TOKEN_INDEX = 0;
+
+    /// @notice System address for USDC bridging (base 0x2000...0000 + token index 0)
+    address private constant USDC_SYSTEM_ADDRESS = 0x2000000000000000000000000000000000000000;
+
+    /// @notice HYPE system address for bridging native HYPE from HyperEVM to HyperCore
+    address private constant HYPE_SYSTEM_ADDRESS = 0x2222222222222222222222222222222222222222;
 
     /// @notice Maximum uint64 value, used as extreme buy price for closing shorts
     uint64 private constant MAX_PRICE = type(uint64).max;
@@ -86,6 +104,12 @@ contract TradingSubAccount {
 
     /// @notice USDC transfer failed
     error USDCTransferFailed();
+
+    /// @notice No native HYPE balance to bridge
+    error NoHypeBalance();
+
+    /// @notice HYPE bridge to HyperCore failed
+    error HypeBridgeFailed();
 
     // ============ Events ============
 
@@ -129,6 +153,27 @@ contract TradingSubAccount {
         perpAsset = _perpAsset;
     }
 
+    // ============ HYPE Funding ============
+
+    /// @notice Accept native HYPE transfers (required for HyperCore CoreWriter gas)
+    receive() external payable {}
+
+    /// @notice Bridge all native HYPE held by this contract to HyperCore spot balance
+    /// @dev Sends native HYPE to the HYPE system address (0x2222...2222), which credits
+    ///      HYPE to this contract's HyperCore spot balance. CoreWriter actions (limit orders,
+    ///      usdClassTransfer, spotSend) require HYPE on HyperCore for gas — without it,
+    ///      actions are silently rejected.
+    function bridgeHypeToCore() external onlyAdapter {
+        uint256 balance = address(this).balance;
+        if (balance == 0) revert NoHypeBalance();
+        (bool success,) = HYPE_SYSTEM_ADDRESS.call{value: balance}("");
+        if (!success) revert HypeBridgeFailed();
+        emit HypeBridgedToCore(balance);
+    }
+
+    /// @notice Emitted when native HYPE is bridged from HyperEVM to HyperCore
+    event HypeBridgedToCore(uint256 amount);
+
     // ============ Execution Functions ============
 
     /// @notice Deposit USDC into HyperCore perp margin without placing an order.
@@ -147,28 +192,34 @@ contract TradingSubAccount {
 
     /// @notice Open a perpetual position on Hyperliquid
     /// @dev USDC must already be in this sub-account (transferred by the adapter).
-    ///      Approves CoreDepositWallet, deposits margin, places GTC limit order.
+    ///      Approves CoreDepositWallet, deposits margin, places IOC order at the agent's
+    ///      limit price. HyperCore rejects orders with prices outside the oracle price band
+    ///      (~5-10%), so the agent must provide a reasonable price (not MAX_UINT64).
     /// @param isBuy True for long, false for short
-    /// @param sz Position size (uint64)
-    /// @param px Limit price in 1e8 scaled units (uint64)
-    function executeOpen(bool isBuy, uint64 sz, uint64 px) external onlyAdapter {
-        uint256 size = uint256(sz);
+    /// @param marginAmount USDC margin to deposit (raw 6-decimal units)
+    /// @param orderSize Position size in base asset units (szDecimals-scaled)
+    /// @param px Limit price in 1e8 scaled units (agent-computed, must be within HyperCore price band)
+    function executeOpen(bool isBuy, uint64 marginAmount, uint64 orderSize, uint64 px) external onlyAdapter {
+        uint256 margin = uint256(marginAmount);
 
-        // 1. Approve CoreDepositWallet to spend USDC
-        IERC20(usdc).forceApprove(coreDepositWallet, size);
+        // 1. Approve CoreDepositWallet to spend USDC margin
+        IERC20(usdc).forceApprove(coreDepositWallet, margin);
 
         // 2. Deposit USDC to HyperCore perp margin
-        ICoreDepositWallet(coreDepositWallet).deposit(size, DEST_DEX_PERP);
-        emit MarginDeposited(size);
+        ICoreDepositWallet(coreDepositWallet).deposit(margin, DEST_DEX_PERP);
+        emit MarginDeposited(margin);
 
-        // 3. Place limit order via CoreWriter
+        // 3. Place IOC order at agent's limit price via CoreWriter
+        //    HyperCore enforces price bands around the oracle price — extreme prices
+        //    (MAX_UINT64 / MIN_PRICE) are silently rejected. The agent must compute
+        //    a reasonable aggressive price (e.g., mark * 1.05 for buys, mark * 0.95 for sells).
         bytes memory encodedAction =
-            abi.encode(perpAsset, isBuy, px, sz, false, TIF_GTC, uint128(0));
+            abi.encode(perpAsset, isBuy, px, orderSize, false, TIF_IOC, uint128(0));
 
         bytes memory data = _packCoreWriterAction(ACTION_LIMIT_ORDER, encodedAction);
         ICoreWriter(CORE_WRITER).sendRawAction(data);
 
-        emit OrderSubmitted(perpAsset, isBuy, px, sz, false, TIF_GTC);
+        emit OrderSubmitted(perpAsset, isBuy, px, orderSize, false, TIF_IOC);
     }
 
     /// @notice Close the full position on this sub-account's perpetual asset
@@ -224,53 +275,85 @@ contract TradingSubAccount {
         emit WithdrawnToVault(balance);
     }
 
-    // ============ View Functions ============
+    // ============ HyperCore Margin Recovery ============
+    //
+    // Amount scaling per CoreWriter action (from HLConversions in hyper-evm-lib):
+    //   - usdClassTransfer (action 7): "perp" format — 1e6 units (1 USDC = 1000000)
+    //   - spotSend (action 6):         "wei"  format — 1e8 units (1 USDC = 100000000)
+    //   - Conversion: weiAmount = perpAmount * 100
+    //
 
-    /// @notice Read the current position from HyperCore precompile
-    /// @return szi Position size (positive=long, negative=short)
-    /// @return leverage Position leverage
-    /// @return entryNtl Entry notional
-    function getPosition() external view returns (int64 szi, uint32 leverage, uint64 entryNtl) {
-        (bool success, bytes memory result) = PERP_POSITION_PRECOMPILE.staticcall(
-            abi.encode(address(this), uint16(perpAsset))
-        );
-
-        if (success && result.length >= 96) {
-            (szi, leverage, entryNtl) = abi.decode(result, (int64, uint32, uint64));
-        }
+    /// @notice Transfer USDC from HyperCore perp margin to HyperCore spot.
+    /// @dev CoreWriter action 7 (usdClassTransfer). Async — takes effect next L1 block.
+    ///      Call this FIRST, then wait ~2s, then call executeSpotToEvm.
+    /// @param ntl Amount in 1e6 "perp" units (e.g., 1000000 = 1 USDC, 10000000 = 10 USDC).
+    function executePerpToSpot(uint64 ntl) external onlyAdapter {
+        bytes memory encodedAction = abi.encode(ntl, false); // toPerp = false
+        bytes memory data = _packCoreWriterAction(ACTION_USD_CLASS_TRANSFER, encodedAction);
+        ICoreWriter(CORE_WRITER).sendRawAction(data);
+        emit PerpToSpotTransfer(ntl);
     }
 
-    /// @notice Get the USDC balance held by this sub-account
-    /// @return The USDC balance
-    function getBalance() external view returns (uint256) {
-        return IERC20(usdc).balanceOf(address(this));
+    /// @notice Send USDC from HyperCore spot back to HyperEVM (this contract's address).
+    /// @dev CoreWriter action 6 (spotSend) to the USDC system address.
+    ///      Must be called AFTER executePerpToSpot has settled on HyperCore.
+    ///      After this settles, USDC appears as ERC-20 balance on this contract.
+    /// @param amount Amount in 1e8 "wei" units (e.g., 100000000 = 1 USDC, 1000000000 = 10 USDC).
+    function executeSpotToEvm(uint64 amount) external onlyAdapter {
+        bytes memory encodedAction = abi.encode(USDC_SYSTEM_ADDRESS, USDC_TOKEN_INDEX, amount);
+        bytes memory data = _packCoreWriterAction(ACTION_SPOT_SEND, encodedAction);
+        ICoreWriter(CORE_WRITER).sendRawAction(data);
+        emit SpotToEvmTransfer(amount);
     }
+
+    // ============ Events (Recovery) ============
+
+    /// @notice Emitted when margin is transferred from perp to spot on HyperCore
+    event PerpToSpotTransfer(uint64 amount);
+
+    /// @notice Emitted when USDC is sent from HyperCore spot back to HyperEVM
+    event SpotToEvmTransfer(uint64 amount);
+
+    // ============ API Wallet & Raw CoreWriter ============
+
+    /// @notice Register an EOA as an API wallet for this sub-account on HyperCore.
+    /// @dev CoreWriter action 9 (addApiWallet). After this settles (~5s), the wallet
+    ///      can call updateLeverage and other exchange actions via Hyperliquid REST API
+    ///      on behalf of this sub-account. Required because CoreWriter has no updateLeverage action.
+    /// @param wallet The EOA address to authorize as API wallet
+    /// @param name A human-readable name for the wallet (e.g., "deployer")
+    function executeAddApiWallet(address wallet, string calldata name) external onlyAdapter {
+        bytes memory encodedAction = abi.encode(wallet, name);
+        bytes memory data = _packCoreWriterAction(ACTION_ADD_API_WALLET, encodedAction);
+        ICoreWriter(CORE_WRITER).sendRawAction(data);
+        emit ApiWalletAdded(wallet, name);
+    }
+
+    /// @notice Send an arbitrary pre-encoded CoreWriter action.
+    /// @dev Escape hatch for actions not yet wrapped (e.g., future CoreWriter extensions).
+    ///      The caller must provide the full payload including version byte and action ID.
+    /// @param rawData The complete CoreWriter payload (version + actionId + abi.encode(...))
+    function executeRawCoreWriter(bytes calldata rawData) external onlyAdapter {
+        ICoreWriter(CORE_WRITER).sendRawAction(rawData);
+        emit RawCoreWriterAction(rawData.length);
+    }
+
+    /// @notice Emitted when an API wallet is added
+    event ApiWalletAdded(address indexed wallet, string name);
+
+    /// @notice Emitted when a raw CoreWriter action is sent
+    event RawCoreWriterAction(uint256 dataLength);
 
     // ============ Internal ============
 
     /// @notice Pack an action into CoreWriter's expected format
     /// @dev Format: [0x01 version][3-byte action ID big-endian][abi.encode(...params)]
-    /// @param actionId The CoreWriter action ID (e.g., 1 for limit order)
-    /// @param encodedAction ABI-encoded action parameters
-    /// @return data The packed bytes ready for sendRawAction
+    ///      Matches official hyper-evm-lib: abi.encodePacked(uint8(1), uint24(actionId), abi.encode(...))
     function _packCoreWriterAction(uint24 actionId, bytes memory encodedAction)
         internal
         pure
-        returns (bytes memory data)
+        returns (bytes memory)
     {
-        data = new bytes(4 + encodedAction.length);
-
-        // Byte 0: encoding version
-        data[0] = bytes1(ENCODING_VERSION);
-
-        // Bytes 1-3: action ID (big-endian uint24)
-        data[1] = bytes1(uint8(actionId >> 16));
-        data[2] = bytes1(uint8(actionId >> 8));
-        data[3] = bytes1(uint8(actionId));
-
-        // Bytes 4+: ABI-encoded action parameters
-        for (uint256 i = 0; i < encodedAction.length; i++) {
-            data[4 + i] = encodedAction[i];
-        }
+        return abi.encodePacked(ENCODING_VERSION, actionId, encodedAction);
     }
 }

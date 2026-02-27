@@ -33,10 +33,13 @@ pub fn to_scaled_u64(f: f64) -> u64 {
 }
 
 /// Build an OraclePriceFeed, sign it with EIP-191, and return both formats.
+/// The on-chain signature includes domain binding: keccak256(feedHash || timestamp || chainId || vaultAddress).
 pub fn build_and_sign_feed(
     snapshot: &MarketSnapshot,
     oracle_private_key: &str,
     _exchange_addr: &[u8; 20],
+    vault_addr: &[u8; 20],
+    chain_id: u64,
 ) -> Result<SignedFeed> {
     // Parse private key and derive signer address
     let pk_bytes = parse_private_key(oracle_private_key)?;
@@ -75,8 +78,23 @@ pub fn build_and_sign_feed(
     // Compute feed hash = SHA-256(hashable body)
     let feed_hash = compute_feed_hash(&feed);
 
-    // EIP-191 personal sign: keccak256("\x19Ethereum Signed Message:\n32" || feed_hash)
-    let eth_message_hash = eip191_hash(&feed_hash);
+    // Domain-bound hash: keccak256(abi.encodePacked(feedHash, oracleTimestamp, chainId, vaultAddress))
+    // This matches OracleVerifier.sol line 69
+    let domain_feed_hash = {
+        let mut packed = Vec::with_capacity(32 + 8 + 32 + 20);
+        packed.extend_from_slice(&feed_hash);                       // bytes32 feedHash
+        packed.extend_from_slice(&(snapshot.timestamp as u64).to_be_bytes()); // uint64 oracleTimestamp (big-endian, abi.encodePacked)
+        // chainId is uint256 in Solidity — abi.encodePacked(uint256) = 32 bytes big-endian
+        let mut chain_id_bytes = [0u8; 32];
+        chain_id_bytes[24..].copy_from_slice(&chain_id.to_be_bytes());
+        packed.extend_from_slice(&chain_id_bytes);                  // uint256 chainId
+        // address is 20 bytes in abi.encodePacked
+        packed.extend_from_slice(vault_addr);                       // address vaultAddress
+        keccak256(&packed)
+    };
+
+    // EIP-191 personal sign: keccak256("\x19Ethereum Signed Message:\n32" || domainFeedHash)
+    let eth_message_hash = eip191_hash(&domain_feed_hash);
 
     // ECDSA sign the EIP-191 hash
     let (signature, recovery_id) = signing_key
@@ -188,7 +206,8 @@ mod tests {
         };
         let exchange = [0x11u8; 20];
 
-        let result = build_and_sign_feed(&snapshot, pk, &exchange);
+        let vault = [0x22u8; 20];
+        let result = build_and_sign_feed(&snapshot, pk, &exchange, &vault, 999);
         assert!(result.is_ok(), "Signing should succeed");
 
         let signed = result.unwrap();

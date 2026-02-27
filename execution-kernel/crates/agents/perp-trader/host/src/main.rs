@@ -122,9 +122,11 @@ fn main() -> anyhow::Result<()> {
         clear_position_state(&cli.state_file);
     }
 
-    // Minimum balance guard: skip execution if vault balance is below threshold.
-    // Prevents dust-level re-entry loops after position has been opened.
-    if vault_state.total_assets < cli.min_balance {
+    // Minimum balance guard: skip execution if vault balance is below threshold
+    // AND no position is open. When a position IS open, the vault balance being
+    // low is expected (USDC was sent to the sub-account for margin). The agent
+    // must still run to evaluate exit conditions (stop-loss, take-profit, etc.).
+    if snapshot.position_size == 0.0 && vault_state.total_assets < cli.min_balance {
         if cli.json {
             let result = serde_json::json!({
                 "status": "no_op",
@@ -170,10 +172,14 @@ fn main() -> anyhow::Result<()> {
     // 5. Build + sign oracle feed
     let oracle_key = Cli::resolve_key(&cli.oracle_key)?;
     let exchange_addr = Cli::parse_address(&cli.exchange_contract)?;
+    let vault_addr = Cli::parse_address(&cli.vault)?;
+    let usdc_addr = Cli::parse_address(&cli.usdc_address)?;
     let signed_feed = oracle_signer::build_and_sign_feed(
         &snapshot,
         &oracle_key,
         &exchange_addr,
+        &vault_addr,
+        cli.chain_id,
     )?;
     if !cli.json {
         eprintln!(
@@ -183,8 +189,6 @@ fn main() -> anyhow::Result<()> {
     }
 
     // 6. Assemble KernelInputV1
-    let vault_addr = Cli::parse_address(&cli.vault)?;
-    let usdc_addr = Cli::parse_address(&cli.usdc_address)?;
     let (kernel_input, input_bytes) = input_builder::build_input(
         &bundle,
         &vault_state,
@@ -224,9 +228,15 @@ fn main() -> anyhow::Result<()> {
     // This enables high-frequency scheduling (e.g. every 30s) with negligible cost
     // on cycles where the strategy produces no signal.
     if action_count == 0 {
+        let reason = if snapshot.position_size != 0.0 {
+            "position_open_no_exit_signal"
+        } else {
+            "no_entry_signal"
+        };
         if cli.json {
             let result = serde_json::json!({
                 "status": "no_op",
+                "reason": reason,
                 "actions": 0,
                 "mark_price": snapshot.mark_price,
                 "position_size": snapshot.position_size,
@@ -234,7 +244,7 @@ fn main() -> anyhow::Result<()> {
             });
             println!("{}", serde_json::to_string_pretty(&result)?);
         } else {
-            eprintln!("No action signal. Skipping proof generation and on-chain submission.");
+            eprintln!("No-op: {}. Skipping proof generation and on-chain submission.", reason);
         }
         return Ok(());
     }
@@ -291,6 +301,7 @@ fn main() -> anyhow::Result<()> {
                 &proof_result.seal_bytes,
                 &agent_output_bytes,
                 &signed_feed.onchain_signature,
+                signed_feed.feed.timestamp,
             ))?;
 
             // Record open position state so next cycle doesn't re-enter.

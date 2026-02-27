@@ -9,18 +9,20 @@ pragma solidity ^0.8.24;
 ///      Vaults register once, then all trading calls are routed to per-vault TradingSubAccounts.
 ///
 ///      Selector reference:
-///        openPosition(bool,uint256,uint256)  => 0xe3255731
-///        closePosition()                     => 0xc393d0e3
-///        withdrawToVault()                   => 0x84f22721
+///        openPosition(bool,uint256,uint256,uint256) => 0x04ba41cb
+///        closePosition()                            => 0xc393d0e3
+///        withdrawToVault()                          => 0x84f22721
 interface IHyperliquidAdapter {
     // ============ Structs ============
 
     /// @notice Configuration for a registered vault
     /// @param subAccount The deployed TradingSubAccount address
     /// @param perpAsset The Hyperliquid perp asset index
+    /// @param szDecimals Hyperliquid szDecimals for the asset (BTC=5, ETH=4, SOL=2)
     struct VaultConfig {
         address subAccount;
         uint32 perpAsset;
+        uint8 szDecimals;
     }
 
     // ============ Events ============
@@ -56,11 +58,17 @@ interface IHyperliquidAdapter {
     /// @notice Zero address provided
     error ZeroAddress();
 
-    /// @notice Size exceeds uint64 range (Hyperliquid uses uint64 for sizes)
-    error SizeOverflow(uint256 size);
+    /// @notice Margin amount exceeds uint64 range
+    error MarginOverflow(uint256 marginAmount);
+
+    /// @notice Order size exceeds uint64 range (Hyperliquid uses uint64 for sizes)
+    error OrderSizeOverflow(uint256 orderSize);
 
     /// @notice Price exceeds uint64 range (Hyperliquid uses uint64 for prices)
     error PriceOverflow(uint256 price);
+
+    /// @notice szDecimals exceeds maximum (8)
+    error InvalidSzDecimals();
 
     /// @notice USDC transfer from vault failed
     error USDCTransferFailed();
@@ -77,8 +85,11 @@ interface IHyperliquidAdapter {
     /// @dev Only the vault owner can register. Vault must be deployed by the VaultFactory.
     /// @param vault The KernelVault address to register
     /// @param perpAsset The Hyperliquid perp asset index (BTC=0, ETH=1, etc.)
+    /// @param szDecimals Hyperliquid szDecimals for the asset (BTC=5, ETH=4, SOL=2)
     /// @return subAccount The deployed TradingSubAccount address
-    function registerVault(address vault, uint32 perpAsset) external returns (address subAccount);
+    function registerVault(address vault, uint32 perpAsset, uint8 szDecimals)
+        external
+        returns (address subAccount);
 
     /// @notice Zero deposit amount provided
     error ZeroDeposit();
@@ -98,9 +109,10 @@ interface IHyperliquidAdapter {
     ///      The vault must have approved USDC to this adapter.
     ///      Routes to the vault's TradingSubAccount.
     /// @param isBuy True for long, false for short
-    /// @param size Position size in USDC margin (will be cast to uint64 for Hyperliquid)
+    /// @param marginAmount USDC margin to deposit (raw 6-decimal units, cast to uint64)
+    /// @param orderSize Position size in base asset units (szDecimals-scaled, cast to uint64)
     /// @param limitPrice Limit price in 1e8 scaled units (will be cast to uint64)
-    function openPosition(bool isBuy, uint256 size, uint256 limitPrice) external;
+    function openPosition(bool isBuy, uint256 marginAmount, uint256 orderSize, uint256 limitPrice) external;
 
     /// @notice Close the full position for the calling vault's perpetual asset
     /// @dev Routes to the vault's TradingSubAccount which reads position via precompile.
@@ -109,6 +121,33 @@ interface IHyperliquidAdapter {
     /// @notice Withdraw all USDC from the vault's sub-account back to the vault
     /// @dev Called after position is closed and funds have returned from HyperCore.
     function withdrawToVault() external;
+
+    // ============ Admin Margin Management ============
+
+    /// @notice Deposit USDC from the vault owner's wallet to a vault's sub-account HyperCore margin.
+    /// @dev Used to pre-fund margin BEFORE bot execution. CoreWriter deposits are async —
+    ///      margin deposited in the same tx as an order hasn't settled yet, causing silent
+    ///      rejection. Pre-depositing in a separate tx ensures margin is available when the
+    ///      bot's limit order is processed.
+    ///
+    ///      Workflow:
+    ///      1. Vault owner calls depositMarginAdmin() (this function)
+    ///      2. Wait ~5s for HyperCore settlement
+    ///      3. Run bot — openPosition() places order using pre-deposited margin
+    ///
+    /// @param vault The vault whose sub-account to fund
+    /// @param amount The amount of USDC to deposit (EVM 6-decimal units)
+    function depositMarginAdmin(address vault, uint256 amount) external;
+
+    // ============ HYPE Funding ============
+
+    /// @notice Fund a vault's sub-account with native HYPE and bridge to HyperCore.
+    /// @dev CoreWriter actions require HYPE on HyperCore for gas. Call once after registration.
+    /// @param vault The vault whose sub-account to fund with HYPE
+    function fundSubAccountHype(address vault) external payable;
+
+    /// @notice Native HYPE transfer to sub-account failed
+    error HypeTransferFailed();
 
     // ============ View Functions ============
 
@@ -127,12 +166,4 @@ interface IHyperliquidAdapter {
     /// @return The VaultConfig struct
     function getVaultConfig(address vault) external view returns (VaultConfig memory);
 
-    /// @notice Compute the deterministic sub-account address for a vault before registration
-    /// @param vault The vault address
-    /// @param perpAsset The perp asset index
-    /// @return The computed TradingSubAccount address
-    function computeSubAccountAddress(address vault, uint32 perpAsset)
-        external
-        view
-        returns (address);
 }
