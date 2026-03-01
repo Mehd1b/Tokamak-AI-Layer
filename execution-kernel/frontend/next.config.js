@@ -4,7 +4,6 @@ const path = require('path');
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@tokamak/execution-kernel-sdk'],
-  serverExternalPackages: ['better-sqlite3'],
   webpack: (config) => {
     config.resolve.fallback = {
       ...config.resolve.fallback,

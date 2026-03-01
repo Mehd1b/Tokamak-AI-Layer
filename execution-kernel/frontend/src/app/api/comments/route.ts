@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid vault address' }, { status: 400 });
     }
 
-    const comments = getCommentsByVault(vault);
+    const comments = await getCommentsByVault(vault);
     return NextResponse.json({ comments });
   } catch (e) {
     console.error('GET /api/comments error:', e);
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
 
     // Validate parentId if provided
     if (parentId) {
-      const parent = getCommentById(parentId);
+      const parent = await getCommentById(parentId);
       if (!parent || parent.deleted) {
         return NextResponse.json({ error: 'Parent comment not found' }, { status: 400 });
       }
@@ -57,12 +57,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Rate limiting
-    const recentCount = countRecentComments(session.address, RATE_LIMIT_WINDOW);
+    const recentCount = await countRecentComments(session.address, RATE_LIMIT_WINDOW);
     if (recentCount >= RATE_LIMIT_MAX) {
       return NextResponse.json({ error: 'Rate limit exceeded. Try again in a minute.' }, { status: 429 });
     }
 
-    const comment = createComment({
+    const comment = await createComment({
       id: crypto.randomUUID(),
       vault,
       author: session.address,

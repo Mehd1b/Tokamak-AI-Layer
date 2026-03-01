@@ -1,39 +1,25 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
+import { sql } from '@vercel/postgres';
 
-const DB_PATH = path.join(process.cwd(), 'data', 'comments.db');
+let initialized = false;
 
-let db: Database.Database | null = null;
+async function ensureTable() {
+  if (initialized) return;
 
-function getDb(): Database.Database {
-  if (db) return db;
-
-  const dir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-
-  db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-
-  db.exec(`
+  await sql`
     CREATE TABLE IF NOT EXISTS comments (
       id TEXT PRIMARY KEY,
       vault TEXT NOT NULL,
       author TEXT NOT NULL,
       content TEXT NOT NULL,
-      parent_id TEXT,
+      parent_id TEXT REFERENCES comments(id),
       created_at INTEGER NOT NULL,
-      deleted INTEGER DEFAULT 0,
-      FOREIGN KEY (parent_id) REFERENCES comments(id)
-    );
-    CREATE INDEX IF NOT EXISTS idx_vault ON comments(vault, created_at);
-    CREATE INDEX IF NOT EXISTS idx_parent ON comments(parent_id);
-  `);
+      deleted INTEGER DEFAULT 0
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_vault ON comments(vault, created_at)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_parent ON comments(parent_id)`;
 
-  return db;
+  initialized = true;
 }
 
 export interface CommentRow {
@@ -46,48 +32,56 @@ export interface CommentRow {
   deleted: number;
 }
 
-export function getCommentsByVault(vault: string): CommentRow[] {
-  const db = getDb();
-  return db.prepare(
-    'SELECT * FROM comments WHERE vault = ? AND deleted = 0 ORDER BY created_at ASC'
-  ).all(vault.toLowerCase()) as CommentRow[];
+export async function getCommentsByVault(vault: string): Promise<CommentRow[]> {
+  await ensureTable();
+  const { rows } = await sql`
+    SELECT * FROM comments
+    WHERE vault = ${vault.toLowerCase()} AND deleted = 0
+    ORDER BY created_at ASC
+  `;
+  return rows as CommentRow[];
 }
 
-export function createComment(params: {
+export async function createComment(params: {
   id: string;
   vault: string;
   author: string;
   content: string;
   parentId: string | null;
-}): CommentRow {
-  const db = getDb();
+}): Promise<CommentRow> {
+  await ensureTable();
   const now = Math.floor(Date.now() / 1000);
 
-  db.prepare(
-    'INSERT INTO comments (id, vault, author, content, parent_id, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(params.id, params.vault.toLowerCase(), params.author.toLowerCase(), params.content, params.parentId, now);
+  await sql`
+    INSERT INTO comments (id, vault, author, content, parent_id, created_at)
+    VALUES (${params.id}, ${params.vault.toLowerCase()}, ${params.author.toLowerCase()}, ${params.content}, ${params.parentId}, ${now})
+  `;
 
-  return db.prepare('SELECT * FROM comments WHERE id = ?').get(params.id) as CommentRow;
+  const { rows } = await sql`SELECT * FROM comments WHERE id = ${params.id}`;
+  return rows[0] as CommentRow;
 }
 
-export function softDeleteComment(id: string, author: string): boolean {
-  const db = getDb();
-  const result = db.prepare(
-    'UPDATE comments SET deleted = 1 WHERE id = ? AND author = ? AND deleted = 0'
-  ).run(id, author.toLowerCase());
-  return result.changes > 0;
+export async function softDeleteComment(id: string, author: string): Promise<boolean> {
+  await ensureTable();
+  const { rowCount } = await sql`
+    UPDATE comments SET deleted = 1
+    WHERE id = ${id} AND author = ${author.toLowerCase()} AND deleted = 0
+  `;
+  return (rowCount ?? 0) > 0;
 }
 
-export function getCommentById(id: string): CommentRow | undefined {
-  const db = getDb();
-  return db.prepare('SELECT * FROM comments WHERE id = ?').get(id) as CommentRow | undefined;
+export async function getCommentById(id: string): Promise<CommentRow | undefined> {
+  await ensureTable();
+  const { rows } = await sql`SELECT * FROM comments WHERE id = ${id}`;
+  return rows[0] as CommentRow | undefined;
 }
 
-export function countRecentComments(author: string, windowSeconds: number): number {
-  const db = getDb();
+export async function countRecentComments(author: string, windowSeconds: number): Promise<number> {
+  await ensureTable();
   const since = Math.floor(Date.now() / 1000) - windowSeconds;
-  const row = db.prepare(
-    'SELECT COUNT(*) as count FROM comments WHERE author = ? AND created_at > ?'
-  ).get(author.toLowerCase(), since) as { count: number };
-  return row.count;
+  const { rows } = await sql`
+    SELECT COUNT(*) as count FROM comments
+    WHERE author = ${author.toLowerCase()} AND created_at > ${since}
+  `;
+  return Number(rows[0].count);
 }

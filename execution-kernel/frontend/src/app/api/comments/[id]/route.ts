@@ -15,7 +15,7 @@ export async function DELETE(
 
     const { id } = await params;
 
-    const comment = getCommentById(id);
+    const comment = await getCommentById(id);
     if (!comment) {
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
     }
@@ -24,7 +24,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
     }
 
-    const deleted = softDeleteComment(id, session.address);
+    const deleted = await softDeleteComment(id, session.address);
 
     if (!deleted) {
       return NextResponse.json({ error: 'Failed to delete comment' }, { status: 500 });

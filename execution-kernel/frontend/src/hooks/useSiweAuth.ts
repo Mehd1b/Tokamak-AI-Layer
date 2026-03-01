@@ -14,6 +14,7 @@ export function useSiweAuth() {
     queryKey: ['siwe-session'],
     queryFn: async () => {
       const res = await fetch('/api/auth/session');
+      if (!res.ok) return null;
       const data = await res.json();
       return data.address as string | null;
     },
@@ -26,6 +27,7 @@ export function useSiweAuth() {
 
       // Get nonce
       const nonceRes = await fetch('/api/auth/nonce');
+      if (!nonceRes.ok) throw new Error('Failed to get nonce');
       const { nonce } = await nonceRes.json();
 
       // Create SIWE message
@@ -51,8 +53,14 @@ export function useSiweAuth() {
       });
 
       if (!verifyRes.ok) {
-        const err = await verifyRes.json();
-        throw new Error(err.error || 'Verification failed');
+        let message = 'Verification failed';
+        try {
+          const err = await verifyRes.json();
+          message = err.error || message;
+        } catch {
+          // Response body is empty or not JSON
+        }
+        throw new Error(message);
       }
 
       return verifyRes.json();
