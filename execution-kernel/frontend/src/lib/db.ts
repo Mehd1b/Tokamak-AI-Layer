@@ -13,11 +13,19 @@ async function ensureTable() {
       content TEXT NOT NULL,
       parent_id TEXT REFERENCES comments(id),
       created_at INTEGER NOT NULL,
-      deleted INTEGER DEFAULT 0
+      deleted INTEGER DEFAULT 0,
+      pinned INTEGER DEFAULT 0
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS idx_vault ON comments(vault, created_at)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_parent ON comments(parent_id)`;
+
+  // Migration: add pinned column if table already exists without it
+  try {
+    await sql`ALTER TABLE comments ADD COLUMN pinned INTEGER DEFAULT 0`;
+  } catch {
+    // Column already exists — ignore
+  }
 
   initialized = true;
 }
@@ -30,6 +38,7 @@ export interface CommentRow {
   parent_id: string | null;
   created_at: number;
   deleted: number;
+  pinned: number;
 }
 
 export async function getCommentsByVault(vault: string): Promise<CommentRow[]> {
@@ -37,7 +46,7 @@ export async function getCommentsByVault(vault: string): Promise<CommentRow[]> {
   const { rows } = await sql`
     SELECT * FROM comments
     WHERE vault = ${vault.toLowerCase()} AND deleted = 0
-    ORDER BY created_at ASC
+    ORDER BY pinned DESC, created_at ASC
   `;
   return rows as CommentRow[];
 }
@@ -74,6 +83,30 @@ export async function getCommentById(id: string): Promise<CommentRow | undefined
   await ensureTable();
   const { rows } = await sql`SELECT * FROM comments WHERE id = ${id}`;
   return rows[0] as CommentRow | undefined;
+}
+
+export async function pinComment(id: string, vault: string): Promise<boolean> {
+  await ensureTable();
+  // Unpin any currently pinned comment in this vault
+  await sql`
+    UPDATE comments SET pinned = 0
+    WHERE vault = ${vault.toLowerCase()} AND pinned = 1
+  `;
+  // Pin the target comment
+  const { rowCount } = await sql`
+    UPDATE comments SET pinned = 1
+    WHERE id = ${id} AND vault = ${vault.toLowerCase()} AND deleted = 0
+  `;
+  return (rowCount ?? 0) > 0;
+}
+
+export async function unpinComment(id: string, vault: string): Promise<boolean> {
+  await ensureTable();
+  const { rowCount } = await sql`
+    UPDATE comments SET pinned = 0
+    WHERE id = ${id} AND vault = ${vault.toLowerCase()} AND deleted = 0
+  `;
+  return (rowCount ?? 0) > 0;
 }
 
 export async function countRecentComments(author: string, windowSeconds: number): Promise<number> {

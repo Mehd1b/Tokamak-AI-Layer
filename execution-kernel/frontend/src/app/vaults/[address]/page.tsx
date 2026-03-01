@@ -202,7 +202,7 @@ export default function VaultDetailPage() {
         {/* Right column — Discussion (sticky on desktop) */}
         <div className="xl:w-[400px] flex-shrink-0">
           <div className="xl:sticky xl:top-8 xl:max-h-[calc(100vh-4rem)] xl:overflow-y-auto xl:scrollbar-thin">
-            <CommentSection vaultAddress={vaultAddress} />
+            <CommentSection vaultAddress={vaultAddress} vaultOwner={vault.owner} />
           </div>
         </div>
       </div>

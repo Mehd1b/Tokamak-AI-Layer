@@ -15,6 +15,14 @@ const ERC20_DECIMALS_ABI = [
 export function useVaultInfo(vaultAddress: `0x${string}` | undefined) {
   const { selectedChainId } = useNetwork();
 
+  const owner = useReadContract({
+    address: vaultAddress,
+    abi: KernelVaultABI,
+    functionName: 'owner',
+    chainId: selectedChainId,
+    query: { enabled: !!vaultAddress },
+  });
+
   const asset = useReadContract({
     address: vaultAddress,
     abi: KernelVaultABI,
@@ -102,6 +110,7 @@ export function useVaultInfo(vaultAddress: `0x${string}` | undefined) {
   const assetSymbol = isEthVault ? 'ETH' : (symbolQuery.data as string | undefined) ?? 'TOKEN';
 
   return {
+    owner: owner.data as `0x${string}` | undefined,
     asset: asset.data,
     agentId: agentId.data,
     trustedImageId: trustedImageId.data,

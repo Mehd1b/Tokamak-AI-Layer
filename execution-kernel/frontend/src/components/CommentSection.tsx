@@ -9,10 +9,11 @@ import { CommentThread } from './CommentThread';
 
 interface CommentSectionProps {
   vaultAddress: string;
+  vaultOwner?: string;
 }
 
-export function CommentSection({ vaultAddress }: CommentSectionProps) {
-  const { comments, isLoading, addComment, addCommentPending, deleteComment, deleteCommentPending } = useComments(vaultAddress);
+export function CommentSection({ vaultAddress, vaultOwner }: CommentSectionProps) {
+  const { comments, isLoading, addComment, addCommentPending, deleteComment, deleteCommentPending, pinComment, unpinComment } = useComments(vaultAddress, vaultOwner);
   const { isSignedIn, session } = useSiweAuth();
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
 
@@ -29,6 +30,14 @@ export function CommentSection({ vaultAddress }: CommentSectionProps) {
 
   const handleDelete = async (commentId: string) => {
     await deleteComment(commentId);
+  };
+
+  const handlePin = async (commentId: string) => {
+    await pinComment(commentId);
+  };
+
+  const handleUnpin = async (commentId: string) => {
+    await unpinComment(commentId);
   };
 
   return (
@@ -79,11 +88,14 @@ export function CommentSection({ vaultAddress }: CommentSectionProps) {
           comments={topLevelComments}
           allComments={comments}
           currentUser={session || null}
+          vaultOwner={vaultOwner}
           replyingTo={replyingTo}
           onReply={setReplyingTo}
           onCancelReply={() => setReplyingTo(null)}
           onSubmitReply={handleReply}
           onDelete={handleDelete}
+          onPin={handlePin}
+          onUnpin={handleUnpin}
           replyPending={addCommentPending}
           deletePending={deleteCommentPending}
         />

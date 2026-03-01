@@ -1,6 +1,13 @@
 export const KernelVaultABI = [
   {
     type: 'function',
+    name: 'owner',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'asset',
     inputs: [],
     outputs: [{ name: '', type: 'address' }],

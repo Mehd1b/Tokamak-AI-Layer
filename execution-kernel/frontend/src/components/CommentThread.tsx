@@ -8,11 +8,14 @@ interface CommentThreadProps {
   comments: Comment[];
   allComments: Comment[];
   currentUser: string | null;
+  vaultOwner?: string;
   replyingTo: string | null;
   onReply: (parentId: string) => void;
   onCancelReply: () => void;
   onSubmitReply: (content: string, parentId: string) => Promise<void>;
   onDelete: (commentId: string) => Promise<void>;
+  onPin?: (commentId: string) => Promise<void>;
+  onUnpin?: (commentId: string) => Promise<void>;
   replyPending: boolean;
   deletePending: boolean;
   depth?: number;
@@ -24,11 +27,14 @@ export function CommentThread({
   comments,
   allComments,
   currentUser,
+  vaultOwner,
   replyingTo,
   onReply,
   onCancelReply,
   onSubmitReply,
   onDelete,
+  onPin,
+  onUnpin,
   replyPending,
   deletePending,
   depth = 0,
@@ -43,8 +49,11 @@ export function CommentThread({
             <CommentCard
               comment={comment}
               currentUser={currentUser}
+              vaultOwner={vaultOwner}
               onReply={depth < MAX_DEPTH ? onReply : () => {}}
               onDelete={onDelete}
+              onPin={onPin}
+              onUnpin={onUnpin}
               deletePending={deletePending}
             />
 
@@ -67,11 +76,14 @@ export function CommentThread({
                 comments={replies}
                 allComments={allComments}
                 currentUser={currentUser}
+                vaultOwner={vaultOwner}
                 replyingTo={replyingTo}
                 onReply={onReply}
                 onCancelReply={onCancelReply}
                 onSubmitReply={onSubmitReply}
                 onDelete={onDelete}
+                onPin={onPin}
+                onUnpin={onUnpin}
                 replyPending={replyPending}
                 deletePending={deletePending}
                 depth={depth + 1}

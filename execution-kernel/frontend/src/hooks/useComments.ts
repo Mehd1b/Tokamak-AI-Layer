@@ -10,9 +10,10 @@ export interface Comment {
   parent_id: string | null;
   created_at: number;
   deleted: number;
+  pinned: number;
 }
 
-export function useComments(vault: string) {
+export function useComments(vault: string, vaultOwner?: string) {
   const queryClient = useQueryClient();
 
   const { data: comments = [], isLoading, error } = useQuery({
@@ -75,6 +76,56 @@ export function useComments(vault: string) {
     },
   });
 
+  const pinCommentMutation = useMutation({
+    mutationFn: async (commentId: string) => {
+      const res = await fetch(`/api/comments/${commentId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(vaultOwner ? { 'x-vault-owner': vaultOwner } : {}),
+        },
+        body: JSON.stringify({ action: 'pin' }),
+      });
+      if (!res.ok) {
+        let message = 'Failed to pin comment';
+        try {
+          const err = await res.json();
+          message = err.error || message;
+        } catch {}
+        throw new Error(message);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments', vault] });
+    },
+  });
+
+  const unpinCommentMutation = useMutation({
+    mutationFn: async (commentId: string) => {
+      const res = await fetch(`/api/comments/${commentId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(vaultOwner ? { 'x-vault-owner': vaultOwner } : {}),
+        },
+        body: JSON.stringify({ action: 'unpin' }),
+      });
+      if (!res.ok) {
+        let message = 'Failed to unpin comment';
+        try {
+          const err = await res.json();
+          message = err.error || message;
+        } catch {}
+        throw new Error(message);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments', vault] });
+    },
+  });
+
   return {
     comments,
     isLoading,
@@ -84,5 +135,9 @@ export function useComments(vault: string) {
     addCommentError: addComment.error,
     deleteComment: deleteComment.mutateAsync,
     deleteCommentPending: deleteComment.isPending,
+    pinComment: pinCommentMutation.mutateAsync,
+    pinCommentPending: pinCommentMutation.isPending,
+    unpinComment: unpinCommentMutation.mutateAsync,
+    unpinCommentPending: unpinCommentMutation.isPending,
   };
 }
