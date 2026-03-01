@@ -2,12 +2,16 @@
 
 import { useState } from 'react';
 import { useIsDeployedVault, useDeployedVaultsList } from '@/hooks/useVaultFactory';
+import { useCommentCounts } from '@/hooks/useCommentCounts';
 import { VaultCard } from '@/components/VaultCard';
 import Link from 'next/link';
 
 export default function VaultsPage() {
   const [searchAddress, setSearchAddress] = useState('');
   const { data: deployedVaults, isLoading: isLoadingVaults, error: vaultsError } = useDeployedVaultsList();
+
+  const vaultAddresses = (deployedVaults ?? []).map((v) => v.address);
+  const { data: commentCounts } = useCommentCounts(vaultAddresses);
 
   const vaultHex = searchAddress.startsWith('0x') && searchAddress.length === 42
     ? (searchAddress as `0x${string}`)
@@ -100,6 +104,7 @@ export default function VaultsPage() {
                     totalValueLocked={v.totalValueLocked}
                     assetDecimals={v.assetDecimals}
                     assetSymbol={v.assetSymbol}
+                    commentCount={commentCounts?.[v.address.toLowerCase()]}
                   />
                 ))}
               </div>

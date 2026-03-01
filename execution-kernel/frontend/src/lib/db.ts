@@ -109,6 +109,22 @@ export async function unpinComment(id: string, vault: string): Promise<boolean> 
   return (rowCount ?? 0) > 0;
 }
 
+export async function getCommentCountsByVaults(vaults: string[]): Promise<Record<string, number>> {
+  await ensureTable();
+  if (vaults.length === 0) return {};
+  const lower = vaults.map((v) => v.toLowerCase());
+  const { rows } = await sql`
+    SELECT vault, COUNT(*) as count FROM comments
+    WHERE vault = ANY(${lower as unknown as string}) AND deleted = 0
+    GROUP BY vault
+  `;
+  const result: Record<string, number> = {};
+  for (const row of rows) {
+    result[(row as { vault: string; count: string }).vault] = Number((row as { vault: string; count: string }).count);
+  }
+  return result;
+}
+
 export async function countRecentComments(author: string, windowSeconds: number): Promise<number> {
   await ensureTable();
   const since = Math.floor(Date.now() / 1000) - windowSeconds;
