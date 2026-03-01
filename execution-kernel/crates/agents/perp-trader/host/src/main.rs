@@ -150,14 +150,29 @@ fn main() -> anyhow::Result<()> {
     // The agent passes size directly to openPosition() which does a USDC transfer,
     // so equity/balance must be in USDC's native denomination (1e6), NOT 1e8 scaled.
     // This way compute_position_size() output matches what the adapter expects.
+    //
+    // Exception: when the vault is empty but HyperCore has margin (post-deposit bootstrap),
+    // keep the HyperCore-reported equity so the seed trade can compute proper actions.
     let vault_equity_raw = vault_state.total_assets as f64; // raw USDC units (6 decimals)
-    snapshot.account_equity = vault_equity_raw;
-    snapshot.available_balance = vault_equity_raw - snapshot.margin_used;
+    let equity_source;
+    if vault_equity_raw > 0.0 {
+        snapshot.account_equity = vault_equity_raw;
+        snapshot.available_balance = vault_equity_raw - snapshot.margin_used;
+        equity_source = "vault";
+    } else if snapshot.account_equity > 0.0 {
+        // Vault is empty but HyperCore has funds (e.g., margin deposited in previous cycle).
+        // Keep HyperCore's equity for seed trade sizing.
+        equity_source = "hypercore";
+    } else {
+        snapshot.account_equity = 0.0;
+        snapshot.available_balance = 0.0;
+        equity_source = "none";
+    }
 
     if !cli.json {
         eprintln!(
-            "[3/8] Market data: mark={:.2}, pos={:.4}, equity={:.2} (vault balance)",
-            snapshot.mark_price, snapshot.position_size, snapshot.account_equity
+            "[3/8] Market data: mark={:.2}, pos={:.4}, equity={:.2} ({})",
+            snapshot.mark_price, snapshot.position_size, snapshot.account_equity, equity_source
         );
     }
 

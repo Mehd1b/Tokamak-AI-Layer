@@ -323,6 +323,19 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
         TradingSubAccount(payable(config.subAccount)).executeRawCoreWriter(rawData);
     }
 
+    /// @notice Deposit the sub-account's existing EVM USDC balance to HyperCore.
+    /// @dev Use when USDC was sent directly to the sub-account address (not via vault).
+    ///      Calls sub.executeDeposit() which transfers USDC to CoreDepositWallet.
+    /// @param vault The vault whose sub-account to deposit from
+    function depositSubBalanceAdmin(address vault) external nonReentrant {
+        VaultConfig memory config = vaultConfigs[vault];
+        if (config.subAccount == address(0)) revert VaultNotRegistered();
+        if (msg.sender != IKernelVaultOwner(vault).owner()) revert NotVaultOwner();
+        uint256 bal = IERC20(usdc).balanceOf(config.subAccount);
+        require(bal > 0, "sub has no USDC");
+        TradingSubAccount(payable(config.subAccount)).executeDepositMargin(bal);
+    }
+
     // ============ View Functions ============
 
     /// @inheritdoc IHyperliquidAdapter
