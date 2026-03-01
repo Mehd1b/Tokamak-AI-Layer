@@ -455,16 +455,6 @@ export function Navbar() {
           >
             DOCS
           </a>
-          <a
-            href="/"
-            onClick={(e) => {
-              e.preventDefault();
-              window.open('https://tokagent.network', '_blank');
-            }}
-            className="px-4 py-2 rounded-lg border border-dashed transition-all tracking-wider text-sm border-white/30 text-white hover:border-white/60 hover:text-gray-300"
-          >
-            TAL
-          </a>
           <NetworkSelector />
           <div className="ml-4">
             <ConnectButton />
@@ -623,15 +613,6 @@ export function Navbar() {
                   onClick={() => setIsMenuOpen(false)}
                 >
                   DOCS
-                </a>
-                <a
-                  href="https://tokagent.network"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-md font-light transition-all duration-300 tracking-wider text-white hover:text-[#A855F7]"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  TAL
                 </a>
               </div>
             </div>
