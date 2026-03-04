@@ -10,6 +10,7 @@ pragma solidity ^0.8.24;
 ///
 ///      Selector reference:
 ///        openPosition(bool,uint256,uint256,uint256) => 0x04ba41cb
+///        closePositionAtPrice(uint64)               => 0x2c0f36da
 ///        closePosition()                            => 0xc393d0e3
 ///        withdrawToVault()                          => 0x84f22721
 interface IHyperliquidAdapter {
@@ -114,8 +115,15 @@ interface IHyperliquidAdapter {
     /// @param limitPrice Limit price in 1e8 scaled units (will be cast to uint64)
     function openPosition(bool isBuy, uint256 marginAmount, uint256 orderSize, uint256 limitPrice) external;
 
+    /// @notice Close the full position using an agent-supplied limit price.
+    /// @dev Uses a price within HyperCore's oracle band instead of extreme prices.
+    ///      Selector: 0x2c0f36da — emitted by the perp-trader zkVM agent.
+    /// @param px Limit price in 1e8 scaled units (must be within oracle band)
+    function closePositionAtPrice(uint64 px) external;
+
     /// @notice Close the full position for the calling vault's perpetual asset
     /// @dev Routes to the vault's TradingSubAccount which reads position via precompile.
+    ///      WARNING: Uses extreme prices which may be silently rejected by HyperCore.
     function closePosition() external;
 
     /// @notice Withdraw all USDC from the vault's sub-account back to the vault
@@ -138,6 +146,16 @@ interface IHyperliquidAdapter {
     /// @param vault The vault whose sub-account to fund
     /// @param amount The amount of USDC to deposit (EVM 6-decimal units)
     function depositMarginAdmin(address vault, uint256 amount) external;
+
+    // ============ Vault-Sourced Admin Margin ============
+
+    /// @notice Deposit USDC from a vault's ERC-20 balance to HyperCore perp margin.
+    /// @dev Enables seed trade bootstrapping: pre-deposits margin before REST API places
+    ///      the opening order. Uses the same vault→adapter USDC approval as openPosition().
+    ///      Only callable by vault owner to prevent unauthorized fund movement.
+    /// @param vault The vault to pull USDC from
+    /// @param amount Amount in USDC native 1e6 decimals
+    function depositMarginFromVaultAdmin(address vault, uint256 amount) external;
 
     // ============ HYPE Funding ============
 

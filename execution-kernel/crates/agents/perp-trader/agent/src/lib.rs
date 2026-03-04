@@ -107,12 +107,10 @@ const FUNDING_REVERSAL_MULTIPLIER: u64 = 3;
 /// Selector: keccak256("openPosition(bool,uint256,uint256,uint256)")[:4] = 0x04ba41cb
 const OPEN_POSITION_SELECTOR: u32 = 0x04ba41cb;
 
-/// HyperliquidAdapter.closePosition()
-/// Selector: keccak256("closePosition()")[:4] = 0xc393d0e3
-const CLOSE_POSITION_SELECTOR: u32 = 0xc393d0e3;
-
-/// HyperliquidAdapter.withdrawToVault()
-/// Selector: keccak256("withdrawToVault()")[:4] = 0x84f22721
+/// HyperliquidAdapter.closePositionAtPrice(uint64 px)
+/// Selector: keccak256("closePositionAtPrice(uint64)")[:4] = 0x2c0f36da
+/// Uses agent-computed price within HyperCore's oracle band.
+const CLOSE_AT_PRICE_SELECTOR: u32 = 0x2c0f36da;
 
 /// Action flag: evaluate market conditions and decide
 const FLAG_EVALUATE: u8 = 0;
@@ -616,18 +614,45 @@ fn compute_order_size(margin: u64, mark_price: u64, sz_decimals: u8, max_leverag
     result as u64
 }
 
+/// Compute a close limit price within HyperCore's oracle price band (~5%).
+///
+/// For closing a long (selling): price = mark * 0.95 (5% below mark)
+/// For closing a short (buying): price = mark * 1.05 (5% above mark)
+///
+/// BTC tick size is $1 = 100 in 1e8 scale. Price is rounded to tick.
+fn compute_close_price(mark_price: u64, is_short: bool) -> u64 {
+    if is_short {
+        // Closing a short = buying → aggressive price above mark
+        let delta = mark_price / 20; // 5%
+        let px = saturating_add_u64(mark_price, delta);
+        (px / 100) * 100 // round down to tick ($1 = 100 in 1e8)
+    } else {
+        // Closing a long = selling → aggressive price below mark
+        let delta = mark_price / 20; // 5%
+        let px = saturating_sub_u64(mark_price, delta);
+        (px / 100) * 100 // round down to tick
+    }
+}
+
 // ============================================================================
 // Action Builders
 // ============================================================================
 
 /// Build action to close the current position.
+///
+/// Emits 1 action:
+/// 1. closePositionAtPrice(uint64 px) — uses agent-computed price within HyperCore's oracle band
+///
 /// Note: withdrawToVault is NOT bundled here because HyperCore settlement is async.
-/// After closing, USDC remains on HyperCore margin — the vault owner must recover
-/// funds manually via the 3-step admin flow: transferPerpToSpot → transferSpotToEvm
-/// → withdrawToVaultAdmin.
+/// If both actions were in the same vault execution, withdrawToVault would find 0 USDC
+/// (close hasn't settled yet on HyperCore) and revert, rolling back the close too.
+/// The host handles the 3-step recovery flow post-close: transferPerpToSpot →
+/// transferSpotToEvm → withdrawToVaultAdmin.
 fn build_close_actions(input: &PerpInput) -> AgentOutput {
+    let close_price = compute_close_price(input.mark_price, input.position_is_short);
     let close = CallBuilder::new(input.exchange_contract)
-        .selector(CLOSE_POSITION_SELECTOR)
+        .selector(CLOSE_AT_PRICE_SELECTOR)
+        .param_u256_from_u64(close_price) // ABI-encoded as uint64 (padded to 32 bytes)
         .build();
     let mut actions = Vec::with_capacity(1);
     actions.push(close);
@@ -1000,10 +1025,8 @@ mod tests {
         let (ctx, input) = build_test(100_000 * PRICE_SCALE, 100_000 * PRICE_SCALE, &perp);
         let output = agent_main(&ctx, &input);
 
-        // Enhancement 6: close + withdrawToVault
-        assert_eq!(output.actions.len(), 2, "Should close + withdraw on stop loss");
+        assert_eq!(output.actions.len(), 1, "Should close on stop loss");
         assert_eq!(output.actions[0].action_type, ACTION_TYPE_CALL); // close
-        assert_eq!(output.actions[1].action_type, ACTION_TYPE_CALL); // withdraw
     }
 
     #[test]
@@ -1020,7 +1043,7 @@ mod tests {
         let (ctx, input) = build_test(100_000 * PRICE_SCALE, 100_000 * PRICE_SCALE, &perp);
         let output = agent_main(&ctx, &input);
 
-        assert_eq!(output.actions.len(), 2, "Should close + withdraw on take profit");
+        assert_eq!(output.actions.len(), 1, "Should close on take profit");
     }
 
     #[test]
@@ -1037,7 +1060,7 @@ mod tests {
         let (ctx, input) = build_test(95_000 * PRICE_SCALE, 100_000 * PRICE_SCALE, &perp);
         let output = agent_main(&ctx, &input);
 
-        assert_eq!(output.actions.len(), 2, "5% drawdown should trigger close + withdraw");
+        assert_eq!(output.actions.len(), 1, "5% drawdown should trigger close");
     }
 
     #[test]
@@ -1059,7 +1082,7 @@ mod tests {
         let (ctx, input2) = build_test(92_000 * PRICE_SCALE, 100_000 * PRICE_SCALE, &perp);
         let output2 = agent_main(&ctx, &input2);
 
-        assert_eq!(output2.actions.len(), 2, "8% drawdown should trigger close + withdraw");
+        assert_eq!(output2.actions.len(), 1, "8% drawdown should trigger close");
     }
 
     #[test]
@@ -1075,7 +1098,7 @@ mod tests {
         let (ctx, input) = build_test(95_000 * PRICE_SCALE, 100_000 * PRICE_SCALE, &perp);
         let output = agent_main(&ctx, &input);
 
-        assert_eq!(output.actions.len(), 2, "Default 5% drawdown should trigger close + withdraw");
+        assert_eq!(output.actions.len(), 1, "Default 5% drawdown should trigger close");
     }
 
     #[test]
@@ -1109,7 +1132,7 @@ mod tests {
         let (ctx, input) = build_test(100_000 * PRICE_SCALE, 100_000 * PRICE_SCALE, &perp);
         let output = agent_main(&ctx, &input);
 
-        assert_eq!(output.actions.len(), 2, "Cooldown should close position + withdraw");
+        assert_eq!(output.actions.len(), 1, "Cooldown should close position");
     }
 
     #[test]
@@ -1145,7 +1168,7 @@ mod tests {
         let (ctx, input) = build_test(100_000 * PRICE_SCALE, 100_000 * PRICE_SCALE, &perp);
         let output = agent_main(&ctx, &input);
 
-        assert_eq!(output.actions.len(), 2, "Should close + withdraw on liquidation proximity");
+        assert_eq!(output.actions.len(), 1, "Should close on liquidation proximity");
     }
 
     #[test]
@@ -1163,7 +1186,7 @@ mod tests {
         let (ctx, input) = build_test(100_000 * PRICE_SCALE, 100_000 * PRICE_SCALE, &perp);
         let output = agent_main(&ctx, &input);
 
-        assert_eq!(output.actions.len(), 2, "Should close + withdraw on funding reversal");
+        assert_eq!(output.actions.len(), 1, "Should close on funding reversal");
     }
 
     #[test]
@@ -1182,7 +1205,7 @@ mod tests {
         let (ctx, input) = build_test(100_000 * PRICE_SCALE, 100_000 * PRICE_SCALE, &perp);
         let output = agent_main(&ctx, &input);
 
-        assert_eq!(output.actions.len(), 2, "Should close + withdraw on trend reversal");
+        assert_eq!(output.actions.len(), 1, "Should close on trend reversal");
     }
 
     // ====================================================================
@@ -1200,7 +1223,7 @@ mod tests {
         let (ctx, input) = build_test(100_000 * PRICE_SCALE, 100_000 * PRICE_SCALE, &perp);
         let output = agent_main(&ctx, &input);
 
-        assert_eq!(output.actions.len(), 2, "Force close should produce close + withdraw");
+        assert_eq!(output.actions.len(), 1, "Force close should produce close action");
     }
 
     #[test]
@@ -1314,7 +1337,7 @@ mod tests {
         let (ctx, input) = build_test(100_000 * PRICE_SCALE, 100_000 * PRICE_SCALE, &perp);
         let output = agent_main(&ctx, &input);
 
-        assert_eq!(output.actions.len(), 2, "Short stop loss should trigger close + withdraw");
+        assert_eq!(output.actions.len(), 1, "Short stop loss should trigger close");
     }
 
     #[test]
@@ -1331,7 +1354,7 @@ mod tests {
         let (ctx, input) = build_test(100_000 * PRICE_SCALE, 100_000 * PRICE_SCALE, &perp);
         let output = agent_main(&ctx, &input);
 
-        assert_eq!(output.actions.len(), 2, "Short take profit should trigger close + withdraw");
+        assert_eq!(output.actions.len(), 1, "Short take profit should trigger close");
     }
 
     // ====================================================================
@@ -1411,7 +1434,7 @@ mod tests {
         let (ctx, input) = build_test(100_000 * PRICE_SCALE, 100_000 * PRICE_SCALE, &perp);
         let output = agent_main(&ctx, &input);
 
-        assert_eq!(output.actions.len(), 2, "Arb mode should still exit on stop loss");
+        assert_eq!(output.actions.len(), 1, "Arb mode should still exit on stop loss");
     }
 
     #[test]
@@ -1440,7 +1463,7 @@ mod tests {
     // ====================================================================
 
     #[test]
-    fn test_close_always_includes_withdraw() {
+    fn test_close_emits_single_action() {
         let mut perp = make_default_perp_input();
         // Setup long position that will be stopped out
         perp.position_size_abs = 10_000 * PRICE_SCALE;
@@ -1452,19 +1475,15 @@ mod tests {
         let (ctx, input) = build_test(100_000 * PRICE_SCALE, 100_000 * PRICE_SCALE, &perp);
         let output = agent_main(&ctx, &input);
 
-        assert_eq!(output.actions.len(), 2);
-        // First action: closePosition()
+        // Close emits only 1 action (no withdraw — HyperCore async settlement)
+        assert_eq!(output.actions.len(), 1);
         let exchange_target = address_to_bytes32(&EXCHANGE);
         assert_eq!(output.actions[0].target, exchange_target);
-        // Second action: withdrawToVault()
-        assert_eq!(output.actions[1].target, exchange_target);
-        // Both should be CALL type
         assert_eq!(output.actions[0].action_type, ACTION_TYPE_CALL);
-        assert_eq!(output.actions[1].action_type, ACTION_TYPE_CALL);
     }
 
     #[test]
-    fn test_force_close_includes_withdraw() {
+    fn test_force_close_emits_single_action() {
         let mut perp = make_default_perp_input();
         perp.action_flag = FLAG_FORCE_CLOSE;
         perp.position_size_abs = 10_000 * PRICE_SCALE;
@@ -1473,7 +1492,7 @@ mod tests {
         let (ctx, input) = build_test(100_000 * PRICE_SCALE, 100_000 * PRICE_SCALE, &perp);
         let output = agent_main(&ctx, &input);
 
-        assert_eq!(output.actions.len(), 2, "Force close must include withdraw");
+        assert_eq!(output.actions.len(), 1, "Force close emits only close action");
     }
 
     // ====================================================================
@@ -1493,7 +1512,7 @@ mod tests {
         // Oracle price at $55,000 > TP level -> should trigger take profit
         let (ctx, input) = build_test(100_000 * PRICE_SCALE, 100_000 * PRICE_SCALE, &perp);
         let output = agent_main(&ctx, &input);
-        assert_eq!(output.actions.len(), 2, "Oracle-verified price should trigger take profit");
+        assert_eq!(output.actions.len(), 1, "Oracle-verified price should trigger take profit");
     }
 
     #[test]

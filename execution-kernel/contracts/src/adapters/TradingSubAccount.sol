@@ -91,6 +91,11 @@ contract TradingSubAccount {
     /// @notice The Hyperliquid perp asset index this sub-account trades
     uint32 public immutable perpAsset;
 
+    /// @notice Hyperliquid szDecimals for this asset (BTC=5, ETH=4, SOL=2)
+    /// @dev Used to convert precompile position sizes (szDecimals-scaled) to
+    ///      CoreWriter format (1e8-scaled). Scale factor = 10^(8-szDecimals).
+    uint8 public immutable szDecimals;
+
     // ============ Errors ============
 
     /// @notice Caller is not the canonical adapter
@@ -144,13 +149,15 @@ contract TradingSubAccount {
         address _vault,
         address _usdc,
         address _coreDepositWallet,
-        uint32 _perpAsset
+        uint32 _perpAsset,
+        uint8 _szDecimals
     ) {
         adapter = _adapter;
         vault = _vault;
         usdc = _usdc;
         coreDepositWallet = _coreDepositWallet;
         perpAsset = _perpAsset;
+        szDecimals = _szDecimals;
     }
 
     // ============ HYPE Funding ============
@@ -222,8 +229,57 @@ contract TradingSubAccount {
         emit OrderSubmitted(perpAsset, isBuy, px, orderSize, false, TIF_IOC);
     }
 
+    /// @notice Close the full position using an agent-supplied limit price.
+    /// @dev Same as executeClose() but uses a price within HyperCore's oracle band
+    ///      instead of MIN_PRICE/MAX_PRICE, which are silently rejected.
+    ///      For closing a long (selling): px should be mark * 0.95 (IOC fills at market).
+    ///      For closing a short (buying): px should be mark * 1.05.
+    /// @param px Agent-computed limit price in 1e8 scaled units (must be within oracle band)
+    function closePositionAtPrice(uint64 px) external onlyAdapter {
+        // 1. Read current position via precompile
+        (bool success, bytes memory result) = PERP_POSITION_PRECOMPILE.staticcall(
+            abi.encode(address(this), uint16(perpAsset))
+        );
+
+        if (!success) revert NoPositionToClose();
+
+        // Decode position: struct Position { int64 szi; uint32 leverage; uint64 entryNtl; }
+        (int64 szi,,) = abi.decode(result, (int64, uint32, uint64));
+
+        if (szi == 0) revert NoPositionToClose();
+
+        // 2. Determine close direction and size (in szDecimals format from precompile)
+        bool isBuy;
+        uint64 szRaw; // szDecimals-scaled (e.g., 37 for 0.00037 BTC with szDecimals=5)
+
+        if (szi > 0) {
+            // Long position -> sell to close
+            isBuy = false;
+            szRaw = uint64(szi);
+        } else {
+            // Short position -> buy to close
+            isBuy = true;
+            szRaw = uint64(uint256(-int256(szi)));
+        }
+
+        // 3. Scale from szDecimals to 1e8 (CoreWriter expects 1e8-scaled sizes)
+        // e.g., BTC szDecimals=5: 37 * 10^(8-5) = 37 * 1000 = 37000
+        uint64 sz = szRaw * uint64(10 ** (8 - szDecimals));
+
+        // 4. Place reduce-only IOC order at agent-supplied price via CoreWriter
+        bytes memory encodedAction =
+            abi.encode(perpAsset, isBuy, px, sz, true, TIF_IOC, uint128(0));
+
+        bytes memory data = _packCoreWriterAction(ACTION_LIMIT_ORDER, encodedAction);
+        ICoreWriter(CORE_WRITER).sendRawAction(data);
+
+        emit OrderSubmitted(perpAsset, isBuy, px, sz, true, TIF_IOC);
+    }
+
     /// @notice Close the full position on this sub-account's perpetual asset
     /// @dev Reads position via precompile, places reduce-only IOC order at extreme price.
+    ///      WARNING: MIN_PRICE/MAX_PRICE may be outside HyperCore's oracle price band,
+    ///      causing silent rejection. Prefer closePositionAtPrice() with agent-computed price.
     function executeClose() external onlyAdapter {
         // 1. Read current position via precompile
         (bool success, bytes memory result) = PERP_POSITION_PRECOMPILE.staticcall(
@@ -237,24 +293,27 @@ contract TradingSubAccount {
 
         if (szi == 0) revert NoPositionToClose();
 
-        // 2. Determine close direction and size
+        // 2. Determine close direction and size (in szDecimals format from precompile)
         bool isBuy;
-        uint64 sz;
+        uint64 szRaw; // szDecimals-scaled
         uint64 px;
 
         if (szi > 0) {
             // Long position -> sell to close
             isBuy = false;
-            sz = uint64(szi);
+            szRaw = uint64(szi);
             px = MIN_PRICE;
         } else {
             // Short position -> buy to close
             isBuy = true;
-            sz = uint64(uint256(-int256(szi)));
+            szRaw = uint64(uint256(-int256(szi)));
             px = MAX_PRICE;
         }
 
-        // 3. Place reduce-only IOC order via CoreWriter
+        // 3. Scale from szDecimals to 1e8 (CoreWriter expects 1e8-scaled sizes)
+        uint64 sz = szRaw * uint64(10 ** (8 - szDecimals));
+
+        // 4. Place reduce-only IOC order via CoreWriter
         bytes memory encodedAction =
             abi.encode(perpAsset, isBuy, px, sz, true, TIF_IOC, uint128(0));
 

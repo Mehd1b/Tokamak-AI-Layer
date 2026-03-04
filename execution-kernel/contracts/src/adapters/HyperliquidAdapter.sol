@@ -50,6 +50,7 @@ interface IKernelVaultOwner {
 ///
 ///      Selector reference (used by perp-trader zkVM agent):
 ///        openPosition(bool,uint256,uint256,uint256) => 0x04ba41cb
+///        closePositionAtPrice(uint64)               => 0x2c0f36da
 ///        closePosition()                            => 0xc393d0e3
 ///        withdrawToVault()                          => 0x84f22721
 contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
@@ -128,7 +129,7 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
         bytes32 salt = keccak256(abi.encodePacked(vault));
         subAccount = address(
             new TradingSubAccount{salt: salt}(
-                address(this), vault, usdc, coreDepositWallet, perpAsset
+                address(this), vault, usdc, coreDepositWallet, perpAsset, szDecimals
             )
         );
 
@@ -186,6 +187,12 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
     }
 
     /// @inheritdoc IHyperliquidAdapter
+    function closePositionAtPrice(uint64 px) external override nonReentrant onlyRegisteredVault {
+        VaultConfig memory config = vaultConfigs[msg.sender];
+        TradingSubAccount(payable(config.subAccount)).closePositionAtPrice(px);
+    }
+
+    /// @inheritdoc IHyperliquidAdapter
     function closePosition() external override nonReentrant onlyRegisteredVault {
         VaultConfig memory config = vaultConfigs[msg.sender];
         TradingSubAccount(payable(config.subAccount)).executeClose();
@@ -236,12 +243,21 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
 
     // ============ Admin Position Management (vault owner only) ============
 
+    /// @notice Close the full position for a vault's sub-account with agent-supplied price.
+    /// @dev Preferred over closePositionAdmin because it uses a price within HyperCore's
+    ///      oracle band, avoiding silent rejection.
+    /// @param vault The vault whose sub-account position to close
+    /// @param px Limit price in 1e8 scaled units (within oracle band)
+    function closePositionAtPriceAdmin(address vault, uint64 px) external nonReentrant {
+        VaultConfig memory config = vaultConfigs[vault];
+        if (config.subAccount == address(0)) revert VaultNotRegistered();
+        if (msg.sender != IKernelVaultOwner(vault).owner()) revert NotVaultOwner();
+        TradingSubAccount(payable(config.subAccount)).closePositionAtPrice(px);
+    }
+
     /// @notice Close the full position for a vault's sub-account. Callable by vault owner.
-    /// @dev Used when the bot's atomic close+withdraw reverts (withdraw fails because USDC
-    ///      is on HyperCore, not as ERC-20). After calling, use the 3-step recovery flow:
-    ///      1. Wait ~5s for HyperCore to settle the close order
-    ///      2. transferPerpToSpot → wait ~2s → transferSpotToEvm → wait ~2s
-    ///      3. withdrawToVaultAdmin
+    /// @dev WARNING: Uses extreme prices (MIN_PRICE/MAX_PRICE) which may be outside HyperCore's
+    ///      oracle price band, causing silent rejection. Prefer closePositionAtPriceAdmin().
     /// @param vault The vault whose sub-account position to close
     function closePositionAdmin(address vault) external nonReentrant {
         VaultConfig memory config = vaultConfigs[vault];
@@ -321,6 +337,22 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
         if (config.subAccount == address(0)) revert VaultNotRegistered();
         if (msg.sender != IKernelVaultOwner(vault).owner()) revert NotVaultOwner();
         TradingSubAccount(payable(config.subAccount)).executeRawCoreWriter(rawData);
+    }
+
+    /// @notice Deposit USDC from a vault's ERC-20 balance to HyperCore perp margin.
+    /// @dev Enables seed trade bootstrapping: pre-deposits margin before REST API places
+    ///      the opening order. Uses the same vault→adapter USDC approval as openPosition().
+    ///      Only callable by vault owner to prevent unauthorized fund movement.
+    /// @param vault The vault to pull USDC from
+    /// @param amount Amount in USDC native 1e6 decimals
+    function depositMarginFromVaultAdmin(address vault, uint256 amount) external nonReentrant {
+        if (amount == 0) revert ZeroDeposit();
+        VaultConfig memory config = vaultConfigs[vault];
+        if (config.subAccount == address(0)) revert VaultNotRegistered();
+        if (msg.sender != IKernelVaultOwner(vault).owner()) revert NotVaultOwner();
+
+        IERC20(usdc).safeTransferFrom(vault, config.subAccount, amount);
+        TradingSubAccount(payable(config.subAccount)).executeDepositMargin(amount);
     }
 
     /// @notice Deposit the sub-account's existing EVM USDC balance to HyperCore.

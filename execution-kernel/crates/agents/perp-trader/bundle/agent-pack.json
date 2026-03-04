@@ -7,11 +7,11 @@
   "kernel_version": 1,
   "risc0_version": "3.0.4",
   "rust_toolchain": "1.75.0",
-  "agent_code_hash": "0x8cb7540a4f566a90c8ad0d5a242bca5326b4f3b346032ba8c1aa0afb8a02c4c3",
-  "image_id": "0x5fec7288bacc9cd7fb21d59b6071350a992ccbd5c24af754b83cf40fe1e5a1ab",
+  "agent_code_hash": "0x9278369e5cd88765a428cf1595c43708b0240332157eaf2af0a758e20001f8d1",
+  "image_id": "0xbb1183db1d9fa05cb545f3b59e5a62721931effa309b8e9152280048bbf9c2c9",
   "artifacts": {
     "elf_path": "guest.elf",
-    "elf_sha256": "0xbe1d340d4baecc3eb94090658b20308fb65d5e335fb26da02bd3ebe527b63a4c"
+    "elf_sha256": "0xcf06829da0e215c134a22f8bb384a7f3fb3261508b098195f2e02426fbecb7c2"
   },
   "build": {
     "cargo_lock_sha256": "0x0000000000000000000000000000000000000000000000000000000000000000",
@@ -27,8 +27,8 @@
     },
     "hyperevm_mainnet": {
       "verifier": "0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30",
-      "vault": "0xfe7e3907ca61d8eb333d35d94bb58743437b70f4",
-      "adapter": "0xB30eAB8E1AeEE31D0905b50133749b6894400c21"
+      "vault": "0x7be46c2b091197dc8a0ae8d9b0821ac5c7666e74",
+      "adapter": "0x0Cb59d461a366d2377ebc7eD7E50F960bEa67dc9"
     }
   }
 }

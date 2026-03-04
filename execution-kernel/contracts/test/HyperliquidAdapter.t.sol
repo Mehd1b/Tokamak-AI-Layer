@@ -147,6 +147,10 @@ contract MockKernelVault {
         HyperliquidAdapter(adapter).closePosition();
     }
 
+    function callClosePositionAtPrice(address adapter, uint64 px) external {
+        HyperliquidAdapter(adapter).closePositionAtPrice(px);
+    }
+
     function callWithdrawToVault(address adapter) external {
         HyperliquidAdapter(adapter).withdrawToVault();
     }
@@ -231,6 +235,11 @@ contract HyperliquidAdapterTest is Test {
         assertEq(selector, bytes4(0x04ba41cb), "openPosition selector mismatch");
     }
 
+    function test_selectorClosePositionAtPrice() public pure {
+        bytes4 selector = IHyperliquidAdapter.closePositionAtPrice.selector;
+        assertEq(selector, bytes4(0x2c0f36da), "closePositionAtPrice selector mismatch");
+    }
+
     function test_selectorClosePosition() public pure {
         bytes4 selector = IHyperliquidAdapter.closePosition.selector;
         assertEq(selector, bytes4(0xc393d0e3), "closePosition selector mismatch");
@@ -304,6 +313,7 @@ contract HyperliquidAdapterTest is Test {
         assertEq(subAccount.usdc(), address(usdc));
         assertEq(subAccount.coreDepositWallet(), address(coreDeposit));
         assertEq(subAccount.perpAsset(), PERP_ASSET_BTC);
+        assertEq(subAccount.szDecimals(), SZ_DECIMALS_BTC);
     }
 
     function test_registerVault_revertsIfNotOwner() public {
@@ -480,6 +490,55 @@ contract HyperliquidAdapterTest is Test {
             )
         );
         adapter.openPosition(true, 10_000e6, 20_000, uint256(type(uint64).max) + 1);
+    }
+
+    // ============ closePositionAtPrice ============
+
+    function test_closePositionAtPrice_longPosition() public {
+        _registerVaultA();
+
+        // Set up a long position at the precompile address
+        MockPerpPositionPrecompile precompile = MockPerpPositionPrecompile(
+            0x0000000000000000000000000000000000000800
+        );
+        vm.store(
+            address(precompile),
+            bytes32(uint256(0)),
+            bytes32(uint256(uint64(1000e8))) // szi = 1000e8 (long)
+        );
+
+        // Close at mark * 0.95 = 47500 * 1e8 (5% below mark for selling)
+        vaultA.callClosePositionAtPrice(address(adapter), 47_500e8);
+    }
+
+    function test_closePositionAtPrice_shortPosition() public {
+        _registerVaultA();
+
+        MockPerpPositionPrecompile precompile = MockPerpPositionPrecompile(
+            0x0000000000000000000000000000000000000800
+        );
+        int64 shortSzi = -500e8;
+        vm.store(
+            address(precompile),
+            bytes32(uint256(0)),
+            bytes32(uint256(uint64(int64(shortSzi))))
+        );
+
+        // Close at mark * 1.05 = 52500 * 1e8 (5% above mark for buying)
+        vaultA.callClosePositionAtPrice(address(adapter), 52_500e8);
+    }
+
+    function test_closePositionAtPrice_revertsWithNoPosition() public {
+        _registerVaultA();
+
+        vm.expectRevert(TradingSubAccount.NoPositionToClose.selector);
+        vaultA.callClosePositionAtPrice(address(adapter), 50_000e8);
+    }
+
+    function test_closePositionAtPrice_revertsIfNotRegistered() public {
+        vm.prank(address(vaultA));
+        vm.expectRevert(IHyperliquidAdapter.VaultNotRegistered.selector);
+        adapter.closePositionAtPrice(50_000e8);
     }
 
     // ============ closePosition ============
@@ -685,5 +744,54 @@ contract HyperliquidAdapterTest is Test {
         vm.prank(ownerA);
         vm.expectRevert(IHyperliquidAdapter.ZeroDeposit.selector);
         adapter.depositMarginAdmin(address(vaultA), 0);
+    }
+
+    // ============ depositMarginFromVaultAdmin ============
+
+    function test_depositMarginFromVaultAdmin_depositsToHyperCore() public {
+        _registerVaultA();
+
+        // Vault already has 1M USDC and approved adapter
+        vm.prank(ownerA);
+        adapter.depositMarginFromVaultAdmin(address(vaultA), 50e6);
+
+        // USDC should flow: vault -> subAccount -> coreDeposit
+        assertEq(usdc.balanceOf(address(vaultA)), 1_000_000e6 - 50e6, "Vault balance should decrease");
+        assertEq(usdc.balanceOf(address(coreDeposit)), 50e6, "CoreDeposit should have the USDC");
+        assertEq(coreDeposit.depositCount(), 1);
+    }
+
+    function test_depositMarginFromVaultAdmin_revertsIfNotOwner() public {
+        _registerVaultA();
+
+        vm.prank(nonOwner);
+        vm.expectRevert(IHyperliquidAdapter.NotVaultOwner.selector);
+        adapter.depositMarginFromVaultAdmin(address(vaultA), 50e6);
+    }
+
+    function test_depositMarginFromVaultAdmin_revertsIfVaultNotRegistered() public {
+        address unregisteredVault = address(new MockKernelVault(ownerA, address(usdc)));
+        factory.setDeployedVault(unregisteredVault, true);
+
+        vm.prank(ownerA);
+        vm.expectRevert(IHyperliquidAdapter.VaultNotRegistered.selector);
+        adapter.depositMarginFromVaultAdmin(unregisteredVault, 50e6);
+    }
+
+    function test_depositMarginFromVaultAdmin_revertsOnZeroAmount() public {
+        _registerVaultA();
+
+        vm.prank(ownerA);
+        vm.expectRevert(IHyperliquidAdapter.ZeroDeposit.selector);
+        adapter.depositMarginFromVaultAdmin(address(vaultA), 0);
+    }
+
+    function test_depositMarginFromVaultAdmin_emitsEvent() public {
+        address subAccount = _registerVaultA();
+
+        vm.expectEmit(false, false, false, true);
+        emit TradingSubAccount.MarginDeposited(50e6);
+        vm.prank(ownerA);
+        adapter.depositMarginFromVaultAdmin(address(vaultA), 50e6);
     }
 }

@@ -220,6 +220,9 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @notice Deposits are locked while a strategy is active (prevents yield dilution)
     error DepositsLockedDuringStrategy();
 
+    /// @notice Cannot rescue tokens while shares are outstanding
+    error SharesStillOutstanding();
+
     /// @notice CALL action targets the vault itself (blocked)
     error InvalidCallTarget(address target);
 
@@ -246,6 +249,22 @@ contract KernelVault is ReentrancyGuard, Pausable {
         agentId = _agentId;
         trustedImageId = _trustedImageId;
         owner = _owner;
+    }
+
+    // ============ Token Rescue ============
+
+    /// @notice Rescue tokens stuck in the vault when no depositors have shares.
+    /// @dev Prevents the ERC4626 virtual offset from permanently trapping tokens
+    ///      that entered the vault outside the deposit flow (e.g., admin recovery
+    ///      returning USDC after all shares were burned). Only callable when
+    ///      totalShares == 0, meaning no depositor has any claim on the vault's assets.
+    /// @param token The ERC20 token to rescue
+    /// @param to The recipient address
+    /// @param amount The amount to transfer
+    function rescueTokens(address token, address to, uint256 amount) external {
+        if (msg.sender != owner) revert NotOwner();
+        if (totalShares != 0) revert SharesStillOutstanding();
+        IERC20(token).safeTransfer(to, amount);
     }
 
     // ============ Oracle Configuration ============

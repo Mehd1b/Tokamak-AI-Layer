@@ -961,4 +961,78 @@ contract KernelVaultTest is Test {
         // shares should be slightly less than 100_000 ether due to rounding
         assertLt(sharesMinted, 100 ether * OFFSET);
     }
+
+    // ============ Rescue Tokens Tests ============
+
+    function test_rescueTokens_success() public {
+        // Simulate stuck tokens: mint directly to vault (bypassing deposit)
+        token.mint(address(vault), 100 ether);
+
+        // totalShares == 0, owner can rescue
+        assertEq(vault.totalShares(), 0);
+        uint256 ownerBefore = token.balanceOf(owner);
+
+        vault.rescueTokens(address(token), owner, 100 ether);
+
+        assertEq(token.balanceOf(address(vault)), 0);
+        assertEq(token.balanceOf(owner), ownerBefore + 100 ether);
+    }
+
+    function test_rescueTokens_partialAmount() public {
+        token.mint(address(vault), 100 ether);
+        vault.rescueTokens(address(token), owner, 40 ether);
+
+        assertEq(token.balanceOf(address(vault)), 60 ether);
+    }
+
+    function test_rescueTokens_revertsWhenSharesOutstanding() public {
+        // User deposits → shares exist
+        vm.prank(user);
+        vault.depositERC20Tokens(DEPOSIT_AMOUNT);
+        assertGt(vault.totalShares(), 0);
+
+        // Mint extra stuck tokens
+        token.mint(address(vault), 50 ether);
+
+        // Owner cannot rescue while shares are outstanding
+        vm.expectRevert(KernelVault.SharesStillOutstanding.selector);
+        vault.rescueTokens(address(token), owner, 50 ether);
+    }
+
+    function test_rescueTokens_revertsWhenNotOwner() public {
+        token.mint(address(vault), 100 ether);
+
+        vm.prank(user);
+        vm.expectRevert(KernelVault.NotOwner.selector);
+        vault.rescueTokens(address(token), user, 100 ether);
+    }
+
+    function test_rescueTokens_canRescueDifferentToken() public {
+        // Deploy a different token and send it to vault
+        MockERC20 otherToken = new MockERC20("Other", "OTH", 18);
+        otherToken.mint(address(vault), 50 ether);
+
+        // Even with 0 shares, vault has 0 of its own asset
+        assertEq(vault.totalShares(), 0);
+
+        vault.rescueTokens(address(otherToken), owner, 50 ether);
+        assertEq(otherToken.balanceOf(owner), 50 ether);
+    }
+
+    function test_rescueTokens_worksAfterAllSharesBurned() public {
+        // User deposits, then withdraws everything
+        vm.startPrank(user);
+        uint256 shares = vault.depositERC20Tokens(DEPOSIT_AMOUNT);
+        vault.withdraw(shares);
+        vm.stopPrank();
+
+        assertEq(vault.totalShares(), 0);
+
+        // Simulate stuck tokens returned from admin recovery
+        token.mint(address(vault), 5 ether);
+
+        // Owner can now rescue
+        vault.rescueTokens(address(token), owner, 5 ether);
+        assertEq(token.balanceOf(address(vault)), 0);
+    }
 }

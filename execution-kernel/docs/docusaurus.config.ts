@@ -11,7 +11,7 @@ const config: Config = {
     v4: true,
   },
 
-  url: 'https://docs.executionkernel.com',
+  url: 'https://docs.tokagent.com',
   baseUrl: '/',
 
   organizationName: 'tokamak-network',

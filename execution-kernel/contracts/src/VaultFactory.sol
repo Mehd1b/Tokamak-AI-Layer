@@ -105,6 +105,16 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     /// @notice Authorize upgrade (only owner)
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
+    /// @notice Update the VaultCreationCodeStore (owner only).
+    /// @dev Used when KernelVault bytecode changes (e.g., adding rescueTokens).
+    ///      Only affects new vaults — already-deployed vaults are immutable.
+    /// @param newStore The new VaultCreationCodeStore contract address
+    function setVaultCreationCodeStore(address newStore) external onlyOwner {
+        require(newStore != address(0), "zero vaultCodeStore");
+        require(newStore.code.length > 0, "no code at store");
+        _vaultCreationCodeStore = newStore;
+    }
+
     // ============ External Functions ============
 
     /// @inheritdoc IVaultFactory

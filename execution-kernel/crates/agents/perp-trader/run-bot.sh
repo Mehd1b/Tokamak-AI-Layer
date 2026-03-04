@@ -45,6 +45,14 @@ API_WALLET="${API_WALLET:-env:API_WALLET_KEY}"  # REST API seed trade key
 SEED_SCRIPT="${SEED_SCRIPT:-${EK_ROOT}/crates/agents/perp-trader/scripts/hl_seed_trade.py}"
 SEED_LEVERAGE="${SEED_LEVERAGE:-5}"  # Leverage for seed trades
 
+# HYPE auto-funding config
+MIN_HYPE="${MIN_HYPE:-5000000000000000}"        # 0.005 HYPE in wei
+HYPE_TOPUP="${HYPE_TOPUP:-10000000000000000}"   # 0.01 HYPE in wei
+
+# Max hold timer: force-close position after MAX_HOLD seconds if TP/SL not hit
+MAX_HOLD="${MAX_HOLD:-900}"  # 15 minutes (900 seconds)
+HOLD_FILE="${HOLD_FILE:-/tmp/perp-trader-mainnet-hold-timer}"
+
 # ── Resolve sub-account ──────────────────────────────────────────────────────
 echo "Resolving sub-account for vault ${VAULT}..."
 SUB_ACCOUNT=$(cast call "$ADAPTER" "getSubAccount(address)(address)" "$VAULT" --rpc-url "$RPC" | tr -d '[]' | xargs)
@@ -81,6 +89,9 @@ echo "  szDecimals:   ${SZ_DECIMALS}"
 echo "  Seed lev:     ${SEED_LEVERAGE}x"
 echo "  API wallet:   ${API_WALLET:0:8}..."
 echo "  State file:   ${STATE_FILE}"
+echo "  Max hold:     ${MAX_HOLD}s"
+echo "  Min HYPE:     ${MIN_HYPE} wei"
+echo "  HYPE topup:   ${HYPE_TOPUP} wei"
 echo "============================================="
 echo ""
 
@@ -88,6 +99,18 @@ while true; do
   CYCLE=$((CYCLE + 1))
   TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
   echo "[${TIMESTAMP}] Cycle #${CYCLE} starting..."
+
+  # ── Max hold timer: force-close if position held too long ──
+  ACTION_FLAG=0
+  if [[ -f "$HOLD_FILE" ]]; then
+    OPENED_AT=$(cat "$HOLD_FILE")
+    NOW=$(date +%s)
+    HOLD_AGE=$((NOW - OPENED_AT))
+    if [[ $HOLD_AGE -gt $MAX_HOLD ]]; then
+      echo "[${TIMESTAMP}] Position held for ${HOLD_AGE}s > max ${MAX_HOLD}s. Force closing."
+      ACTION_FLAG=1
+    fi
+  fi
 
   OUTPUT=$("$BINARY" \
     --vault "$VAULT" \
@@ -109,6 +132,10 @@ while true; do
     --api-wallet-key "$API_WALLET" \
     --seed-script "$SEED_SCRIPT" \
     --seed-leverage "$SEED_LEVERAGE" \
+    --adapter-address "$ADAPTER" \
+    --min-hype "$MIN_HYPE" \
+    --hype-topup "$HYPE_TOPUP" \
+    --action-flag "$ACTION_FLAG" \
     --json 2>&1) || true
 
   # Parse status from JSON output
@@ -119,18 +146,39 @@ while true; do
     no_op)
       REASON=$(echo "$OUTPUT" | grep -o '"reason"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
       echo "[${TIMESTAMP}] No-op: ${REASON:-no signal}"
+      # Clear hold timer if no position exists
+      if [[ "$REASON" == "no_entry_signal" || "$REASON" == "vault_balance_below_minimum" ]]; then
+        if [[ -f "$HOLD_FILE" ]]; then
+          echo "[${TIMESTAMP}] Position closed. Clearing hold timer."
+          rm -f "$HOLD_FILE"
+        fi
+      fi
       ;;
     seed_trade)
       FILL_STATUS=$(echo "$OUTPUT" | grep -o '"fill_status"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
       AVG_PX=$(echo "$OUTPUT" | grep -o '"avg_price"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
       TOTAL_SZ=$(echo "$OUTPUT" | grep -o '"total_size"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
       echo "[${TIMESTAMP}] SEED TRADE: ${FILL_STATUS} ${TOTAL_SZ} ${ASSET} @ \$${AVG_PX}"
+      # Record position open time for max hold timer
+      if [[ "$FILL_STATUS" == "filled" ]]; then
+        date +%s > "$HOLD_FILE"
+        echo "[${TIMESTAMP}] Hold timer started (max ${MAX_HOLD}s)."
+      fi
       ;;
     submitted)
       TX=$(echo "$OUTPUT" | grep -o '"tx_hash"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
       SUCCESS=$(echo "$OUTPUT" | grep -o '"success"[[:space:]]*:[[:space:]]*[a-z]*' | head -1 | sed 's/.*: *//')
       if [[ "$SUCCESS" == "true" ]]; then
         echo "[${TIMESTAMP}] EXECUTED: ${ACTIONS} actions, tx=${TX}"
+        # If this was a force close (action_flag=1), clear the hold timer
+        if [[ "$ACTION_FLAG" == "1" ]]; then
+          echo "[${TIMESTAMP}] Force close submitted. Clearing hold timer."
+          rm -f "$HOLD_FILE"
+        elif [[ ! -f "$HOLD_FILE" ]]; then
+          # Position opened via ZKP (not seed trade) — start hold timer
+          date +%s > "$HOLD_FILE"
+          echo "[${TIMESTAMP}] Hold timer started (max ${MAX_HOLD}s)."
+        fi
       else
         echo "[${TIMESTAMP}] TX REVERTED: tx=${TX}"
       fi

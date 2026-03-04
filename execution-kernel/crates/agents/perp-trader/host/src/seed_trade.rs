@@ -14,7 +14,10 @@ use kernel_core::{AgentOutput, CanonicalDecode, ACTION_TYPE_CALL};
 /// Selector for openPosition(bool,uint256,uint256,uint256) = 0x04ba41cb
 const OPEN_POSITION_SELECTOR: [u8; 4] = [0x04, 0xba, 0x41, 0xcb];
 
-/// Selector for closePosition() = 0xc393d0e3
+/// Selector for closePositionAtPrice(uint64) = 0x2c0f36da
+const CLOSE_AT_PRICE_SELECTOR: [u8; 4] = [0x2c, 0x0f, 0x36, 0xda];
+
+/// Selector for closePosition() = 0xc393d0e3 [legacy]
 const CLOSE_POSITION_SELECTOR: [u8; 4] = [0xc3, 0x93, 0xd0, 0xe3];
 
 /// Parsed parameters from an openPosition CALL action.
@@ -115,7 +118,7 @@ pub fn parse_agent_intent(agent_output_bytes: &[u8]) -> AgentIntent {
             });
         }
 
-        if selector == CLOSE_POSITION_SELECTOR {
+        if selector == CLOSE_AT_PRICE_SELECTOR || selector == CLOSE_POSITION_SELECTOR {
             return AgentIntent::Close;
         }
     }
@@ -170,7 +173,7 @@ pub fn execute_seed_trade(
         cli.seed_leverage,
     );
 
-    let output = std::process::Command::new("python3")
+    let child = std::process::Command::new("python3")
         .arg(&script_path)
         .arg("seed_trade")
         .arg("--key")
@@ -187,8 +190,27 @@ pub fn execute_seed_trade(
         .arg(format!("{:.width$}", size_float, width = cli.sz_decimals as usize))
         .arg("--price")
         .arg(format!("{:.0}", price_rounded))
-        .output()
-        .map_err(|e| anyhow::anyhow!("Failed to run seed trade script: {}", e))?;
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| anyhow::anyhow!("Failed to spawn seed trade script: {}", e))?;
+
+    // Wait with 30s timeout to prevent indefinite hangs
+    let (tx, rx) = std::sync::mpsc::channel();
+    let handle = std::thread::spawn(move || {
+        let result = child.wait_with_output();
+        let _ = tx.send(result);
+    });
+
+    let output = match rx.recv_timeout(std::time::Duration::from_secs(30)) {
+        Ok(Ok(output)) => output,
+        Ok(Err(e)) => return Err(anyhow::anyhow!("Seed trade process failed: {}", e)),
+        Err(_) => {
+            // Timeout — the thread holds the child, which will be dropped when it finishes
+            drop(handle);
+            return Err(anyhow::anyhow!("Seed trade timed out after 30s"));
+        }
+    };
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

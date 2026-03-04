@@ -61,6 +61,8 @@ pub struct MarginSummary {
     pub total_ntl_pos: String,
     pub total_raw_usd: String,
     pub total_margin_used: String,
+    #[serde(default)]
+    pub withdrawable: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -90,6 +92,21 @@ pub struct LeverageInfo {
     #[serde(rename = "type")]
     pub leverage_type: String,
     pub value: u32,
+}
+
+/// Response from the "spotClearinghouseState" info endpoint.
+#[derive(Debug, Deserialize)]
+pub struct SpotClearinghouseState {
+    pub balances: Vec<SpotBalance>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpotBalance {
+    pub coin: String,
+    pub token: u64,
+    pub total: String,
+    pub hold: String,
 }
 
 /// Response from the "candleSnapshot" info endpoint.

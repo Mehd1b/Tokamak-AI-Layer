@@ -448,7 +448,7 @@ export function Navbar() {
             WHITEPAPER
           </Link>
           <a
-            href="https://docs.execution.tokagent.network"
+            href="https://docs.tokagent.network"
             target="_blank"
             rel="noopener noreferrer"
             className="px-4 py-2 rounded-lg border border-dashed transition-all tracking-wider text-sm border-white/30 text-white hover:border-white/60 hover:text-gray-300"
@@ -606,7 +606,7 @@ export function Navbar() {
                   WHITEPAPER
                 </Link>
                 <a
-                  href="https://docs.execution.tokagent.network"
+                  href="https://docs.tokagent.network"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block text-md font-light transition-all duration-300 tracking-wider text-white hover:text-[#A855F7]"

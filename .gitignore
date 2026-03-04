@@ -1,16 +1,6 @@
 # Dependencies
 node_modules/
 
-# Build artifacts
-contracts/out/
-contracts/cache/
-contracts/broadcast/
-sdk/dist/
-frontend/.next/
-frontend/out/
-agent-examples/solidity-auditor/dist/
-agent-examples/solidity-auditor/data/
-
 # Local configuration
 .omc/
 .claude/
@@ -30,11 +20,6 @@ agent-examples/solidity-auditor/data/
 *.swo
 .DS_Store
 
-# Deployment artifacts
-contracts/deployments/local.json
-
 # Coverage
 coverage/
 lcov.info
-
-

@@ -1,1 +1,0 @@
-"use strict";(globalThis.webpackChunktal_docs=globalThis.webpackChunktal_docs||[]).push([[3490],{3490(a,s,c){c.d(s,{createInfoServices:()=>e.v});var e=c(1885);c(7960)}}]);

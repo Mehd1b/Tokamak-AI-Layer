@@ -161,7 +161,11 @@ fn main() -> anyhow::Result<()> {
         equity_source = "vault";
     } else if snapshot.account_equity > 0.0 {
         // Vault is empty but HyperCore has funds (e.g., margin deposited in previous cycle).
-        // Keep HyperCore's equity for seed trade sizing.
+        // HyperCore reports equity in decimal USDC (e.g., 18.975391).
+        // Agent expects raw USDC units with 6 decimals (e.g., 18975391).
+        // Scale up to match the vault-sourced format.
+        snapshot.account_equity *= 1_000_000.0;
+        snapshot.available_balance = snapshot.account_equity - snapshot.margin_used;
         equity_source = "hypercore";
     } else {
         snapshot.account_equity = 0.0;
@@ -265,11 +269,73 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    // 7.5: Ensure sub-account has HYPE for CoreWriter gas (moved before seed trade)
+    //
+    // CoreWriter actions are "intents, not immediate state changes" — they can be
+    // silently rejected on HyperCore if the sub-account lacks HYPE gas.
+    //
+    // TWO checks are needed because HYPE exists in two places:
+    //   1. HyperEVM native balance (checked by check_and_fund_hype → triggers bridging)
+    //   2. HyperCore spot ledger (where CoreWriter actually reads gas balance)
+    //
+    // HYPE bridging (HyperEVM → HyperCore via 0x2222...2222) is async: the EVM tx
+    // succeeds but HYPE doesn't appear on HyperCore for ~5-10 seconds. ALL CoreWriter
+    // actions submitted before settlement are silently rejected.
+    #[cfg(feature = "onchain")]
+    if action_count > 0 && !cli.dry_run {
+        // First: check HyperCore HYPE balance (the authoritative source for CoreWriter gas)
+        let core_hype = hl_client.get_core_hype_balance(&cli.sub_account).unwrap_or(0.0);
+        let min_core_hype = cli.min_hype as f64 / 1e18; // Convert wei threshold to HYPE
+
+        if core_hype < min_core_hype {
+            if !cli.json {
+                eprintln!(
+                    "[7.5] HyperCore HYPE too low ({:.4} < {:.4}). Funding from HyperEVM...",
+                    core_hype, min_core_hype
+                );
+            }
+            let rt = tokio::runtime::Runtime::new()?;
+            match rt.block_on(onchain::check_and_fund_hype(&cli)) {
+                Ok(funded) => {
+                    if funded {
+                        if !cli.json {
+                            eprintln!("[7.5] Funded sub-account. Waiting 15s for HyperCore HYPE bridge settlement...");
+                        }
+                        std::thread::sleep(std::time::Duration::from_secs(15));
+
+                        // Verify HYPE arrived on HyperCore
+                        let new_core_hype = hl_client.get_core_hype_balance(&cli.sub_account).unwrap_or(0.0);
+                        if new_core_hype < min_core_hype {
+                            if !cli.json {
+                                eprintln!(
+                                    "[7.5] WARNING: HYPE bridge may not have settled (core={:.4}). CoreWriter actions may fail.",
+                                    new_core_hype
+                                );
+                            }
+                        } else if !cli.json {
+                            eprintln!("[7.5] HyperCore HYPE verified: {:.4}", new_core_hype);
+                        }
+                    }
+                }
+                Err(e) => {
+                    if !cli.json {
+                        eprintln!("[7.5] HYPE funding failed (non-fatal): {}", e);
+                    }
+                }
+            }
+        } else if !cli.json {
+            eprintln!("[7.5] HyperCore HYPE OK: {:.4}", core_hype);
+        }
+    }
+
     // ── Seed trade gate ─────────────────────────────────────────────────────
     // When no position exists (position_size == 0), the HyperCore position
     // precompile returns leverage=0, causing ALL CoreWriter limit orders to be
     // silently dropped. To bootstrap the first trade, we use the REST API via
     // the API wallet to set leverage and place the opening order.
+    //
+    // Before placing the seed trade, we pre-deposit margin from the vault to
+    // HyperCore so the REST API order has margin available.
     //
     // Once a position exists (leverage > 0), subsequent trades go through the
     // normal ZK-verified CoreWriter flow.
@@ -280,10 +346,95 @@ fn main() -> anyhow::Result<()> {
                 eprintln!("[SEED] No position exists — using REST API for opening trade");
             }
 
+            // Step 1: Try to pre-deposit margin from vault to HyperCore.
+            // This requires the vault to have approved the adapter for USDC.
+            // If the vault hasn't approved yet (first run), this will fail gracefully
+            // and the seed trade will proceed using manually pre-funded margin.
+            #[cfg(feature = "onchain")]
+            if !cli.dry_run {
+                let margin = params.margin_amount;
+                if !cli.json {
+                    eprintln!("[SEED] Attempting to pre-deposit {} USDC from vault to HyperCore...", margin);
+                }
+                let rt = tokio::runtime::Runtime::new()?;
+                match rt.block_on(onchain::deposit_margin_from_vault(&cli, margin)) {
+                    Ok(()) => {
+                        if !cli.json {
+                            eprintln!("[SEED] EVM tx succeeded. Waiting 10s for HyperCore settlement...");
+                        }
+                        std::thread::sleep(std::time::Duration::from_secs(10));
+
+                        // Verify margin appeared on HyperCore
+                        let perp_equity = hl_client.get_perp_withdrawable(&cli.sub_account).unwrap_or(0.0);
+                        if perp_equity < 0.01 {
+                            if !cli.json {
+                                eprintln!("[SEED] WARNING: Margin deposit may not have settled (equity={:.2}).", perp_equity);
+                                eprintln!("[SEED] CoreDepositWallet deposits are async — waiting 10s more...");
+                            }
+                            std::thread::sleep(std::time::Duration::from_secs(10));
+                        } else if !cli.json {
+                            eprintln!("[SEED] Margin verified on HyperCore: equity={:.2}", perp_equity);
+                        }
+                    }
+                    Err(e) => {
+                        // Non-fatal: margin may have been pre-funded manually via
+                        // depositSubBalanceAdmin or depositMarginAdmin.
+                        if !cli.json {
+                            eprintln!("[SEED] Auto pre-deposit failed (non-fatal): {}", e);
+                            eprintln!("[SEED] Proceeding with seed trade — ensure margin was pre-funded manually.");
+                        }
+                    }
+                }
+            }
+
+            // Pre-check: verify HyperCore margin is available before spending 30s on seed trade
+            let perp_equity = hl_client.get_perp_withdrawable(&cli.sub_account).unwrap_or(0.0);
+            if perp_equity < 0.5 {
+                if !cli.json {
+                    eprintln!(
+                        "[SEED] ERROR: Insufficient HyperCore margin ({:.2}). Seed trade would fail.",
+                        perp_equity
+                    );
+                    eprintln!("[SEED] Ensure margin is deposited via depositMarginAdmin or depositMarginFromVaultAdmin.");
+                }
+                if cli.json {
+                    let result_json = serde_json::json!({
+                        "status": "seed_trade",
+                        "fill_status": "error",
+                        "detail": format!("Insufficient HyperCore margin: {:.2}", perp_equity),
+                    });
+                    println!("{}", serde_json::to_string_pretty(&result_json)?);
+                }
+                return Ok(());
+            }
+
+            // Step 2: Place opening order via REST API (margin is now available)
             match seed_trade::execute_seed_trade(&cli, &params) {
                 Ok(result) => {
                     if result.status == "filled" {
-                        // Seed trade filled — record position state and return
+                        // Seed trade filled — verify position on HyperCore
+                        if !cli.json {
+                            eprintln!(
+                                "[SEED] Order filled: {} {} @ ${}",
+                                result.total_size.as_deref().unwrap_or("?"),
+                                cli.asset,
+                                result.avg_price.as_deref().unwrap_or("?"),
+                            );
+                            eprintln!("[SEED] Waiting 5s to verify position on HyperCore...");
+                        }
+                        std::thread::sleep(std::time::Duration::from_secs(5));
+
+                        let position_verified = hl_client
+                            .has_position(&cli.sub_account, &cli.asset)
+                            .unwrap_or(false);
+                        if !position_verified && !cli.json {
+                            eprintln!("[SEED] WARNING: Seed trade reported filled but position not yet visible.");
+                            eprintln!("[SEED] This may be normal — HyperCore settles asynchronously.");
+                        } else if !cli.json {
+                            eprintln!("[SEED] Position verified on HyperCore.");
+                        }
+
+                        // Record position state
                         let now = std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
                             .unwrap_or_default()
@@ -302,36 +453,48 @@ fn main() -> anyhow::Result<()> {
                                 "is_buy": params.is_buy,
                                 "asset": cli.asset,
                                 "mark_price": snapshot.mark_price,
+                                "position_verified": position_verified,
                             });
                             println!("{}", serde_json::to_string_pretty(&result_json)?);
-                        } else {
-                            eprintln!(
-                                "[SEED] Order filled: {} {} @ ${}",
-                                result.total_size.as_deref().unwrap_or("?"),
-                                cli.asset,
-                                result.avg_price.as_deref().unwrap_or("?"),
-                            );
                         }
                         return Ok(());
                     } else {
-                        // Seed trade didn't fill — log and fall through to normal flow
-                        // (which will also fail via CoreWriter, but provides diagnostics)
-                        if !cli.json {
+                        // Seed trade didn't fill — return error instead of falling through.
+                        // The ZK proof path CANNOT open positions when position_size==0
+                        // (CoreWriter requires leverage>0 which only exists with a position).
+                        // Falling through wastes 8-10 min on proof generation for nothing.
+                        if cli.json {
+                            let result_json = serde_json::json!({
+                                "status": "seed_trade",
+                                "fill_status": result.status,
+                                "detail": result.detail,
+                                "is_buy": params.is_buy,
+                                "asset": cli.asset,
+                            });
+                            println!("{}", serde_json::to_string_pretty(&result_json)?);
+                        } else {
                             eprintln!(
                                 "[SEED] Order did not fill: status={}, detail={}",
                                 result.status,
                                 result.detail.as_deref().unwrap_or("none"),
                             );
                         }
-                        // Fall through — the normal CoreWriter path will also fail,
-                        // but we still generate the proof for record-keeping
+                        return Ok(());
                     }
                 }
                 Err(e) => {
-                    if !cli.json {
+                    // Seed trade script failed — return error, don't waste time on ZK proof
+                    if cli.json {
+                        let result_json = serde_json::json!({
+                            "status": "seed_trade",
+                            "fill_status": "error",
+                            "detail": format!("{}", e),
+                        });
+                        println!("{}", serde_json::to_string_pretty(&result_json)?);
+                    } else {
                         eprintln!("[SEED] Seed trade failed: {}", e);
                     }
-                    // Fall through to normal flow
+                    return Ok(());
                 }
             }
         }
@@ -406,21 +569,81 @@ fn main() -> anyhow::Result<()> {
                 });
             }
 
+            // Post-execution verification: CoreWriter actions inside execute() are
+            // "intents, not immediate state changes" — they can be silently rejected.
+            // Wait for HyperCore settlement and verify the expected state change.
+            let mut verified = false;
+            if tx_result.success {
+                if !cli.json {
+                    eprintln!("Transaction submitted: {}", tx_result.tx_hash);
+                    eprintln!("Execution successful at block {:?}. Verifying on HyperCore...", tx_result.block_number);
+                }
+                std::thread::sleep(std::time::Duration::from_secs(10));
+
+                let had_position = snapshot.position_size != 0.0;
+                let has_position_now = hl_client.has_position(&cli.sub_account, &cli.asset)
+                    .unwrap_or(had_position); // Assume unchanged on API error
+
+                if !had_position && has_position_now {
+                    // Open action took effect
+                    if !cli.json {
+                        eprintln!("[VERIFY] Position opened on HyperCore.");
+                    }
+                    verified = true;
+                } else if had_position && !has_position_now {
+                    // Close action took effect — trigger fund recovery
+                    if !cli.json {
+                        eprintln!("[VERIFY] Position closed on HyperCore. Starting fund recovery...");
+                    }
+                    verified = true;
+                    clear_position_state(&cli.state_file);
+
+                    // Automated fund recovery: perp → spot → EVM → vault
+                    let rt_recover = tokio::runtime::Runtime::new()?;
+                    match rt_recover.block_on(onchain::recover_funds_to_vault(&cli, &hl_client)) {
+                        Ok(recovered) => {
+                            if !cli.json && recovered > 0 {
+                                eprintln!("[RECOVER] Successfully recovered {} USDC to vault", recovered);
+                            }
+                        }
+                        Err(e) => {
+                            if !cli.json {
+                                eprintln!("[RECOVER] Fund recovery failed (manual recovery needed): {}", e);
+                            }
+                        }
+                    }
+                } else if !had_position && !has_position_now {
+                    // Open action was silently rejected
+                    if !cli.json {
+                        eprintln!("[VERIFY] WARNING: ZK proof submitted but position did NOT open.");
+                        eprintln!("[VERIFY] CoreWriter limit order was silently rejected.");
+                        eprintln!("[VERIFY] Possible causes: insufficient HYPE gas, leverage=0, price outside oracle band.");
+                    }
+                } else {
+                    // had_position && has_position_now — close was silently rejected OR hold action
+                    if cli.action_flag == 1 {
+                        if !cli.json {
+                            eprintln!("[VERIFY] WARNING: Force-close submitted but position still open.");
+                            eprintln!("[VERIFY] CoreWriter close order was silently rejected.");
+                        }
+                    } else {
+                        verified = true; // Position maintained, which may be expected
+                    }
+                }
+            } else if !cli.json {
+                eprintln!("Transaction submitted: {}", tx_result.tx_hash);
+                eprintln!("Transaction reverted!");
+            }
+
             if cli.json {
                 let result = serde_json::json!({
                     "status": "submitted",
                     "tx_hash": tx_result.tx_hash,
                     "block_number": tx_result.block_number,
                     "success": tx_result.success,
+                    "verified": verified,
                 });
                 println!("{}", serde_json::to_string_pretty(&result)?);
-            } else {
-                eprintln!("Transaction submitted: {}", tx_result.tx_hash);
-                if tx_result.success {
-                    eprintln!("Execution successful at block {:?}", tx_result.block_number);
-                } else {
-                    eprintln!("Transaction reverted!");
-                }
             }
         }
 

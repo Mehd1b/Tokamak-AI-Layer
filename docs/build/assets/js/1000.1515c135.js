@@ -1,1 +1,0 @@
-"use strict";(globalThis.webpackChunktal_docs=globalThis.webpackChunktal_docs||[]).push([[1e3],{1e3(a,e,s){s.d(e,{createRadarServices:()=>c.f});var c=s(7846);s(7960)}}]);

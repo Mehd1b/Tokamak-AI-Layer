@@ -50,7 +50,7 @@ impl HyperliquidClient {
     }
 
     /// Fetch clearinghouse state for a user.
-    fn fetch_clearinghouse_state(&self, user: &str) -> Result<ClearinghouseState> {
+    pub fn fetch_clearinghouse_state(&self, user: &str) -> Result<ClearinghouseState> {
         self.post_info(&serde_json::json!({
             "type": "clearinghouseState",
             "user": user
@@ -92,6 +92,54 @@ impl HyperliquidClient {
     /// Find the asset index for a given coin name in the meta response.
     fn find_asset_index(meta: &MetaResponse, coin: &str) -> Option<usize> {
         meta.universe.iter().position(|a| a.name == coin)
+    }
+
+    /// Fetch spot clearinghouse state (spot balances including HYPE) for a user.
+    pub fn fetch_spot_state(&self, user: &str) -> Result<super::types::SpotClearinghouseState> {
+        self.post_info(&serde_json::json!({
+            "type": "spotClearinghouseState",
+            "user": user
+        }))
+    }
+
+    /// Check HYPE balance on HyperCore (spot ledger, NOT HyperEVM).
+    /// CoreWriter gas comes from HyperCore HYPE, not HyperEVM native balance.
+    /// Returns the HYPE balance as a float (e.g., 0.17 = 0.17 HYPE).
+    pub fn get_core_hype_balance(&self, user: &str) -> Result<f64> {
+        let state = self.fetch_spot_state(user)?;
+        let balance = state.balances.iter()
+            .find(|b| b.coin == "HYPE")
+            .map(|b| parse_decimal(&b.total))
+            .unwrap_or(0.0);
+        Ok(balance)
+    }
+
+    /// Get USDC balance on HyperCore spot ledger.
+    pub fn get_spot_usdc(&self, user: &str) -> Result<f64> {
+        let state = self.fetch_spot_state(user)?;
+        let balance = state.balances.iter()
+            .find(|b| b.coin == "USDC")
+            .map(|b| parse_decimal(&b.total))
+            .unwrap_or(0.0);
+        Ok(balance)
+    }
+
+    /// Get withdrawable perp margin balance.
+    pub fn get_perp_withdrawable(&self, user: &str) -> Result<f64> {
+        let state = self.fetch_clearinghouse_state(user)?;
+        let withdrawable = state.margin_summary.withdrawable
+            .as_deref()
+            .map(|s| parse_decimal(s))
+            .unwrap_or(0.0);
+        Ok(withdrawable)
+    }
+
+    /// Check if user has an open position in a given asset on HyperCore.
+    pub fn has_position(&self, user: &str, asset: &str) -> Result<bool> {
+        let state = self.fetch_clearinghouse_state(user)?;
+        let has_pos = state.asset_positions.iter()
+            .any(|p| p.position.coin == asset && parse_decimal(&p.position.szi) != 0.0);
+        Ok(has_pos)
     }
 }
 

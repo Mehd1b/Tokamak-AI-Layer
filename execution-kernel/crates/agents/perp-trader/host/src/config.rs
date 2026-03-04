@@ -126,6 +126,24 @@ pub struct Cli {
     #[arg(long, default_value_t = 5)]
     pub seed_leverage: u32,
 
+    // ---- HYPE auto-funding ----
+    /// Minimum HYPE balance (wei) on HyperCore before auto-funding.
+    /// If the sub-account's HYPE balance drops below this, the host will
+    /// call fundSubAccountHype before submitting CoreWriter actions.
+    /// Default: 5000000000000000 (0.005 HYPE)
+    #[arg(long, default_value_t = 5_000_000_000_000_000)]
+    pub min_hype: u64,
+
+    /// Amount of HYPE (wei) to send when auto-funding the sub-account.
+    /// Default: 10000000000000000 (0.01 HYPE)
+    #[arg(long, default_value_t = 10_000_000_000_000_000)]
+    pub hype_topup: u64,
+
+    /// HyperliquidAdapter contract address for HYPE funding calls (0x-prefixed).
+    /// Usually same as exchange_contract.
+    #[arg(long, env = "ADAPTER_ADDRESS")]
+    pub adapter_address: Option<String>,
+
     // ---- Execution modes ----
     /// Use dev-mode proving (fast, not on-chain verifiable)
     #[arg(long, default_value_t = false)]

@@ -57,7 +57,7 @@ Each vault gets its own `TradingSubAccount` deployed via CREATE2, ensuring **pos
 
 | Contract | Address |
 |----------|---------|
-| HyperliquidAdapter | `0x2e5A60066826551eE71aa3115E236ccE289975E4` |
+| HyperliquidAdapter | `0x0Cb59d461a366d2377ebc7eD7E50F960bEa67dc9` |
 | USDC (HyperEVM) | `0xb88339CB7199b77E23DB6E890353E22632Ba630f` |
 | CoreWriter (System) | `0x3333333333333333333333333333333333333333` |
 
@@ -140,9 +140,23 @@ Order execution on Hyperliquid is **asynchronous**. The `CoreWriter.sendRawActio
 function closePosition() external
 ```
 
-Closes the full position for the calling vault's perpetual asset. Reads the current position via the perp position precompile (`0x0800`) and places a reduce-only IOC (immediate-or-cancel) order at an extreme price.
+Closes the full position using extreme limit prices (MIN_PRICE/MAX_PRICE). This is available for admin/manual use but **should not be used by the zkVM agent** — HyperCore's oracle price band (~5-10%) silently rejects orders at extreme prices.
 
 **Selector:** `0xc393d0e3`
+
+#### closePositionAtPrice
+
+```solidity
+function closePositionAtPrice(uint64 px) external
+```
+
+Closes the full position at an agent-computed limit price within HyperCore's oracle price band. The agent computes the price as `mark * 0.95` for selling longs or `mark * 1.05` for buying to close shorts. This is the **recommended close function** for zkVM-verified agents.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `px` | `uint64` | Limit price in 1e8 scaled units (must be within ~5-10% of oracle price) |
+
+**Selector:** `0x2c0f36da`
 
 #### withdrawToVault
 
@@ -213,45 +227,27 @@ cast send $ADAPTER \
     --legacy
 ```
 
-### 2. Deposit USDC into Vault
+### 2. Fund Sub-Account with HYPE
+
+CoreWriter actions require HYPE on HyperCore for gas. Without HYPE, all CoreWriter actions are **silently rejected** (no revert, no error). Fund the sub-account before running the agent:
 
 ```bash
-# Approve USDC to vault
-cast send $USDC "approve(address,uint256)" $VAULT_ADDRESS 1000000000 \
-    --rpc-url https://rpc.hyperliquid.xyz/evm \
-    --private-key $PRIVATE_KEY \
-    --legacy
-
-# Deposit 1000 USDC into vault
-cast send $VAULT_ADDRESS "deposit(uint256)" 1000000000 \
+# Send 0.01 HYPE to the sub-account for CoreWriter gas
+cast send $ADAPTER \
+    "fundSubAccountHype(address)" $VAULT_ADDRESS \
+    --value 10000000000000000 \
     --rpc-url https://rpc.hyperliquid.xyz/evm \
     --private-key $PRIVATE_KEY \
     --legacy
 ```
 
-### 3. Seed Sub-Account Margin (Optional)
+:::tip
+The perp-trader host has automatic HYPE funding via `--min-hype` and `--hype-topup` CLI flags. When the sub-account's HYPE balance drops below `min-hype`, the host calls `fundSubAccountHype()` before submitting actions.
+:::
 
-Before the agent runs, you can pre-deposit margin so the sub-account has equity visible on HyperCore:
+### 3. Agent Execution (zkVM-Verified)
 
-```bash
-# Approve USDC from vault to adapter
-cast send $VAULT_ADDRESS \
-    "approveERC20(address,address,uint256)" \
-    $USDC $ADAPTER 500000000 \
-    --rpc-url https://rpc.hyperliquid.xyz/evm \
-    --private-key $PRIVATE_KEY \
-    --legacy
-
-# Deposit 500 USDC margin to sub-account
-cast send $ADAPTER "depositMargin(uint256)" 500000000 \
-    --rpc-url https://rpc.hyperliquid.xyz/evm \
-    --private-key $PRIVATE_KEY \
-    --legacy
-```
-
-### 4. Agent Execution (zkVM-Verified)
-
-The agent runs inside the zkVM and produces CALL actions targeting the adapter. The host submits the proof to the vault:
+The agent runs inside the zkVM and produces CALL actions targeting the adapter. The host fetches market data, builds inputs, generates a ZK proof, and submits on-chain:
 
 ```bash
 cargo run -p perp-trader-host --features full -- \
@@ -263,7 +259,10 @@ cargo run -p perp-trader-host --features full -- \
     --hl-url https://api.hyperliquid.xyz \
     --sub-account $SUB_ACCOUNT \
     --exchange-contract $ADAPTER \
-    --usdc-address $USDC
+    --usdc-address $USDC \
+    --adapter-address $ADAPTER \
+    --min-hype 5000000000000000 \
+    --hype-topup 10000000000000000
 ```
 
 The vault verifies the proof, then executes the agent's actions which route through the adapter:
@@ -275,19 +274,37 @@ Vault.execute() → CALL adapter.openPosition(...)
                 → Sub-account places order via CoreWriter
 ```
 
-### 5. Close Position and Withdraw
+:::warning Seed Trade Bootstrapping
+When no position exists, HyperCore's position precompile returns `leverage=0`, causing CoreWriter limit orders to be silently dropped. The host automatically detects this and uses the REST API (via an API wallet) to place the first trade. After a position exists, subsequent trades go through the normal ZK-verified CoreWriter flow. Configure with `--api-wallet-key` and `--seed-leverage`.
+:::
 
-When the agent decides to close, it emits `closePosition()` and `withdrawToVault()` actions:
+### 4. Close Position and Recovery
+
+When the agent decides to close, it emits a single `closePositionAtPrice(uint64 px)` action with a price within HyperCore's oracle band:
 
 ```
-Vault.execute() → CALL adapter.closePosition()
+Vault.execute() → CALL adapter.closePositionAtPrice(px)
                 → Sub-account reads position via precompile
-                → Sub-account places reduce-only IOC order
+                → Sub-account places reduce-only IOC order at agent-computed price
+```
 
-# After HyperCore settles and funds return to sub-account EVM balance:
+:::warning Async Settlement
+`withdrawToVault()` is **not bundled** with the close action. HyperCore settlement is asynchronous — USDC does not return to the sub-account's EVM balance in the same transaction. If both actions were bundled, `withdrawToVault` would revert (no USDC available), rolling back the close too.
+:::
 
-Vault.execute() → CALL adapter.withdrawToVault()
-                → Sub-account transfers USDC back to vault
+After HyperCore settles the close (typically a few seconds), funds must be recovered via the admin 3-step flow:
+
+```bash
+# 1. Transfer USDC from HyperCore perp margin to spot (action 7, 1e6 units)
+cast send $ADAPTER "depositSubBalanceAdmin(address,uint256)" $VAULT 18000000 \
+    --rpc-url ... --private-key ... --legacy
+
+# 2. Transfer USDC from HyperCore spot to EVM (action 6, 1e8 units)
+# (handled by transferSpotToEvm in TradingSubAccount)
+
+# 3. Withdraw ERC-20 USDC from sub-account back to vault
+cast send $ADAPTER "withdrawToVaultAdmin(address)" $VAULT \
+    --rpc-url ... --private-key ... --legacy
 ```
 
 ## TradingSubAccount Details
@@ -334,7 +351,7 @@ The sub-account reads its HyperCore position via a precompile staticcall:
 ### Access Control
 
 - Only the **vault owner** can call `registerVault()`
-- Only **registered vaults** can call `openPosition()`, `closePosition()`, `withdrawToVault()`, and `depositMargin()`
+- Only **registered vaults** can call `openPosition()`, `closePosition()`, `closePositionAtPrice()`, `withdrawToVault()`, and `depositMargin()`
 - Only the **adapter** can call execution functions on `TradingSubAccount`
 - All state-changing functions are protected by `ReentrancyGuard`
 

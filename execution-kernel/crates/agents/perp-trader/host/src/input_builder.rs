@@ -106,10 +106,9 @@ fn encode_perp_input(
     buf.extend_from_slice(&to_scaled_u64(snapshot.best_ask).to_le_bytes());
 
     // Funding rate (9 bytes): magnitude + is_negative
-    // TEMPORARY: Force funding rate to 0 (favorable for both directions)
-    let (_funding_abs, _funding_is_neg) = split_signed(snapshot.funding_rate);
-    buf.extend_from_slice(&0u64.to_le_bytes()); // funding_rate_abs = 0
-    buf.push(0); // funding_rate_is_neg = false
+    let (funding_abs, funding_is_neg) = split_signed(snapshot.funding_rate);
+    buf.extend_from_slice(&funding_abs.to_le_bytes());
+    buf.push(if funding_is_neg { 1 } else { 0 });
 
     // Position state (26 bytes)
     let (pos_abs, pos_is_short) = split_signed(snapshot.position_size);
@@ -126,18 +125,12 @@ fn encode_perp_input(
     buf.extend_from_slice(&(snapshot.account_equity as u64).to_le_bytes());
     buf.extend_from_slice(&(snapshot.margin_used as u64).to_le_bytes());
 
-    // Indicators (36 bytes, pre-computed)
-    // TEMPORARY: Force bullish crossover for testing.
-    // prev: fast(100) <= slow(200), current: fast(300) > slow(200)
-    let test_sma_fast = to_scaled_u64(snapshot.mark_price * 1.001); // slightly above mark
-    let test_sma_slow = to_scaled_u64(snapshot.mark_price * 0.999); // slightly below mark
-    let test_prev_fast = to_scaled_u64(snapshot.mark_price * 0.998); // was below slow
-    let test_prev_slow = to_scaled_u64(snapshot.mark_price * 0.999); // slow unchanged
-    buf.extend_from_slice(&test_sma_fast.to_le_bytes());
-    buf.extend_from_slice(&test_sma_slow.to_le_bytes());
-    buf.extend_from_slice(&5000u32.to_le_bytes()); // RSI 50 (neutral)
-    buf.extend_from_slice(&test_prev_fast.to_le_bytes());
-    buf.extend_from_slice(&test_prev_slow.to_le_bytes());
+    // Indicators (36 bytes, pre-computed from real candle data)
+    buf.extend_from_slice(&to_scaled_u64(indicators.sma_fast).to_le_bytes());
+    buf.extend_from_slice(&to_scaled_u64(indicators.sma_slow).to_le_bytes());
+    buf.extend_from_slice(&indicators.rsi_bps.to_le_bytes());
+    buf.extend_from_slice(&to_scaled_u64(indicators.prev_sma_fast).to_le_bytes());
+    buf.extend_from_slice(&to_scaled_u64(indicators.prev_sma_slow).to_le_bytes());
 
     // Risk params (16 bytes, all bps)
     buf.extend_from_slice(&50_000u32.to_le_bytes()); // max_leverage_bps (5x)

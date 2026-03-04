@@ -44,7 +44,7 @@ flowchart TD
 | VaultFactory | `0xc7Fc0dD5f1B03E3De0C313eE0D3b06Cb2Dc017BB` |
 | KernelExecutionVerifier | `0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30` |
 | RISC Zero Verifier Router | `0x9f8d4D1f7AAf06aab1640abd565A731399862Bc8` |
-| HyperliquidAdapter | `0xE6130FF36F1eEf239a910F025004954Ee2E37632` |
+| HyperliquidAdapter | `0x30C1ab0F82CDE134A9eb91CC8AEBAD503aa736dA` |
 
 See [Hyperliquid Integration](/onchain/hyperliquid-integration) for details on the adapter and sub-account architecture.
 

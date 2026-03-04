@@ -54,18 +54,37 @@ def do_seed_trade(args):
     """Set leverage + place IOC order to seed a position."""
     try:
         exchange = make_exchange(args.key, args.hl_url)
+        info = make_info(args.hl_url)
 
         # Step 1: Set leverage
         lev_result = exchange.update_leverage(args.leverage, args.asset, True)
         if lev_result.get("status") != "ok":
             return {"status": "error", "step": "set_leverage", "detail": str(lev_result)}
 
-        # Step 2: Place IOC order
+        # Step 2: Compute fill-ensuring price for IOC order.
+        # The agent's limit price is for GTC orders and may be below ask (buys)
+        # or above bid (sells). For IOC to fill immediately, we need:
+        #   BUY:  price >= best_ask  (use mark * 1.005, rounded to tick)
+        #   SELL: price <= best_bid  (use mark * 0.995, rounded to tick)
+        l2 = info.l2_snapshot(args.asset)
+        if args.is_buy:
+            best_ask = float(l2["levels"][1][0]["px"]) if l2.get("levels") and len(l2["levels"]) > 1 and l2["levels"][1] else args.price
+            ioc_price = round(best_ask * 1.005)  # 0.5% above ask
+        else:
+            best_bid = float(l2["levels"][0][0]["px"]) if l2.get("levels") and l2["levels"][0] else args.price
+            ioc_price = round(best_bid * 0.995)  # 0.5% below bid
+
+        # Ensure price is within HyperCore oracle band (~5-10% of mark)
+        # and use it instead of the agent's GTC limit price
+        import sys
+        print(f"Seed IOC price: ${ioc_price} (agent limit: ${args.price})", file=sys.stderr)
+
+        # Step 3: Place IOC order at fill-ensuring price
         order_result = exchange.order(
             args.asset,
             args.is_buy,
             args.size,
-            args.price,
+            ioc_price,
             {"limit": {"tif": "Ioc"}}
         )
 
