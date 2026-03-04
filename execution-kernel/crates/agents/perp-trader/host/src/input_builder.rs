@@ -125,12 +125,19 @@ fn encode_perp_input(
     buf.extend_from_slice(&(snapshot.account_equity as u64).to_le_bytes());
     buf.extend_from_slice(&(snapshot.margin_used as u64).to_le_bytes());
 
-    // Indicators (36 bytes, pre-computed from real candle data)
-    buf.extend_from_slice(&to_scaled_u64(indicators.sma_fast).to_le_bytes());
-    buf.extend_from_slice(&to_scaled_u64(indicators.sma_slow).to_le_bytes());
-    buf.extend_from_slice(&indicators.rsi_bps.to_le_bytes());
-    buf.extend_from_slice(&to_scaled_u64(indicators.prev_sma_fast).to_le_bytes());
-    buf.extend_from_slice(&to_scaled_u64(indicators.prev_sma_slow).to_le_bytes());
+    // Indicators (36 bytes) — FORCED BULLISH for demo recording.
+    // Fakes an SMA crossover: prev_fast <= prev_slow, current fast > slow.
+    // RSI 50 (neutral zone). Triggers openPosition every cycle when no position.
+    let test_sma_fast = to_scaled_u64(snapshot.mark_price * 1.001);
+    let test_sma_slow = to_scaled_u64(snapshot.mark_price * 0.999);
+    let test_rsi: u32 = 5000; // RSI 50 — middle of neutral zone
+    let test_prev_sma_fast = to_scaled_u64(snapshot.mark_price * 0.998);
+    let test_prev_sma_slow = to_scaled_u64(snapshot.mark_price * 0.999);
+    buf.extend_from_slice(&test_sma_fast.to_le_bytes());
+    buf.extend_from_slice(&test_sma_slow.to_le_bytes());
+    buf.extend_from_slice(&test_rsi.to_le_bytes());
+    buf.extend_from_slice(&test_prev_sma_fast.to_le_bytes());
+    buf.extend_from_slice(&test_prev_sma_slow.to_le_bytes());
 
     // Risk params (16 bytes, all bps)
     buf.extend_from_slice(&50_000u32.to_le_bytes()); // max_leverage_bps (5x)
