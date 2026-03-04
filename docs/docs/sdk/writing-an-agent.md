@@ -236,7 +236,7 @@ This single macro generates `kernel_main()` and `kernel_main_with_constraints()`
 
 ## The Code Hash Build Script
 
-Create `build.rs` to compute the agent code hash at compile time. The scaffold generates this automatically. See the [scaffold source](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/execution-kernel/crates/agent-pack/src/scaffold.rs) for the full template.
+Create `build.rs` to compute the agent code hash at compile time. The scaffold generates this automatically. See the [scaffold source](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/crates/agent-pack/src/scaffold.rs) for the full template.
 
 Include the generated constant in `lib.rs`:
 

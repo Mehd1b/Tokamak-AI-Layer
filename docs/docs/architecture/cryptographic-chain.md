@@ -39,7 +39,7 @@ flowchart TD
 
 The `agent_code_hash` is a SHA-256 hash of the agent's source files, computed at build time by `build.rs`. The script collects all `.rs` files in `src/`, sorts them for deterministic ordering, then feeds each filename and its contents into a SHA-256 hasher. The resulting hash is embedded as a constant (`AGENT_CODE_HASH`) in the compiled binary.
 
-See the [scaffold `build.rs` template](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/execution-kernel/crates/agent-pack/src/scaffold.rs) for the full implementation.
+See the [scaffold `build.rs` template](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/crates/agent-pack/src/scaffold.rs) for the full implementation.
 
 **Properties**:
 - Changes when source code changes

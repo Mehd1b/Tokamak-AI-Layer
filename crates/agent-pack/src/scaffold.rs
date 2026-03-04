@@ -397,9 +397,9 @@ description = "Agent implementation for {name}"
 crate-type = ["rlib"]
 
 [dependencies]
-kernel-sdk = {{ git = "https://github.com/tokamak-network/Tokamak-AI-Layer", branch = "master", path = "execution-kernel/crates/sdk/kernel-sdk" }}
-kernel-guest = {{ git = "https://github.com/tokamak-network/Tokamak-AI-Layer", branch = "master", path = "execution-kernel/crates/runtime/kernel-guest" }}
-constraints = {{ git = "https://github.com/tokamak-network/Tokamak-AI-Layer", branch = "master", path = "execution-kernel/crates/protocol/kernel-core" }}
+kernel-sdk = {{ git = "https://github.com/tokamak-network/Tokamak-AI-Layer", branch = "master", path = "crates/sdk/kernel-sdk" }}
+kernel-guest = {{ git = "https://github.com/tokamak-network/Tokamak-AI-Layer", branch = "master", path = "crates/runtime/kernel-guest" }}
+constraints = {{ git = "https://github.com/tokamak-network/Tokamak-AI-Layer", branch = "master", path = "crates/protocol/kernel-core" }}
 
 [build-dependencies]
 sha2.workspace = true
@@ -858,7 +858,7 @@ description = "Test suite for {name}"
 crate-type = ["rlib"]
 
 [dependencies]
-kernel-sdk = {{ git = "https://github.com/tokamak-network/Tokamak-AI-Layer", branch = "master", path = "execution-kernel/crates/sdk/kernel-sdk" }}
+kernel-sdk = {{ git = "https://github.com/tokamak-network/Tokamak-AI-Layer", branch = "master", path = "crates/sdk/kernel-sdk" }}
 {name} = {{ path = "../agent" }}
 
 [dev-dependencies]

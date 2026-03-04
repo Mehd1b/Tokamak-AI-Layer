@@ -10,7 +10,7 @@ This document provides a complete map of the execution-kernel repository structu
 ## Directory Structure
 
 ```
-execution-kernel/
+Tokamak-AI-Layer/
 ├── Cargo.toml                    # Workspace root
 ├── Cargo.lock                    # Dependency lockfile
 ├── README.md                     # Project overview

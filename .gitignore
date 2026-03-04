@@ -1,9 +1,17 @@
+# Build
+CLAUDE.md
+target/
+*/target/
+
+# Local config
+/.claude
+/prompts
+/bundles/*
+/run/*
+/content
+
 # Dependencies
 node_modules/
-
-# Local configuration
-.omc/
-.claude/
 
 # Environment
 .env
@@ -23,3 +31,12 @@ node_modules/
 # Coverage
 coverage/
 lcov.info
+
+# Generated agent-pack manifests (keep only the example)
+dist/agent-pack.json
+
+# Frontend build artifacts
+frontend/.next/
+frontend/node_modules/
+frontend/.env.local
+frontend/data/

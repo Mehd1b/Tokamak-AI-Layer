@@ -35,7 +35,7 @@ Add the crate to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-reference-integrator = { path = "../execution-kernel/crates/reference-integrator" }
+reference-integrator = { path = "../crates/reference-integrator" }
 ```
 
 ### Feature Flags

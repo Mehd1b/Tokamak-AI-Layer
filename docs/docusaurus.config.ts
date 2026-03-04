@@ -37,7 +37,7 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/execution-kernel/docs/',
+          editUrl: 'https://github.com/tokamak-network/Tokamak-AI-Layer/tree/master/docs/',
           routeBasePath: '/',
         },
         blog: false,

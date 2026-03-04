@@ -235,7 +235,7 @@ cast send $VAULT_ADDRESS \
   --private-key $PRIVATE_KEY --rpc-url $RPC_URL
 ```
 
-See the [shell deployment script](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/execution-kernel/contracts/script/deploy-defi-yield-agent.sh) for a complete automated deployment.
+See the [shell deployment script](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/contracts/script/deploy-defi-yield-agent.sh) for a complete automated deployment.
 
 ## Key Files
 

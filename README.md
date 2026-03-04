@@ -1,4 +1,4 @@
-# Execution Kernel
+# Tokagent Execution Kernel
 
 Verifiable agent execution using RISC Zero zkVM.
 

@@ -25,10 +25,10 @@ pub struct KernelJournalV1 {
 ```
 
 :::tip Where in the code?
-- **Type definition**: [`kernel-core/src/types.rs:40`](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/execution-kernel/crates/protocol/kernel-core/src/types.rs#L40) — `KernelJournalV1` struct
-- **ExecutionStatus enum**: [`kernel-core/src/types.rs:78`](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/execution-kernel/crates/protocol/kernel-core/src/types.rs#L78) — Success/Failure encoding
-- **Journal production**: [`kernel-guest/src/lib.rs`](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/execution-kernel/crates/runtime/kernel-guest/src/lib.rs) — `kernel_main_with_agent()` function
-- **On-chain parsing**: [`contracts/src/libraries/KernelOutputParser.sol`](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/execution-kernel/contracts/src/libraries/KernelOutputParser.sol) — Solidity library
+- **Type definition**: [`kernel-core/src/types.rs:40`](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/crates/protocol/kernel-core/src/types.rs#L40) — `KernelJournalV1` struct
+- **ExecutionStatus enum**: [`kernel-core/src/types.rs:78`](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/crates/protocol/kernel-core/src/types.rs#L78) — Success/Failure encoding
+- **Journal production**: [`kernel-guest/src/lib.rs`](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/crates/runtime/kernel-guest/src/lib.rs) — `kernel_main_with_agent()` function
+- **On-chain parsing**: [`contracts/src/libraries/KernelOutputParser.sol`](https://github.com/tokamak-network/Tokamak-AI-Layer/blob/master/contracts/src/libraries/KernelOutputParser.sol) — Solidity library
 :::
 
 ## Binary Layout

@@ -235,7 +235,7 @@ Sending USDC directly to the CoreDepositWallet from an EOA does **not** trigger 
 
 ## Environment Setup
 
-Create a `.env` file in `execution-kernel/contracts/`:
+Create a `.env` file in `contracts/`:
 
 ```bash
 # Executor wallet (vault owner, signs transactions)
