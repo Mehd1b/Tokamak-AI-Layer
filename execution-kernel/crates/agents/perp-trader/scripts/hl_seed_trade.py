@@ -94,17 +94,33 @@ def do_seed_trade(args):
 
 
 def do_close_position(args):
-    """Place a closing IOC order."""
+    """Place a reduce-only closing IOC order."""
     try:
         exchange = make_exchange(args.key, args.hl_url)
+        info = make_info(args.hl_url)
+
+        # Get current mark price for a tight IOC price
+        l2 = info.l2_snapshot(args.asset)
+        if args.is_buy:
+            # Closing a short: buy at slightly above ask
+            best_ask = float(l2["levels"][1][0]["px"]) if l2.get("levels") and len(l2["levels"]) > 1 and l2["levels"][1] else args.price
+            ioc_price = round(best_ask * 1.005)
+        else:
+            # Closing a long: sell at slightly below bid
+            best_bid = float(l2["levels"][0][0]["px"]) if l2.get("levels") and l2["levels"][0] else args.price
+            ioc_price = round(best_bid * 0.995)
+
+        print(f"Closing via REST API: {'BUY' if args.is_buy else 'SELL'} {args.size} {args.asset} @ ${ioc_price} (mark=${l2['levels'][0][0]['px'] if l2.get('levels') and l2['levels'][0] else 'unknown'})", file=sys.stderr)
 
         # Close = sell if long (is_buy=false), buy if short (is_buy=true)
+        # reduce_only=True prevents flipping the position
         order_result = exchange.order(
             args.asset,
-            args.is_buy,  # opposite of position direction
+            args.is_buy,
             args.size,
-            args.price,
-            {"limit": {"tif": "Ioc"}}
+            ioc_price,
+            {"limit": {"tif": "Ioc"}},
+            reduce_only=True,
         )
 
         return parse_order_result(order_result)

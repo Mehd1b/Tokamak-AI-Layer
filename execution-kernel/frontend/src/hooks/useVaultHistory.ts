@@ -10,6 +10,7 @@ import {
   withdrawEvent,
   executionAppliedEvent,
   findVaultDeployBlock,
+  getLogsClient,
 } from '@/lib/vaultEvents';
 import type { Log } from 'viem';
 
@@ -80,12 +81,13 @@ export function useVaultHistory(vaultAddress: `0x${string}` | undefined, assetDe
       const livePps = currentShares > BigInt(0) ? Number(currentAssets) / Number(currentShares) : 1.0;
 
       // Try to fetch historical events for richer chart data
-      // Some RPCs (e.g. HyperEVM) have limited getLogs support, so wrap in try/catch
+      // Use native RPC for getLogs on chains where third-party RPCs may not support it
+      const logClient = getLogsClient(client, selectedChainId);
       const tvlPoints: TimeSeriesPoint[] = [];
       const ppsPoints: TimeSeriesPoint[] = [];
 
       try {
-        const currentBlock = await client.getBlockNumber();
+        const currentBlock = await logClient.getBlockNumber();
 
         // Fetch events — try primary path (deploy block + paginated), fallback to small-range direct query
         let depositLogs: any[] = [];
@@ -94,15 +96,15 @@ export function useVaultHistory(vaultAddress: `0x${string}` | undefined, assetDe
 
         const fetchEvents = async (fromBlock: bigint, toBlock: bigint) => {
           const [d, w, e] = await Promise.all([
-            paginatedGetLogs(client, { address: vaultAddress, event: depositEvent, fromBlock, toBlock }),
-            paginatedGetLogs(client, { address: vaultAddress, event: withdrawEvent, fromBlock, toBlock }),
-            paginatedGetLogs(client, { address: vaultAddress, event: executionAppliedEvent, fromBlock, toBlock }),
+            paginatedGetLogs(logClient, { address: vaultAddress, event: depositEvent, fromBlock, toBlock }),
+            paginatedGetLogs(logClient, { address: vaultAddress, event: withdrawEvent, fromBlock, toBlock }),
+            paginatedGetLogs(logClient, { address: vaultAddress, event: executionAppliedEvent, fromBlock, toBlock }),
           ]);
           return { d, w, e };
         };
 
         const fromBlock = await findVaultDeployBlock(
-          client, contracts.vaultFactory, vaultAddress, currentBlock,
+          logClient, contracts.vaultFactory, vaultAddress, currentBlock,
         );
         const result = await fetchEvents(fromBlock, currentBlock);
         depositLogs = result.d;

@@ -52,6 +52,9 @@ pub struct ClearinghouseState {
     pub margin_summary: MarginSummary,
     pub cross_margin_summary: MarginSummary,
     pub asset_positions: Vec<AssetPosition>,
+    /// Top-level withdrawable field (NOT inside marginSummary)
+    #[serde(default)]
+    pub withdrawable: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -61,8 +64,6 @@ pub struct MarginSummary {
     pub total_ntl_pos: String,
     pub total_raw_usd: String,
     pub total_margin_used: String,
-    #[serde(default)]
-    pub withdrawable: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

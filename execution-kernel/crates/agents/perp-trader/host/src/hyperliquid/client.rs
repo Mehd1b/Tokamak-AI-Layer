@@ -125,9 +125,10 @@ impl HyperliquidClient {
     }
 
     /// Get withdrawable perp margin balance.
+    /// Note: `withdrawable` is a top-level field in the API response, not inside marginSummary.
     pub fn get_perp_withdrawable(&self, user: &str) -> Result<f64> {
         let state = self.fetch_clearinghouse_state(user)?;
-        let withdrawable = state.margin_summary.withdrawable
+        let withdrawable = state.withdrawable
             .as_deref()
             .map(|s| parse_decimal(s))
             .unwrap_or(0.0);

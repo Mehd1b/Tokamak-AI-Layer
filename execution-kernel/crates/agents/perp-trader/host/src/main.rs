@@ -328,18 +328,32 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    // ── Seed trade gate ─────────────────────────────────────────────────────
-    // When no position exists (position_size == 0), the HyperCore position
-    // precompile returns leverage=0, causing ALL CoreWriter limit orders to be
-    // silently dropped. To bootstrap the first trade, we use the REST API via
-    // the API wallet to set leverage and place the opening order.
-    //
-    // Before placing the seed trade, we pre-deposit margin from the vault to
-    // HyperCore so the REST API order has margin available.
-    //
-    // Once a position exists (leverage > 0), subsequent trades go through the
-    // normal ZK-verified CoreWriter flow.
-    if snapshot.position_size == 0.0 && cli.api_wallet_key.is_some() {
+    // ── Pre-set leverage via REST API ──────────────────────────────────────
+    // CoreWriter requires leverage > 0 to process limit orders. When no
+    // position exists, the HyperCore precompile returns leverage=0. Calling
+    // updateLeverage via REST API sets it in HyperCore's internal state so
+    // the ZK-proven openPosition via CoreWriter will be accepted.
+    if snapshot.position_size == 0.0 && cli.api_wallet_key.is_some() && action_count > 0 {
+        if !cli.json {
+            eprintln!("[PRE-EXEC] No position — setting leverage via REST API for CoreWriter...");
+        }
+        let leverage_result = seed_trade::set_leverage_only(&cli);
+        match leverage_result {
+            Ok(()) => {
+                if !cli.json {
+                    eprintln!("[PRE-EXEC] Leverage set to {}x. CoreWriter orders will be accepted.", cli.seed_leverage);
+                }
+            }
+            Err(e) => {
+                if !cli.json {
+                    eprintln!("[PRE-EXEC] WARNING: Failed to set leverage: {}. CoreWriter may reject orders.", e);
+                }
+            }
+        }
+    }
+
+    // ── Seed trade gate (BYPASSED — all trades go through ZK proof path) ─
+    if false && snapshot.position_size == 0.0 && cli.api_wallet_key.is_some() {
         let intent = seed_trade::parse_agent_intent(&agent_output_bytes);
         if let seed_trade::AgentIntent::Open(params) = intent {
             if !cli.json {
@@ -542,6 +556,16 @@ fn main() -> anyhow::Result<()> {
     {
         #[cfg(feature = "onchain")]
         {
+            // Log vault USDC balance before execution
+            if !cli.json {
+                let vault_balance = hl_client.get_spot_usdc(&cli.vault).ok();
+                let sub_equity = hl_client.get_perp_withdrawable(&cli.sub_account).ok();
+                eprintln!("[EXEC] ── Pre-execution balances ──");
+                eprintln!("[EXEC]   Vault USDC (EVM):        check on-chain");
+                eprintln!("[EXEC]   Sub-account (HyperCore): ${:.2}", sub_equity.unwrap_or(0.0));
+                eprintln!("[EXEC] Submitting ZK proof to vault.executeWithOracle()...");
+            }
+
             let pk = Cli::resolve_key(&cli.pk)?;
             let rt = tokio::runtime::Runtime::new()?;
             let tx_result = rt.block_on(onchain::execute_with_oracle(
@@ -585,9 +609,21 @@ fn main() -> anyhow::Result<()> {
                     .unwrap_or(had_position); // Assume unchanged on API error
 
                 if !had_position && has_position_now {
-                    // Open action took effect
+                    // Open action took effect — fetch and display position details
                     if !cli.json {
-                        eprintln!("[VERIFY] Position opened on HyperCore.");
+                        eprintln!("[VERIFY] Position OPENED on HyperCore via ZK proof!");
+                        // Fetch fresh snapshot to show position details
+                        if let Ok(new_snap) = hl_client.fetch_snapshot(&cli.asset, &cli.sub_account, 1) {
+                            let side = if new_snap.position_size > 0.0 { "LONG" } else { "SHORT" };
+                            eprintln!("[VERIFY]   Side:       {}", side);
+                            eprintln!("[VERIFY]   Size:       {:.5} {}", new_snap.position_size.abs(), cli.asset);
+                            eprintln!("[VERIFY]   Entry:      ${:.2}", new_snap.entry_price);
+                            eprintln!("[VERIFY]   Mark:       ${:.2}", new_snap.mark_price);
+                            eprintln!("[VERIFY]   UPnL:       ${:.4}", new_snap.unrealized_pnl);
+                            eprintln!("[VERIFY]   Margin:     ${:.2}", new_snap.margin_used);
+                            eprintln!("[VERIFY]   Equity:     ${:.2}", new_snap.account_equity);
+                            eprintln!("[VERIFY]   Liq price:  ${:.2}", new_snap.liquidation_price);
+                        }
                     }
                     verified = true;
                 } else if had_position && !has_position_now {

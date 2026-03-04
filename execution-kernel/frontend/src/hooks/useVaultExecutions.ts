@@ -3,7 +3,7 @@
 import { usePublicClient } from 'wagmi';
 import { useQuery } from '@tanstack/react-query';
 import { useNetwork } from '@/lib/NetworkContext';
-import { paginatedGetLogs, executionAppliedEvent, findVaultDeployBlock } from '@/lib/vaultEvents';
+import { paginatedGetLogs, executionAppliedEvent, findVaultDeployBlock, getLogsClient } from '@/lib/vaultEvents';
 
 export interface ExecutionEvent {
   executionNonce: string;
@@ -23,6 +23,9 @@ export function useVaultExecutions(vaultAddress: `0x${string}` | undefined) {
     queryFn: async (): Promise<ExecutionEvent[]> => {
       if (!client || !vaultAddress) return [];
 
+      // Use native RPC for getLogs on chains where third-party RPCs may not support it
+      const logClient = getLogsClient(client, selectedChainId);
+
       const mapLogs = (logs: any[]): ExecutionEvent[] =>
         logs.slice(-10).reverse().map((log: any) => ({
           executionNonce: String(log.args?.executionNonce ?? '0'),
@@ -33,11 +36,11 @@ export function useVaultExecutions(vaultAddress: `0x${string}` | undefined) {
           blockNumber: log.blockNumber ? String(log.blockNumber) : undefined,
         }));
 
-      const currentBlock = await client.getBlockNumber();
+      const currentBlock = await logClient.getBlockNumber();
       const fromBlock = await findVaultDeployBlock(
-        client, contracts.vaultFactory, vaultAddress, currentBlock,
+        logClient, contracts.vaultFactory, vaultAddress, currentBlock,
       );
-      const logs = await paginatedGetLogs(client, {
+      const logs = await paginatedGetLogs(logClient, {
         address: vaultAddress,
         event: executionAppliedEvent,
         fromBlock,

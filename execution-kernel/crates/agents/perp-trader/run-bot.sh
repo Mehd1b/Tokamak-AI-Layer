@@ -168,8 +168,31 @@ while true; do
     submitted)
       TX=$(echo "$OUTPUT" | grep -o '"tx_hash"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
       SUCCESS=$(echo "$OUTPUT" | grep -o '"success"[[:space:]]*:[[:space:]]*[a-z]*' | head -1 | sed 's/.*: *//')
+      VERIFIED=$(echo "$OUTPUT" | grep -o '"verified"[[:space:]]*:[[:space:]]*[a-z]*' | head -1 | sed 's/.*: *//')
       if [[ "$SUCCESS" == "true" ]]; then
         echo "[${TIMESTAMP}] EXECUTED: ${ACTIONS} actions, tx=${TX}"
+        echo "[${TIMESTAMP}] Verified on HyperCore: ${VERIFIED}"
+        # Fetch and display position details from HyperCore
+        POS_JSON=$(curl -s https://api.hyperliquid.xyz/info -X POST -H 'Content-Type: application/json' \
+          -d "{\"type\":\"clearinghouseState\",\"user\":\"${SUB_ACCOUNT}\"}" 2>/dev/null)
+        if [[ -n "$POS_JSON" ]]; then
+          POS_SZI=$(echo "$POS_JSON" | python3 -c "
+import sys,json
+state=json.load(sys.stdin)
+for p in state.get('assetPositions',[]):
+    szi=float(p['position']['szi'])
+    if szi!=0:
+        pos=p['position']
+        side='LONG' if szi>0 else 'SHORT'
+        print(f'{side} {abs(szi)} {pos[\"coin\"]} @ \${pos.get(\"entryPx\",\"?\")}  |  UPnL: \${pos[\"unrealizedPnl\"]}  |  Margin: \${pos[\"marginUsed\"]}  |  Liq: \${pos.get(\"liquidationPx\",\"?\")}')
+        break
+else:
+    print('NO POSITION')
+" 2>/dev/null)
+          echo "[${TIMESTAMP}] Position: ${POS_SZI}"
+          EQUITY=$(echo "$POS_JSON" | python3 -c "import sys,json; s=json.load(sys.stdin); print(s['marginSummary']['accountValue'])" 2>/dev/null)
+          echo "[${TIMESTAMP}] Account equity: \$${EQUITY}"
+        fi
         # If this was a force close (action_flag=1), clear the hold timer
         if [[ "$ACTION_FLAG" == "1" ]]; then
           echo "[${TIMESTAMP}] Force close submitted. Clearing hold timer."

@@ -1,8 +1,38 @@
-import type { Log } from 'viem';
+import { createPublicClient, http, type Log } from 'viem';
+import { hyperEvmMainnet, hyperEvmTestnet } from '@/lib/chains';
 
 // Block range tiers — tried large-to-small until the RPC accepts one.
 // HyperEVM supports max 1000; Sepolia/mainnet support 500K+.
-const BLOCK_RANGE_TIERS = [BigInt(500_000), BigInt(10_000), BigInt(1_000)];
+const BLOCK_RANGE_TIERS = [BigInt(500_000), BigInt(10_000), BigInt(1_000), BigInt(100)];
+
+/**
+ * Native RPC URLs for chains where third-party RPCs (e.g. Alchemy) may not
+ * support eth_getLogs reliably. Used as fallback for event fetching.
+ */
+const NATIVE_RPC_URLS: Record<number, string> = {
+  [hyperEvmMainnet.id]: 'https://rpc.hyperliquid.xyz/evm',
+  [hyperEvmTestnet.id]: 'https://rpc.hyperliquid-testnet.xyz/evm',
+};
+
+const CHAIN_BY_ID: Record<number, any> = {
+  [hyperEvmMainnet.id]: hyperEvmMainnet,
+  [hyperEvmTestnet.id]: hyperEvmTestnet,
+};
+
+/**
+ * Returns a viem public client that uses the native RPC for chains where
+ * third-party providers don't support getLogs well. Falls back to the
+ * provided client if no native override exists.
+ */
+export function getLogsClient(primaryClient: any, chainId?: number): any {
+  if (chainId && NATIVE_RPC_URLS[chainId] && CHAIN_BY_ID[chainId]) {
+    return createPublicClient({
+      chain: CHAIN_BY_ID[chainId],
+      transport: http(NATIVE_RPC_URLS[chainId]),
+    });
+  }
+  return primaryClient;
+}
 
 /**
  * Paginated getLogs that auto-discovers the max block range the RPC supports.

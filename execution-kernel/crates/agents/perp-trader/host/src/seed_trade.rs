@@ -223,3 +223,69 @@ pub fn execute_seed_trade(
 
     Ok(result)
 }
+
+/// Set leverage via REST API without placing any order.
+///
+/// CoreWriter requires leverage > 0 to process limit orders. When no position
+/// exists, the precompile returns leverage=0. This function calls the Hyperliquid
+/// REST API to set leverage so that the ZK-proven openPosition via CoreWriter
+/// will be accepted by HyperCore.
+pub fn set_leverage_only(cli: &Cli) -> anyhow::Result<()> {
+    let api_key = cli.api_wallet_key.as_ref()
+        .ok_or_else(|| anyhow::anyhow!("api_wallet_key required for leverage setting"))?;
+    let api_key = Cli::resolve_key(api_key)?;
+
+    let script_path = if let Some(ref path) = cli.seed_script {
+        path.clone()
+    } else {
+        let bundle_dir = std::path::Path::new(&cli.bundle);
+        let script = bundle_dir.parent()
+            .unwrap_or(bundle_dir)
+            .join("scripts")
+            .join("hl_seed_trade.py");
+        script.to_string_lossy().to_string()
+    };
+
+    let child = std::process::Command::new("python3")
+        .arg(&script_path)
+        .arg("set_leverage")
+        .arg("--key")
+        .arg(&api_key)
+        .arg("--hl-url")
+        .arg(&cli.hl_url)
+        .arg("--asset")
+        .arg(&cli.asset)
+        .arg("--leverage")
+        .arg(cli.seed_leverage.to_string())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| anyhow::anyhow!("Failed to spawn set_leverage script: {}", e))?;
+
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let result = child.wait_with_output();
+        let _ = tx.send(result);
+    });
+
+    let output = match rx.recv_timeout(std::time::Duration::from_secs(15)) {
+        Ok(Ok(output)) => output,
+        Ok(Err(e)) => return Err(anyhow::anyhow!("set_leverage failed: {}", e)),
+        Err(_) => return Err(anyhow::anyhow!("set_leverage timed out after 15s")),
+    };
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!("set_leverage script failed: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let result: serde_json::Value = serde_json::from_str(stdout.trim())
+        .map_err(|e| anyhow::anyhow!("Failed to parse set_leverage result: {}", e))?;
+
+    if result.get("status").and_then(|s| s.as_str()) != Some("ok") {
+        return Err(anyhow::anyhow!("set_leverage returned error: {}", result));
+    }
+
+    Ok(())
+}
