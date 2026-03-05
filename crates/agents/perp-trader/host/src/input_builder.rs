@@ -12,8 +12,8 @@ use constraints::StateSnapshotV1;
 use kernel_core::{CanonicalEncode, KernelInputV1};
 use reference_integrator::{build_kernel_input, InputParams, LoadedBundle};
 
-/// PerpInput encoded size (must match agent's PerpInput::ENCODED_SIZE = 239).
-const PERP_INPUT_SIZE: usize = 239;
+/// PerpInput encoded size (must match agent's PerpInput::ENCODED_SIZE = 240).
+const PERP_INPUT_SIZE: usize = 240;
 
 /// Build a complete KernelInputV1 from all components.
 ///
@@ -29,13 +29,31 @@ pub fn build_input(
     vault_addr: &[u8; 20],
     usdc_addr: &[u8; 20],
 ) -> Result<(KernelInputV1, Vec<u8>)> {
+    build_input_with_phase(bundle, vault_state, snapshot, indicators, signed_feed, cli, exchange_addr, vault_addr, usdc_addr, 0)
+}
+
+/// Build input with an explicit open_phase for two-proof mode.
+///
+/// open_phase: 0=normal, 1=deposit only, 2=order only
+pub fn build_input_with_phase(
+    bundle: &LoadedBundle,
+    vault_state: &VaultState,
+    snapshot: &MarketSnapshot,
+    indicators: &IndicatorSet,
+    signed_feed: &SignedFeed,
+    cli: &Cli,
+    exchange_addr: &[u8; 20],
+    vault_addr: &[u8; 20],
+    usdc_addr: &[u8; 20],
+    open_phase: u8,
+) -> Result<(KernelInputV1, Vec<u8>)> {
     // Part 1: StateSnapshotV1 (36 bytes)
     let snapshot_bytes = encode_state_snapshot(vault_state, snapshot);
 
     // Part 2: Oracle feed bytes (already encoded in signed_feed)
     // (variable, 111 bytes for 1 price)
 
-    // Part 3: PerpInput (238 bytes)
+    // Part 3: PerpInput (240 bytes)
     let perp_bytes = encode_perp_input(
         snapshot,
         indicators,
@@ -43,6 +61,7 @@ pub fn build_input(
         exchange_addr,
         vault_addr,
         usdc_addr,
+        open_phase,
     );
     assert_eq!(perp_bytes.len(), PERP_INPUT_SIZE);
 
@@ -91,6 +110,7 @@ fn encode_perp_input(
     exchange_addr: &[u8; 20],
     vault_addr: &[u8; 20],
     usdc_addr: &[u8; 20],
+    open_phase: u8,
 ) -> Vec<u8> {
     let mut buf = Vec::with_capacity(PERP_INPUT_SIZE);
 
@@ -125,19 +145,12 @@ fn encode_perp_input(
     buf.extend_from_slice(&(snapshot.account_equity as u64).to_le_bytes());
     buf.extend_from_slice(&(snapshot.margin_used as u64).to_le_bytes());
 
-    // Indicators (36 bytes) — FORCED BULLISH for demo recording.
-    // Fakes an SMA crossover: prev_fast <= prev_slow, current fast > slow.
-    // RSI 50 (neutral zone). Triggers openPosition every cycle when no position.
-    let test_sma_fast = to_scaled_u64(snapshot.mark_price * 1.001);
-    let test_sma_slow = to_scaled_u64(snapshot.mark_price * 0.999);
-    let test_rsi: u32 = 5000; // RSI 50 — middle of neutral zone
-    let test_prev_sma_fast = to_scaled_u64(snapshot.mark_price * 0.998);
-    let test_prev_sma_slow = to_scaled_u64(snapshot.mark_price * 0.999);
-    buf.extend_from_slice(&test_sma_fast.to_le_bytes());
-    buf.extend_from_slice(&test_sma_slow.to_le_bytes());
-    buf.extend_from_slice(&test_rsi.to_le_bytes());
-    buf.extend_from_slice(&test_prev_sma_fast.to_le_bytes());
-    buf.extend_from_slice(&test_prev_sma_slow.to_le_bytes());
+    // Indicators (36 bytes) — real SMA crossover from computed indicators
+    buf.extend_from_slice(&to_scaled_u64(indicators.sma_fast).to_le_bytes());
+    buf.extend_from_slice(&to_scaled_u64(indicators.sma_slow).to_le_bytes());
+    buf.extend_from_slice(&indicators.rsi_bps.to_le_bytes());
+    buf.extend_from_slice(&to_scaled_u64(indicators.prev_sma_fast).to_le_bytes());
+    buf.extend_from_slice(&to_scaled_u64(indicators.prev_sma_slow).to_le_bytes());
 
     // Risk params (16 bytes, all bps)
     buf.extend_from_slice(&50_000u32.to_le_bytes()); // max_leverage_bps (5x)
@@ -164,6 +177,9 @@ fn encode_perp_input(
 
     // Hyperliquid szDecimals (1 byte)
     buf.push(cli.sz_decimals);
+
+    // Two-proof open phase (1 byte)
+    buf.push(open_phase);
 
     debug_assert_eq!(buf.len(), PERP_INPUT_SIZE, "PerpInput encoding size mismatch");
     buf
@@ -244,7 +260,7 @@ mod tests {
         let vault = [0x22u8; 20];
         let usdc = [0x33u8; 20];
 
-        let bytes = encode_perp_input(&snapshot, &indicators, &cli, &exchange, &vault, &usdc);
+        let bytes = encode_perp_input(&snapshot, &indicators, &cli, &exchange, &vault, &usdc, 0);
         assert_eq!(bytes.len(), PERP_INPUT_SIZE, "PerpInput must be {} bytes", PERP_INPUT_SIZE);
     }
 }

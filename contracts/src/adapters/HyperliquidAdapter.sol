@@ -177,8 +177,11 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
         uint256 scaledSize = orderSize * (10 ** (8 - config.szDecimals));
         if (scaledSize > type(uint64).max) revert OrderSizeOverflow(scaledSize);
 
-        // Pull USDC margin from vault directly to sub-account
-        IERC20(usdc).safeTransferFrom(msg.sender, config.subAccount, marginAmount);
+        // Pull USDC margin from vault directly to sub-account (skip if margin=0,
+        // used in two-proof mode where deposit was done in a prior proof execution)
+        if (marginAmount > 0) {
+            IERC20(usdc).safeTransferFrom(msg.sender, config.subAccount, marginAmount);
+        }
 
         // Delegate execution to sub-account (margin for deposit, scaledSize for the order)
         TradingSubAccount(payable(config.subAccount)).executeOpen(

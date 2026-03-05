@@ -20,21 +20,28 @@ Usage:
 
 import sys
 import json
+import signal
 import argparse
 from eth_account import Account
 
+# Hard kill timeout: if the script hasn't finished in 25s, abort.
+# This prevents zombie processes when the SDK hangs on WebSocket/HTTP.
+def _timeout_handler(signum, frame):
+    print(json.dumps({"status": "error", "step": "timeout", "detail": "Script hard-killed after 25s"}))
+    sys.exit(1)
+
+signal.signal(signal.SIGALRM, _timeout_handler)
+signal.alarm(25)
+
+# HTTP timeout for all SDK requests (seconds)
+SDK_TIMEOUT = 10
+
 
 def make_exchange(key, hl_url):
-    """Create a Hyperliquid Exchange client."""
+    """Create a Hyperliquid Exchange client with timeout and skip_ws."""
     from hyperliquid.exchange import Exchange
     account = Account.from_key(key)
-    return Exchange(account, hl_url)
-
-
-def make_info(hl_url):
-    """Create a Hyperliquid Info client."""
-    from hyperliquid.info import Info
-    return Info(hl_url)
+    return Exchange(account, hl_url, timeout=SDK_TIMEOUT)
 
 
 def do_set_leverage(args):
@@ -53,20 +60,25 @@ def do_set_leverage(args):
 def do_seed_trade(args):
     """Set leverage + place IOC order to seed a position."""
     try:
+        import time
+        t0 = time.time()
+        print(f"[seed] Creating exchange client...", file=sys.stderr, flush=True)
         exchange = make_exchange(args.key, args.hl_url)
-        info = make_info(args.hl_url)
+        print(f"[seed] Exchange client created ({time.time()-t0:.1f}s)", file=sys.stderr, flush=True)
 
         # Step 1: Set leverage
+        print(f"[seed] Setting leverage to {args.leverage}x...", file=sys.stderr, flush=True)
         lev_result = exchange.update_leverage(args.leverage, args.asset, True)
+        print(f"[seed] Leverage result: {lev_result.get('status')} ({time.time()-t0:.1f}s)", file=sys.stderr, flush=True)
         if lev_result.get("status") != "ok":
             return {"status": "error", "step": "set_leverage", "detail": str(lev_result)}
 
         # Step 2: Compute fill-ensuring price for IOC order.
-        # The agent's limit price is for GTC orders and may be below ask (buys)
-        # or above bid (sells). For IOC to fill immediately, we need:
-        #   BUY:  price >= best_ask  (use mark * 1.005, rounded to tick)
-        #   SELL: price <= best_bid  (use mark * 0.995, rounded to tick)
-        l2 = info.l2_snapshot(args.asset)
+        # Use exchange.info (skip_ws=True internally) instead of separate Info client.
+        print(f"[seed] Fetching L2 snapshot...", file=sys.stderr, flush=True)
+        l2 = exchange.info.l2_snapshot(args.asset)
+        print(f"[seed] L2 snapshot received ({time.time()-t0:.1f}s)", file=sys.stderr, flush=True)
+
         if args.is_buy:
             best_ask = float(l2["levels"][1][0]["px"]) if l2.get("levels") and len(l2["levels"]) > 1 and l2["levels"][1] else args.price
             ioc_price = round(best_ask * 1.005)  # 0.5% above ask
@@ -74,12 +86,10 @@ def do_seed_trade(args):
             best_bid = float(l2["levels"][0][0]["px"]) if l2.get("levels") and l2["levels"][0] else args.price
             ioc_price = round(best_bid * 0.995)  # 0.5% below bid
 
-        # Ensure price is within HyperCore oracle band (~5-10% of mark)
-        # and use it instead of the agent's GTC limit price
-        import sys
-        print(f"Seed IOC price: ${ioc_price} (agent limit: ${args.price})", file=sys.stderr)
+        print(f"[seed] IOC price: ${ioc_price} (agent limit: ${args.price})", file=sys.stderr, flush=True)
 
         # Step 3: Place IOC order at fill-ensuring price
+        print(f"[seed] Placing IOC order: {'BUY' if args.is_buy else 'SELL'} {args.size} {args.asset} @ ${ioc_price}...", file=sys.stderr, flush=True)
         order_result = exchange.order(
             args.asset,
             args.is_buy,
@@ -87,6 +97,7 @@ def do_seed_trade(args):
             ioc_price,
             {"limit": {"tif": "Ioc"}}
         )
+        print(f"[seed] Order result received ({time.time()-t0:.1f}s)", file=sys.stderr, flush=True)
 
         return parse_order_result(order_result)
     except Exception as e:
@@ -97,10 +108,9 @@ def do_close_position(args):
     """Place a reduce-only closing IOC order."""
     try:
         exchange = make_exchange(args.key, args.hl_url)
-        info = make_info(args.hl_url)
 
-        # Get current mark price for a tight IOC price
-        l2 = info.l2_snapshot(args.asset)
+        # Use exchange.info (skip_ws=True internally) instead of separate Info client.
+        l2 = exchange.info.l2_snapshot(args.asset)
         if args.is_buy:
             # Closing a short: buy at slightly above ask
             best_ask = float(l2["levels"][1][0]["px"]) if l2.get("levels") and len(l2["levels"]) > 1 and l2["levels"][1] else args.price
@@ -110,7 +120,7 @@ def do_close_position(args):
             best_bid = float(l2["levels"][0][0]["px"]) if l2.get("levels") and l2["levels"][0] else args.price
             ioc_price = round(best_bid * 0.995)
 
-        print(f"Closing via REST API: {'BUY' if args.is_buy else 'SELL'} {args.size} {args.asset} @ ${ioc_price} (mark=${l2['levels'][0][0]['px'] if l2.get('levels') and l2['levels'][0] else 'unknown'})", file=sys.stderr)
+        print(f"Closing via REST API: {'BUY' if args.is_buy else 'SELL'} {args.size} {args.asset} @ ${ioc_price} (mark=${l2['levels'][0][0]['px'] if l2.get('levels') and l2['levels'][0] else 'unknown'})", file=sys.stderr, flush=True)
 
         # Close = sell if long (is_buy=false), buy if short (is_buy=true)
         # reduce_only=True prevents flipping the position

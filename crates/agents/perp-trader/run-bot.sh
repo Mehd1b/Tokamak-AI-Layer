@@ -45,6 +45,9 @@ API_WALLET="${API_WALLET:-env:API_WALLET_KEY}"  # REST API seed trade key
 SEED_SCRIPT="${SEED_SCRIPT:-${EK_ROOT}/crates/agents/perp-trader/scripts/hl_seed_trade.py}"
 SEED_LEVERAGE="${SEED_LEVERAGE:-5}"  # Leverage for seed trades
 
+# Pre-deposit margin config (USDC raw 1e6 units deposited to HyperCore before open)
+PRE_DEPOSIT_USDC="${PRE_DEPOSIT_USDC:-5000000}"  # 5 USDC
+
 # HYPE auto-funding config
 MIN_HYPE="${MIN_HYPE:-5000000000000000}"        # 0.005 HYPE in wei
 HYPE_TOPUP="${HYPE_TOPUP:-10000000000000000}"   # 0.01 HYPE in wei
@@ -61,7 +64,6 @@ if [[ -z "$SUB_ACCOUNT" || "$SUB_ACCOUNT" == "0x00000000000000000000000000000000
   echo "ERROR: Could not resolve sub-account. Is the vault registered on the adapter?"
   exit 1
 fi
-echo "Sub-account: ${SUB_ACCOUNT}"
 
 # ── Build binary (once) ──────────────────────────────────────────────────────
 echo "Building perp-trader-host (release + full features)..."
@@ -72,45 +74,53 @@ if [[ ! -x "$BINARY" ]]; then
   echo "ERROR: Binary not found at ${BINARY}"
   exit 1
 fi
-echo "Binary ready: ${BINARY}"
 
 set +e  # disable exit-on-error for the loop (grep may return 1 on no match)
 
+# ── Helper: parse JSON field ─────────────────────────────────────────────────
+json_str() { echo "$1" | grep -o "\"$2\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" | head -1 | sed 's/.*"\([^"]*\)"$/\1/'; }
+json_val() { echo "$1" | grep -o "\"$2\"[[:space:]]*:[[:space:]]*[a-z0-9.]*" | head -1 | sed 's/.*: *//'; }
+
+# ── Startup banner ────────────────────────────────────────────────────────────
+echo ""
+echo "================================================"
+echo "  PERP-TRADER BOT  |  HyperEVM Mainnet"
+echo "================================================"
+echo "  Asset:       ${ASSET}  (${SEED_LEVERAGE}x leverage)"
+echo "  Vault:       ${VAULT:0:10}...${VAULT: -4}"
+echo "  Sub-acct:    ${SUB_ACCOUNT:0:10}...${SUB_ACCOUNT: -4}"
+echo "  Adapter:     ${ADAPTER:0:10}...${ADAPTER: -4}"
+echo "  Interval:    ${INTERVAL}s  |  Max hold: ${MAX_HOLD}s"
+echo "  SL: ${STOP_LOSS_BPS}bps  |  TP: ${TAKE_PROFIT_BPS}bps"
+echo "================================================"
+echo ""
+
 # ── Bot loop ─────────────────────────────────────────────────────────────────
 CYCLE=0
-echo ""
-echo "=== Perp-Trader Bot (HyperEVM Mainnet) ==="
-echo "  Vault:        ${VAULT}"
-echo "  Asset:        ${ASSET}"
-echo "  Interval:     ${INTERVAL}s"
-echo "  Adapter:      ${ADAPTER}"
-echo "  Sub-acct:     ${SUB_ACCOUNT}"
-echo "  szDecimals:   ${SZ_DECIMALS}"
-echo "  Seed lev:     ${SEED_LEVERAGE}x"
-echo "  API wallet:   ${API_WALLET:0:8}..."
-echo "  State file:   ${STATE_FILE}"
-echo "  Max hold:     ${MAX_HOLD}s"
-echo "  Min HYPE:     ${MIN_HYPE} wei"
-echo "  HYPE topup:   ${HYPE_TOPUP} wei"
-echo "============================================="
-echo ""
 
 while true; do
   CYCLE=$((CYCLE + 1))
-  TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
-  echo "[${TIMESTAMP}] Cycle #${CYCLE} starting..."
+  TS=$(date '+%H:%M:%S')
 
-  # ── Max hold timer: force-close if position held too long ──
+  # ── Hold timer status ──
+  HOLD_INFO=""
   ACTION_FLAG=0
   if [[ -f "$HOLD_FILE" ]]; then
     OPENED_AT=$(cat "$HOLD_FILE")
     NOW=$(date +%s)
     HOLD_AGE=$((NOW - OPENED_AT))
+    HOLD_REMAINING=$((MAX_HOLD - HOLD_AGE))
     if [[ $HOLD_AGE -gt $MAX_HOLD ]]; then
-      echo "[${TIMESTAMP}] Position held for ${HOLD_AGE}s > max ${MAX_HOLD}s. Force closing."
       ACTION_FLAG=1
+      HOLD_INFO="  FORCE CLOSE (held ${HOLD_AGE}s > ${MAX_HOLD}s)"
+    else
+      HOLD_MINS=$((HOLD_REMAINING / 60))
+      HOLD_SECS=$((HOLD_REMAINING % 60))
+      HOLD_INFO="  [hold: ${HOLD_MINS}m${HOLD_SECS}s left]"
     fi
   fi
+
+  echo "--- #${CYCLE} ${TS}${HOLD_INFO} ---"
 
   OUTPUT=$("$BINARY" \
     --vault "$VAULT" \
@@ -136,84 +146,165 @@ while true; do
     --min-hype "$MIN_HYPE" \
     --hype-topup "$HYPE_TOPUP" \
     --action-flag "$ACTION_FLAG" \
+    --pre-deposit-usdc "$PRE_DEPOSIT_USDC" \
     --json 2>&1) || true
 
-  # Parse status from JSON output
-  STATUS=$(echo "$OUTPUT" | grep -o '"status"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
-  ACTIONS=$(echo "$OUTPUT" | grep -o '"actions"[[:space:]]*:[[:space:]]*[0-9]*' | head -1 | sed 's/.*: *//')
+  # Parse JSON fields
+  STATUS=$(json_str "$OUTPUT" "status")
+  ACTIONS=$(json_val "$OUTPUT" "actions")
 
   case "$STATUS" in
     no_op)
-      REASON=$(echo "$OUTPUT" | grep -o '"reason"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
-      echo "[${TIMESTAMP}] No-op: ${REASON:-no signal}"
-      # Clear hold timer if no position exists
+      REASON=$(json_str "$OUTPUT" "reason")
+      MARK=$(json_val "$OUTPUT" "mark_price")
+      POS_SIZE=$(json_val "$OUTPUT" "position_size")
+      EQUITY=$(json_val "$OUTPUT" "account_equity")
+
+      # Human-readable reason
+      case "$REASON" in
+        no_entry_signal)       REASON_TEXT="no signal" ;;
+        vault_balance_below_minimum) REASON_TEXT="vault balance too low" ;;
+        position_pending_settlement) REASON_TEXT="waiting for position to appear" ;;
+        *)                     REASON_TEXT="${REASON:-idle}" ;;
+      esac
+
+      # Compact one-liner with price context
+      if [[ -n "$POS_SIZE" && "$POS_SIZE" != "0" && "$POS_SIZE" != "0.0" ]]; then
+        SIDE="LONG"
+        SIZE_DISPLAY="$POS_SIZE"
+        # Detect negative (short)
+        if [[ "$POS_SIZE" == -* ]]; then
+          SIDE="SHORT"
+          SIZE_DISPLAY="${POS_SIZE#-}"
+        fi
+        echo "  ${SIDE} ${SIZE_DISPLAY} ${ASSET} | equity \$${EQUITY} | ${REASON_TEXT}"
+      else
+        echo "  No position | ${REASON_TEXT}"
+      fi
+
+      # Clear hold timer if no position
       if [[ "$REASON" == "no_entry_signal" || "$REASON" == "vault_balance_below_minimum" ]]; then
         if [[ -f "$HOLD_FILE" ]]; then
-          echo "[${TIMESTAMP}] Position closed. Clearing hold timer."
+          echo "  Hold timer cleared (position closed)"
           rm -f "$HOLD_FILE"
         fi
       fi
       ;;
-    seed_trade)
-      FILL_STATUS=$(echo "$OUTPUT" | grep -o '"fill_status"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
-      AVG_PX=$(echo "$OUTPUT" | grep -o '"avg_price"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
-      TOTAL_SZ=$(echo "$OUTPUT" | grep -o '"total_size"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
-      echo "[${TIMESTAMP}] SEED TRADE: ${FILL_STATUS} ${TOTAL_SZ} ${ASSET} @ \$${AVG_PX}"
-      # Record position open time for max hold timer
-      if [[ "$FILL_STATUS" == "filled" ]]; then
-        date +%s > "$HOLD_FILE"
-        echo "[${TIMESTAMP}] Hold timer started (max ${MAX_HOLD}s)."
+
+    recovered)
+      RECOVERED=$(json_val "$OUTPUT" "recovered_usdc")
+      REASON=$(json_str "$OUTPUT" "reason")
+      if [[ -n "$RECOVERED" && "$RECOVERED" != "0" ]]; then
+        RECOVERED_USD=$(python3 -c "print(f'{int(${RECOVERED}) / 1e6:.2f}')" 2>/dev/null || echo "$RECOVERED")
+        echo "  RECOVERED \$${RECOVERED_USD} to vault (${REASON})"
+      else
+        echo "  Recovery attempted (${REASON}) — no funds moved"
       fi
       ;;
+
+    seed_trade)
+      FILL_STATUS=$(json_str "$OUTPUT" "fill_status")
+      AVG_PX=$(json_str "$OUTPUT" "avg_price")
+      TOTAL_SZ=$(json_str "$OUTPUT" "total_size")
+      IS_BUY=$(json_val "$OUTPUT" "is_buy")
+      if [[ "$IS_BUY" == "true" ]]; then SIDE="LONG"; else SIDE="SHORT"; fi
+
+      if [[ "$FILL_STATUS" == "filled" ]]; then
+        echo "  OPENED ${SIDE} ${TOTAL_SZ} ${ASSET} @ \$${AVG_PX} (via REST API)"
+        date +%s > "$HOLD_FILE"
+        echo "  Hold timer started (${MAX_HOLD}s)"
+      else
+        DETAIL=$(json_str "$OUTPUT" "detail")
+        echo "  Seed trade failed: ${FILL_STATUS} — ${DETAIL:-no detail}"
+      fi
+      ;;
+
     submitted)
-      TX=$(echo "$OUTPUT" | grep -o '"tx_hash"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
-      SUCCESS=$(echo "$OUTPUT" | grep -o '"success"[[:space:]]*:[[:space:]]*[a-z]*' | head -1 | sed 's/.*: *//')
-      VERIFIED=$(echo "$OUTPUT" | grep -o '"verified"[[:space:]]*:[[:space:]]*[a-z]*' | head -1 | sed 's/.*: *//')
+      TX=$(json_str "$OUTPUT" "tx_hash")
+      SUCCESS=$(json_val "$OUTPUT" "success")
+      VERIFIED=$(json_val "$OUTPUT" "verified")
+      WAS_CLOSE=$(json_val "$OUTPUT" "was_close")
+      TX_SHORT="${TX:0:10}...${TX: -4}"
+
       if [[ "$SUCCESS" == "true" ]]; then
-        echo "[${TIMESTAMP}] EXECUTED: ${ACTIONS} actions, tx=${TX}"
-        echo "[${TIMESTAMP}] Verified on HyperCore: ${VERIFIED}"
-        # Fetch and display position details from HyperCore
+        # Determine action type for display
+        if [[ "$WAS_CLOSE" == "true" ]]; then
+          ACTION_LABEL="CLOSE"
+        else
+          ACTION_LABEL="OPEN"
+        fi
+
+        echo "  ZK proof submitted: ${ACTION_LABEL} (tx ${TX_SHORT})"
+
+        # Fetch position details from HyperCore
         POS_JSON=$(curl -s https://api.hyperliquid.xyz/info -X POST -H 'Content-Type: application/json' \
           -d "{\"type\":\"clearinghouseState\",\"user\":\"${SUB_ACCOUNT}\"}" 2>/dev/null)
+
         if [[ -n "$POS_JSON" ]]; then
-          POS_SZI=$(echo "$POS_JSON" | python3 -c "
+          POS_INFO=$(echo "$POS_JSON" | python3 -c "
 import sys,json
 state=json.load(sys.stdin)
+equity=state['marginSummary']['accountValue']
 for p in state.get('assetPositions',[]):
     szi=float(p['position']['szi'])
     if szi!=0:
         pos=p['position']
         side='LONG' if szi>0 else 'SHORT'
-        print(f'{side} {abs(szi)} {pos[\"coin\"]} @ \${pos.get(\"entryPx\",\"?\")}  |  UPnL: \${pos[\"unrealizedPnl\"]}  |  Margin: \${pos[\"marginUsed\"]}  |  Liq: \${pos.get(\"liquidationPx\",\"?\")}')
+        print(f'  Position: {side} {abs(szi)} {pos[\"coin\"]} @ \${pos.get(\"entryPx\",\"?\")}')
+        print(f'  UPnL: \${pos[\"unrealizedPnl\"]}  |  Margin: \${pos[\"marginUsed\"]}  |  Liq: \${pos.get(\"liquidationPx\",\"?\")}')
         break
 else:
-    print('NO POSITION')
+    print('  No position on HyperCore')
+print(f'  Equity: \${equity}')
 " 2>/dev/null)
-          echo "[${TIMESTAMP}] Position: ${POS_SZI}"
-          EQUITY=$(echo "$POS_JSON" | python3 -c "import sys,json; s=json.load(sys.stdin); print(s['marginSummary']['accountValue'])" 2>/dev/null)
-          echo "[${TIMESTAMP}] Account equity: \$${EQUITY}"
+          echo "$POS_INFO"
         fi
-        # If this was a force close (action_flag=1), clear the hold timer
-        if [[ "$ACTION_FLAG" == "1" ]]; then
-          echo "[${TIMESTAMP}] Force close submitted. Clearing hold timer."
+
+        # Verification status
+        if [[ "$VERIFIED" == "true" ]]; then
+          echo "  Verified: YES"
+        else
+          echo "  Verified: NO (CoreWriter action silently rejected)"
+          # Show all stderr diagnostic lines from the binary (REST API fallback, recovery, etc.)
+          FALLBACK_MSG=$(echo "$OUTPUT" | grep -oE '\[VERIFY\].*|\[RECOVER\].*' | head -10)
+          if [[ -n "$FALLBACK_MSG" ]]; then
+            echo "$FALLBACK_MSG" | while read -r line; do echo "  $line"; done
+          fi
+        fi
+
+        # Hold timer management
+        if [[ "$WAS_CLOSE" == "true" && "$VERIFIED" == "true" ]]; then
+          echo "  Close verified — hold timer cleared"
           rm -f "$HOLD_FILE"
-        elif [[ ! -f "$HOLD_FILE" ]]; then
-          # Position opened via ZKP (not seed trade) — start hold timer
+        elif [[ "$ACTION_FLAG" == "1" ]]; then
+          echo "  Force close submitted — hold timer cleared"
+          rm -f "$HOLD_FILE"
+        elif [[ "$WAS_CLOSE" != "true" && "$VERIFIED" == "true" && ! -f "$HOLD_FILE" ]]; then
           date +%s > "$HOLD_FILE"
-          echo "[${TIMESTAMP}] Hold timer started (max ${MAX_HOLD}s)."
+          echo "  Hold timer started (${MAX_HOLD}s)"
         fi
       else
-        echo "[${TIMESTAMP}] TX REVERTED: tx=${TX}"
+        echo "  TX REVERTED: ${TX_SHORT}"
       fi
       ;;
+
     dry_run)
-      echo "[${TIMESTAMP}] Dry-run: ${ACTIONS} actions detected (not submitted)"
+      echo "  Dry-run: ${ACTIONS} actions (not submitted)"
       ;;
+
     *)
-      echo "[${TIMESTAMP}] Output: ${OUTPUT}"
+      # Unknown status — show stderr lines (recovery, HYPE funding, etc.)
+      # Filter out JSON and show only human-readable lines
+      STDERR_LINES=$(echo "$OUTPUT" | grep -E '^\s*\[' | head -10)
+      if [[ -n "$STDERR_LINES" ]]; then
+        echo "$STDERR_LINES" | while read -r line; do echo "  $line"; done
+      else
+        # Truly unexpected output — show first few lines
+        echo "  Unexpected output:"
+        echo "$OUTPUT" | head -5 | while read -r line; do echo "    $line"; done
+      fi
       ;;
   esac
 
-  echo "[${TIMESTAMP}] Sleeping ${INTERVAL}s..."
   sleep "$INTERVAL"
 done

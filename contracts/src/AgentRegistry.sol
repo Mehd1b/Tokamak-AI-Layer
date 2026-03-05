@@ -35,6 +35,9 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
     /// @notice Mapping from agentId to its index in _agentIds array (for O(1) removal)
     mapping(bytes32 => uint256) internal _agentIdIndex;
 
+    /// @notice Maximum number of vaults checked during unregister (prevents OOG)
+    uint256 public constant MAX_VAULTS_PER_UNREGISTER = 50;
+
     /// @notice Storage gap for future upgrades
     uint256[46] private __gap;
 
@@ -42,6 +45,9 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
 
     /// @notice Caller is not the owner
     error OwnableUnauthorizedAccount(address account);
+
+    /// @notice Too many vaults to check during unregister — empty some vaults first
+    error TooManyVaultsToUnregister(bytes32 agentId, uint256 vaultCount, uint256 maxAllowed);
 
     // ============ Events ============
 
@@ -190,6 +196,9 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
         // Query factory for all vaults deployed for this agent
         require(_factory != address(0), "factory not set");
         address[] memory vaults = IVaultFactory(_factory).getAgentVaults(agentId);
+        if (vaults.length > MAX_VAULTS_PER_UNREGISTER) {
+            revert TooManyVaultsToUnregister(agentId, vaults.length, MAX_VAULTS_PER_UNREGISTER);
+        }
         for (uint256 i = 0; i < vaults.length; i++) {
             uint256 assets = IKernelVaultView(vaults[i]).totalAssets();
             if (assets > 0) revert VaultHasDeposits(vaults[i], assets);

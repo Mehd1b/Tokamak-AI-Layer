@@ -107,6 +107,10 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @notice Timestamp when the vault was paused (for emergency withdraw delay)
     uint256 public pausedAt;
 
+    /// @notice Tracked ETH balance for ETH vaults (prevents donation/selfdestruct inflation attacks)
+    /// @dev Only meaningful when asset == address(0). Updated in depositETH, withdraw, execute, receive.
+    uint256 public trackedETHBalance;
+
     // ============ Events ============
 
     /// @notice Emitted when tokens are deposited
@@ -328,9 +332,9 @@ contract KernelVault is ReentrancyGuard, Pausable {
         if (msg.value == 0) revert ZeroDeposit();
 
         // Calculate shares using virtual offset formula (ERC4626)
-        // For non-strategy: msg.value is already in balance, subtract it for pre-transfer calculation
+        // Use tracked balance (pre-deposit) for PPS calculation
         uint256 effectiveAssets =
-            strategyActive ? snapshotTotalAssets : (address(this).balance - msg.value);
+            strategyActive ? snapshotTotalAssets : trackedETHBalance;
 
         // shares = assets * (totalShares + OFFSET) / (effectiveAssets + 1)
         sharesMinted = (msg.value * (totalShares + _DECIMALS_OFFSET)) / (effectiveAssets + 1);
@@ -340,6 +344,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
         shares[msg.sender] += sharesMinted;
         totalShares += sharesMinted;
         totalDeposited += msg.value;
+        trackedETHBalance += msg.value;
 
         emit Deposit(msg.sender, msg.value, sharesMinted);
     }
@@ -348,44 +353,16 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @param shareAmount Number of shares to burn
     /// @return assetsOut Amount of tokens returned based on current exchange rate
     function withdraw(uint256 shareAmount) external nonReentrant whenNotPaused returns (uint256 assetsOut) {
-        if (shareAmount == 0) revert ZeroWithdraw();
-        if (shares[msg.sender] < shareAmount) {
-            revert InsufficientShares(shareAmount, shares[msg.sender]);
-        }
+        return _processWithdraw(shareAmount, msg.sender);
+    }
 
-        // Calculate assets using virtual offset formula (ERC4626)
-        // assets = shares * (effectiveAssets + 1) / (totalShares + OFFSET)
-        uint256 effectiveAssets = effectiveTotalAssets();
-        assetsOut = (shareAmount * (effectiveAssets + 1)) / (totalShares + _DECIMALS_OFFSET);
-        if (assetsOut == 0) revert ZeroAssetsOut();
-
-        // Cap to actual available balance during active strategy
-        uint256 available = totalAssets();
-        if (assetsOut > available) {
-            revert InsufficientAvailableAssets(assetsOut, available);
-        }
-
-        // Burn shares
-        shares[msg.sender] -= shareAmount;
-        totalShares -= shareAmount;
-        totalWithdrawn += assetsOut;
-
-        // Update snapshot to reflect withdrawal
-        if (strategyActive) {
-            snapshotTotalAssets -= assetsOut;
-            snapshotTotalShares -= shareAmount;
-        }
-
-        // Transfer tokens or ETH
-        bool isETH = address(asset) == address(0);
-        if (isETH) {
-            (bool success,) = msg.sender.call{ value: assetsOut }("");
-            if (!success) revert ETHTransferFailed();
-        } else {
-            asset.safeTransfer(msg.sender, assetsOut);
-        }
-
-        emit Withdraw(msg.sender, assetsOut, shareAmount);
+    /// @notice Withdraw to an alternate recipient address (e.g., if msg.sender is blacklisted)
+    /// @param shareAmount Number of shares to burn
+    /// @param to Recipient address for the withdrawn assets
+    /// @return assetsOut Amount of tokens returned based on current exchange rate
+    function withdrawTo(uint256 shareAmount, address to) external nonReentrant whenNotPaused returns (uint256 assetsOut) {
+        require(to != address(0), "zero recipient");
+        return _processWithdraw(shareAmount, to);
     }
 
     // ============ Execution ============
@@ -492,6 +469,51 @@ contract KernelVault is ReentrancyGuard, Pausable {
         );
     }
 
+    // ============ Internal Withdraw ============
+
+    /// @notice Internal withdrawal logic shared by withdraw() and withdrawTo()
+    function _processWithdraw(uint256 shareAmount, address to) internal returns (uint256 assetsOut) {
+        if (shareAmount == 0) revert ZeroWithdraw();
+        if (shares[msg.sender] < shareAmount) {
+            revert InsufficientShares(shareAmount, shares[msg.sender]);
+        }
+
+        // Calculate assets using virtual offset formula (ERC4626)
+        // assets = shares * (effectiveAssets + 1) / (totalShares + OFFSET)
+        uint256 effectiveAssets = effectiveTotalAssets();
+        assetsOut = (shareAmount * (effectiveAssets + 1)) / (totalShares + _DECIMALS_OFFSET);
+        if (assetsOut == 0) revert ZeroAssetsOut();
+
+        // Cap to actual available balance during active strategy
+        uint256 available = totalAssets();
+        if (assetsOut > available) {
+            revert InsufficientAvailableAssets(assetsOut, available);
+        }
+
+        // Burn shares
+        shares[msg.sender] -= shareAmount;
+        totalShares -= shareAmount;
+        totalWithdrawn += assetsOut;
+
+        // Update snapshot to reflect withdrawal
+        if (strategyActive) {
+            snapshotTotalAssets -= assetsOut;
+            snapshotTotalShares -= shareAmount;
+        }
+
+        // Transfer tokens or ETH
+        bool isETH = address(asset) == address(0);
+        if (isETH) {
+            trackedETHBalance -= assetsOut;
+            (bool success,) = to.call{ value: assetsOut }("");
+            if (!success) revert ETHTransferFailed();
+        } else {
+            asset.safeTransfer(to, assetsOut);
+        }
+
+        emit Withdraw(msg.sender, assetsOut, shareAmount);
+    }
+
     // ============ Internal ============
 
     /// @notice Execute a single action
@@ -536,7 +558,8 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
         // Execute transfer (ETH or ERC20)
         if (token == address(0)) {
-            // ETH transfer
+            // ETH transfer — update tracking before external call
+            trackedETHBalance -= amount;
             (bool success,) = to.call{ value: amount }("");
             if (!success) revert ETHTransferFailed();
         } else {
@@ -582,6 +605,11 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
         // Capture balance before call for snapshot detection
         uint256 balanceBefore = totalAssets();
+
+        // Update ETH tracking before external call (prevents donation inflation)
+        if (value > 0 && address(asset) == address(0)) {
+            trackedETHBalance -= value;
+        }
 
         // Execute call
         (bool success, bytes memory returnData) = target.call{ value: value }(callData);
@@ -655,6 +683,20 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @param shareAmount Number of shares to burn
     /// @return assetsOut Amount of tokens returned
     function emergencyWithdraw(uint256 shareAmount) external nonReentrant returns (uint256 assetsOut) {
+        return _processEmergencyWithdraw(shareAmount, msg.sender);
+    }
+
+    /// @notice Emergency withdraw to an alternate recipient (e.g., if msg.sender is blacklisted)
+    /// @param shareAmount Number of shares to burn
+    /// @param to Recipient address for the withdrawn assets
+    /// @return assetsOut Amount of tokens returned
+    function emergencyWithdrawTo(uint256 shareAmount, address to) external nonReentrant returns (uint256 assetsOut) {
+        require(to != address(0), "zero recipient");
+        return _processEmergencyWithdraw(shareAmount, to);
+    }
+
+    /// @notice Internal emergency withdrawal logic
+    function _processEmergencyWithdraw(uint256 shareAmount, address to) internal returns (uint256 assetsOut) {
         require(paused(), "not paused");
         uint256 earliest = pausedAt + EMERGENCY_WITHDRAW_DELAY;
         if (block.timestamp < earliest) revert EmergencyWithdrawTooEarly(earliest, block.timestamp);
@@ -689,10 +731,11 @@ contract KernelVault is ReentrancyGuard, Pausable {
         // Transfer tokens or ETH
         bool isETH = address(asset) == address(0);
         if (isETH) {
-            (bool success,) = msg.sender.call{ value: assetsOut }("");
+            trackedETHBalance -= assetsOut;
+            (bool success,) = to.call{ value: assetsOut }("");
             if (!success) revert ETHTransferFailed();
         } else {
-            asset.safeTransfer(msg.sender, assetsOut);
+            asset.safeTransfer(to, assetsOut);
         }
 
         emit Withdraw(msg.sender, assetsOut, shareAmount);
@@ -721,10 +764,11 @@ contract KernelVault is ReentrancyGuard, Pausable {
     }
 
     /// @notice Returns total assets held by the vault
-    /// @return Total balance of the vault's asset (ETH balance if asset is address(0))
+    /// @return Total balance of the vault's asset (tracked ETH balance if asset is address(0))
+    /// @dev For ETH vaults, uses internally tracked balance to prevent selfdestruct donation attacks
     function totalAssets() public view returns (uint256) {
         if (address(asset) == address(0)) {
-            return address(this).balance;
+            return trackedETHBalance;
         }
         return asset.balanceOf(address(this));
     }
@@ -751,5 +795,10 @@ contract KernelVault is ReentrancyGuard, Pausable {
     }
 
     /// @notice Allow receiving ETH for CALL actions with value
-    receive() external payable { }
+    /// @dev Updates tracked ETH balance for ETH vaults to prevent donation inflation
+    receive() external payable {
+        if (address(asset) == address(0)) {
+            trackedETHBalance += msg.value;
+        }
+    }
 }

@@ -123,11 +123,90 @@ fn main() -> anyhow::Result<()> {
         clear_position_state(&cli.state_file);
     }
 
+    // Ensure sub-account has HYPE for CoreWriter gas EVERY cycle.
+    // This runs unconditionally (before agent intent is known) because CoreWriter
+    // is needed for multiple paths: ZK proof execution, fund recovery, spotToEvm, etc.
+    // Without HYPE, ALL CoreWriter actions are silently rejected.
+    #[cfg(feature = "onchain")]
+    if !cli.dry_run {
+        let core_hype = hl_client.get_core_hype_balance(&cli.sub_account).unwrap_or(0.0);
+        let min_core_hype = cli.min_hype as f64 / 1e18;
+
+        if core_hype < min_core_hype {
+            if !cli.json {
+                eprintln!(
+                    "[HYPE] HyperCore HYPE too low ({:.4} < {:.4}). Funding...",
+                    core_hype, min_core_hype
+                );
+            }
+            let rt = tokio::runtime::Runtime::new()?;
+            match rt.block_on(onchain::check_and_fund_hype(&cli)) {
+                Ok(funded) => {
+                    if funded {
+                        if !cli.json {
+                            eprintln!("[HYPE] Funded. Waiting 15s for bridge settlement...");
+                        }
+                        std::thread::sleep(std::time::Duration::from_secs(15));
+                    }
+                }
+                Err(e) => {
+                    if !cli.json {
+                        eprintln!("[HYPE] Funding failed (non-fatal): {}", e);
+                    }
+                }
+            }
+        } else if !cli.json {
+            eprintln!("[HYPE] OK: {:.4}", core_hype);
+        }
+    }
+
     // Minimum balance guard: skip execution if vault balance is below threshold
     // AND no position is open. When a position IS open, the vault balance being
     // low is expected (USDC was sent to the sub-account for margin). The agent
     // must still run to evaluate exit conditions (stop-loss, take-profit, etc.).
-    if snapshot.position_size == 0.0 && vault_state.total_assets < cli.min_balance {
+    //
+    // Exception: when action_flag == 1 (force-close), bypass this guard entirely.
+    // Force-close is triggered by the hold timer and must run to close + recover funds.
+    // Also: if no position is open but HyperCore has stranded funds, attempt recovery.
+    if snapshot.position_size == 0.0 && vault_state.total_assets < cli.min_balance && cli.action_flag != 1 {
+        // Before giving up, check if HyperCore has stranded funds from a previous
+        // close that didn't recover (e.g., bot was restarted mid-cycle).
+        #[cfg(feature = "onchain")]
+        {
+            let sub_equity = hl_client.get_perp_withdrawable(&cli.sub_account).unwrap_or(0.0);
+            if sub_equity > 0.5 {
+                if !cli.json {
+                    eprintln!(
+                        "Vault balance {} < min_balance {}, but sub-account has ${:.2} stranded on HyperCore.",
+                        vault_state.total_assets, cli.min_balance, sub_equity
+                    );
+                    eprintln!("Attempting fund recovery...");
+                }
+                let rt_recover = tokio::runtime::Runtime::new()?;
+                match rt_recover.block_on(onchain::recover_funds_to_vault(&cli, &hl_client)) {
+                    Ok(recovered) => {
+                        if cli.json {
+                            let result = serde_json::json!({
+                                "status": "recovered",
+                                "reason": "stranded_funds_on_hypercore",
+                                "recovered_usdc": recovered,
+                                "vault_balance": vault_state.total_assets,
+                            });
+                            println!("{}", serde_json::to_string_pretty(&result)?);
+                        } else if recovered > 0 {
+                            eprintln!("[RECOVER] Successfully recovered {} USDC to vault.", recovered);
+                        }
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        if !cli.json {
+                            eprintln!("[RECOVER] Fund recovery failed: {}", e);
+                        }
+                    }
+                }
+            }
+        }
+
         if cli.json {
             let result = serde_json::json!({
                 "status": "no_op",
@@ -208,7 +287,7 @@ fn main() -> anyhow::Result<()> {
         );
     }
 
-    // 6. Assemble KernelInputV1
+    // 6. Assemble KernelInputV1 (with open_phase=0 for initial strategy evaluation)
     let (kernel_input, input_bytes) = input_builder::build_input(
         &bundle,
         &vault_state,
@@ -228,7 +307,7 @@ fn main() -> anyhow::Result<()> {
         );
     }
 
-    // 7. Reconstruct agent output
+    // 7. Reconstruct agent output (open_phase=0 to evaluate strategy intent)
     let (agent_output_bytes, action_commitment) =
         output_reconstruct::reconstruct_output(&kernel_input, &input_bytes)?;
     let action_count = kernel_core::AgentOutput::decode(&agent_output_bytes)
@@ -244,9 +323,6 @@ fn main() -> anyhow::Result<()> {
     }
 
     // No-op gate: skip proving and on-chain submission when the agent has no actions.
-    // Steps 1–7 are cheap (~500ms). Proving (step 8) and submitting are expensive.
-    // This enables high-frequency scheduling (e.g. every 30s) with negligible cost
-    // on cycles where the strategy produces no signal.
     if action_count == 0 {
         let reason = if snapshot.position_size != 0.0 {
             "position_open_no_exit_signal"
@@ -269,250 +345,20 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    // 7.5: Ensure sub-account has HYPE for CoreWriter gas (moved before seed trade)
+    // ── Two-proof open: detect if agent wants to open with no existing position ──
+    // CoreWriter deposits are async — deposit + order in the same tx means the
+    // order is processed before the deposit settles, causing silent rejection.
     //
-    // CoreWriter actions are "intents, not immediate state changes" — they can be
-    // silently rejected on HyperCore if the sub-account lacks HYPE gas.
+    // Solution: split into two ZK proofs.
+    //   Proof 1 (open_phase=1): approve + depositMargin — vault's USDC → HyperCore
+    //   Wait 10s for settlement + set leverage via REST API
+    //   Proof 2 (open_phase=2): openPosition(margin=0) — order against settled margin
     //
-    // TWO checks are needed because HYPE exists in two places:
-    //   1. HyperEVM native balance (checked by check_and_fund_hype → triggers bridging)
-    //   2. HyperCore spot ledger (where CoreWriter actually reads gas balance)
-    //
-    // HYPE bridging (HyperEVM → HyperCore via 0x2222...2222) is async: the EVM tx
-    // succeeds but HYPE doesn't appear on HyperCore for ~5-10 seconds. ALL CoreWriter
-    // actions submitted before settlement are silently rejected.
-    #[cfg(feature = "onchain")]
-    if action_count > 0 && !cli.dry_run {
-        // First: check HyperCore HYPE balance (the authoritative source for CoreWriter gas)
-        let core_hype = hl_client.get_core_hype_balance(&cli.sub_account).unwrap_or(0.0);
-        let min_core_hype = cli.min_hype as f64 / 1e18; // Convert wei threshold to HYPE
-
-        if core_hype < min_core_hype {
-            if !cli.json {
-                eprintln!(
-                    "[7.5] HyperCore HYPE too low ({:.4} < {:.4}). Funding from HyperEVM...",
-                    core_hype, min_core_hype
-                );
-            }
-            let rt = tokio::runtime::Runtime::new()?;
-            match rt.block_on(onchain::check_and_fund_hype(&cli)) {
-                Ok(funded) => {
-                    if funded {
-                        if !cli.json {
-                            eprintln!("[7.5] Funded sub-account. Waiting 15s for HyperCore HYPE bridge settlement...");
-                        }
-                        std::thread::sleep(std::time::Duration::from_secs(15));
-
-                        // Verify HYPE arrived on HyperCore
-                        let new_core_hype = hl_client.get_core_hype_balance(&cli.sub_account).unwrap_or(0.0);
-                        if new_core_hype < min_core_hype {
-                            if !cli.json {
-                                eprintln!(
-                                    "[7.5] WARNING: HYPE bridge may not have settled (core={:.4}). CoreWriter actions may fail.",
-                                    new_core_hype
-                                );
-                            }
-                        } else if !cli.json {
-                            eprintln!("[7.5] HyperCore HYPE verified: {:.4}", new_core_hype);
-                        }
-                    }
-                }
-                Err(e) => {
-                    if !cli.json {
-                        eprintln!("[7.5] HYPE funding failed (non-fatal): {}", e);
-                    }
-                }
-            }
-        } else if !cli.json {
-            eprintln!("[7.5] HyperCore HYPE OK: {:.4}", core_hype);
-        }
-    }
-
-    // ── Pre-set leverage via REST API ──────────────────────────────────────
-    // CoreWriter requires leverage > 0 to process limit orders. When no
-    // position exists, the HyperCore precompile returns leverage=0. Calling
-    // updateLeverage via REST API sets it in HyperCore's internal state so
-    // the ZK-proven openPosition via CoreWriter will be accepted.
-    if snapshot.position_size == 0.0 && cli.api_wallet_key.is_some() && action_count > 0 {
-        if !cli.json {
-            eprintln!("[PRE-EXEC] No position — setting leverage via REST API for CoreWriter...");
-        }
-        let leverage_result = seed_trade::set_leverage_only(&cli);
-        match leverage_result {
-            Ok(()) => {
-                if !cli.json {
-                    eprintln!("[PRE-EXEC] Leverage set to {}x. CoreWriter orders will be accepted.", cli.seed_leverage);
-                }
-            }
-            Err(e) => {
-                if !cli.json {
-                    eprintln!("[PRE-EXEC] WARNING: Failed to set leverage: {}. CoreWriter may reject orders.", e);
-                }
-            }
-        }
-    }
-
-    // ── Seed trade gate (BYPASSED — all trades go through ZK proof path) ─
-    if false && snapshot.position_size == 0.0 && cli.api_wallet_key.is_some() {
-        let intent = seed_trade::parse_agent_intent(&agent_output_bytes);
-        if let seed_trade::AgentIntent::Open(params) = intent {
-            if !cli.json {
-                eprintln!("[SEED] No position exists — using REST API for opening trade");
-            }
-
-            // Step 1: Try to pre-deposit margin from vault to HyperCore.
-            // This requires the vault to have approved the adapter for USDC.
-            // If the vault hasn't approved yet (first run), this will fail gracefully
-            // and the seed trade will proceed using manually pre-funded margin.
-            #[cfg(feature = "onchain")]
-            if !cli.dry_run {
-                let margin = params.margin_amount;
-                if !cli.json {
-                    eprintln!("[SEED] Attempting to pre-deposit {} USDC from vault to HyperCore...", margin);
-                }
-                let rt = tokio::runtime::Runtime::new()?;
-                match rt.block_on(onchain::deposit_margin_from_vault(&cli, margin)) {
-                    Ok(()) => {
-                        if !cli.json {
-                            eprintln!("[SEED] EVM tx succeeded. Waiting 10s for HyperCore settlement...");
-                        }
-                        std::thread::sleep(std::time::Duration::from_secs(10));
-
-                        // Verify margin appeared on HyperCore
-                        let perp_equity = hl_client.get_perp_withdrawable(&cli.sub_account).unwrap_or(0.0);
-                        if perp_equity < 0.01 {
-                            if !cli.json {
-                                eprintln!("[SEED] WARNING: Margin deposit may not have settled (equity={:.2}).", perp_equity);
-                                eprintln!("[SEED] CoreDepositWallet deposits are async — waiting 10s more...");
-                            }
-                            std::thread::sleep(std::time::Duration::from_secs(10));
-                        } else if !cli.json {
-                            eprintln!("[SEED] Margin verified on HyperCore: equity={:.2}", perp_equity);
-                        }
-                    }
-                    Err(e) => {
-                        // Non-fatal: margin may have been pre-funded manually via
-                        // depositSubBalanceAdmin or depositMarginAdmin.
-                        if !cli.json {
-                            eprintln!("[SEED] Auto pre-deposit failed (non-fatal): {}", e);
-                            eprintln!("[SEED] Proceeding with seed trade — ensure margin was pre-funded manually.");
-                        }
-                    }
-                }
-            }
-
-            // Pre-check: verify HyperCore margin is available before spending 30s on seed trade
-            let perp_equity = hl_client.get_perp_withdrawable(&cli.sub_account).unwrap_or(0.0);
-            if perp_equity < 0.5 {
-                if !cli.json {
-                    eprintln!(
-                        "[SEED] ERROR: Insufficient HyperCore margin ({:.2}). Seed trade would fail.",
-                        perp_equity
-                    );
-                    eprintln!("[SEED] Ensure margin is deposited via depositMarginAdmin or depositMarginFromVaultAdmin.");
-                }
-                if cli.json {
-                    let result_json = serde_json::json!({
-                        "status": "seed_trade",
-                        "fill_status": "error",
-                        "detail": format!("Insufficient HyperCore margin: {:.2}", perp_equity),
-                    });
-                    println!("{}", serde_json::to_string_pretty(&result_json)?);
-                }
-                return Ok(());
-            }
-
-            // Step 2: Place opening order via REST API (margin is now available)
-            match seed_trade::execute_seed_trade(&cli, &params) {
-                Ok(result) => {
-                    if result.status == "filled" {
-                        // Seed trade filled — verify position on HyperCore
-                        if !cli.json {
-                            eprintln!(
-                                "[SEED] Order filled: {} {} @ ${}",
-                                result.total_size.as_deref().unwrap_or("?"),
-                                cli.asset,
-                                result.avg_price.as_deref().unwrap_or("?"),
-                            );
-                            eprintln!("[SEED] Waiting 5s to verify position on HyperCore...");
-                        }
-                        std::thread::sleep(std::time::Duration::from_secs(5));
-
-                        let position_verified = hl_client
-                            .has_position(&cli.sub_account, &cli.asset)
-                            .unwrap_or(false);
-                        if !position_verified && !cli.json {
-                            eprintln!("[SEED] WARNING: Seed trade reported filled but position not yet visible.");
-                            eprintln!("[SEED] This may be normal — HyperCore settles asynchronously.");
-                        } else if !cli.json {
-                            eprintln!("[SEED] Position verified on HyperCore.");
-                        }
-
-                        // Record position state
-                        let now = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap_or_default()
-                            .as_secs();
-                        let _ = write_position_state(&cli.state_file, &PositionState {
-                            nonce: kernel_input.execution_nonce,
-                            opened_at: now,
-                        });
-
-                        if cli.json {
-                            let result_json = serde_json::json!({
-                                "status": "seed_trade",
-                                "fill_status": "filled",
-                                "avg_price": result.avg_price,
-                                "total_size": result.total_size,
-                                "is_buy": params.is_buy,
-                                "asset": cli.asset,
-                                "mark_price": snapshot.mark_price,
-                                "position_verified": position_verified,
-                            });
-                            println!("{}", serde_json::to_string_pretty(&result_json)?);
-                        }
-                        return Ok(());
-                    } else {
-                        // Seed trade didn't fill — return error instead of falling through.
-                        // The ZK proof path CANNOT open positions when position_size==0
-                        // (CoreWriter requires leverage>0 which only exists with a position).
-                        // Falling through wastes 8-10 min on proof generation for nothing.
-                        if cli.json {
-                            let result_json = serde_json::json!({
-                                "status": "seed_trade",
-                                "fill_status": result.status,
-                                "detail": result.detail,
-                                "is_buy": params.is_buy,
-                                "asset": cli.asset,
-                            });
-                            println!("{}", serde_json::to_string_pretty(&result_json)?);
-                        } else {
-                            eprintln!(
-                                "[SEED] Order did not fill: status={}, detail={}",
-                                result.status,
-                                result.detail.as_deref().unwrap_or("none"),
-                            );
-                        }
-                        return Ok(());
-                    }
-                }
-                Err(e) => {
-                    // Seed trade script failed — return error, don't waste time on ZK proof
-                    if cli.json {
-                        let result_json = serde_json::json!({
-                            "status": "seed_trade",
-                            "fill_status": "error",
-                            "detail": format!("{}", e),
-                        });
-                        println!("{}", serde_json::to_string_pretty(&result_json)?);
-                    } else {
-                        eprintln!("[SEED] Seed trade failed: {}", e);
-                    }
-                    return Ok(());
-                }
-            }
-        }
-    }
+    // For closes and holds, a single proof (open_phase=0) suffices.
+    let needs_two_proof = matches!(
+        seed_trade::parse_agent_intent(&agent_output_bytes),
+        seed_trade::AgentIntent::Open(_)
+    ) && snapshot.position_size == 0.0;
 
     // In dry-run mode, skip proving and on-chain submission — just report the signal.
     if cli.dry_run {
@@ -520,6 +366,7 @@ fn main() -> anyhow::Result<()> {
             let result = serde_json::json!({
                 "status": "dry_run",
                 "actions": action_count,
+                "two_proof": needs_two_proof,
                 "mark_price": snapshot.mark_price,
                 "position_size": snapshot.position_size,
                 "account_equity": snapshot.account_equity,
@@ -529,40 +376,193 @@ fn main() -> anyhow::Result<()> {
             });
             println!("{}", serde_json::to_string_pretty(&result)?);
         } else {
-            eprintln!("Dry run complete. {} actions detected. Skipping proof + submission.", action_count);
+            eprintln!(
+                "Dry run complete. {} actions detected (two_proof={}). Skipping proof + submission.",
+                action_count, needs_two_proof
+            );
         }
         return Ok(());
     }
 
-    // 8. Generate proof (if prove feature enabled)
-    let proof_result = prove::generate_proof(&bundle, &input_bytes, cli.dev_mode)?;
-    if !cli.json {
-        eprintln!(
-            "[8/8] Proof: journal={} bytes, seal={} bytes",
-            proof_result.journal_bytes.len(),
-            proof_result.seal_bytes.len()
-        );
-    }
+    // 8. Generate proof(s) and produce the final proof package for submission.
+    //
+    // For two-proof opens: generate + submit deposit proof, wait, then generate
+    // order proof. The order proof becomes the "final" proof for the submission block.
+    // For single-proof: generate one proof directly.
+    //
+    // Returns: (proof_result, agent_output_bytes, signed_feed, execution_nonce)
+    let (final_proof, final_output, final_feed, final_nonce) = if needs_two_proof {
+        if !cli.json {
+            eprintln!("[OPEN] Two-proof mode: deposit proof + order proof");
+        }
 
-    // Verify commitment match
-    if proof_result.journal.action_commitment != action_commitment {
-        return Err(anyhow::anyhow!(
-            "Action commitment mismatch: proof={}, reconstructed={}",
-            hex::encode(proof_result.journal.action_commitment),
-            hex::encode(action_commitment)
-        ));
-    }
+        // ── Proof 1: deposit only (open_phase=1) ──
+        let (deposit_input, deposit_input_bytes) = input_builder::build_input_with_phase(
+            &bundle, &vault_state, &snapshot, &indicator_set, &signed_feed,
+            &cli, &exchange_addr, &vault_addr, &usdc_addr, 1,
+        )?;
+        let (deposit_output_bytes, deposit_commitment) =
+            output_reconstruct::reconstruct_output(&deposit_input, &deposit_input_bytes)?;
+        let deposit_action_count = kernel_core::AgentOutput::decode(&deposit_output_bytes)
+            .map(|o| o.actions.len()).unwrap_or(0);
 
+        if deposit_action_count == 0 {
+            return Err(anyhow::anyhow!("Deposit phase produced 0 actions — agent declined to deposit"));
+        }
+
+        if !cli.json {
+            eprintln!("[OPEN] Phase 1: generating deposit proof ({} actions)...", deposit_action_count);
+        }
+        let deposit_proof = prove::generate_proof(&bundle, &deposit_input_bytes, cli.dev_mode)?;
+
+        if deposit_proof.journal.action_commitment != deposit_commitment {
+            return Err(anyhow::anyhow!(
+                "Deposit proof commitment mismatch: proof={}, reconstructed={}",
+                hex::encode(deposit_proof.journal.action_commitment),
+                hex::encode(deposit_commitment)
+            ));
+        }
+
+        // Submit proof 1
+        #[cfg(feature = "onchain")]
+        {
+            let pk = Cli::resolve_key(&cli.pk)?;
+            if !cli.json {
+                eprintln!("[OPEN] Phase 1: submitting deposit proof...");
+            }
+            let rt = tokio::runtime::Runtime::new()?;
+            let tx1 = rt.block_on(onchain::execute_with_oracle(
+                &cli.vault, &cli.rpc, &pk,
+                &deposit_proof.journal_bytes, &deposit_proof.seal_bytes,
+                &deposit_output_bytes,
+                &signed_feed.onchain_signature, signed_feed.feed.timestamp,
+            ))?;
+
+            if !tx1.success {
+                return Err(anyhow::anyhow!("Deposit proof tx reverted: {}", tx1.tx_hash));
+            }
+            if !cli.json {
+                eprintln!("[OPEN] Phase 1: deposit tx {} confirmed. Waiting 10s for HyperCore settlement...", tx1.tx_hash);
+            }
+            std::thread::sleep(std::time::Duration::from_secs(10));
+
+            let perp_equity = hl_client.get_perp_withdrawable(&cli.sub_account).unwrap_or(0.0);
+            if !cli.json {
+                eprintln!("[OPEN] HyperCore perp equity after deposit: ${:.2}", perp_equity);
+            }
+
+            // Set leverage via REST API (CoreWriter has no updateLeverage action)
+            if cli.api_wallet_key.is_some() {
+                if !cli.json {
+                    eprintln!("[OPEN] Setting leverage to {}x via REST API...", cli.seed_leverage);
+                }
+                if let Err(e) = seed_trade::set_leverage_only(&cli) {
+                    if !cli.json { eprintln!("[OPEN] WARNING: Failed to set leverage: {}", e); }
+                } else if !cli.json {
+                    eprintln!("[OPEN] Leverage set.");
+                }
+            }
+        }
+
+        // ── Proof 2: order only (open_phase=2) ──
+        // Re-read vault state (nonce incremented by proof 1, balance changed)
+        #[cfg(feature = "onchain")]
+        let vault_state_2 = {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(onchain::read_vault_state(&cli.vault, &cli.rpc))?
+        };
+        #[cfg(not(feature = "onchain"))]
+        let vault_state_2 = onchain::VaultState::default_for_dry_run();
+
+        // Re-fetch market data (fresh prices for the order)
+        let mut snapshot_2 = hl_client.fetch_snapshot(&cli.asset, &cli.sub_account, cli.candles_needed())?;
+        let vault_equity_2 = vault_state_2.total_assets as f64;
+        if vault_equity_2 > 0.0 {
+            snapshot_2.account_equity = vault_equity_2;
+            snapshot_2.available_balance = vault_equity_2 - snapshot_2.margin_used;
+        } else if snapshot_2.account_equity > 0.0 {
+            snapshot_2.account_equity *= 1_000_000.0;
+            snapshot_2.available_balance = snapshot_2.account_equity - snapshot_2.margin_used;
+        }
+
+        let indicator_set_2 = indicators::compute_indicators(&snapshot_2.candle_closes, &cli)?;
+        let oracle_key_2 = Cli::resolve_key(&cli.oracle_key)?;
+        let signed_feed_2 = oracle_signer::build_and_sign_feed(
+            &snapshot_2, &oracle_key_2, &exchange_addr, &vault_addr, cli.chain_id,
+        )?;
+
+        let (order_input, order_input_bytes) = input_builder::build_input_with_phase(
+            &bundle, &vault_state_2, &snapshot_2, &indicator_set_2, &signed_feed_2,
+            &cli, &exchange_addr, &vault_addr, &usdc_addr, 2,
+        )?;
+        let (order_output, order_commitment) =
+            output_reconstruct::reconstruct_output(&order_input, &order_input_bytes)?;
+        let order_action_count = kernel_core::AgentOutput::decode(&order_output)
+            .map(|o| o.actions.len()).unwrap_or(0);
+
+        if order_action_count == 0 {
+            if !cli.json {
+                eprintln!("[OPEN] Phase 2: agent produced 0 actions (market changed). Deposit on HyperCore will be recovered next cycle.");
+            }
+            if cli.json {
+                println!("{}", serde_json::to_string_pretty(&serde_json::json!({
+                    "status": "no_op",
+                    "reason": "two_proof_phase2_no_signal",
+                    "deposit_tx_submitted": true,
+                }))?);
+            }
+            return Ok(());
+        }
+
+        if !cli.json {
+            eprintln!("[OPEN] Phase 2: generating order proof ({} actions)...", order_action_count);
+        }
+        let order_proof = prove::generate_proof(&bundle, &order_input_bytes, cli.dev_mode)?;
+
+        if order_proof.journal.action_commitment != order_commitment {
+            return Err(anyhow::anyhow!(
+                "Order proof commitment mismatch: proof={}, reconstructed={}",
+                hex::encode(order_proof.journal.action_commitment),
+                hex::encode(order_commitment)
+            ));
+        }
+
+        if !cli.json {
+            eprintln!(
+                "[8/8] Order proof: journal={} bytes, seal={} bytes",
+                order_proof.journal_bytes.len(), order_proof.seal_bytes.len()
+            );
+        }
+
+        (order_proof, order_output, signed_feed_2, order_input.execution_nonce)
+    } else {
+        // Single proof path (closes, holds, normal operation)
+        let proof_result = prove::generate_proof(&bundle, &input_bytes, cli.dev_mode)?;
+        if !cli.json {
+            eprintln!(
+                "[8/8] Proof: journal={} bytes, seal={} bytes",
+                proof_result.journal_bytes.len(), proof_result.seal_bytes.len()
+            );
+        }
+
+        if proof_result.journal.action_commitment != action_commitment {
+            return Err(anyhow::anyhow!(
+                "Action commitment mismatch: proof={}, reconstructed={}",
+                hex::encode(proof_result.journal.action_commitment),
+                hex::encode(action_commitment)
+            ));
+        }
+
+        (proof_result, agent_output_bytes, signed_feed, kernel_input.execution_nonce)
+    };
+
+    // 9. Submit proof and verify on-chain
     {
         #[cfg(feature = "onchain")]
         {
-            // Log vault USDC balance before execution
             if !cli.json {
-                let vault_balance = hl_client.get_spot_usdc(&cli.vault).ok();
                 let sub_equity = hl_client.get_perp_withdrawable(&cli.sub_account).ok();
-                eprintln!("[EXEC] ── Pre-execution balances ──");
-                eprintln!("[EXEC]   Vault USDC (EVM):        check on-chain");
-                eprintln!("[EXEC]   Sub-account (HyperCore): ${:.2}", sub_equity.unwrap_or(0.0));
+                eprintln!("[EXEC] Sub-account (HyperCore): ${:.2}", sub_equity.unwrap_or(0.0));
                 eprintln!("[EXEC] Submitting ZK proof to vault.executeWithOracle()...");
             }
 
@@ -572,30 +572,16 @@ fn main() -> anyhow::Result<()> {
                 &cli.vault,
                 &cli.rpc,
                 &pk,
-                &proof_result.journal_bytes,
-                &proof_result.seal_bytes,
-                &agent_output_bytes,
-                &signed_feed.onchain_signature,
-                signed_feed.feed.timestamp,
+                &final_proof.journal_bytes,
+                &final_proof.seal_bytes,
+                &final_output,
+                &final_feed.onchain_signature,
+                final_feed.feed.timestamp,
             ))?;
 
-            // Record open position state so next cycle doesn't re-enter.
-            // Only write state if the transaction succeeded and had actions
-            // (which means a position was opened).
-            if tx_result.success {
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs();
-                let _ = write_position_state(&cli.state_file, &PositionState {
-                    nonce: kernel_input.execution_nonce,
-                    opened_at: now,
-                });
-            }
+            let agent_intent = seed_trade::parse_agent_intent(&final_output);
+            let is_close_intent = matches!(agent_intent, seed_trade::AgentIntent::Close);
 
-            // Post-execution verification: CoreWriter actions inside execute() are
-            // "intents, not immediate state changes" — they can be silently rejected.
-            // Wait for HyperCore settlement and verify the expected state change.
             let mut verified = false;
             if tx_result.success {
                 if !cli.json {
@@ -606,13 +592,11 @@ fn main() -> anyhow::Result<()> {
 
                 let had_position = snapshot.position_size != 0.0;
                 let has_position_now = hl_client.has_position(&cli.sub_account, &cli.asset)
-                    .unwrap_or(had_position); // Assume unchanged on API error
+                    .unwrap_or(had_position);
 
                 if !had_position && has_position_now {
-                    // Open action took effect — fetch and display position details
                     if !cli.json {
                         eprintln!("[VERIFY] Position OPENED on HyperCore via ZK proof!");
-                        // Fetch fresh snapshot to show position details
                         if let Ok(new_snap) = hl_client.fetch_snapshot(&cli.asset, &cli.sub_account, 1) {
                             let side = if new_snap.position_size > 0.0 { "LONG" } else { "SHORT" };
                             eprintln!("[VERIFY]   Side:       {}", side);
@@ -626,6 +610,15 @@ fn main() -> anyhow::Result<()> {
                         }
                     }
                     verified = true;
+
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+                    let _ = write_position_state(&cli.state_file, &PositionState {
+                        nonce: final_nonce,
+                        opened_at: now,
+                    });
                 } else if had_position && !has_position_now {
                     // Close action took effect — trigger fund recovery
                     if !cli.json {
@@ -649,21 +642,159 @@ fn main() -> anyhow::Result<()> {
                         }
                     }
                 } else if !had_position && !has_position_now {
-                    // Open action was silently rejected
-                    if !cli.json {
-                        eprintln!("[VERIFY] WARNING: ZK proof submitted but position did NOT open.");
-                        eprintln!("[VERIFY] CoreWriter limit order was silently rejected.");
-                        eprintln!("[VERIFY] Possible causes: insufficient HYPE gas, leverage=0, price outside oracle band.");
-                    }
-                } else {
-                    // had_position && has_position_now — close was silently rejected OR hold action
-                    if cli.action_flag == 1 {
-                        if !cli.json {
-                            eprintln!("[VERIFY] WARNING: Force-close submitted but position still open.");
-                            eprintln!("[VERIFY] CoreWriter close order was silently rejected.");
+                    // Open action was silently rejected by CoreWriter.
+                    // This should be rare if pre-deposit succeeded (margin was settled).
+                    // Possible causes: pre-deposit failed, insufficient margin, price outside
+                    // oracle band, or HyperCore issue. REST API fallback as last resort.
+                    eprintln!("[VERIFY] WARNING: ZK proof submitted but position did NOT open.");
+                    eprintln!("[VERIFY] CoreWriter order rejected (pre-deposit may have failed or margin insufficient).");
+                    eprintln!("[VERIFY] agent_intent = {:?}", agent_intent);
+
+                    if let seed_trade::AgentIntent::Open(ref params) = agent_intent {
+                        eprintln!("[VERIFY] Attempting REST API fallback open (is_buy={}, size={}, price={})...",
+                            params.is_buy, params.order_size, params.limit_price);
+                        if cli.api_wallet_key.is_some() {
+                            // Verify margin is actually on HyperCore before placing order
+                            let perp_equity = hl_client.get_perp_withdrawable(&cli.sub_account).unwrap_or(0.0);
+                            eprintln!("[VERIFY] HyperCore perp equity: {:.2}", perp_equity);
+                            if perp_equity < 1.0 {
+                                eprintln!("[VERIFY] Margin still not settled (equity={:.2}). Waiting 10s more...", perp_equity);
+                                std::thread::sleep(std::time::Duration::from_secs(10));
+                                let perp_equity2 = hl_client.get_perp_withdrawable(&cli.sub_account).unwrap_or(0.0);
+                                eprintln!("[VERIFY] After wait: perp equity = {:.2}", perp_equity2);
+                            }
+
+                            // Use seed_trade (sets leverage + places IOC at L2 prices)
+                            match seed_trade::execute_seed_trade(&cli, params) {
+                                Ok(result) if result.status == "filled" => {
+                                    eprintln!(
+                                        "[VERIFY] REST API open FILLED: {} {} @ ${}",
+                                        result.total_size.as_deref().unwrap_or("?"),
+                                        cli.asset,
+                                        result.avg_price.as_deref().unwrap_or("?"),
+                                    );
+                                    std::thread::sleep(std::time::Duration::from_secs(10));
+
+                                    // Verify position appeared
+                                    let opened = hl_client.has_position(&cli.sub_account, &cli.asset)
+                                        .unwrap_or(false);
+                                    if opened {
+                                        verified = true;
+                                        let now = std::time::SystemTime::now()
+                                            .duration_since(std::time::UNIX_EPOCH)
+                                            .unwrap_or_default()
+                                            .as_secs();
+                                        let _ = write_position_state(&cli.state_file, &PositionState {
+                                            nonce: final_nonce,
+                                            opened_at: now,
+                                        });
+                                        eprintln!("[VERIFY] Position confirmed open via REST API fallback.");
+                                    } else {
+                                        eprintln!("[VERIFY] WARNING: REST API filled but position not visible yet.");
+                                    }
+                                }
+                                Ok(result) => {
+                                    eprintln!(
+                                        "[VERIFY] REST API open did not fill: status={}, detail={}",
+                                        result.status,
+                                        result.detail.as_deref().unwrap_or("none"),
+                                    );
+                                }
+                                Err(e) => {
+                                    eprintln!("[VERIFY] REST API open failed: {}", e);
+                                }
+                            }
+                        } else {
+                            eprintln!("[VERIFY] No API wallet configured — cannot attempt REST API fallback.");
                         }
                     } else {
-                        verified = true; // Position maintained, which may be expected
+                        eprintln!("[VERIFY] Agent intent was not Open — skipping REST API fallback.");
+                    }
+                } else {
+                    // had_position && has_position_now — close was silently rejected OR hold
+                    if is_close_intent {
+                        // Agent intended to close but CoreWriter order was rejected
+                        // (likely price drifted outside oracle band during proof generation)
+                        if !cli.json {
+                            eprintln!("[VERIFY] WARNING: Close order silently rejected by HyperCore.");
+                            eprintln!("[VERIFY] Price likely drifted outside oracle band during ZK proof (~8-10 min).");
+                            eprintln!("[VERIFY] Attempting REST API fallback close...");
+                        }
+
+                        // Use REST API to close with real-time L2 orderbook prices
+                        if cli.api_wallet_key.is_some() {
+                            // Determine close direction: closing a long = sell (is_buy=false),
+                            // closing a short = buy (is_buy=true)
+                            let is_long = snapshot.position_size > 0.0;
+                            let close_is_buy = !is_long; // sell to close long, buy to close short
+                            let close_size = snapshot.position_size.abs();
+
+                            match seed_trade::execute_close_trade(
+                                &cli,
+                                close_is_buy,
+                                close_size,
+                                snapshot.mark_price,
+                            ) {
+                                Ok(result) if result.status == "filled" => {
+                                    if !cli.json {
+                                        eprintln!(
+                                            "[VERIFY] REST API close FILLED: {} {} @ ${}",
+                                            result.total_size.as_deref().unwrap_or("?"),
+                                            cli.asset,
+                                            result.avg_price.as_deref().unwrap_or("?"),
+                                        );
+                                        eprintln!("[VERIFY] Waiting 10s for HyperCore settlement...");
+                                    }
+                                    std::thread::sleep(std::time::Duration::from_secs(10));
+
+                                    // Verify position is actually closed
+                                    let still_open = hl_client.has_position(&cli.sub_account, &cli.asset)
+                                        .unwrap_or(true);
+                                    if !still_open {
+                                        verified = true;
+                                        clear_position_state(&cli.state_file);
+                                        if !cli.json {
+                                            eprintln!("[VERIFY] Position confirmed closed. Starting fund recovery...");
+                                        }
+                                        // Trigger fund recovery
+                                        let rt_recover = tokio::runtime::Runtime::new()?;
+                                        match rt_recover.block_on(onchain::recover_funds_to_vault(&cli, &hl_client)) {
+                                            Ok(recovered) => {
+                                                if !cli.json && recovered > 0 {
+                                                    eprintln!("[RECOVER] Successfully recovered {} USDC to vault", recovered);
+                                                }
+                                            }
+                                            Err(e) => {
+                                                if !cli.json {
+                                                    eprintln!("[RECOVER] Fund recovery failed (manual recovery needed): {}", e);
+                                                }
+                                            }
+                                        }
+                                    } else if !cli.json {
+                                        eprintln!("[VERIFY] WARNING: REST API close filled but position still visible. May need more settlement time.");
+                                    }
+                                }
+                                Ok(result) => {
+                                    if !cli.json {
+                                        eprintln!(
+                                            "[VERIFY] REST API close did not fill: status={}, detail={}",
+                                            result.status,
+                                            result.detail.as_deref().unwrap_or("none"),
+                                        );
+                                    }
+                                }
+                                Err(e) => {
+                                    if !cli.json {
+                                        eprintln!("[VERIFY] REST API close failed: {}", e);
+                                    }
+                                }
+                            }
+                        } else if !cli.json {
+                            eprintln!("[VERIFY] No API wallet configured — cannot attempt REST API fallback.");
+                        }
+                    } else {
+                        // Not a close intent — agent chose to hold, position maintained as expected
+                        verified = true;
                     }
                 }
             } else if !cli.json {
@@ -678,6 +809,7 @@ fn main() -> anyhow::Result<()> {
                     "block_number": tx_result.block_number,
                     "success": tx_result.success,
                     "verified": verified,
+                    "was_close": is_close_intent,
                 });
                 println!("{}", serde_json::to_string_pretty(&result)?);
             }

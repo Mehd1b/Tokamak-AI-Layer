@@ -205,12 +205,17 @@ pub async fn check_and_fund_hype(cli: &crate::config::Cli) -> Result<bool> {
     Ok(true) // Funded successfully
 }
 
-/// Deposit USDC from a vault's ERC-20 balance to HyperCore perp margin.
+/// Pre-deposit USDC from the deployer to HyperCore perp margin.
 ///
-/// Calls adapter.depositMarginFromVaultAdmin(vault, amount).
-/// Used to pre-deposit margin before REST API seed trades.
+/// Calls adapter.depositMarginAdmin(vault, amount) which pulls USDC from the
+/// deployer (msg.sender), not the vault. This avoids the chicken-and-egg problem
+/// where the vault hasn't approved the adapter yet (approval only happens inside
+/// ZK proof execution).
+///
+/// The deployer must have USDC and have approved the adapter for spending.
+/// If the deployer hasn't approved yet, this function approves max uint first.
 #[cfg(feature = "onchain")]
-pub async fn deposit_margin_from_vault(cli: &crate::config::Cli, amount: u64) -> Result<()> {
+pub async fn deposit_margin_from_deployer(cli: &crate::config::Cli, amount: u64) -> Result<()> {
     use alloy::network::EthereumWallet;
     use alloy::primitives::{Address, U256};
     use alloy::providers::ProviderBuilder;
@@ -221,7 +226,12 @@ pub async fn deposit_margin_from_vault(cli: &crate::config::Cli, amount: u64) ->
     sol! {
         #[sol(rpc)]
         interface IAdapter {
-            function depositMarginFromVaultAdmin(address vault, uint256 amount) external;
+            function depositMarginAdmin(address vault, uint256 amount) external;
+        }
+        #[sol(rpc)]
+        interface IERC20 {
+            function allowance(address owner, address spender) external view returns (uint256);
+            function approve(address spender, uint256 amount) external returns (bool);
         }
     }
 
@@ -230,6 +240,8 @@ pub async fn deposit_margin_from_vault(cli: &crate::config::Cli, amount: u64) ->
         .map_err(|_| Error::OnChain(format!("Invalid adapter address: {}", adapter_addr_str)))?;
     let vault = Address::from_str(&cli.vault)
         .map_err(|_| Error::OnChain(format!("Invalid vault address: {}", cli.vault)))?;
+    let usdc = Address::from_str(&cli.usdc_address)
+        .map_err(|_| Error::OnChain(format!("Invalid USDC address: {}", cli.usdc_address)))?;
 
     let url: reqwest::Url = cli.rpc
         .parse()
@@ -240,6 +252,7 @@ pub async fn deposit_margin_from_vault(cli: &crate::config::Cli, amount: u64) ->
     let signer: PrivateKeySigner = pk_clean
         .parse()
         .map_err(|_| Error::OnChain("Invalid private key for margin deposit".into()))?;
+    let deployer = signer.address();
 
     let wallet = EthereumWallet::from(signer);
     let provider = ProviderBuilder::new()
@@ -247,10 +260,26 @@ pub async fn deposit_margin_from_vault(cli: &crate::config::Cli, amount: u64) ->
         .wallet(wallet)
         .on_http(url);
 
-    let contract = IAdapter::new(adapter, &provider);
+    // Check if deployer has approved adapter for USDC, approve if needed
+    let usdc_contract = IERC20::new(usdc, &provider);
+    let allowance = usdc_contract.allowance(deployer, adapter).call().await
+        .map_err(|e| Error::OnChain(format!("Failed to check USDC allowance: {}", e)))?._0;
 
+    if allowance < U256::from(amount) {
+        eprintln!("  [PRE-DEPOSIT] Approving adapter for USDC...");
+        let approve_tx = usdc_contract.approve(adapter, U256::MAX).send().await
+            .map_err(|e| Error::OnChain(format!("USDC approve tx failed: {}", e)))?;
+        let approve_receipt = approve_tx.get_receipt().await
+            .map_err(|e| Error::OnChain(format!("USDC approve receipt failed: {}", e)))?;
+        if !approve_receipt.status() {
+            return Err(Error::OnChain("USDC approve reverted".into()));
+        }
+    }
+
+    // Deposit margin from deployer to HyperCore via adapter
+    let contract = IAdapter::new(adapter, &provider);
     let tx = contract
-        .depositMarginFromVaultAdmin(vault, U256::from(amount))
+        .depositMarginAdmin(vault, U256::from(amount))
         .send()
         .await
         .map_err(|e| Error::OnChain(format!("Margin deposit tx failed: {}", e)))?;
@@ -327,14 +356,36 @@ pub async fn recover_funds_to_vault(
     let contract = IAdapter::new(adapter, &provider);
     let usdc_contract = IERC20::new(usdc, &read_provider);
 
+    // Pre-flight: ensure HYPE is available for CoreWriter gas.
+    // Recovery uses up to 3 CoreWriter actions (perpToSpot, spotToEvm, withdrawToVault).
+    // Without HYPE, ALL are silently rejected.
+    eprintln!("  [RECOVER] Checking HYPE for CoreWriter gas...");
+    match check_and_fund_hype(cli).await {
+        Ok(funded) => {
+            if funded {
+                eprintln!("  [RECOVER] HYPE funded. Waiting 15s for bridge settlement...");
+                tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+            } else {
+                eprintln!("  [RECOVER] HYPE OK.");
+            }
+        }
+        Err(e) => {
+            eprintln!("  [RECOVER] HYPE check failed (proceeding anyway): {}", e);
+        }
+    }
+
+    // Dust buffer: leave 0.02 USDC behind to avoid HyperCore rounding rejections.
+    // Trying to withdraw the exact amount risks silent rejection if HyperCore's
+    // internal ledger rounds differently from what the API reports.
+    const DUST_BUFFER: f64 = 0.02;
+
     // Step 1: Transfer perp margin → spot (if any withdrawable)
     let perp_withdrawable = hl_client.get_perp_withdrawable(&cli.sub_account)
         .unwrap_or(0.0);
-    if perp_withdrawable > 0.01 {
-        // Leave 0.005 USDC buffer to avoid exceeding actual balance
-        let amount_1e6 = ((perp_withdrawable - 0.005) * 1_000_000.0) as u64;
+    if perp_withdrawable > DUST_BUFFER + 0.01 {
+        let amount_1e6 = ((perp_withdrawable - DUST_BUFFER) * 1_000_000.0) as u64;
         if amount_1e6 > 0 {
-            eprintln!("  [RECOVER] Step 1: perpToSpot({} raw USDC)...", amount_1e6);
+            eprintln!("  [RECOVER] Step 1: perpToSpot({} raw = ${:.2})...", amount_1e6, amount_1e6 as f64 / 1e6);
             let tx = contract.transferPerpToSpot(vault, amount_1e6).send().await
                 .map_err(|e| Error::OnChain(format!("perpToSpot tx failed: {}", e)))?;
             let receipt = tx.get_receipt().await
@@ -357,11 +408,11 @@ pub async fn recover_funds_to_vault(
 
     // Step 2: Transfer spot → EVM (if any spot USDC)
     let spot_usdc = hl_client.get_spot_usdc(&cli.sub_account).unwrap_or(0.0);
-    if spot_usdc > 0.01 {
-        // adapter.transferSpotToEvm takes amount in 1e6 and internally multiplies by 100
-        let amount_1e6 = ((spot_usdc - 0.005) * 1_000_000.0) as u64;
+    if spot_usdc > DUST_BUFFER + 0.01 {
+        // adapter.transferSpotToEvm takes amount in 1e6, internally multiplies by 100 for 1e8
+        let amount_1e6 = ((spot_usdc - DUST_BUFFER) * 1_000_000.0) as u64;
         if amount_1e6 > 0 {
-            eprintln!("  [RECOVER] Step 2: spotToEvm({} raw USDC)...", amount_1e6);
+            eprintln!("  [RECOVER] Step 2: spotToEvm({} raw = ${:.2})...", amount_1e6, amount_1e6 as f64 / 1e6);
             let tx = contract.transferSpotToEvm(vault, amount_1e6).send().await
                 .map_err(|e| Error::OnChain(format!("spotToEvm tx failed: {}", e)))?;
             let receipt = tx.get_receipt().await
@@ -369,25 +420,38 @@ pub async fn recover_funds_to_vault(
             if !receipt.status() {
                 return Err(Error::OnChain("spotToEvm transaction reverted".into()));
             }
-            // Wait for HyperCore → EVM settlement
-            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+            // Wait for HyperCore → EVM settlement (longer wait — this is the most fragile step)
+            tokio::time::sleep(std::time::Duration::from_secs(15)).await;
 
             // Verify USDC appeared on sub-account's EVM balance
             let evm_balance = usdc_contract.balanceOf(sub).call().await
                 .map_err(|e| Error::OnChain(format!("balanceOf failed: {}", e)))?._0;
             if evm_balance.is_zero() {
-                eprintln!("  [RECOVER] WARNING: spotToEvm may have been silently rejected (EVM USDC=0)");
-                // Retry once after additional wait
-                eprintln!("  [RECOVER] Waiting 15s and retrying...");
+                eprintln!("  [RECOVER] WARNING: spotToEvm not settled yet. Waiting 15s more...");
                 tokio::time::sleep(std::time::Duration::from_secs(15)).await;
-                let tx2 = contract.transferSpotToEvm(vault, amount_1e6).send().await
-                    .map_err(|e| Error::OnChain(format!("spotToEvm retry tx failed: {}", e)))?;
-                let receipt2 = tx2.get_receipt().await
-                    .map_err(|e| Error::OnChain(format!("spotToEvm retry receipt failed: {}", e)))?;
-                if !receipt2.status() {
-                    return Err(Error::OnChain("spotToEvm retry reverted".into()));
+
+                // Re-check before retrying (the first tx might just be slow)
+                let evm_balance2 = usdc_contract.balanceOf(sub).call().await
+                    .map_err(|e| Error::OnChain(format!("balanceOf failed: {}", e)))?._0;
+                if evm_balance2.is_zero() {
+                    // Still nothing — re-fund HYPE and retry the spotToEvm
+                    eprintln!("  [RECOVER] Still 0. Re-checking HYPE and retrying...");
+                    if let Ok(funded) = check_and_fund_hype(cli).await {
+                        if funded {
+                            tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+                        }
+                    }
+                    let tx2 = contract.transferSpotToEvm(vault, amount_1e6).send().await
+                        .map_err(|e| Error::OnChain(format!("spotToEvm retry tx failed: {}", e)))?;
+                    let receipt2 = tx2.get_receipt().await
+                        .map_err(|e| Error::OnChain(format!("spotToEvm retry receipt failed: {}", e)))?;
+                    if !receipt2.status() {
+                        return Err(Error::OnChain("spotToEvm retry reverted".into()));
+                    }
+                    tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+                } else {
+                    eprintln!("  [RECOVER] Step 2 settled (delayed): EVM USDC = {}", evm_balance2);
                 }
-                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
             } else {
                 eprintln!("  [RECOVER] Step 2 verified: EVM USDC = {}", evm_balance);
             }
@@ -407,7 +471,7 @@ pub async fn recover_funds_to_vault(
             return Err(Error::OnChain("withdrawToVault transaction reverted".into()));
         }
         let recovered: u64 = evm_balance.try_into().unwrap_or(0);
-        eprintln!("  [RECOVER] Recovered {} USDC to vault", recovered);
+        eprintln!("  [RECOVER] Recovered {} USDC (${:.2}) to vault", recovered, recovered as f64 / 1e6);
         return Ok(recovered);
     }
 

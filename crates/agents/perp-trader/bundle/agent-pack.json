@@ -7,18 +7,18 @@
   "kernel_version": 1,
   "risc0_version": "3.0.4",
   "rust_toolchain": "1.75.0",
-  "agent_code_hash": "0x9278369e5cd88765a428cf1595c43708b0240332157eaf2af0a758e20001f8d1",
-  "image_id": "0xbb1183db1d9fa05cb545f3b59e5a62721931effa309b8e9152280048bbf9c2c9",
+  "agent_code_hash": "0xd6d848b6c5bec39f95f84e0b869633d0976587339af53b174c5f5bf8f9eba2a8",
+  "image_id": "0x31a3ab90ab3391b178f9d9df8351965af3bf8ee642fb6ed38416c5c5503be6e3",
   "artifacts": {
     "elf_path": "guest.elf",
-    "elf_sha256": "0xcf06829da0e215c134a22f8bb384a7f3fb3261508b098195f2e02426fbecb7c2"
+    "elf_sha256": "0xa1a71146488de9fb060e47413a47f5b94784f909ce6559dc4886dd68e627d664"
   },
   "build": {
     "cargo_lock_sha256": "0x0000000000000000000000000000000000000000000000000000000000000000",
     "build_command": "cd crates/agents/perp-trader/risc0-methods && RISC0_USE_DOCKER=1 cargo build --release",
     "reproducible": true
   },
-  "inputs": "StateSnapshotV1 (36B) + OraclePriceFeed (variable, 111..607B) + PerpInput (239B)",
+  "inputs": "StateSnapshotV1 (36B) + OraclePriceFeed (variable, 111..607B) + PerpInput (240B)",
   "actions_profile": "CALL actions targeting HyperliquidAdapter: openPosition, closePosition",
   "networks": {
     "hyperevm_testnet": {

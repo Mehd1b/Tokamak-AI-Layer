@@ -107,6 +107,11 @@ const FUNDING_REVERSAL_MULTIPLIER: u64 = 3;
 /// Selector: keccak256("openPosition(bool,uint256,uint256,uint256)")[:4] = 0x04ba41cb
 const OPEN_POSITION_SELECTOR: u32 = 0x04ba41cb;
 
+/// HyperliquidAdapter.depositMargin(uint256 amount)
+/// Selector: keccak256("depositMargin(uint256)")[:4] = 0x19bd1776
+/// Deposits USDC from vault to HyperCore perp margin (no order placed).
+const DEPOSIT_MARGIN_SELECTOR: u32 = 0x19bd1776;
+
 /// HyperliquidAdapter.closePositionAtPrice(uint64 px)
 /// Selector: keccak256("closePositionAtPrice(uint64)")[:4] = 0x2c0f36da
 /// Uses agent-computed price within HyperCore's oracle band.
@@ -120,6 +125,15 @@ const FLAG_FORCE_CLOSE: u8 = 1;
 
 /// Action flag: force flat (no-op, stay out of market)
 const FLAG_FORCE_FLAT: u8 = 2;
+
+/// Open phase: normal single-proof mode (approve + openPosition with deposit + order)
+const OPEN_PHASE_NORMAL: u8 = 0;
+
+/// Open phase: deposit only (approve + depositMargin, no order). First of two proofs.
+const OPEN_PHASE_DEPOSIT: u8 = 1;
+
+/// Open phase: order only (openPosition with margin=0, no deposit). Second of two proofs.
+const OPEN_PHASE_ORDER: u8 = 2;
 
 /// Strategy mode: SMA crossover with RSI + funding confirmation
 const STRATEGY_SMA_CROSSOVER: u8 = 0;
@@ -190,6 +204,11 @@ kernel_sdk::agent_input! {
         strategy_mode:             u8,    // 0 = SMA crossover, 1 = Funding rate arb
         // Hyperliquid asset size decimals (1 byte)
         sz_decimals:               u8,    // Asset szDecimals (BTC=5, ETH=4, SOL=2)
+        // Two-proof open phase (1 byte)
+        // 0 = normal (single proof: deposit + order)
+        // 1 = deposit only (first proof: approve + depositMargin)
+        // 2 = order only (second proof: openPosition with margin=0)
+        open_phase:                u8,
     }
 }
 
@@ -616,19 +635,23 @@ fn compute_order_size(margin: u64, mark_price: u64, sz_decimals: u8, max_leverag
 
 /// Compute a close limit price within HyperCore's oracle price band (~5%).
 ///
-/// For closing a long (selling): price = mark * 0.95 (5% below mark)
-/// For closing a short (buying): price = mark * 1.05 (5% above mark)
+/// For closing a long (selling): price = mark * 0.97 (3% below mark)
+/// For closing a short (buying): price = mark * 1.03 (3% above mark)
+///
+/// Uses 3% offset instead of 5% to leave ~2% headroom for price drift during
+/// ZK proof generation (~8-10 min). If the price drifts more than 3%, the host
+/// falls back to the REST API which uses real-time L2 orderbook prices.
 ///
 /// BTC tick size is $1 = 100 in 1e8 scale. Price is rounded to tick.
 fn compute_close_price(mark_price: u64, is_short: bool) -> u64 {
     if is_short {
         // Closing a short = buying → aggressive price above mark
-        let delta = mark_price / 20; // 5%
+        let delta = mark_price * 3 / 100; // 3%
         let px = saturating_add_u64(mark_price, delta);
         (px / 100) * 100 // round down to tick ($1 = 100 in 1e8)
     } else {
         // Closing a long = selling → aggressive price below mark
-        let delta = mark_price / 20; // 5%
+        let delta = mark_price * 3 / 100; // 3%
         let px = saturating_sub_u64(mark_price, delta);
         (px / 100) * 100 // round down to tick
     }
@@ -659,44 +682,78 @@ fn build_close_actions(input: &PerpInput) -> AgentOutput {
     AgentOutput { actions }
 }
 
-/// Build actions to open a long position: approve USDC margin + open with base-asset order size.
+/// Build actions to open a long position, respecting the open_phase for two-proof mode.
 fn build_open_long_actions(input: &PerpInput, margin: u64, order_size: u64) -> AgentOutput {
-    let approve = kernel_sdk::actions::erc20::approve(
-        &input.usdc_token,
-        &input.exchange_contract,
-        margin,
-    );
-    let open = CallBuilder::new(input.exchange_contract)
-        .selector(OPEN_POSITION_SELECTOR)
-        .param_bool(true) // isBuy = true (long)
-        .param_u256_from_u64(margin)      // marginAmount (USDC)
-        .param_u256_from_u64(order_size)  // orderSize (base asset, szDecimals-scaled)
-        .param_u256_from_u64(input.best_ask) // limit price for longs
-        .build();
-    let mut actions = Vec::with_capacity(2);
-    actions.push(approve);
-    actions.push(open);
-    AgentOutput { actions }
+    build_open_actions(input, true, margin, order_size, input.best_ask)
 }
 
-/// Build actions to open a short position: approve USDC margin + open with base-asset order size.
+/// Build actions to open a short position, respecting the open_phase for two-proof mode.
 fn build_open_short_actions(input: &PerpInput, margin: u64, order_size: u64) -> AgentOutput {
-    let approve = kernel_sdk::actions::erc20::approve(
-        &input.usdc_token,
-        &input.exchange_contract,
-        margin,
-    );
-    let open = CallBuilder::new(input.exchange_contract)
-        .selector(OPEN_POSITION_SELECTOR)
-        .param_bool(false) // isBuy = false (short)
-        .param_u256_from_u64(margin)      // marginAmount (USDC)
-        .param_u256_from_u64(order_size)  // orderSize (base asset, szDecimals-scaled)
-        .param_u256_from_u64(input.best_bid) // limit price for shorts
-        .build();
-    let mut actions = Vec::with_capacity(2);
-    actions.push(approve);
-    actions.push(open);
-    AgentOutput { actions }
+    build_open_actions(input, false, margin, order_size, input.best_bid)
+}
+
+/// Build open-position actions dispatched by open_phase.
+///
+/// Phase 0 (normal):  [approve, openPosition(margin, size, price)]  — single proof
+/// Phase 1 (deposit): [approve, depositMargin(margin)]              — first proof
+/// Phase 2 (order):   [openPosition(0, size, price)]                — second proof
+fn build_open_actions(
+    input: &PerpInput,
+    is_buy: bool,
+    margin: u64,
+    order_size: u64,
+    limit_price: u64,
+) -> AgentOutput {
+    match input.open_phase {
+        OPEN_PHASE_DEPOSIT => {
+            // Phase 1: approve adapter for margin + deposit to HyperCore (no order)
+            let approve = kernel_sdk::actions::erc20::approve(
+                &input.usdc_token,
+                &input.exchange_contract,
+                margin,
+            );
+            let deposit = CallBuilder::new(input.exchange_contract)
+                .selector(DEPOSIT_MARGIN_SELECTOR)
+                .param_u256_from_u64(margin)
+                .build();
+            let mut actions = Vec::with_capacity(2);
+            actions.push(approve);
+            actions.push(deposit);
+            AgentOutput { actions }
+        }
+        OPEN_PHASE_ORDER => {
+            // Phase 2: place order only, margin=0 (deposit already settled from phase 1)
+            let open = CallBuilder::new(input.exchange_contract)
+                .selector(OPEN_POSITION_SELECTOR)
+                .param_bool(is_buy)
+                .param_u256_from_u64(0)           // marginAmount = 0 (already deposited)
+                .param_u256_from_u64(order_size)
+                .param_u256_from_u64(limit_price)
+                .build();
+            let mut actions = Vec::with_capacity(1);
+            actions.push(open);
+            AgentOutput { actions }
+        }
+        _ => {
+            // Phase 0 / normal: approve + openPosition with deposit + order (single proof)
+            let approve = kernel_sdk::actions::erc20::approve(
+                &input.usdc_token,
+                &input.exchange_contract,
+                margin,
+            );
+            let open = CallBuilder::new(input.exchange_contract)
+                .selector(OPEN_POSITION_SELECTOR)
+                .param_bool(is_buy)
+                .param_u256_from_u64(margin)
+                .param_u256_from_u64(order_size)
+                .param_u256_from_u64(limit_price)
+                .build();
+            let mut actions = Vec::with_capacity(2);
+            actions.push(approve);
+            actions.push(open);
+            AgentOutput { actions }
+        }
+    }
 }
 
 // ============================================================================

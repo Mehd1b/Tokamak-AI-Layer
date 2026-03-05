@@ -207,14 +207,14 @@ contract TradingSubAccount {
     /// @param orderSize Position size in base asset units (szDecimals-scaled)
     /// @param px Limit price in 1e8 scaled units (agent-computed, must be within HyperCore price band)
     function executeOpen(bool isBuy, uint64 marginAmount, uint64 orderSize, uint64 px) external onlyAdapter {
-        uint256 margin = uint256(marginAmount);
-
-        // 1. Approve CoreDepositWallet to spend USDC margin
-        IERC20(usdc).forceApprove(coreDepositWallet, margin);
-
-        // 2. Deposit USDC to HyperCore perp margin
-        ICoreDepositWallet(coreDepositWallet).deposit(margin, DEST_DEX_PERP);
-        emit MarginDeposited(margin);
+        // 1-2. Deposit margin to HyperCore (skip if margin=0, used in two-proof mode
+        // where deposit was done in a prior proof via depositMargin)
+        if (marginAmount > 0) {
+            uint256 margin = uint256(marginAmount);
+            IERC20(usdc).forceApprove(coreDepositWallet, margin);
+            ICoreDepositWallet(coreDepositWallet).deposit(margin, DEST_DEX_PERP);
+            emit MarginDeposited(margin);
+        }
 
         // 3. Place IOC order at agent's limit price via CoreWriter
         //    HyperCore enforces price bands around the oracle price — extreme prices

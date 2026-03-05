@@ -144,6 +144,13 @@ pub struct Cli {
     #[arg(long, env = "ADAPTER_ADDRESS")]
     pub adapter_address: Option<String>,
 
+    /// Amount of USDC (raw 1e6 units) to pre-deposit from vault to HyperCore
+    /// before an open-position ZK proof. Ensures margin is settled on HyperCore
+    /// when the CoreWriter limit order executes (deposit is async).
+    /// Default: 5_000_000 (5 USDC). Set to 0 to disable pre-deposit.
+    #[arg(long, default_value_t = 5_000_000)]
+    pub pre_deposit_usdc: u64,
+
     // ---- Execution modes ----
     /// Use dev-mode proving (fast, not on-chain verifiable)
     #[arg(long, default_value_t = false)]
