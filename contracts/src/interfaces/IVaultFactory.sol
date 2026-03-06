@@ -31,6 +31,39 @@ interface IVaultFactory {
         bytes32 expectedImageId
     ) external returns (address vault);
 
+    /// @notice Deploy a new OptimisticKernelVault for an agent
+    /// @param agentId The agent ID to bind the vault to
+    /// @param asset The ERC20 asset address (or address(0) for ETH)
+    /// @param userSalt User-provided salt for CREATE2 address prediction
+    /// @param expectedImageId The expected RISC Zero image ID (verified against registry)
+    /// @param bondManager The bond manager contract address
+    /// @param challengeWindow Initial challenge window in seconds
+    /// @return vault The deployed OptimisticKernelVault address
+    function deployOptimisticVault(
+        bytes32 agentId,
+        address asset,
+        bytes32 userSalt,
+        bytes32 expectedImageId,
+        address bondManager,
+        uint256 challengeWindow
+    ) external returns (address vault);
+
+    /// @notice Compute the deterministic optimistic vault address before deployment
+    /// @param owner The vault owner's address
+    /// @param agentId The agent ID from AgentRegistry
+    /// @param asset The ERC20 asset address (or address(0) for ETH)
+    /// @param userSalt A unique salt chosen by the user
+    /// @param bondManager The bond manager contract address
+    /// @return vault The computed vault address
+    /// @return salt The CREATE2 salt used for deployment
+    function computeOptimisticVaultAddress(
+        address owner,
+        bytes32 agentId,
+        address asset,
+        bytes32 userSalt,
+        address bondManager
+    ) external view returns (address vault, bytes32 salt);
+
     /// @notice Image ID changed between computeVaultAddress and deployVault
     error ImageIdChanged(bytes32 expected, bytes32 actual);
 
@@ -69,6 +102,10 @@ interface IVaultFactory {
     /// @return The code store contract whose runtime bytecode is KernelVault creation code
     function vaultCreationCodeStore() external view returns (address);
 
+    /// @notice Get the OptimisticVaultCreationCodeStore address
+    /// @return The code store contract whose runtime bytecode is OptimisticKernelVault creation code
+    function optimisticVaultCreationCodeStore() external view returns (address);
+
     /// @notice Emitted when a vault is deployed
     event VaultDeployed(
         address indexed vault,
@@ -77,6 +114,14 @@ interface IVaultFactory {
         address asset,
         bytes32 trustedImageId,
         bytes32 salt
+    );
+
+    /// @notice Emitted when an optimistic vault is deployed
+    event OptimisticVaultDeployed(
+        address indexed vault,
+        bytes32 indexed agentId,
+        address indexed owner,
+        address bondManager
     );
 
     /// @notice Agent not registered in the registry

@@ -1,6 +1,9 @@
 //! Perp-trader host CLI: single-shot execution cycle.
 //!
 //! Pipeline: fetch → build → prove → submit
+//!
+//! With `--optimistic`: fetch → build → reconstruct → submitOptimistic → queue proof
+//! (proof generated asynchronously in background thread)
 
 mod config;
 mod error;
@@ -8,16 +11,21 @@ mod hyperliquid;
 mod indicators;
 mod input_builder;
 mod market;
+mod monitor;
 mod oracle_signer;
 mod onchain;
 mod output_reconstruct;
 mod prove;
+mod prove_worker;
 mod seed_trade;
 
 use clap::Parser;
 use config::Cli;
 use kernel_core::CanonicalDecode;
 use market::MarketDataProvider;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
 
 /// Persistent state between single-shot cycles to track open positions.
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -50,6 +58,65 @@ fn clear_position_state(path: &str) {
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
+    // Start background proving worker if optimistic mode is enabled.
+    // The worker runs in a separate thread, dequeuing proof jobs and submitting
+    // proofs on-chain as they complete.
+    let proof_queue = prove_worker::new_proof_queue();
+    let shutdown = Arc::new(AtomicBool::new(false));
+    let worker_status = prove_worker::WorkerStatus::new();
+    let last_known_nonce = Arc::new(AtomicU64::new(0));
+
+    if cli.optimistic {
+        let worker_queue = proof_queue.clone();
+        let worker_shutdown = shutdown.clone();
+        let worker_status_clone = worker_status.clone();
+        std::thread::spawn(move || {
+            prove_worker::run_proving_worker(worker_queue, worker_shutdown, worker_status_clone);
+        });
+
+        // Start monitor thread for deadline tracking
+        let monitor_shutdown = shutdown.clone();
+        let monitor_nonce = last_known_nonce.clone();
+        let monitor_rpc = cli.rpc.clone();
+        let monitor_vault = cli.vault.clone();
+        std::thread::spawn(move || {
+            monitor::run_monitor_loop(
+                monitor::MonitorConfig::new(monitor_rpc, monitor_vault),
+                1, // first_optimistic_nonce (will check from nonce 1)
+                monitor_nonce,
+                monitor_shutdown,
+            );
+        });
+
+        if !cli.json {
+            eprintln!("[optimistic] Background proving worker and monitor started.");
+        }
+    }
+
+    let result = run_pipeline(&cli, &proof_queue, &last_known_nonce);
+
+    // Signal background threads to stop.
+    // In single-shot mode, the main thread exits after one cycle, so background
+    // threads are cleaned up by process termination. In a future daemon mode,
+    // this flag allows graceful shutdown.
+    shutdown.store(true, Ordering::Relaxed);
+
+    // Give background threads a moment to notice the shutdown signal before
+    // the process exits and kills them. Only needed if optimistic mode is active
+    // and we want clean log output from the worker.
+    if cli.optimistic {
+        std::thread::sleep(Duration::from_millis(100));
+    }
+
+    result
+}
+
+/// Main execution pipeline, extracted for clean shutdown handling.
+fn run_pipeline(
+    cli: &Cli,
+    proof_queue: &prove_worker::ProofQueue,
+    last_known_nonce: &Arc<AtomicU64>,
+) -> anyhow::Result<()> {
     // 1. Load agent-pack bundle
     let bundle = reference_integrator::LoadedBundle::load(&cli.bundle)
         .map_err(|e| anyhow::anyhow!("Failed to load bundle: {}", e))?;
@@ -384,6 +451,112 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    // === OPTIMISTIC EXECUTION PATH (RFC-001) ===
+    //
+    // When --optimistic is enabled, submit actions immediately with a predicted
+    // journal (no ZK proof needed yet). The proof is generated asynchronously
+    // in the background worker thread and submitted before the challenge window
+    // deadline.
+    //
+    // NOTE: Optimistic mode is incompatible with two-proof opens. If the agent
+    // wants to open a new position, fall through to the synchronous path.
+    if cli.optimistic && !needs_two_proof {
+        if !cli.json {
+            eprintln!("[optimistic] Building predicted journal...");
+        }
+
+        // Build predicted journal: identical to what the zkVM would produce,
+        // but computed entirely on the host side (no proving needed).
+        let predicted_journal = build_predicted_journal(
+            &kernel_input,
+            &input_bytes,
+            &agent_output_bytes,
+        )?;
+
+        if !cli.json {
+            eprintln!(
+                "[optimistic] Predicted journal: {} bytes",
+                predicted_journal.len()
+            );
+        }
+
+        // Submit optimistically (actions execute immediately, bond escrowed)
+        #[cfg(feature = "onchain")]
+        {
+            use std::time::Instant;
+            let pk = Cli::resolve_key(&cli.pk)?;
+            if !cli.json {
+                eprintln!("[optimistic] Submitting optimistic execution to vault...");
+            }
+
+            let rt = tokio::runtime::Runtime::new()?;
+            let execution_nonce = rt.block_on(submit_optimistic_execution(
+                &cli.vault,
+                &cli.rpc,
+                &pk,
+                &predicted_journal,
+                &agent_output_bytes,
+                &signed_feed.onchain_signature,
+                signed_feed.feed.timestamp,
+                cli.bond_amount,
+            ))?;
+
+            if !cli.json {
+                eprintln!(
+                    "[optimistic] Execution nonce {} submitted! Actions executed immediately.",
+                    execution_nonce
+                );
+            }
+
+            // Update last known nonce for the monitor thread
+            last_known_nonce.store(execution_nonce, Ordering::Relaxed);
+
+            // Queue proof job for background worker
+            let proof_job = prove_worker::PendingProof {
+                execution_nonce,
+                input_bytes: input_bytes.clone(),
+                bundle_path: cli.bundle.clone(),
+                rpc_url: cli.rpc.clone(),
+                vault_address: cli.vault.clone(),
+                private_key: pk,
+                deadline: Instant::now() + Duration::from_secs(cli.challenge_window),
+                queued_at: Instant::now(),
+                dev_mode: cli.dev_mode,
+                retry_count: 0,
+            };
+
+            {
+                let mut queue = proof_queue.lock().unwrap();
+                queue.push_back(proof_job);
+            }
+
+            if cli.json {
+                let result = serde_json::json!({
+                    "status": "optimistic_submitted",
+                    "execution_nonce": execution_nonce,
+                    "actions": action_count,
+                    "challenge_window_secs": cli.challenge_window,
+                    "proof_queued": true,
+                });
+                println!("{}", serde_json::to_string_pretty(&result)?);
+            } else {
+                eprintln!(
+                    "[optimistic] Proof job queued (deadline in {}s). Main thread returning.",
+                    cli.challenge_window
+                );
+            }
+
+            return Ok(());
+        }
+
+        #[cfg(not(feature = "onchain"))]
+        {
+            return Err(anyhow::anyhow!(
+                "Optimistic execution requires --features onchain."
+            ));
+        }
+    }
+
     // 8. Generate proof(s) and produce the final proof package for submission.
     //
     // For two-proof opens: generate + submit deposit proof, wait, then generate
@@ -476,13 +649,22 @@ fn main() -> anyhow::Result<()> {
 
         // Re-fetch market data (fresh prices for the order)
         let mut snapshot_2 = hl_client.fetch_snapshot(&cli.asset, &cli.sub_account, cli.candles_needed())?;
-        let vault_equity_2 = vault_state_2.total_assets as f64;
-        if vault_equity_2 > 0.0 {
+
+        // Phase 2 equity: use HyperCore equity (where margin was deposited in Phase 1),
+        // NOT vault balance (which only has the 10% leftover after deposit).
+        let hypercore_equity = snapshot_2.account_equity; // decimal USDC from HyperCore API
+        if hypercore_equity > 0.5 {
+            // HyperCore has the deposited margin — use it for order sizing
+            snapshot_2.account_equity = hypercore_equity * 1_000_000.0;
+            snapshot_2.available_balance = snapshot_2.account_equity - snapshot_2.margin_used;
+            if !cli.json {
+                eprintln!("[OPEN] Phase 2: using HyperCore equity ${:.2} for order sizing", hypercore_equity);
+            }
+        } else {
+            // Fallback: use vault balance (shouldn't happen in normal two-proof flow)
+            let vault_equity_2 = vault_state_2.total_assets as f64;
             snapshot_2.account_equity = vault_equity_2;
             snapshot_2.available_balance = vault_equity_2 - snapshot_2.margin_used;
-        } else if snapshot_2.account_equity > 0.0 {
-            snapshot_2.account_equity *= 1_000_000.0;
-            snapshot_2.available_balance = snapshot_2.account_equity - snapshot_2.margin_used;
         }
 
         let indicator_set_2 = indicators::compute_indicators(&snapshot_2.candle_closes, &cli)?;
@@ -824,4 +1006,173 @@ fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+// ============================================================================
+// Optimistic execution helpers (RFC-001)
+// ============================================================================
+
+/// Build a predicted journal without running the zkVM prover.
+///
+/// The journal is deterministic given the input and agent output. This function
+/// replicates the kernel's journal construction logic on the host side:
+///   - Identity fields copied from KernelInputV1
+///   - input_commitment = SHA256(input_bytes)
+///   - action_commitment = SHA256(agent_output_bytes)
+///   - execution_status = Success (0x01)
+///
+/// The resulting bytes are identical to what the zkVM guest would produce.
+fn build_predicted_journal(
+    kernel_input: &kernel_core::KernelInputV1,
+    input_bytes: &[u8],
+    agent_output_bytes: &[u8],
+) -> anyhow::Result<Vec<u8>> {
+    use kernel_core::{CanonicalEncode, ExecutionStatus, KernelJournalV1};
+    use sha2::{Digest, Sha256};
+
+    // Compute input commitment
+    let input_commitment: [u8; 32] = {
+        let mut hasher = Sha256::new();
+        hasher.update(input_bytes);
+        hasher.finalize().into()
+    };
+
+    // Compute action commitment
+    let action_commitment: [u8; 32] = {
+        let mut hasher = Sha256::new();
+        hasher.update(agent_output_bytes);
+        hasher.finalize().into()
+    };
+
+    let journal = KernelJournalV1 {
+        protocol_version: kernel_input.protocol_version,
+        kernel_version: kernel_input.kernel_version,
+        agent_id: kernel_input.agent_id,
+        agent_code_hash: kernel_input.agent_code_hash,
+        constraint_set_hash: kernel_input.constraint_set_hash,
+        input_root: kernel_input.input_root,
+        execution_nonce: kernel_input.execution_nonce,
+        input_commitment,
+        action_commitment,
+        execution_status: ExecutionStatus::Success,
+    };
+
+    journal
+        .encode()
+        .map_err(|e| anyhow::anyhow!("Failed to encode predicted journal: {:?}", e))
+}
+
+/// Submit an optimistic execution on-chain via vault.executeOptimistic().
+///
+/// Actions execute immediately. Bond is escrowed. Returns the execution nonce
+/// assigned by the vault contract.
+#[cfg(feature = "onchain")]
+async fn submit_optimistic_execution(
+    vault_address: &str,
+    rpc_url: &str,
+    private_key: &str,
+    journal_bytes: &[u8],
+    agent_output_bytes: &[u8],
+    oracle_signature: &[u8],
+    oracle_timestamp: u64,
+    bond_amount: u128,
+) -> anyhow::Result<u64> {
+    use alloy::network::EthereumWallet;
+    use alloy::primitives::{Address, Bytes, U256};
+    use alloy::providers::ProviderBuilder;
+    use alloy::signers::local::PrivateKeySigner;
+    use alloy::sol;
+    use std::str::FromStr;
+
+    sol! {
+        #[sol(rpc)]
+        interface IOptimisticKernelVault {
+            function executeOptimistic(
+                bytes calldata journal,
+                bytes calldata agentOutputBytes,
+                bytes calldata oracleSignature,
+                uint64 oracleTimestamp
+            ) external payable returns (uint64 executionNonce);
+
+            function lastExecutionNonce() external view returns (uint64);
+
+            function getMinBond() external view returns (uint256);
+        }
+    }
+
+    let vault = Address::from_str(vault_address)
+        .map_err(|_| anyhow::anyhow!("Invalid vault address: {}", vault_address))?;
+
+    let url: reqwest::Url = rpc_url
+        .parse()
+        .map_err(|_| anyhow::anyhow!("Invalid RPC URL: {}", rpc_url))?;
+
+    let pk_clean = private_key.strip_prefix("0x").unwrap_or(private_key);
+    let signer: PrivateKeySigner = pk_clean
+        .parse()
+        .map_err(|_| anyhow::anyhow!("Invalid private key"))?;
+
+    let wallet = EthereumWallet::from(signer);
+    let provider = ProviderBuilder::new()
+        .with_recommended_fillers()
+        .wallet(wallet)
+        .on_http(url);
+
+    let contract = IOptimisticKernelVault::new(vault, &provider);
+
+    // Determine bond amount: use provided value or query on-chain min
+    let bond = if bond_amount > 0 {
+        U256::from(bond_amount)
+    } else {
+        let min_bond = contract
+            .getMinBond()
+            .call()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to query getMinBond: {}", e))?
+            ._0;
+        eprintln!("[optimistic] Auto-queried min bond: {} wei", min_bond);
+        min_bond
+    };
+
+    // Read nonce before submission to detect the new one
+    let nonce_before = contract
+        .lastExecutionNonce()
+        .call()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to read nonce: {}", e))?
+        ._0;
+
+    let journal = Bytes::copy_from_slice(journal_bytes);
+    let output = Bytes::copy_from_slice(agent_output_bytes);
+    let oracle_sig = Bytes::copy_from_slice(oracle_signature);
+
+    let tx = contract
+        .executeOptimistic(journal, output, oracle_sig, oracle_timestamp)
+        .value(bond)
+        .send()
+        .await
+        .map_err(|e| anyhow::anyhow!("executeOptimistic tx failed: {}", e))?;
+
+    let receipt = tx
+        .get_receipt()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to get executeOptimistic receipt: {}", e))?;
+
+    if !receipt.status() {
+        let tx_hash = format!("0x{}", hex::encode(receipt.transaction_hash.as_slice()));
+        return Err(anyhow::anyhow!(
+            "executeOptimistic transaction reverted: {}",
+            tx_hash
+        ));
+    }
+
+    let tx_hash = format!("0x{}", hex::encode(receipt.transaction_hash.as_slice()));
+    eprintln!(
+        "[optimistic] executeOptimistic tx confirmed: {} (block {:?})",
+        tx_hash, receipt.block_number
+    );
+
+    // The execution nonce is nonce_before + 1 (vault increments atomically)
+    let execution_nonce = nonce_before + 1;
+    Ok(execution_nonce)
 }

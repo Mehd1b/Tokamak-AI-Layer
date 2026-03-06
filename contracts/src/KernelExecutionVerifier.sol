@@ -150,6 +150,17 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
         return parsed;
     }
 
+    /// @notice Verify a RISC Zero proof without parsing the journal
+    /// @dev Used by OptimisticKernelVault to verify proofs for pending executions
+    ///      where the journal hash was stored at submission time.
+    /// @param seal The RISC Zero proof seal
+    /// @param imageId The expected image ID
+    /// @param journalDigest The SHA256 digest of the journal
+    function verify(bytes calldata seal, bytes32 imageId, bytes32 journalDigest) external view {
+        if (imageId == bytes32(0)) revert ZeroImageId();
+        verifier.verify(seal, imageId, journalDigest);
+    }
+
     /// @notice Parse journal without proof verification (for testing/viewing)
     /// @param journal The raw journal bytes
     /// @return parsed The parsed journal fields

@@ -7,7 +7,7 @@ import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable
 import { UUPSUpgradeable } from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 /// @title VaultFactory
-/// @notice Factory for deploying KernelVault instances with CREATE2
+/// @notice Factory for deploying KernelVault and OptimisticKernelVault instances with CREATE2
 /// @dev Deploys vaults with imageId pinned from AgentRegistry at deployment time.
 ///      Registry updates do NOT affect already-deployed vaults.
 ///      Uses UUPS proxy pattern for upgradeability.
@@ -35,8 +35,11 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     /// @notice Mapping from agentId to all vault addresses deployed for that agent
     mapping(bytes32 => address[]) internal _agentVaults;
 
+    /// @notice Contract whose runtime bytecode is OptimisticKernelVault creation code
+    address public _optimisticVaultCreationCodeStore;
+
     /// @notice Storage gap for future upgrades
-    uint256[44] private __gap;
+    uint256[43] private __gap;
 
     // ============ Errors ============
 
@@ -115,6 +118,16 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         _vaultCreationCodeStore = newStore;
     }
 
+    /// @notice Update the OptimisticVaultCreationCodeStore (owner only).
+    /// @dev Used when OptimisticKernelVault bytecode changes.
+    ///      Only affects new vaults — already-deployed vaults are immutable.
+    /// @param newStore The new OptimisticVaultCreationCodeStore contract address
+    function setOptimisticVaultCreationCodeStore(address newStore) external onlyOwner {
+        require(newStore != address(0), "zero optimisticVaultCodeStore");
+        require(newStore.code.length > 0, "no code at store");
+        _optimisticVaultCreationCodeStore = newStore;
+    }
+
     // ============ External Functions ============
 
     /// @inheritdoc IVaultFactory
@@ -130,6 +143,11 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     /// @inheritdoc IVaultFactory
     function vaultCreationCodeStore() external view returns (address) {
         return _vaultCreationCodeStore;
+    }
+
+    /// @inheritdoc IVaultFactory
+    function optimisticVaultCreationCodeStore() external view returns (address) {
+        return _optimisticVaultCreationCodeStore;
     }
 
     /// @inheritdoc IVaultFactory
@@ -213,6 +231,94 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     }
 
     /// @inheritdoc IVaultFactory
+    function deployOptimisticVault(
+        bytes32 agentId,
+        address asset,
+        bytes32 userSalt,
+        bytes32 expectedImageId,
+        address bondManager,
+        uint256 challengeWindow
+    ) external returns (address vault) {
+        // Get agent info from registry
+        IAgentRegistry.AgentInfo memory agentInfo = _registry.get(agentId);
+        if (!agentInfo.exists) {
+            revert AgentNotRegistered(agentId);
+        }
+
+        // Only the agent author can deploy vaults for their agent
+        if (msg.sender != agentInfo.author) {
+            revert NotAgentAuthor(agentId, msg.sender, agentInfo.author);
+        }
+
+        // Verify imageId hasn't changed since computeVaultAddress was called
+        if (agentInfo.imageId != expectedImageId) {
+            revert ImageIdChanged(expectedImageId, agentInfo.imageId);
+        }
+
+        // Compute CREATE2 salt
+        bytes32 salt = _computeSalt(msg.sender, agentId, asset, userSalt);
+
+        // Get creation bytecode with constructor args (owner = agent author = msg.sender)
+        bytes memory bytecode = _getOptimisticCreationBytecode(
+            asset, agentId, agentInfo.imageId, msg.sender, bondManager
+        );
+
+        // Deploy with CREATE2
+        assembly {
+            vault := create2(0, add(bytecode, 0x20), mload(bytecode), salt)
+        }
+
+        // Verify deployment succeeded
+        if (vault == address(0)) {
+            revert VaultAlreadyExists(vault);
+        }
+
+        // Track deployment (shared tracking with regular vaults)
+        isDeployedVault[vault] = true;
+        _deployedVaults.push(vault);
+        _agentVaults[agentId].push(vault);
+
+        emit OptimisticVaultDeployed(vault, agentId, msg.sender, bondManager);
+        emit VaultDeployed(vault, msg.sender, agentId, asset, agentInfo.imageId, salt);
+
+        return vault;
+    }
+
+    /// @inheritdoc IVaultFactory
+    function computeOptimisticVaultAddress(
+        address owner_,
+        bytes32 agentId,
+        address asset,
+        bytes32 userSalt,
+        address bondManager
+    ) external view returns (address vault, bytes32 salt) {
+        // Compute CREATE2 salt
+        salt = _computeSalt(owner_, agentId, asset, userSalt);
+
+        // Get agent info to include imageId in bytecode
+        IAgentRegistry.AgentInfo memory agentInfo = _registry.get(agentId);
+        if (!agentInfo.exists) {
+            revert AgentNotRegistered(agentId);
+        }
+
+        // Compute CREATE2 address
+        bytes memory bytecode = _getOptimisticCreationBytecode(
+            asset, agentId, agentInfo.imageId, owner_, bondManager
+        );
+        bytes32 bytecodeHash = keccak256(bytecode);
+
+        vault = address(
+            uint160(
+                uint256(
+                    keccak256(abi.encodePacked(bytes1(0xff), address(this), salt, bytecodeHash))
+                )
+            )
+        );
+
+        return (vault, salt);
+    }
+
+    /// @inheritdoc IVaultFactory
     function vaultCount() external view returns (uint256) {
         return _deployedVaults.length;
     }
@@ -264,6 +370,27 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         return abi.encodePacked(
             _vaultCreationCodeStore.code,
             abi.encode(asset, _verifier, agentId, imageId, vaultOwner)
+        );
+    }
+
+    /// @notice Get the creation bytecode for OptimisticKernelVault with constructor arguments
+    /// @param asset The asset address
+    /// @param agentId The agent ID
+    /// @param imageId The trusted image ID
+    /// @param vaultOwner The vault owner (agent author)
+    /// @param bondManager The bond manager contract address
+    /// @return The creation bytecode
+    function _getOptimisticCreationBytecode(
+        address asset,
+        bytes32 agentId,
+        bytes32 imageId,
+        address vaultOwner,
+        address bondManager
+    ) internal view returns (bytes memory) {
+        require(_optimisticVaultCreationCodeStore != address(0), "optimistic code store not set");
+        return abi.encodePacked(
+            _optimisticVaultCreationCodeStore.code,
+            abi.encode(asset, _verifier, agentId, imageId, vaultOwner, bondManager)
         );
     }
 }

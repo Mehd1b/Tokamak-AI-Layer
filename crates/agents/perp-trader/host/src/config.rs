@@ -163,6 +163,26 @@ pub struct Cli {
     /// Output results as JSON
     #[arg(long, default_value_t = false)]
     pub json: bool,
+
+    // ---- Optimistic execution (RFC-001) ----
+    /// Enable optimistic execution mode.
+    /// Actions execute immediately upon submitting a predicted journal + bond.
+    /// Proof is generated asynchronously in a background thread and submitted later.
+    #[arg(long, default_value_t = false)]
+    pub optimistic: bool,
+
+    /// Bond amount in wei (native token) for optimistic execution.
+    /// If 0, the host will query BondManager.getMinBond() on-chain.
+    /// Default: 0 (auto-query).
+    #[arg(long, default_value_t = 0)]
+    pub bond_amount: u128,
+
+    /// Expected challenge window in seconds (for deadline tracking).
+    /// The operator's proof must be submitted within this window after
+    /// optimistic execution, or the bond is slashed.
+    /// Default: 3600 (1 hour).
+    #[arg(long, default_value_t = 3600)]
+    pub challenge_window: u64,
 }
 
 impl Cli {

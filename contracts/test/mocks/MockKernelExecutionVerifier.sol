@@ -122,6 +122,20 @@ contract MockKernelExecutionVerifier is IKernelExecutionVerifier {
     }
 
     /// @inheritdoc IKernelExecutionVerifier
+    /// @dev Verify a proof without parsing — mock version checks shouldRevert flag
+    function verify(bytes calldata, bytes32 imageId, bytes32) external view override {
+        if (shouldRevert) {
+            revert MockRevert(revertMessage);
+        }
+        if (imageId == bytes32(0)) {
+            revert ZeroImageId();
+        }
+        if (validateImageId && imageId != expectedImageId) {
+            revert ImageIdMismatch(expectedImageId, imageId);
+        }
+    }
+
+    /// @inheritdoc IKernelExecutionVerifier
     /// @dev Returns empty journal for mock - pure function can't access storage
     function parseJournal(bytes calldata) external pure override returns (ParsedJournal memory) {
         return ParsedJournal({

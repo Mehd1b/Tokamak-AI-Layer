@@ -77,6 +77,8 @@ pub mod agent_output;
 pub mod bundle;
 pub mod execute;
 pub mod input;
+pub mod optimistic;
+pub mod predict;
 pub mod prove;
 pub mod verify;
 
@@ -88,12 +90,18 @@ pub use input::{
     build_and_encode_input, build_kernel_input, build_kernel_input_raw, parse_hex, parse_hex_32,
     InputError, InputParams,
 };
+pub use predict::{build_predicted_journal, build_predicted_journal_struct, PredictError};
 pub use prove::{is_proving_available, ProveError, ProveResult, ProvingMode};
 pub use verify::{verify_offline, verify_structure, OfflineVerificationResult, VerifyError};
 
 // Conditional re-exports based on features
 #[cfg(feature = "onchain")]
 pub use execute::execute_onchain;
+
+#[cfg(feature = "onchain")]
+pub use optimistic::{
+    query_pending_execution, submit_optimistic, submit_proof, PendingExecutionInfo,
+};
 
 #[cfg(feature = "onchain")]
 pub use verify::{verify_full, verify_onchain, OnchainVerificationResult};
