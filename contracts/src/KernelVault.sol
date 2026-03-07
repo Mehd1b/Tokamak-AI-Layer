@@ -413,8 +413,8 @@ contract KernelVault is ReentrancyGuard, Pausable {
             revert AgentIdMismatch(agentId, parsed.agentId);
         }
 
-        // 3. Verify oracle signature if oracle signer is configured
-        if (oracleSigner != address(0)) {
+        // 3. Verify oracle signature if oracle signer is configured and signature provided
+        if (oracleSigner != address(0) && oracleSignature.length > 0) {
             OracleVerifier.requireValidOracleSignature(
                 parsed.inputRoot,
                 oracleSignature,

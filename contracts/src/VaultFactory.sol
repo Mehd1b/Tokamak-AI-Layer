@@ -236,7 +236,7 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         address asset,
         bytes32 userSalt,
         bytes32 expectedImageId,
-        address bondManager,
+        uint256 bondChainId,
         uint256 challengeWindow
     ) external returns (address vault) {
         // Get agent info from registry
@@ -260,7 +260,7 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
 
         // Get creation bytecode with constructor args (owner = agent author = msg.sender)
         bytes memory bytecode = _getOptimisticCreationBytecode(
-            asset, agentId, agentInfo.imageId, msg.sender, bondManager
+            asset, agentId, agentInfo.imageId, msg.sender, bondChainId
         );
 
         // Deploy with CREATE2
@@ -278,7 +278,7 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         _deployedVaults.push(vault);
         _agentVaults[agentId].push(vault);
 
-        emit OptimisticVaultDeployed(vault, agentId, msg.sender, bondManager);
+        emit OptimisticVaultDeployed(vault, agentId, msg.sender, bondChainId);
         emit VaultDeployed(vault, msg.sender, agentId, asset, agentInfo.imageId, salt);
 
         return vault;
@@ -290,7 +290,7 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         bytes32 agentId,
         address asset,
         bytes32 userSalt,
-        address bondManager
+        uint256 bondChainId
     ) external view returns (address vault, bytes32 salt) {
         // Compute CREATE2 salt
         salt = _computeSalt(owner_, agentId, asset, userSalt);
@@ -303,7 +303,7 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
 
         // Compute CREATE2 address
         bytes memory bytecode = _getOptimisticCreationBytecode(
-            asset, agentId, agentInfo.imageId, owner_, bondManager
+            asset, agentId, agentInfo.imageId, owner_, bondChainId
         );
         bytes32 bytecodeHash = keccak256(bytecode);
 
@@ -316,6 +316,19 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         );
 
         return (vault, salt);
+    }
+
+    /// @inheritdoc IVaultFactory
+    function registerExternalVault(address vault, bytes32 agentId) external onlyOwner {
+        require(vault != address(0), "zero vault");
+        require(vault.code.length > 0, "no code at vault");
+        require(!isDeployedVault[vault], "already registered");
+
+        isDeployedVault[vault] = true;
+        _deployedVaults.push(vault);
+        _agentVaults[agentId].push(vault);
+
+        emit ExternalVaultRegistered(vault, agentId);
     }
 
     /// @inheritdoc IVaultFactory
@@ -378,19 +391,19 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     /// @param agentId The agent ID
     /// @param imageId The trusted image ID
     /// @param vaultOwner The vault owner (agent author)
-    /// @param bondManager The bond manager contract address
+    /// @param bondChainId The L1 chain ID where bonds are locked
     /// @return The creation bytecode
     function _getOptimisticCreationBytecode(
         address asset,
         bytes32 agentId,
         bytes32 imageId,
         address vaultOwner,
-        address bondManager
+        uint256 bondChainId
     ) internal view returns (bytes memory) {
         require(_optimisticVaultCreationCodeStore != address(0), "optimistic code store not set");
         return abi.encodePacked(
             _optimisticVaultCreationCodeStore.code,
-            abi.encode(asset, _verifier, agentId, imageId, vaultOwner, bondManager)
+            abi.encode(asset, _verifier, agentId, imageId, vaultOwner, bondChainId)
         );
     }
 }

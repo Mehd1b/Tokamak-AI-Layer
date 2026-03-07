@@ -6,26 +6,26 @@ import { OptimisticKernelVault } from "../../src/OptimisticKernelVault.sol";
 import { KernelVault } from "../../src/KernelVault.sol";
 import { KernelExecutionVerifier } from "../../src/KernelExecutionVerifier.sol";
 import { KernelOutputParser } from "../../src/KernelOutputParser.sol";
-import { WSTONBondManager } from "../../src/WSTONBondManager.sol";
 import { IOptimisticKernelVault } from "../../src/interfaces/IOptimisticKernelVault.sol";
+import { OracleVerifier } from "../../src/libraries/OracleVerifier.sol";
 import { MockVerifier } from "../mocks/MockVerifier.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /// @title OptimisticIntegrationTest
-/// @notice Integration tests for the full optimistic execution stack
+/// @notice Integration tests for the full optimistic execution stack (cross-chain oracle-attested bonds)
 contract OptimisticIntegrationTest is Test {
     OptimisticKernelVault public vault;
     KernelExecutionVerifier public executionVerifier;
     MockVerifier public mockRiscZeroVerifier;
-    WSTONBondManager public bondManager;
     MockERC20 public token;
-    MockERC20 public mockWston;
+
+    uint256 public constant ORACLE_PRIVATE_KEY = 0xA11CE;
+    address public oracleSigner;
 
     address public owner = address(this);
     address public user = address(0x1111111111111111111111111111111111111111);
     address public recipient = address(0x2222222222222222222222222222222222222222);
-    address public treasury = address(0x3333333333333333333333333333333333333333);
     address public slasher = address(0x4444444444444444444444444444444444444444);
 
     bytes32 public constant TEST_AGENT_ID = bytes32(uint256(0xA6E17));
@@ -38,8 +38,11 @@ contract OptimisticIntegrationTest is Test {
     uint256 public constant INITIAL_BALANCE = 1000 ether;
     uint256 public constant DEPOSIT_AMOUNT = 100 ether;
     uint256 public constant BOND_AMOUNT = 10 ether;
+    uint256 public constant BOND_CHAIN_ID = 1; // Ethereum mainnet
 
     function setUp() public {
+        oracleSigner = vm.addr(ORACLE_PRIVATE_KEY);
+
         // Deploy mock RISC Zero verifier (underneath the real KernelExecutionVerifier)
         mockRiscZeroVerifier = new MockVerifier();
 
@@ -54,26 +57,18 @@ contract OptimisticIntegrationTest is Test {
         // Deploy mock ERC20 token
         token = new MockERC20("Test Token", "TEST", 18);
 
-        // Deploy MockWSTON token for bonds
-        mockWston = new MockERC20("Wrapped Staked TON", "WSTON", 18);
-
-        // Deploy WSTONBondManager
-        bondManager = new WSTONBondManager(address(mockWston), treasury, address(this), BOND_AMOUNT);
-
-        // Deploy OptimisticKernelVault
+        // Deploy OptimisticKernelVault (cross-chain bonds, bondChainId = 1)
         vault = new OptimisticKernelVault(
             address(token),
             address(executionVerifier),
             TEST_AGENT_ID,
             TEST_IMAGE_ID,
             address(this),
-            address(bondManager)
+            BOND_CHAIN_ID
         );
 
-        // Authorize vault in BondManager
-        bondManager.authorizeVault(address(vault));
-
-        // Enable optimistic execution
+        // Set oracle signer and enable optimistic execution
+        vault.setOracleSigner(oracleSigner, 900);
         vault.setOptimisticEnabled(true);
         vault.setMinBond(BOND_AMOUNT);
 
@@ -81,13 +76,22 @@ contract OptimisticIntegrationTest is Test {
         token.mint(user, INITIAL_BALANCE);
         vm.prank(user);
         token.approve(address(vault), type(uint256).max);
-
-        // Mint WSTON to owner for bonds and approve BondManager
-        mockWston.mint(owner, 1000 ether);
-        mockWston.approve(address(bondManager), type(uint256).max);
     }
 
     // ============ Helper Functions ============
+
+    function _signBondAttestation(address operator, uint64 nonce, uint256 bondAmount)
+        internal
+        view
+        returns (bytes memory)
+    {
+        bytes32 bondHash = keccak256(
+            abi.encodePacked("BOND_LOCK_V1", operator, address(vault), nonce, bondAmount, BOND_CHAIN_ID)
+        );
+        bytes32 ethSignedHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", bondHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ORACLE_PRIVATE_KEY, ethSignedHash);
+        return abi.encodePacked(r, s, v);
+    }
 
     function _buildJournal(bytes32 agentId, uint64 nonce, bytes32 actionCommitment)
         internal
@@ -152,14 +156,16 @@ contract OptimisticIntegrationTest is Test {
         bytes memory agentOutputBytes = _buildEmptyAction();
         bytes32 actionCommitment = sha256(agentOutputBytes);
         bytes memory journal = _buildJournal(TEST_AGENT_ID, nonce, actionCommitment);
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT);
+        bytes memory bondAttestation = _signBondAttestation(address(this), nonce, BOND_AMOUNT);
+        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
     }
 
     function _submitOptimisticTransfer(uint64 nonce, uint256 transferAmount) internal {
         bytes memory agentOutputBytes = _buildTransferAction(address(token), recipient, transferAmount);
         bytes32 actionCommitment = sha256(agentOutputBytes);
         bytes memory journal = _buildJournal(TEST_AGENT_ID, nonce, actionCommitment);
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT);
+        bytes memory bondAttestation = _signBondAttestation(address(this), nonce, BOND_AMOUNT);
+        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
     }
 
     function _submitSyncEmpty(uint64 nonce) internal {
@@ -245,12 +251,10 @@ contract OptimisticIntegrationTest is Test {
         assertEq(token.balanceOf(recipient), recipientBefore + 6 ether);
     }
 
-    /// @notice Submit 3, finalize 1, slash 1, leave 1 pending
+    /// @notice Submit 3, finalize 1, slash 1, leave 1 pending (cross-chain: events only, no WSTON checks)
     function test_partialFinalization() public {
         vm.prank(user);
         vault.depositERC20Tokens(DEPOSIT_AMOUNT);
-
-        uint256 ownerWstonBefore = mockWston.balanceOf(owner);
 
         // Submit 3 optimistic executions
         _submitOptimisticEmpty(1);
@@ -258,24 +262,24 @@ contract OptimisticIntegrationTest is Test {
         _submitOptimisticEmpty(3);
 
         assertEq(vault.pendingCount(), 3);
-        assertEq(mockWston.balanceOf(owner), ownerWstonBefore - 3 * BOND_AMOUNT);
 
-        // Finalize nonce 2 with proof — bond returned
+        // Finalize nonce 2 with proof — emits ProofSubmitted (oracle relays to L1 for bond release)
+        vm.expectEmit(true, true, false, false);
+        emit IOptimisticKernelVault.ProofSubmitted(2, address(this));
         vault.submitProof(2, hex"deadbeef");
         assertEq(vault.pendingCount(), 2);
         assertEq(vault.getPendingExecution(2).status, 2); // FINALIZED
-        assertEq(mockWston.balanceOf(owner), ownerWstonBefore - 2 * BOND_AMOUNT);
 
         // Warp past deadline to allow slashing
         vm.warp(block.timestamp + vault.challengeWindow() + 1);
 
-        // Slash nonce 1 — bond distributed (finder gets 10%)
-        uint256 slasherWstonBefore = mockWston.balanceOf(slasher);
+        // Slash nonce 1 — emits ExecutionSlashed (oracle relays to L1 for bond slash)
+        vm.expectEmit(true, true, false, true);
+        emit IOptimisticKernelVault.ExecutionSlashed(1, slasher, BOND_AMOUNT);
         vm.prank(slasher);
         vault.slashExpired(1);
         assertEq(vault.pendingCount(), 1);
         assertEq(vault.getPendingExecution(1).status, 3); // SLASHED
-        assertEq(mockWston.balanceOf(slasher), slasherWstonBefore + 1 ether); // 10% finder fee
 
         // Nonce 3 is still pending
         assertEq(vault.getPendingExecution(3).status, 1); // PENDING

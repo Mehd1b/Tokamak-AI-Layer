@@ -554,3 +554,251 @@ pub async fn execute_with_oracle(
         success: receipt.status(),
     })
 }
+
+// ============================================================================
+// Optimistic execution helpers
+// ============================================================================
+
+/// Bond configuration read from the vault and its BondManager.
+#[cfg(feature = "onchain")]
+#[derive(Debug, Clone)]
+pub struct BondConfig {
+    /// BondManager contract address (0x-prefixed)
+    pub bond_manager: String,
+    /// WSTON token address (0x-prefixed)
+    pub wston_token: String,
+    /// Effective minimum bond: max(vault.minBond, bondManager.getMinBond)
+    pub min_bond: u128,
+}
+
+/// Read optimistic bond configuration from the vault and its BondManager.
+///
+/// Queries `vault.bondManager()`, `vault.minBond()`, `bondManager.bondToken()`,
+/// and `bondManager.getMinBond(vault)` to determine the WSTON token address
+/// and effective minimum bond amount.
+#[cfg(feature = "onchain")]
+pub async fn read_bond_config(vault_address: &str, rpc_url: &str) -> Result<BondConfig> {
+    use alloy::primitives::Address;
+    use alloy::providers::ProviderBuilder;
+    use alloy::sol;
+    use std::str::FromStr;
+
+    sol! {
+        #[sol(rpc)]
+        interface IOptimisticVault {
+            function bondManager() external view returns (address);
+            function minBond() external view returns (uint256);
+        }
+        #[sol(rpc)]
+        interface IBondManager {
+            function bondToken() external view returns (address);
+            function getMinBond(address vault) external view returns (uint256);
+        }
+    }
+
+    let vault = Address::from_str(vault_address)
+        .map_err(|_| Error::OnChain(format!("Invalid vault address: {}", vault_address)))?;
+    let url: reqwest::Url = rpc_url
+        .parse()
+        .map_err(|_| Error::OnChain(format!("Invalid RPC URL: {}", rpc_url)))?;
+    let provider = ProviderBuilder::new().on_http(url);
+
+    let vault_contract = IOptimisticVault::new(vault, &provider);
+
+    let bm_addr = vault_contract
+        .bondManager()
+        .call()
+        .await
+        .map_err(|e| Error::OnChain(format!("Failed to read bondManager: {}", e)))?
+        ._0;
+    if bm_addr == Address::ZERO {
+        return Err(Error::OnChain(
+            "BondManager not configured on vault".into(),
+        ));
+    }
+
+    let vault_min = vault_contract
+        .minBond()
+        .call()
+        .await
+        .map_err(|e| Error::OnChain(format!("Failed to read vault minBond: {}", e)))?
+        ._0;
+
+    let bm_contract = IBondManager::new(bm_addr, &provider);
+
+    let wston_addr = bm_contract
+        .bondToken()
+        .call()
+        .await
+        .map_err(|e| Error::OnChain(format!("Failed to read bondToken: {}", e)))?
+        ._0;
+
+    let bm_min = bm_contract
+        .getMinBond(vault)
+        .call()
+        .await
+        .map_err(|e| Error::OnChain(format!("Failed to read getMinBond: {}", e)))?
+        ._0;
+
+    let effective_min = if vault_min > bm_min {
+        vault_min
+    } else {
+        bm_min
+    };
+    let min_bond: u128 = effective_min.try_into().unwrap_or(u128::MAX);
+
+    Ok(BondConfig {
+        bond_manager: format!("{}", bm_addr),
+        wston_token: format!("{}", wston_addr),
+        min_bond,
+    })
+}
+
+/// Ensure the operator has approved sufficient WSTON for the BondManager.
+///
+/// Checks the operator's WSTON allowance for the BondManager contract.
+/// If below `min_required`, approves max uint256 (standard DeFi pattern).
+/// Returns `true` if a new approval was sent, `false` if already sufficient.
+#[cfg(feature = "onchain")]
+pub async fn ensure_wston_approval(
+    wston_address: &str,
+    bond_manager_address: &str,
+    rpc_url: &str,
+    private_key: &str,
+    min_required: u128,
+) -> Result<bool> {
+    use alloy::network::EthereumWallet;
+    use alloy::primitives::{Address, U256};
+    use alloy::providers::ProviderBuilder;
+    use alloy::signers::local::PrivateKeySigner;
+    use alloy::sol;
+    use std::str::FromStr;
+
+    sol! {
+        #[sol(rpc)]
+        interface IERC20 {
+            function allowance(address owner, address spender) external view returns (uint256);
+            function approve(address spender, uint256 amount) external returns (bool);
+        }
+    }
+
+    let wston = Address::from_str(wston_address)
+        .map_err(|_| Error::OnChain(format!("Invalid WSTON address: {}", wston_address)))?;
+    let bm = Address::from_str(bond_manager_address)
+        .map_err(|_| {
+            Error::OnChain(format!(
+                "Invalid BondManager address: {}",
+                bond_manager_address
+            ))
+        })?;
+    let url: reqwest::Url = rpc_url
+        .parse()
+        .map_err(|_| Error::OnChain(format!("Invalid RPC URL: {}", rpc_url)))?;
+
+    let pk_clean = private_key.strip_prefix("0x").unwrap_or(private_key);
+    let signer: PrivateKeySigner = pk_clean
+        .parse()
+        .map_err(|_| Error::OnChain("Invalid private key for WSTON approval".into()))?;
+    let operator = signer.address();
+    let wallet = EthereumWallet::from(signer);
+    let provider = ProviderBuilder::new()
+        .with_recommended_fillers()
+        .wallet(wallet)
+        .on_http(url);
+
+    let token = IERC20::new(wston, &provider);
+    let current_allowance = token
+        .allowance(operator, bm)
+        .call()
+        .await
+        .map_err(|e| Error::OnChain(format!("Failed to check WSTON allowance: {}", e)))?
+        ._0;
+
+    if current_allowance >= U256::from(min_required) {
+        return Ok(false); // Already approved
+    }
+
+    eprintln!("[WSTON] Approving BondManager for WSTON spending...");
+    let tx = token
+        .approve(bm, U256::MAX)
+        .send()
+        .await
+        .map_err(|e| Error::OnChain(format!("WSTON approve tx failed: {}", e)))?;
+    let receipt = tx
+        .get_receipt()
+        .await
+        .map_err(|e| Error::OnChain(format!("WSTON approve receipt failed: {}", e)))?;
+    if !receipt.status() {
+        return Err(Error::OnChain("WSTON approve transaction reverted".into()));
+    }
+
+    Ok(true) // Approved
+}
+
+/// Call vault.selfSlash(nonce) to gracefully forfeit the bond.
+///
+/// Used by the prove_worker when proof generation has exhausted all retries.
+/// Self-slash distributes the bond: 90% to vault depositors, 10% to treasury
+/// (no finder fee since the operator initiates it).
+#[cfg(feature = "onchain")]
+pub async fn self_slash(
+    vault_address: &str,
+    rpc_url: &str,
+    private_key: &str,
+    execution_nonce: u64,
+) -> Result<()> {
+    use alloy::network::EthereumWallet;
+    use alloy::primitives::Address;
+    use alloy::providers::ProviderBuilder;
+    use alloy::signers::local::PrivateKeySigner;
+    use alloy::sol;
+    use std::str::FromStr;
+
+    sol! {
+        #[sol(rpc)]
+        interface IOptimisticKernelVault {
+            function selfSlash(uint64 executionNonce) external;
+        }
+    }
+
+    let vault = Address::from_str(vault_address)
+        .map_err(|_| Error::OnChain(format!("Invalid vault address: {}", vault_address)))?;
+    let url: reqwest::Url = rpc_url
+        .parse()
+        .map_err(|_| Error::OnChain(format!("Invalid RPC URL: {}", rpc_url)))?;
+
+    let pk_clean = private_key.strip_prefix("0x").unwrap_or(private_key);
+    let signer: PrivateKeySigner = pk_clean
+        .parse()
+        .map_err(|_| Error::OnChain("Invalid private key for self-slash".into()))?;
+    let wallet = EthereumWallet::from(signer);
+    let provider = ProviderBuilder::new()
+        .with_recommended_fillers()
+        .wallet(wallet)
+        .on_http(url);
+
+    let contract = IOptimisticKernelVault::new(vault, provider);
+    let tx = contract
+        .selfSlash(execution_nonce)
+        .send()
+        .await
+        .map_err(|e| Error::OnChain(format!("selfSlash tx failed: {}", e)))?;
+    let receipt = tx
+        .get_receipt()
+        .await
+        .map_err(|e| Error::OnChain(format!("selfSlash receipt failed: {}", e)))?;
+    if !receipt.status() {
+        return Err(Error::OnChain(format!(
+            "selfSlash transaction reverted for nonce {}",
+            execution_nonce
+        )));
+    }
+
+    let tx_hash = format!("0x{}", hex::encode(receipt.transaction_hash.as_slice()));
+    eprintln!(
+        "[self-slash] selfSlash tx confirmed: {} (nonce {})",
+        tx_hash, execution_nonce
+    );
+
+    Ok(())
+}

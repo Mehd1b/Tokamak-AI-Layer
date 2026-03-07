@@ -140,10 +140,46 @@ pub fn run_proving_worker(
                     }
                 } else {
                     eprintln!(
-                        "[prove-worker] Nonce {} exceeded max retries ({}). Giving up.",
+                        "[prove-worker] Nonce {} exceeded max retries ({}). Self-slashing to forfeit bond gracefully.",
                         job.execution_nonce, MAX_RETRIES
                     );
                     status.jobs_failed.fetch_add(1, Ordering::Relaxed);
+
+                    // Self-slash: forfeit the bond (90% to depositors, 10% treasury)
+                    // rather than waiting for external slashExpired (which gives 10% to finder).
+                    #[cfg(feature = "onchain")]
+                    {
+                        let slash_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            let rt = tokio::runtime::Runtime::new()
+                                .expect("Failed to create tokio runtime for self-slash");
+                            rt.block_on(crate::onchain::self_slash(
+                                &job.vault_address,
+                                &job.rpc_url,
+                                &job.private_key,
+                                job.execution_nonce,
+                            ))
+                        }));
+                        match slash_result {
+                            Ok(Ok(())) => {
+                                eprintln!(
+                                    "[prove-worker] Self-slash succeeded for nonce {}.",
+                                    job.execution_nonce
+                                );
+                            }
+                            Ok(Err(e)) => {
+                                eprintln!(
+                                    "[prove-worker] Self-slash FAILED for nonce {}: {}. Bond at risk of external slash!",
+                                    job.execution_nonce, e
+                                );
+                            }
+                            Err(_) => {
+                                eprintln!(
+                                    "[prove-worker] Self-slash PANICKED for nonce {}. Bond at risk!",
+                                    job.execution_nonce
+                                );
+                            }
+                        }
+                    }
                 }
             }
             Err(_panic) => {

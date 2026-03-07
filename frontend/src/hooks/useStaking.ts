@@ -1,0 +1,197 @@
+'use client';
+
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { parseEther, parseUnits, type Address } from 'viem';
+import { mainnet } from 'wagmi/chains';
+import { L1_CONTRACTS } from '@/lib/stakingContracts';
+
+const ERC20_ABI = [
+  {
+    name: 'balanceOf', type: 'function', stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'approve', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+  {
+    name: 'allowance', type: 'function', stateMutability: 'view',
+    inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+] as const;
+
+const WTON_ABI = [
+  ...ERC20_ABI,
+  {
+    name: 'swapFromTON', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'tonAmount', type: 'uint256' }],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+] as const;
+
+const WSTON_ABI = [
+  {
+    name: 'getStakingIndex', type: 'function', stateMutability: 'view',
+    inputs: [], outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'balanceOf', type: 'function', stateMutability: 'view',
+    inputs: [{ name: 'owner', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'depositWTONAndGetWSTON', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: '_amount', type: 'uint256' }], outputs: [],
+  },
+  {
+    name: 'requestWithdrawal', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: '_wstonAmount', type: 'uint256' }], outputs: [],
+  },
+  {
+    name: 'claimWithdrawalTotal', type: 'function', stateMutability: 'nonpayable',
+    inputs: [], outputs: [],
+  },
+  {
+    name: 'getWithdrawalRequestIndex', type: 'function', stateMutability: 'view',
+    inputs: [{ name: '_user', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'getTotalClaimableAmountByUser', type: 'function', stateMutability: 'view',
+    inputs: [{ name: 'user', type: 'address' }],
+    outputs: [{ name: 'totalClaimableAmount', type: 'uint256' }],
+  },
+] as const;
+
+/** Convert TON amount (18 decimals) to WTON amount (27 decimals) */
+export const toWTONAmount = (tonRawAmount: bigint): bigint => tonRawAmount * 10n ** 9n;
+
+// ============ Read Hooks ============
+
+export function useTONBalance(address?: Address) {
+  return useReadContract({
+    address: L1_CONTRACTS.ton, abi: ERC20_ABI, functionName: 'balanceOf',
+    args: address ? [address] : undefined, chainId: mainnet.id,
+    query: { enabled: !!address },
+  });
+}
+
+export function useWTONBalance(address?: Address) {
+  return useReadContract({
+    address: L1_CONTRACTS.wton, abi: ERC20_ABI, functionName: 'balanceOf',
+    args: address ? [address] : undefined, chainId: mainnet.id,
+    query: { enabled: !!address },
+  });
+}
+
+export function useWSTONBalance(address?: Address) {
+  return useReadContract({
+    address: L1_CONTRACTS.wston, abi: WSTON_ABI, functionName: 'balanceOf',
+    args: address ? [address] : undefined, chainId: mainnet.id,
+    query: { enabled: !!address },
+  });
+}
+
+export function useStakingIndex() {
+  return useReadContract({
+    address: L1_CONTRACTS.wston, abi: WSTON_ABI, functionName: 'getStakingIndex',
+    chainId: mainnet.id,
+  });
+}
+
+export function useTONAllowance(owner?: Address) {
+  return useReadContract({
+    address: L1_CONTRACTS.ton, abi: ERC20_ABI, functionName: 'allowance',
+    args: owner ? [owner, L1_CONTRACTS.wton] : undefined, chainId: mainnet.id,
+    query: { enabled: !!owner },
+  });
+}
+
+export function useWTONAllowanceForWSTON(owner?: Address) {
+  return useReadContract({
+    address: L1_CONTRACTS.wton, abi: ERC20_ABI, functionName: 'allowance',
+    args: owner ? [owner, L1_CONTRACTS.wston] : undefined, chainId: mainnet.id,
+    query: { enabled: !!owner },
+  });
+}
+
+export function useClaimableAmount(address?: Address) {
+  return useReadContract({
+    address: L1_CONTRACTS.wston, abi: WSTON_ABI, functionName: 'getTotalClaimableAmountByUser',
+    args: address ? [address] : undefined, chainId: mainnet.id,
+    query: { enabled: !!address },
+  });
+}
+
+export function useWithdrawalRequestCount(address?: Address) {
+  return useReadContract({
+    address: L1_CONTRACTS.wston, abi: WSTON_ABI, functionName: 'getWithdrawalRequestIndex',
+    args: address ? [address] : undefined, chainId: mainnet.id,
+    query: { enabled: !!address },
+  });
+}
+
+// ============ Write Hooks ============
+
+export function useApproveTON() {
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const approve = (amount: string) => {
+    writeContract({ address: L1_CONTRACTS.ton, abi: ERC20_ABI, functionName: 'approve',
+      args: [L1_CONTRACTS.wton, parseEther(amount)], chainId: mainnet.id });
+  };
+  return { approve, hash, isPending, isConfirming, isSuccess, error };
+}
+
+export function useSwapToWTON() {
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const swap = (amount: string) => {
+    writeContract({ address: L1_CONTRACTS.wton, abi: WTON_ABI, functionName: 'swapFromTON',
+      args: [parseEther(amount)], chainId: mainnet.id });
+  };
+  return { swap, hash, isPending, isConfirming, isSuccess, error };
+}
+
+export function useApproveWTONForWSTON() {
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const approve = (wtonAmount: bigint) => {
+    writeContract({ address: L1_CONTRACTS.wton, abi: ERC20_ABI, functionName: 'approve',
+      args: [L1_CONTRACTS.wston, wtonAmount], chainId: mainnet.id });
+  };
+  return { approve, hash, isPending, isConfirming, isSuccess, error };
+}
+
+export function useDepositWTON() {
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const deposit = (wtonAmount: bigint) => {
+    writeContract({ address: L1_CONTRACTS.wston, abi: WSTON_ABI, functionName: 'depositWTONAndGetWSTON',
+      args: [wtonAmount], chainId: mainnet.id });
+  };
+  return { deposit, hash, isPending, isConfirming, isSuccess, error };
+}
+
+export function useRequestWithdrawal() {
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const requestWithdrawal = (wstonAmount: bigint) => {
+    writeContract({ address: L1_CONTRACTS.wston, abi: WSTON_ABI, functionName: 'requestWithdrawal',
+      args: [wstonAmount], chainId: mainnet.id });
+  };
+  return { requestWithdrawal, hash, isPending, isConfirming, isSuccess, error };
+}
+
+export function useClaimWithdrawal() {
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const claim = () => {
+    writeContract({ address: L1_CONTRACTS.wston, abi: WSTON_ABI, functionName: 'claimWithdrawalTotal',
+      chainId: mainnet.id });
+  };
+  return { claim, hash, isPending, isConfirming, isSuccess, error };
+}

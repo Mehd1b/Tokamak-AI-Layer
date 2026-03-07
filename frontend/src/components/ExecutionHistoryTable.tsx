@@ -10,6 +10,35 @@ interface ExecutionEvent {
   actionCount: string;
   transactionHash?: string;
   blockNumber?: string;
+  optimisticStatus?: 'proven' | 'pending' | 'finalized' | 'slashed';
+}
+
+function ExecutionStatusBadge({ status }: { status?: string }) {
+  if (!status || status === 'proven') {
+    return (
+      <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium bg-white/5 text-gray-400 border-white/10">
+        Proven
+      </span>
+    );
+  }
+
+  const styles: Record<string, string> = {
+    pending: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    finalized: 'bg-green-500/10 text-green-400 border-green-500/20',
+    slashed: 'bg-red-500/10 text-red-400 border-red-500/20',
+  };
+
+  const labels: Record<string, string> = {
+    pending: 'Pending Proof',
+    finalized: 'Finalized',
+    slashed: 'Slashed',
+  };
+
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${styles[status] ?? ''}`}>
+      {labels[status] ?? status}
+    </span>
+  );
 }
 
 export function ExecutionHistoryTable({ executions }: { executions: ExecutionEvent[] }) {
@@ -32,6 +61,7 @@ export function ExecutionHistoryTable({ executions }: { executions: ExecutionEve
             <th className="text-left text-gray-500 py-3 px-4 text-xs uppercase tracking-wider">Agent ID</th>
             <th className="text-left text-gray-500 py-3 px-4 text-xs uppercase tracking-wider">Action Commitment</th>
             <th className="text-left text-gray-500 py-3 px-4 text-xs uppercase tracking-wider">Actions</th>
+            <th className="text-left text-gray-500 py-3 px-4 text-xs uppercase tracking-wider">Status</th>
             <th className="text-left text-gray-500 py-3 px-4 text-xs uppercase tracking-wider">Tx</th>
           </tr>
         </thead>
@@ -42,6 +72,9 @@ export function ExecutionHistoryTable({ executions }: { executions: ExecutionEve
               <td className="py-3 px-4 text-gray-300">{truncateBytes32(exec.agentId)}</td>
               <td className="py-3 px-4 text-gray-400">{truncateBytes32(exec.actionCommitment)}</td>
               <td className="py-3 px-4 text-gray-400">{exec.actionCount}</td>
+              <td className="py-3 px-4">
+                <ExecutionStatusBadge status={exec.optimisticStatus} />
+              </td>
               <td className="py-3 px-4">
                 {exec.transactionHash ? (
                   <a

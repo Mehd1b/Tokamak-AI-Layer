@@ -1,0 +1,111 @@
+export const OptimisticKernelVaultABI = [
+  {
+    type: 'function',
+    name: 'optimisticEnabled',
+    inputs: [],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'challengeWindow',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'minBond',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'maxPending',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'bondManager',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'pendingCount',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'pendingExecutions',
+    inputs: [{ name: 'nonce', type: 'uint64' }],
+    outputs: [
+      { name: 'journalHash', type: 'bytes32' },
+      { name: 'actionCommitment', type: 'bytes32' },
+      { name: 'bondAmount', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+      { name: 'status', type: 'uint8' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'submitProof',
+    inputs: [
+      { name: 'executionNonce', type: 'uint64' },
+      { name: 'seal', type: 'bytes' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'slashExpired',
+    inputs: [{ name: 'executionNonce', type: 'uint64' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'event',
+    name: 'OptimisticExecutionSubmitted',
+    inputs: [
+      { name: 'executionNonce', type: 'uint64', indexed: true },
+      { name: 'journalHash', type: 'bytes32', indexed: false },
+      { name: 'bondAmount', type: 'uint256', indexed: false },
+      { name: 'deadline', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'ProofSubmitted',
+    inputs: [
+      { name: 'executionNonce', type: 'uint64', indexed: true },
+      { name: 'submitter', type: 'address', indexed: true },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'ExecutionSlashed',
+    inputs: [
+      { name: 'executionNonce', type: 'uint64', indexed: true },
+      { name: 'slasher', type: 'address', indexed: true },
+      { name: 'bondAmount', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'OptimisticConfigUpdated',
+    inputs: [
+      { name: 'challengeWindow', type: 'uint256', indexed: false },
+      { name: 'minBond', type: 'uint256', indexed: false },
+      { name: 'maxPending', type: 'uint256', indexed: false },
+      { name: 'enabled', type: 'bool', indexed: false },
+    ],
+  },
+] as const;

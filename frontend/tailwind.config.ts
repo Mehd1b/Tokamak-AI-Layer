@@ -23,6 +23,11 @@ const config: Config = {
         fuchsia: {
           accent: '#D946EF',
         },
+        cyan: {
+          accent: '#06B6D4',
+          light: '#22D3EE',
+          dark: '#0891B2',
+        },
       },
       fontFamily: {
         sans: ['var(--font-sans)', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'system-ui', 'sans-serif'],

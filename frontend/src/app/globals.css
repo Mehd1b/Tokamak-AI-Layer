@@ -426,3 +426,59 @@
 .social-glow:hover .social-icon {
   @apply text-[#C084FC] scale-110;
 }
+
+/* ===== REDUCED MOTION ===== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ===== SKELETON LOADING ===== */
+.skeleton {
+  @apply animate-pulse rounded bg-white/5;
+}
+
+/* ===== SEARCH INPUT CLEAR BUTTON ===== */
+.input-dark-wrapper {
+  @apply relative;
+}
+
+.input-dark-wrapper .input-clear {
+  @apply absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-gray-500 hover:text-white hover:bg-white/10 transition-colors cursor-pointer;
+}
+
+/* ===== TOAST NOTIFICATIONS ===== */
+.toast {
+  @apply fixed bottom-6 right-6 z-[100] flex items-center gap-3 px-5 py-3 rounded-xl border backdrop-blur-md text-sm font-mono;
+  animation: toast-in 0.3s ease-out;
+}
+
+.toast-success {
+  @apply toast bg-emerald-500/10 border-emerald-500/30 text-emerald-400;
+}
+
+.toast-error {
+  @apply toast bg-red-500/10 border-red-500/30 text-red-400;
+}
+
+@keyframes toast-in {
+  0% { transform: translateY(20px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+/* ===== BREADCRUMB ===== */
+.breadcrumb {
+  @apply flex items-center gap-2 text-sm font-mono text-gray-500 mb-8;
+}
+
+.breadcrumb a {
+  @apply hover:text-[#A855F7] transition-colors;
+}
+
+.breadcrumb .separator {
+  @apply text-gray-700;
+}

@@ -143,6 +143,60 @@ fn run_pipeline(
     #[cfg(not(feature = "onchain"))]
     let vault_state = onchain::VaultState::default_for_dry_run();
 
+    // 2b. WSTON bond approval for optimistic execution mode.
+    // The operator must approve the BondManager to transferFrom their WSTON.
+    // Runs once at startup with max-uint256 approval. Non-blocking: if it fails,
+    // the optimistic submission will fail later and fall back to synchronous.
+    #[cfg(feature = "onchain")]
+    if cli.optimistic && !cli.dry_run {
+        let rt_bond = tokio::runtime::Runtime::new()?;
+        match rt_bond.block_on(onchain::read_bond_config(&cli.vault, &cli.rpc)) {
+            Ok(bond_config) => {
+                if !cli.json {
+                    eprintln!(
+                        "[2b/8] Bond config: manager={}, wston={}, min_bond={}",
+                        bond_config.bond_manager, bond_config.wston_token, bond_config.min_bond
+                    );
+                }
+                let pk_bond = Cli::resolve_key(&cli.pk)?;
+                match rt_bond.block_on(onchain::ensure_wston_approval(
+                    &bond_config.wston_token,
+                    &bond_config.bond_manager,
+                    &cli.rpc,
+                    &pk_bond,
+                    bond_config.min_bond,
+                )) {
+                    Ok(true) => {
+                        if !cli.json {
+                            eprintln!("[2b/8] WSTON approved for BondManager.");
+                        }
+                    }
+                    Ok(false) => {
+                        if !cli.json {
+                            eprintln!("[2b/8] WSTON allowance already sufficient.");
+                        }
+                    }
+                    Err(e) => {
+                        if !cli.json {
+                            eprintln!(
+                                "[2b/8] WARNING: WSTON approval failed: {}. Optimistic may fail.",
+                                e
+                            );
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                if !cli.json {
+                    eprintln!(
+                        "[2b/8] WARNING: Failed to read bond config: {}. Optimistic may fail.",
+                        e
+                    );
+                }
+            }
+        }
+    }
+
     // 3. Fetch market data
     let hl_client = hyperliquid::client::HyperliquidClient::new(&cli.hl_url);
     let mut snapshot = hl_client.fetch_snapshot(&cli.asset, &cli.sub_account, cli.candles_needed())?;
@@ -458,95 +512,384 @@ fn run_pipeline(
     // in the background worker thread and submitted before the challenge window
     // deadline.
     //
-    // NOTE: Optimistic mode is incompatible with two-proof opens. If the agent
-    // wants to open a new position, fall through to the synchronous path.
-    if cli.optimistic && !needs_two_proof {
-        if !cli.json {
-            eprintln!("[optimistic] Building predicted journal...");
-        }
-
-        // Build predicted journal: identical to what the zkVM would produce,
-        // but computed entirely on the host side (no proving needed).
-        let predicted_journal = build_predicted_journal(
-            &kernel_input,
-            &input_bytes,
-            &agent_output_bytes,
-        )?;
-
-        if !cli.json {
-            eprintln!(
-                "[optimistic] Predicted journal: {} bytes",
-                predicted_journal.len()
-            );
-        }
-
-        // Submit optimistically (actions execute immediately, bond escrowed)
+    // Two-phase opens: each phase is a separate optimistic execution with its own
+    // WSTON bond. Phase 1 deposits margin, waits for HyperCore settlement, then
+    // Phase 2 places the order. Both proofs are queued for background generation.
+    //
+    // FALLBACK: If optimistic submission fails (TooManyPending, InsufficientBond,
+    // nonce conflict, WSTON balance, etc.), fall through to synchronous proven
+    // execution for this cycle.
+    let mut optimistic_succeeded = false;
+    if cli.optimistic {
         #[cfg(feature = "onchain")]
         {
             use std::time::Instant;
             let pk = Cli::resolve_key(&cli.pk)?;
-            if !cli.json {
-                eprintln!("[optimistic] Submitting optimistic execution to vault...");
-            }
 
-            let rt = tokio::runtime::Runtime::new()?;
-            let execution_nonce = rt.block_on(submit_optimistic_execution(
-                &cli.vault,
-                &cli.rpc,
-                &pk,
-                &predicted_journal,
-                &agent_output_bytes,
-                &signed_feed.onchain_signature,
-                signed_feed.feed.timestamp,
-                cli.bond_amount,
-            ))?;
+            if needs_two_proof {
+                // ── Two-phase optimistic open ──
+                // Phase 1: deposit margin (optimistic execution #1, bond #1)
+                // Phase 2: place order    (optimistic execution #2, bond #2)
+                if !cli.json {
+                    eprintln!("[optimistic] Two-phase open: deposit + order (2 bonds)");
+                }
 
-            if !cli.json {
-                eprintln!(
-                    "[optimistic] Execution nonce {} submitted! Actions executed immediately.",
-                    execution_nonce
-                );
-            }
+                // Phase 1: build deposit-only input (open_phase=1)
+                let (deposit_input, deposit_input_bytes) = input_builder::build_input_with_phase(
+                    &bundle, &vault_state, &snapshot, &indicator_set, &signed_feed,
+                    &cli, &exchange_addr, &vault_addr, &usdc_addr, 1,
+                )?;
+                let (deposit_output_bytes, _deposit_commitment) =
+                    output_reconstruct::reconstruct_output(&deposit_input, &deposit_input_bytes)?;
+                let deposit_action_count = kernel_core::AgentOutput::decode(&deposit_output_bytes)
+                    .map(|o| o.actions.len())
+                    .unwrap_or(0);
 
-            // Update last known nonce for the monitor thread
-            last_known_nonce.store(execution_nonce, Ordering::Relaxed);
+                if deposit_action_count == 0 {
+                    if !cli.json {
+                        eprintln!("[optimistic] Phase 1 produced 0 actions — agent declined to deposit. Falling back.");
+                    }
+                } else {
+                    // Build predicted journal for phase 1
+                    let deposit_journal = build_predicted_journal(
+                        &deposit_input,
+                        &deposit_input_bytes,
+                        &deposit_output_bytes,
+                    )?;
 
-            // Queue proof job for background worker
-            let proof_job = prove_worker::PendingProof {
-                execution_nonce,
-                input_bytes: input_bytes.clone(),
-                bundle_path: cli.bundle.clone(),
-                rpc_url: cli.rpc.clone(),
-                vault_address: cli.vault.clone(),
-                private_key: pk,
-                deadline: Instant::now() + Duration::from_secs(cli.challenge_window),
-                queued_at: Instant::now(),
-                dev_mode: cli.dev_mode,
-                retry_count: 0,
-            };
+                    if !cli.json {
+                        eprintln!(
+                            "[optimistic] Phase 1: submitting deposit ({} actions, journal={} bytes)...",
+                            deposit_action_count, deposit_journal.len()
+                        );
+                    }
 
-            {
-                let mut queue = proof_queue.lock().unwrap();
-                queue.push_back(proof_job);
-            }
+                    let rt = tokio::runtime::Runtime::new()?;
+                    let phase1_result = rt.block_on(submit_optimistic_execution(
+                        &cli.vault, &cli.rpc, &pk,
+                        &deposit_journal, &deposit_output_bytes,
+                        &signed_feed.onchain_signature, signed_feed.feed.timestamp,
+                        cli.bond_amount,
+                    ));
 
-            if cli.json {
-                let result = serde_json::json!({
-                    "status": "optimistic_submitted",
-                    "execution_nonce": execution_nonce,
-                    "actions": action_count,
-                    "challenge_window_secs": cli.challenge_window,
-                    "proof_queued": true,
-                });
-                println!("{}", serde_json::to_string_pretty(&result)?);
+                    match phase1_result {
+                        Ok(nonce1) => {
+                            if !cli.json {
+                                eprintln!(
+                                    "[optimistic] Phase 1 nonce {} submitted. Queuing proof #1.",
+                                    nonce1
+                                );
+                            }
+                            last_known_nonce.store(nonce1, Ordering::Relaxed);
+
+                            // Queue proof job for phase 1
+                            {
+                                let mut queue = proof_queue.lock().unwrap();
+                                queue.push_back(prove_worker::PendingProof {
+                                    execution_nonce: nonce1,
+                                    input_bytes: deposit_input_bytes.clone(),
+                                    bundle_path: cli.bundle.clone(),
+                                    rpc_url: cli.rpc.clone(),
+                                    vault_address: cli.vault.clone(),
+                                    private_key: pk.clone(),
+                                    deadline: Instant::now() + Duration::from_secs(cli.challenge_window),
+                                    queued_at: Instant::now(),
+                                    dev_mode: cli.dev_mode,
+                                    retry_count: 0,
+                                });
+                            }
+
+                            // Wait for HyperCore deposit settlement
+                            if !cli.json {
+                                eprintln!("[optimistic] Waiting 10s for HyperCore deposit settlement...");
+                            }
+                            std::thread::sleep(std::time::Duration::from_secs(10));
+
+                            // Set leverage via REST API (CoreWriter has no updateLeverage action)
+                            if cli.api_wallet_key.is_some() {
+                                if !cli.json {
+                                    eprintln!("[optimistic] Setting leverage to {}x via REST API...", cli.seed_leverage);
+                                }
+                                if let Err(e) = seed_trade::set_leverage_only(&cli) {
+                                    if !cli.json {
+                                        eprintln!("[optimistic] WARNING: Failed to set leverage: {}", e);
+                                    }
+                                }
+                            }
+
+                            // Phase 2: re-read vault state, re-fetch market data, build order
+                            let vault_state_2 = rt.block_on(onchain::read_vault_state(&cli.vault, &cli.rpc))?;
+                            let mut snapshot_2 = hl_client.fetch_snapshot(
+                                &cli.asset, &cli.sub_account, cli.candles_needed(),
+                            )?;
+
+                            // Use HyperCore equity for order sizing (margin was deposited in Phase 1)
+                            let hypercore_equity = snapshot_2.account_equity;
+                            if hypercore_equity > 0.5 {
+                                snapshot_2.account_equity = hypercore_equity * 1_000_000.0;
+                                snapshot_2.available_balance = snapshot_2.account_equity - snapshot_2.margin_used;
+                            } else {
+                                let vault_eq = vault_state_2.total_assets as f64;
+                                snapshot_2.account_equity = vault_eq;
+                                snapshot_2.available_balance = vault_eq - snapshot_2.margin_used;
+                            }
+
+                            let indicator_set_2 = indicators::compute_indicators(&snapshot_2.candle_closes, &cli)?;
+                            let oracle_key_2 = Cli::resolve_key(&cli.oracle_key)?;
+                            let signed_feed_2 = oracle_signer::build_and_sign_feed(
+                                &snapshot_2, &oracle_key_2, &exchange_addr, &vault_addr, cli.chain_id,
+                            )?;
+
+                            let (order_input, order_input_bytes) = input_builder::build_input_with_phase(
+                                &bundle, &vault_state_2, &snapshot_2, &indicator_set_2, &signed_feed_2,
+                                &cli, &exchange_addr, &vault_addr, &usdc_addr, 2,
+                            )?;
+                            let (order_output_bytes, _order_commitment) =
+                                output_reconstruct::reconstruct_output(&order_input, &order_input_bytes)?;
+                            let order_action_count = kernel_core::AgentOutput::decode(&order_output_bytes)
+                                .map(|o| o.actions.len())
+                                .unwrap_or(0);
+
+                            if order_action_count == 0 {
+                                if !cli.json {
+                                    eprintln!("[optimistic] Phase 2: agent produced 0 actions (market changed). Deposit on HyperCore will be recovered next cycle.");
+                                }
+                                if cli.json {
+                                    println!("{}", serde_json::to_string_pretty(&serde_json::json!({
+                                        "status": "optimistic_partial",
+                                        "reason": "two_proof_phase2_no_signal",
+                                        "phase1_nonce": nonce1,
+                                        "phase1_proof_queued": true,
+                                    }))?);
+                                }
+                                optimistic_succeeded = true;
+                            } else {
+                                // Build predicted journal for phase 2
+                                let order_journal = build_predicted_journal(
+                                    &order_input,
+                                    &order_input_bytes,
+                                    &order_output_bytes,
+                                )?;
+
+                                if !cli.json {
+                                    eprintln!(
+                                        "[optimistic] Phase 2: submitting order ({} actions, journal={} bytes)...",
+                                        order_action_count, order_journal.len()
+                                    );
+                                }
+
+                                let phase2_result = rt.block_on(submit_optimistic_execution(
+                                    &cli.vault, &cli.rpc, &pk,
+                                    &order_journal, &order_output_bytes,
+                                    &signed_feed_2.onchain_signature, signed_feed_2.feed.timestamp,
+                                    cli.bond_amount,
+                                ));
+
+                                match phase2_result {
+                                    Ok(nonce2) => {
+                                        if !cli.json {
+                                            eprintln!(
+                                                "[optimistic] Phase 2 nonce {} submitted. Queuing proof #2.",
+                                                nonce2
+                                            );
+                                        }
+                                        last_known_nonce.store(nonce2, Ordering::Relaxed);
+
+                                        // Queue proof job for phase 2
+                                        {
+                                            let mut queue = proof_queue.lock().unwrap();
+                                            queue.push_back(prove_worker::PendingProof {
+                                                execution_nonce: nonce2,
+                                                input_bytes: order_input_bytes,
+                                                bundle_path: cli.bundle.clone(),
+                                                rpc_url: cli.rpc.clone(),
+                                                vault_address: cli.vault.clone(),
+                                                private_key: pk.clone(),
+                                                deadline: Instant::now() + Duration::from_secs(cli.challenge_window),
+                                                queued_at: Instant::now(),
+                                                dev_mode: cli.dev_mode,
+                                                retry_count: 0,
+                                            });
+                                        }
+
+                                        // Track position state for the open
+                                        let now = std::time::SystemTime::now()
+                                            .duration_since(std::time::UNIX_EPOCH)
+                                            .unwrap_or_default()
+                                            .as_secs();
+                                        let _ = write_position_state(&cli.state_file, &PositionState {
+                                            nonce: nonce2,
+                                            opened_at: now,
+                                        });
+
+                                        if cli.json {
+                                            let result = serde_json::json!({
+                                                "status": "optimistic_submitted",
+                                                "two_phase": true,
+                                                "phase1_nonce": nonce1,
+                                                "phase2_nonce": nonce2,
+                                                "actions": order_action_count,
+                                                "challenge_window_secs": cli.challenge_window,
+                                                "proofs_queued": 2,
+                                            });
+                                            println!("{}", serde_json::to_string_pretty(&result)?);
+                                        } else {
+                                            eprintln!(
+                                                "[optimistic] Both proofs queued (deadlines in {}s). Main thread returning.",
+                                                cli.challenge_window
+                                            );
+                                        }
+
+                                        optimistic_succeeded = true;
+                                    }
+                                    Err(e) => {
+                                        // Phase 2 optimistic failed, but Phase 1 already executed.
+                                        // Phase 1 proof is queued. Try Phase 2 synchronously.
+                                        if !cli.json {
+                                            eprintln!(
+                                                "[optimistic] Phase 2 failed: {}. Trying synchronous for phase 2...",
+                                                e
+                                            );
+                                        }
+                                        let order_proof = prove::generate_proof(&bundle, &order_input_bytes, cli.dev_mode)?;
+                                        let sync_result = rt.block_on(onchain::execute_with_oracle(
+                                            &cli.vault, &cli.rpc, &pk,
+                                            &order_proof.journal_bytes, &order_proof.seal_bytes,
+                                            &order_output_bytes,
+                                            &signed_feed_2.onchain_signature, signed_feed_2.feed.timestamp,
+                                        ));
+                                        match sync_result {
+                                            Ok(tx) if tx.success => {
+                                                if !cli.json {
+                                                    eprintln!("[optimistic] Phase 2 synchronous fallback succeeded: {}", tx.tx_hash);
+                                                }
+                                                let now = std::time::SystemTime::now()
+                                                    .duration_since(std::time::UNIX_EPOCH)
+                                                    .unwrap_or_default()
+                                                    .as_secs();
+                                                let _ = write_position_state(&cli.state_file, &PositionState {
+                                                    nonce: order_input.execution_nonce,
+                                                    opened_at: now,
+                                                });
+                                                optimistic_succeeded = true;
+                                            }
+                                            Ok(tx) => {
+                                                if !cli.json {
+                                                    eprintln!("[optimistic] Phase 2 synchronous fallback reverted: {}", tx.tx_hash);
+                                                }
+                                                optimistic_succeeded = true; // Phase 1 still succeeded
+                                            }
+                                            Err(e) => {
+                                                if !cli.json {
+                                                    eprintln!("[optimistic] Phase 2 synchronous fallback failed: {}", e);
+                                                }
+                                                optimistic_succeeded = true; // Phase 1 still succeeded
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            // Phase 1 optimistic failed — fall through to fully synchronous path
+                            if !cli.json {
+                                eprintln!(
+                                    "[optimistic] Phase 1 failed: {}. Falling back to synchronous two-proof.",
+                                    e
+                                );
+                            }
+                        }
+                    }
+                }
             } else {
-                eprintln!(
-                    "[optimistic] Proof job queued (deadline in {}s). Main thread returning.",
-                    cli.challenge_window
-                );
-            }
+                // ── Single-proof optimistic (closes, holds) ──
+                if !cli.json {
+                    eprintln!("[optimistic] Building predicted journal...");
+                }
 
-            return Ok(());
+                let predicted_journal = build_predicted_journal(
+                    &kernel_input,
+                    &input_bytes,
+                    &agent_output_bytes,
+                )?;
+
+                if !cli.json {
+                    eprintln!(
+                        "[optimistic] Predicted journal: {} bytes",
+                        predicted_journal.len()
+                    );
+                    eprintln!("[optimistic] Submitting optimistic execution to vault...");
+                }
+
+                let rt = tokio::runtime::Runtime::new()?;
+                let optimistic_result = rt.block_on(submit_optimistic_execution(
+                    &cli.vault,
+                    &cli.rpc,
+                    &pk,
+                    &predicted_journal,
+                    &agent_output_bytes,
+                    &signed_feed.onchain_signature,
+                    signed_feed.feed.timestamp,
+                    cli.bond_amount,
+                ));
+
+                match optimistic_result {
+                    Ok(execution_nonce) => {
+                        if !cli.json {
+                            eprintln!(
+                                "[optimistic] Execution nonce {} submitted! Actions executed immediately.",
+                                execution_nonce
+                            );
+                        }
+
+                        last_known_nonce.store(execution_nonce, Ordering::Relaxed);
+
+                        let proof_job = prove_worker::PendingProof {
+                            execution_nonce,
+                            input_bytes: input_bytes.clone(),
+                            bundle_path: cli.bundle.clone(),
+                            rpc_url: cli.rpc.clone(),
+                            vault_address: cli.vault.clone(),
+                            private_key: pk,
+                            deadline: Instant::now() + Duration::from_secs(cli.challenge_window),
+                            queued_at: Instant::now(),
+                            dev_mode: cli.dev_mode,
+                            retry_count: 0,
+                        };
+
+                        {
+                            let mut queue = proof_queue.lock().unwrap();
+                            queue.push_back(proof_job);
+                        }
+
+                        if cli.json {
+                            let result = serde_json::json!({
+                                "status": "optimistic_submitted",
+                                "execution_nonce": execution_nonce,
+                                "actions": action_count,
+                                "challenge_window_secs": cli.challenge_window,
+                                "proof_queued": true,
+                            });
+                            println!("{}", serde_json::to_string_pretty(&result)?);
+                        } else {
+                            eprintln!(
+                                "[optimistic] Proof job queued (deadline in {}s). Main thread returning.",
+                                cli.challenge_window
+                            );
+                        }
+
+                        optimistic_succeeded = true;
+                    }
+                    Err(e) => {
+                        if !cli.json {
+                            eprintln!(
+                                "[optimistic] Submission failed: {}. Falling back to synchronous proven execution.",
+                                e
+                            );
+                        }
+                    }
+                }
+            }
         }
 
         #[cfg(not(feature = "onchain"))]
@@ -555,6 +898,11 @@ fn run_pipeline(
                 "Optimistic execution requires --features onchain."
             ));
         }
+    }
+
+    // If optimistic succeeded, we're done — proof(s) queued in background.
+    if optimistic_succeeded {
+        return Ok(());
     }
 
     // 8. Generate proof(s) and produce the final proof package for submission.
@@ -1064,8 +1412,11 @@ fn build_predicted_journal(
 
 /// Submit an optimistic execution on-chain via vault.executeOptimistic().
 ///
-/// Actions execute immediately. Bond is escrowed. Returns the execution nonce
-/// assigned by the vault contract.
+/// Actions execute immediately. WSTON bond is escrowed via BondManager.
+/// Returns the execution nonce assigned by the vault contract.
+///
+/// The operator must have previously approved the BondManager to spend their
+/// WSTON tokens (handled by ensure_wston_approval at startup).
 #[cfg(feature = "onchain")]
 async fn submit_optimistic_execution(
     vault_address: &str,
@@ -1084,6 +1435,9 @@ async fn submit_optimistic_execution(
     use alloy::sol;
     use std::str::FromStr;
 
+    // Match the actual OptimisticKernelVault contract ABI:
+    // - executeOptimistic takes 5 parameters (includes bondAmount as uint256)
+    // - NOT payable: bond is WSTON ERC20 pulled via BondManager.lockBond()
     sol! {
         #[sol(rpc)]
         interface IOptimisticKernelVault {
@@ -1091,12 +1445,18 @@ async fn submit_optimistic_execution(
                 bytes calldata journal,
                 bytes calldata agentOutputBytes,
                 bytes calldata oracleSignature,
-                uint64 oracleTimestamp
-            ) external payable returns (uint64 executionNonce);
+                uint64 oracleTimestamp,
+                uint256 bondAmount
+            ) external;
 
             function lastExecutionNonce() external view returns (uint64);
+            function bondManager() external view returns (address);
+            function minBond() external view returns (uint256);
+        }
 
-            function getMinBond() external view returns (uint256);
+        #[sol(rpc)]
+        interface IBondManager {
+            function getMinBond(address vault) external view returns (uint256);
         }
     }
 
@@ -1120,18 +1480,43 @@ async fn submit_optimistic_execution(
 
     let contract = IOptimisticKernelVault::new(vault, &provider);
 
-    // Determine bond amount: use provided value or query on-chain min
+    // Determine bond amount: use provided value or query on-chain min.
+    // The effective min is max(vault.minBond, bondManager.getMinBond(vault)).
     let bond = if bond_amount > 0 {
         U256::from(bond_amount)
     } else {
-        let min_bond = contract
-            .getMinBond()
+        let vault_min = contract
+            .minBond()
+            .call()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to query vault minBond: {}", e))?
+            ._0;
+
+        let bm_addr = contract
+            .bondManager()
+            .call()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to query bondManager: {}", e))?
+            ._0;
+
+        let bm = IBondManager::new(bm_addr, &provider);
+        let bm_min = bm
+            .getMinBond(vault)
             .call()
             .await
             .map_err(|e| anyhow::anyhow!("Failed to query getMinBond: {}", e))?
             ._0;
-        eprintln!("[optimistic] Auto-queried min bond: {} wei", min_bond);
-        min_bond
+
+        let effective_min = if vault_min > bm_min {
+            vault_min
+        } else {
+            bm_min
+        };
+        eprintln!(
+            "[optimistic] Auto-queried min bond: {} (vault={}, manager={})",
+            effective_min, vault_min, bm_min
+        );
+        effective_min
     };
 
     // Read nonce before submission to detect the new one
@@ -1146,9 +1531,9 @@ async fn submit_optimistic_execution(
     let output = Bytes::copy_from_slice(agent_output_bytes);
     let oracle_sig = Bytes::copy_from_slice(oracle_signature);
 
+    // Submit with bondAmount as the 5th parameter (no msg.value — bond is WSTON ERC20)
     let tx = contract
-        .executeOptimistic(journal, output, oracle_sig, oracle_timestamp)
-        .value(bond)
+        .executeOptimistic(journal, output, oracle_sig, oracle_timestamp, bond)
         .send()
         .await
         .map_err(|e| anyhow::anyhow!("executeOptimistic tx failed: {}", e))?;

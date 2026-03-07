@@ -5,7 +5,7 @@ import { useAccount } from 'wagmi';
 import { useAgent, useUnregisterAgent } from '@/hooks/useKernelAgent';
 import { useVaultsForAgent } from '@/hooks/useVaultFactory';
 import { VaultCard } from '@/components/VaultCard';
-import { formatBytes32, truncateAddress } from '@/lib/utils';
+import { formatBytes32, truncateAddress, truncateBytes32 } from '@/lib/utils';
 import { useNetwork } from '@/lib/NetworkContext';
 import { NetworkBadge } from '@/components/NetworkLogo';
 import Link from 'next/link';
@@ -64,13 +64,14 @@ export default function AgentDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-6 lg:px-12 py-12">
-      {/* Back button */}
-      <Link href="/agents" className="inline-flex items-center gap-2 text-gray-400 hover:text-[#A855F7] transition-colors mb-8 font-mono text-sm">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        Back to Agents
-      </Link>
+      {/* Breadcrumbs */}
+      <nav className="breadcrumb">
+        <Link href="/">Home</Link>
+        <span className="separator">/</span>
+        <Link href="/agents">Agents</Link>
+        <span className="separator">/</span>
+        <span className="text-gray-400">{truncateBytes32(agentId, 8)}</span>
+      </nav>
 
       {/* Agent header */}
       <div className="card mb-8">

@@ -154,7 +154,7 @@ fn encode_perp_input(
 
     // Risk params (16 bytes, all bps)
     buf.extend_from_slice(&50_000u32.to_le_bytes()); // max_leverage_bps (5x)
-    buf.extend_from_slice(&10_000u32.to_le_bytes()); // max_position_bps (100%)
+    buf.extend_from_slice(&9_000u32.to_le_bytes());  // max_position_bps (90% — leave 10% buffer for HL margin requirements, fees, rounding)
     buf.extend_from_slice(&cli.stop_loss_bps.to_le_bytes());
     buf.extend_from_slice(&cli.take_profit_bps.to_le_bytes());
 

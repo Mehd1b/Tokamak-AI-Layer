@@ -41,3 +41,23 @@ export function timestampToDate(timestamp: number | bigint): string {
   if (ts === 0) return 'Never';
   return new Date(ts * 1000).toLocaleString();
 }
+
+export function formatDuration(seconds: number | bigint): string {
+  const s = typeof seconds === 'bigint' ? Number(seconds) : seconds;
+  if (s <= 0) return '0s';
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  if (m > 0) return sec > 0 ? `${m}m ${sec}s` : `${m}m`;
+  return `${sec}s`;
+}
+
+export function formatCountdown(remainingSeconds: number): string {
+  if (remainingSeconds <= 0) return 'Expired';
+  const h = Math.floor(remainingSeconds / 3600);
+  const m = Math.floor((remainingSeconds % 3600) / 60);
+  const s = Math.floor(remainingSeconds % 60);
+  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+  return `${m}m ${String(s).padStart(2, '0')}s`;
+}

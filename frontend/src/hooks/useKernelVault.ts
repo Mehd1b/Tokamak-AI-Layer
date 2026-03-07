@@ -2,7 +2,7 @@
 
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther, parseUnits } from 'viem';
-import { KernelVaultABI } from '@/lib/contracts';
+import { KernelVaultABI, OptimisticKernelVaultABI } from '@/lib/contracts';
 import { useNetwork } from '@/lib/NetworkContext';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
@@ -106,6 +106,57 @@ export function useVaultInfo(vaultAddress: `0x${string}` | undefined) {
     query: { enabled: !!vaultAddress },
   });
 
+  // Optimistic vault detection — if optimisticEnabled() reverts, it's a standard vault
+  const optimisticEnabled = useReadContract({
+    address: vaultAddress,
+    abi: OptimisticKernelVaultABI,
+    functionName: 'optimisticEnabled',
+    chainId: selectedChainId,
+    query: { enabled: !!vaultAddress },
+  });
+
+  const isOptimistic = optimisticEnabled.data === true;
+
+  const challengeWindow = useReadContract({
+    address: vaultAddress,
+    abi: OptimisticKernelVaultABI,
+    functionName: 'challengeWindow',
+    chainId: selectedChainId,
+    query: { enabled: !!vaultAddress && isOptimistic },
+  });
+
+  const minBond = useReadContract({
+    address: vaultAddress,
+    abi: OptimisticKernelVaultABI,
+    functionName: 'minBond',
+    chainId: selectedChainId,
+    query: { enabled: !!vaultAddress && isOptimistic },
+  });
+
+  const maxPending = useReadContract({
+    address: vaultAddress,
+    abi: OptimisticKernelVaultABI,
+    functionName: 'maxPending',
+    chainId: selectedChainId,
+    query: { enabled: !!vaultAddress && isOptimistic },
+  });
+
+  const bondManagerAddr = useReadContract({
+    address: vaultAddress,
+    abi: OptimisticKernelVaultABI,
+    functionName: 'bondManager',
+    chainId: selectedChainId,
+    query: { enabled: !!vaultAddress && isOptimistic },
+  });
+
+  const pendingCount = useReadContract({
+    address: vaultAddress,
+    abi: OptimisticKernelVaultABI,
+    functionName: 'pendingCount',
+    chainId: selectedChainId,
+    query: { enabled: !!vaultAddress && isOptimistic },
+  });
+
   const assetDecimals = isEthVault ? 18 : (decimalsQuery.data as number | undefined) ?? 18;
   const assetSymbol = isEthVault ? 'ETH' : (symbolQuery.data as string | undefined) ?? 'TOKEN';
 
@@ -122,6 +173,12 @@ export function useVaultInfo(vaultAddress: `0x${string}` | undefined) {
     assetDecimals,
     assetSymbol,
     isEthVault,
+    isOptimistic,
+    challengeWindow: challengeWindow.data as bigint | undefined,
+    minBond: minBond.data as bigint | undefined,
+    maxPending: maxPending.data as bigint | undefined,
+    bondManagerAddress: bondManagerAddr.data as `0x${string}` | undefined,
+    pendingCount: pendingCount.data as bigint | undefined,
     isLoading: asset.isLoading || agentId.isLoading || trustedImageId.isLoading || totalShares.isLoading || totalAssets.isLoading,
   };
 }

@@ -136,11 +136,12 @@ pub async fn submit_optimistic(
     }
 
     // Parse OptimisticExecutionSubmitted event for the nonce
-    for log in &receipt.inner.logs() {
+    use alloy::sol_types::SolEvent;
+    for log in receipt.inner.logs() {
         if let Ok(event) =
-            IOptimisticKernelVault::OptimisticExecutionSubmitted::decode_log(log, true)
+            IOptimisticKernelVault::OptimisticExecutionSubmitted::decode_log(&log.inner, true)
         {
-            return Ok(event.executionNonce);
+            return Ok(event.data.executionNonce);
         }
     }
 

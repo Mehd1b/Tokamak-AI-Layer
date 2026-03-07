@@ -70,6 +70,9 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     /// @notice Authorized vaults that can lock/release/slash bonds
     mapping(address => bool) public authorizedVaults;
 
+    /// @notice Trusted relayer address for cross-chain bond operations
+    address public trustedRelayer;
+
     // ============ Events ============
 
     event BondLocked(address indexed operator, address indexed vault, uint64 indexed nonce, uint256 amount);
@@ -80,6 +83,8 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     event VaultAuthorized(address indexed vault);
     event VaultRevoked(address indexed vault);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event TrustedRelayerUpdated(address indexed newRelayer);
+    event CrossChainBondLocked(address indexed operator, address indexed vault, uint64 indexed nonce, uint256 amount);
 
     // ============ Errors ============
 
@@ -91,6 +96,7 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     error ZeroOwner();
     error ZeroToken();
     error ZeroBondAmount();
+    error NotTrustedRelayer(address caller);
 
     // ============ Modifiers ============
 
@@ -101,6 +107,11 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
 
     modifier onlyAuthorizedVault() {
         if (!authorizedVaults[msg.sender]) revert NotAuthorizedVault(msg.sender);
+        _;
+    }
+
+    modifier onlyRelayer() {
+        if (msg.sender != trustedRelayer) revert NotTrustedRelayer(msg.sender);
         _;
     }
 
@@ -216,6 +227,98 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         emit BondSlashed(operator, vault, nonce, amount, slasher);
     }
 
+    // ============ Cross-Chain Functions ============
+
+    /// @notice Lock a bond directly as the operator (no vault intermediary)
+    /// @dev Used for cross-chain bonds: operator locks WSTON on L1 before submitting
+    ///      an optimistic execution on HyperEVM. The vault address is the cross-chain vault.
+    /// @param vault The cross-chain vault address (used as key, not called)
+    /// @param nonce The execution nonce
+    /// @param amount The bond amount to lock
+    function lockBondDirect(address vault, uint64 nonce, uint256 amount) external nonReentrant {
+        if (amount == 0) revert ZeroBondAmount();
+
+        BondInfo storage bond = bonds[msg.sender][vault][nonce];
+        if (bond.status != BondStatus.Empty) {
+            revert BondAlreadyExists(msg.sender, vault, nonce);
+        }
+
+        // Pull WSTON from operator
+        wston.safeTransferFrom(msg.sender, address(this), amount);
+
+        bond.amount = amount;
+        bond.lockedAt = block.timestamp;
+        bond.status = BondStatus.Locked;
+
+        totalBonded[msg.sender] += amount;
+
+        emit CrossChainBondLocked(msg.sender, vault, nonce, amount);
+        emit BondLocked(msg.sender, vault, nonce, amount);
+    }
+
+    /// @notice Release a bond via trusted relayer (cross-chain: oracle relays ProofSubmitted from HyperEVM)
+    /// @param operator The operator address
+    /// @param vault The cross-chain vault address
+    /// @param nonce The execution nonce
+    function releaseBondByRelayer(
+        address operator,
+        address vault,
+        uint64 nonce
+    ) external nonReentrant onlyRelayer {
+        BondInfo storage bond = bonds[operator][vault][nonce];
+        if (bond.status != BondStatus.Locked) {
+            revert InvalidBondStatus(operator, vault, nonce, bond.status);
+        }
+
+        uint256 amount = bond.amount;
+        bond.status = BondStatus.Released;
+        totalBonded[operator] -= amount;
+
+        wston.safeTransfer(operator, amount);
+
+        emit BondReleased(operator, vault, nonce, amount);
+    }
+
+    /// @notice Slash a bond via trusted relayer (cross-chain: oracle relays ExecutionSlashed from HyperEVM)
+    /// @param operator The operator address
+    /// @param vault The cross-chain vault address
+    /// @param nonce The execution nonce
+    /// @param slasher The address that triggered the slash on HyperEVM (address(0) for self-slash)
+    function slashBondByRelayer(
+        address operator,
+        address vault,
+        uint64 nonce,
+        address slasher
+    ) external nonReentrant onlyRelayer {
+        BondInfo storage bond = bonds[operator][vault][nonce];
+        if (bond.status != BondStatus.Locked) {
+            revert InvalidBondStatus(operator, vault, nonce, bond.status);
+        }
+
+        uint256 amount = bond.amount;
+        bond.status = BondStatus.Slashed;
+        totalBonded[operator] -= amount;
+
+        // Calculate distribution shares
+        uint256 treasuryShare = (amount * TREASURY_SHARE_BPS) / BPS_DENOMINATOR;
+        uint256 depositorShare;
+
+        if (slasher == address(0)) {
+            // Self-slash: no finder fee, extra goes to treasury (cross-chain can't send to vault depositors)
+            depositorShare = 0;
+        } else {
+            depositorShare = 0; // Cross-chain: no direct transfer to HyperEVM depositors
+        }
+
+        // Cross-chain slash: all goes to treasury (treasury handles redistribution off-chain or via bridge)
+        uint256 treasuryTotal = amount;
+        if (treasuryTotal > 0) {
+            wston.safeTransfer(treasury, treasuryTotal);
+        }
+
+        emit BondSlashed(operator, vault, nonce, amount, slasher);
+    }
+
     // ============ View Functions ============
 
     /// @inheritdoc IBondManager
@@ -254,6 +357,11 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     function revokeVault(address vault) external onlyOwner {
         authorizedVaults[vault] = false;
         emit VaultRevoked(vault);
+    }
+
+    function setTrustedRelayer(address relayer) external onlyOwner {
+        trustedRelayer = relayer;
+        emit TrustedRelayerUpdated(relayer);
     }
 
     function transferOwnership(address newOwner) external onlyOwner {

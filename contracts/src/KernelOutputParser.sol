@@ -78,7 +78,7 @@ library KernelOutputParser {
     /// @notice Parse AgentOutput bytes into an array of actions
     /// @param data The raw AgentOutput bytes
     /// @return actions Array of parsed actions
-    function parseActions(bytes calldata data) internal pure returns (Action[] memory actions) {
+    function parseActions(bytes calldata data) public pure returns (Action[] memory actions) {
         uint256 offset = 0;
 
         // Read action_count (u32 LE)

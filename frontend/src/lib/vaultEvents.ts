@@ -126,6 +126,36 @@ export const withdrawEvent = {
   ],
 };
 
+export const optimisticExecutionSubmittedEvent = {
+  type: 'event' as const,
+  name: 'OptimisticExecutionSubmitted' as const,
+  inputs: [
+    { name: 'executionNonce', type: 'uint64' as const, indexed: true },
+    { name: 'journalHash', type: 'bytes32' as const, indexed: false },
+    { name: 'bondAmount', type: 'uint256' as const, indexed: false },
+    { name: 'deadline', type: 'uint256' as const, indexed: false },
+  ],
+};
+
+export const proofSubmittedEvent = {
+  type: 'event' as const,
+  name: 'ProofSubmitted' as const,
+  inputs: [
+    { name: 'executionNonce', type: 'uint64' as const, indexed: true },
+    { name: 'submitter', type: 'address' as const, indexed: true },
+  ],
+};
+
+export const executionSlashedEvent = {
+  type: 'event' as const,
+  name: 'ExecutionSlashed' as const,
+  inputs: [
+    { name: 'executionNonce', type: 'uint64' as const, indexed: true },
+    { name: 'slasher', type: 'address' as const, indexed: true },
+    { name: 'bondAmount', type: 'uint256' as const, indexed: false },
+  ],
+};
+
 /**
  * Find the block at which a vault was deployed via VaultDeployed event.
  * Uses expanding lookback windows to minimize RPC calls.

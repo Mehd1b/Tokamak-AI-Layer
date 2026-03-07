@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.24;
 
-import { IBondManager } from "./IBondManager.sol";
-
 /// @title IOptimisticKernelVault
 /// @notice Interface for the OptimisticKernelVault — extends KernelVault with optimistic execution
-/// @dev Operators can execute agent actions immediately by posting a bond, then submit proofs later.
-///      If the proof is not submitted within the challenge window, anyone can slash the bond.
+/// @dev Operators execute agent actions immediately by providing an oracle attestation that a bond
+///      was locked on L1 (where WSTON exists). Proofs are submitted later within a challenge window.
+///      Bond release/slash is handled on L1 via oracle relay of HyperEVM events.
 interface IOptimisticKernelVault {
     // ============ Structs ============
 
@@ -21,27 +20,31 @@ interface IOptimisticKernelVault {
 
     // ============ Functions ============
 
-    /// @notice Submit an optimistic execution with a WSTON bond (owner only)
-    /// @dev Operator must approve the BondManager to spend `bondAmount` of WSTON before calling.
+    /// @notice Submit an optimistic execution with an oracle-attested bond (owner only)
+    /// @dev Operator must first lock WSTON on L1 BondManager, then obtain an oracle attestation.
     /// @param journal The raw journal bytes (209 bytes)
     /// @param agentOutputBytes The agent output bytes containing actions
-    /// @param oracleSignature Oracle ECDSA signature (empty if oracle not configured)
+    /// @param oracleSignature Oracle ECDSA signature for price feed (empty if oracle not configured)
     /// @param oracleTimestamp Oracle data timestamp
-    /// @param bondAmount Amount of WSTON to stake as bond
+    /// @param bondAmount Amount of WSTON locked as bond on L1
+    /// @param bondAttestation Oracle attestation of L1 bond lock (65-byte ECDSA signature)
     function executeOptimistic(
         bytes calldata journal,
         bytes calldata agentOutputBytes,
         bytes calldata oracleSignature,
         uint64 oracleTimestamp,
-        uint256 bondAmount
+        uint256 bondAmount,
+        bytes calldata bondAttestation
     ) external;
 
     /// @notice Submit a proof for a pending optimistic execution (permissionless)
+    /// @dev Emits ProofSubmitted — oracle relays this to L1 BondManager to release the bond.
     /// @param executionNonce The nonce of the pending execution
     /// @param seal The RISC Zero proof seal
     function submitProof(uint64 executionNonce, bytes calldata seal) external;
 
     /// @notice Slash a pending execution whose challenge window has expired (permissionless)
+    /// @dev Emits ExecutionSlashed — oracle relays this to L1 BondManager to slash the bond.
     /// @param executionNonce The nonce of the expired execution
     function slashExpired(uint64 executionNonce) external;
 
@@ -62,12 +65,13 @@ interface IOptimisticKernelVault {
     function setMaxPending(uint256 max) external;
 
     /// @notice Enable or disable optimistic execution (owner only)
+    /// @dev Requires oracleSigner to be set (needed for bond attestation verification)
     /// @param enabled Whether optimistic execution is enabled
     function setOptimisticEnabled(bool enabled) external;
 
-    /// @notice Set the bond manager contract (owner only)
-    /// @param manager The IBondManager implementation
-    function setBondManager(IBondManager manager) external;
+    /// @notice Set the L1 chain ID where bonds are locked (owner only)
+    /// @param bondChainId The chain ID (e.g., 1 for Ethereum mainnet)
+    function setBondChainId(uint256 bondChainId) external;
 
     /// @notice Get a pending execution by nonce
     /// @param nonce The execution nonce
@@ -92,9 +96,11 @@ interface IOptimisticKernelVault {
     );
 
     /// @notice Emitted when a proof is submitted for a pending execution
+    /// @dev Oracle watches this event and calls releaseBondByRelayer on L1 BondManager
     event ProofSubmitted(uint64 indexed executionNonce, address indexed submitter);
 
     /// @notice Emitted when a pending execution is slashed
+    /// @dev Oracle watches this event and calls slashBondByRelayer on L1 BondManager
     event ExecutionSlashed(
         uint64 indexed executionNonce,
         address indexed slasher,
@@ -129,8 +135,8 @@ interface IOptimisticKernelVault {
     /// @notice Max pending value exceeds the hard cap
     error InvalidMaxPending(uint256 provided, uint256 max);
 
-    /// @notice Bond manager has not been set
-    error BondManagerNotSet();
+    /// @notice Oracle signer not set (required for bond attestation verification)
+    error OracleSignerNotSet();
 
     /// @notice Proof verification failed
     error ProofVerificationFailed();

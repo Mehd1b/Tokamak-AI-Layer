@@ -36,7 +36,7 @@ interface IVaultFactory {
     /// @param asset The ERC20 asset address (or address(0) for ETH)
     /// @param userSalt User-provided salt for CREATE2 address prediction
     /// @param expectedImageId The expected RISC Zero image ID (verified against registry)
-    /// @param bondManager The bond manager contract address
+    /// @param bondChainId The L1 chain ID where bonds are locked (e.g., 1 for Ethereum)
     /// @param challengeWindow Initial challenge window in seconds
     /// @return vault The deployed OptimisticKernelVault address
     function deployOptimisticVault(
@@ -44,7 +44,7 @@ interface IVaultFactory {
         address asset,
         bytes32 userSalt,
         bytes32 expectedImageId,
-        address bondManager,
+        uint256 bondChainId,
         uint256 challengeWindow
     ) external returns (address vault);
 
@@ -53,7 +53,7 @@ interface IVaultFactory {
     /// @param agentId The agent ID from AgentRegistry
     /// @param asset The ERC20 asset address (or address(0) for ETH)
     /// @param userSalt A unique salt chosen by the user
-    /// @param bondManager The bond manager contract address
+    /// @param bondChainId The L1 chain ID where bonds are locked
     /// @return vault The computed vault address
     /// @return salt The CREATE2 salt used for deployment
     function computeOptimisticVaultAddress(
@@ -61,7 +61,7 @@ interface IVaultFactory {
         bytes32 agentId,
         address asset,
         bytes32 userSalt,
-        address bondManager
+        uint256 bondChainId
     ) external view returns (address vault, bytes32 salt);
 
     /// @notice Image ID changed between computeVaultAddress and deployVault
@@ -121,8 +121,19 @@ interface IVaultFactory {
         address indexed vault,
         bytes32 indexed agentId,
         address indexed owner,
-        address bondManager
+        uint256 bondChainId
     );
+
+    /// @notice Register an externally deployed vault with the factory
+    /// @dev Allows the factory owner to register vaults that were deployed directly
+    ///      (e.g., when creation code exceeds block gas limits for code store deployment).
+    ///      The vault must have code at the given address.
+    /// @param vault The vault address to register
+    /// @param agentId The agent ID the vault is bound to
+    function registerExternalVault(address vault, bytes32 agentId) external;
+
+    /// @notice Emitted when an external vault is registered
+    event ExternalVaultRegistered(address indexed vault, bytes32 indexed agentId);
 
     /// @notice Agent not registered in the registry
     error AgentNotRegistered(bytes32 agentId);

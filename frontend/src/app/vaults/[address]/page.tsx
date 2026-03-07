@@ -5,11 +5,14 @@ import { useAccount } from 'wagmi';
 import { useVaultInfo, useVaultShares } from '@/hooks/useKernelVault';
 import { useVaultHistory } from '@/hooks/useVaultHistory';
 import { useVaultExecutions } from '@/hooks/useVaultExecutions';
+import { useOptimisticExecutions } from '@/hooks/useOptimisticExecutions';
 import { VaultDepositForm } from '@/components/VaultDepositForm';
 import { VaultWithdrawForm } from '@/components/VaultWithdrawForm';
 import { VaultChart } from '@/components/VaultChart';
 import { ExecutionSubmitForm } from '@/components/ExecutionSubmitForm';
 import { ExecutionHistoryTable } from '@/components/ExecutionHistoryTable';
+import { OptimisticStatusCard } from '@/components/OptimisticStatusCard';
+import { PendingExecutionsTable } from '@/components/PendingExecutionsTable';
 import { formatBytes32, formatEther, timestampToDate, truncateAddress } from '@/lib/utils';
 import { useNetwork } from '@/lib/NetworkContext';
 import { NetworkBadge } from '@/components/NetworkLogo';
@@ -26,6 +29,10 @@ export default function VaultDetailPage() {
   const { data: userShares } = useVaultShares(vaultAddress, userAddress);
   const { tvl, pps, isLoading: historyLoading } = useVaultHistory(vaultAddress, vault.assetDecimals);
   const { executions, isLoading: executionsLoading } = useVaultExecutions(vaultAddress);
+  const { executions: optimisticExecs, isLoading: optimisticLoading } = useOptimisticExecutions(
+    vaultAddress,
+    vault.isOptimistic,
+  );
 
   if (vault.isLoading) {
     return (
@@ -41,43 +48,19 @@ export default function VaultDetailPage() {
 
   return (
     <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-12">
-      {/* Back button */}
-      <Link href="/vaults" className="inline-flex items-center gap-2 text-gray-400 hover:text-[#A855F7] transition-colors mb-8 font-mono text-sm">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        Back to Vaults
-      </Link>
+      {/* Breadcrumbs */}
+      <nav className="breadcrumb">
+        <Link href="/">Home</Link>
+        <span className="separator">/</span>
+        <Link href="/vaults">Vaults</Link>
+        <span className="separator">/</span>
+        <span className="text-gray-400">{truncateAddress(vaultAddress, 6)}</span>
+      </nav>
 
       {/* Two-column layout: main content left, discussion right */}
       <div className="flex flex-col xl:flex-row gap-8">
         {/* Left column — vault content */}
         <div className="flex-1 min-w-0">
-          {/* Actions grid */}
-          <div className="grid md:grid-cols-2 gap-6 mb-8">
-            {/* Deposit */}
-            <div className="card">
-              <h2 className="text-lg font-light text-white mb-4" style={{ fontFamily: 'var(--font-serif), serif' }}>
-                Deposit
-              </h2>
-              <VaultDepositForm
-                vaultAddress={vaultAddress}
-                isEthVault={vault.isEthVault}
-                assetDecimals={vault.assetDecimals}
-                assetSymbol={vault.assetSymbol}
-                assetAddress={vault.asset as `0x${string}` | undefined}
-              />
-            </div>
-
-            {/* Withdraw */}
-            <div className="card">
-              <h2 className="text-lg font-light text-white mb-4" style={{ fontFamily: 'var(--font-serif), serif' }}>
-                Withdraw
-              </h2>
-              <VaultWithdrawForm vaultAddress={vaultAddress} assetDecimals={vault.assetDecimals} />
-            </div>
-          </div>
-
           {/* Vault header */}
           <div className="card mb-8">
             <div className="flex items-center gap-4 mb-6">
@@ -101,6 +84,11 @@ export default function VaultDetailPage() {
                     {truncateAddress(vaultAddress, 6)}
                   </span>
                   <NetworkBadge />
+                  {vault.isOptimistic && (
+                    <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium bg-cyan-500/10 text-cyan-400 border-cyan-500/20">
+                      Optimistic Vault
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -158,6 +146,75 @@ export default function VaultDetailPage() {
             )}
           </div>
 
+          {/* Optimistic Status (only for optimistic vaults) */}
+          {vault.isOptimistic && (
+            <OptimisticStatusCard
+              optimisticEnabled={vault.isOptimistic}
+              challengeWindow={vault.challengeWindow}
+              minBond={vault.minBond}
+              maxPending={vault.maxPending}
+              pendingCount={vault.pendingCount}
+              bondManagerAddress={vault.bondManagerAddress}
+            />
+          )}
+
+          {/* Key Stats Bar */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div className="card text-center py-4">
+              <div className="text-xs text-gray-500 font-mono uppercase tracking-wider mb-1">TVL</div>
+              <div className="text-lg font-medium text-white font-mono">
+                {vault.totalValueLocked !== undefined
+                  ? formatEther(vault.totalValueLocked, vault.assetDecimals)
+                  : vault.totalAssets !== undefined
+                    ? formatEther(vault.totalAssets, vault.assetDecimals)
+                    : '-'}{' '}
+                <span className="text-sm text-gray-400">{vault.assetSymbol}</span>
+              </div>
+            </div>
+            <div className="card text-center py-4">
+              <div className="text-xs text-gray-500 font-mono uppercase tracking-wider mb-1">Shares</div>
+              <div className="text-lg font-medium text-white font-mono">
+                {vault.totalShares !== undefined ? formatEther(vault.totalShares, vault.assetDecimals) : '-'}
+              </div>
+            </div>
+            <div className="card text-center py-4">
+              <div className="text-xs text-gray-500 font-mono uppercase tracking-wider mb-1">Executions</div>
+              <div className="text-lg font-medium text-white font-mono">
+                {vault.lastExecutionNonce !== undefined ? vault.lastExecutionNonce.toString() : '0'}
+              </div>
+            </div>
+            <div className="card text-center py-4">
+              <div className="text-xs text-gray-500 font-mono uppercase tracking-wider mb-1">Last Run</div>
+              <div className="text-lg font-medium text-white font-mono">
+                {vault.lastExecutionTimestamp !== undefined && vault.lastExecutionTimestamp > BigInt(0)
+                  ? timestampToDate(vault.lastExecutionTimestamp)
+                  : 'Never'}
+              </div>
+            </div>
+          </div>
+
+          {/* Deposit & Withdraw */}
+          <div className="grid md:grid-cols-2 gap-6 mb-8">
+            <div className="card">
+              <h2 className="text-lg font-light text-white mb-4" style={{ fontFamily: 'var(--font-serif), serif' }}>
+                Deposit
+              </h2>
+              <VaultDepositForm
+                vaultAddress={vaultAddress}
+                isEthVault={vault.isEthVault}
+                assetDecimals={vault.assetDecimals}
+                assetSymbol={vault.assetSymbol}
+                assetAddress={vault.asset as `0x${string}` | undefined}
+              />
+            </div>
+            <div className="card">
+              <h2 className="text-lg font-light text-white mb-4" style={{ fontFamily: 'var(--font-serif), serif' }}>
+                Withdraw
+              </h2>
+              <VaultWithdrawForm vaultAddress={vaultAddress} assetDecimals={vault.assetDecimals} />
+            </div>
+          </div>
+
           {/* TVL & PPS Charts */}
           <div className="grid grid-cols-1 gap-6 mb-8">
             <VaultChart
@@ -178,6 +235,27 @@ export default function VaultDetailPage() {
               height={250}
             />
           </div>
+
+          {/* Pending Executions (optimistic vaults only) */}
+          {vault.isOptimistic && optimisticExecs.length > 0 && (
+            <div className="card mb-8">
+              <h2 className="text-lg font-light text-white mb-4" style={{ fontFamily: 'var(--font-serif), serif' }}>
+                Optimistic Executions
+              </h2>
+              <p className="text-gray-500 text-sm font-mono mb-4">
+                Executions awaiting ZK proof submission. Expired executions can be slashed by anyone.
+              </p>
+              {optimisticLoading ? (
+                <div className="animate-pulse space-y-3">
+                  {[...Array(2)].map((_, i) => (
+                    <div key={i} className="h-10 bg-white/5 rounded" />
+                  ))}
+                </div>
+              ) : (
+                <PendingExecutionsTable vaultAddress={vaultAddress} executions={optimisticExecs} />
+              )}
+            </div>
+          )}
 
           {/* Execution History */}
           <div className="card">

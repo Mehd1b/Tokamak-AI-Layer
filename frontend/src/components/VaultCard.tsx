@@ -14,9 +14,11 @@ interface VaultCardProps {
   assetDecimals: number;
   assetSymbol: string;
   commentCount?: number;
+  isOptimistic?: boolean;
+  pendingCount?: number;
 }
 
-export function VaultCard({ address, agentId, asset, totalAssets, totalShares, totalValueLocked, assetDecimals, assetSymbol, commentCount }: VaultCardProps) {
+export function VaultCard({ address, agentId, asset, totalAssets, totalShares, totalValueLocked, assetDecimals, assetSymbol, commentCount, isOptimistic, pendingCount }: VaultCardProps) {
   return (
     <Link href={`/vaults/${address}`}>
       <div className="card-hover cursor-pointer group">
@@ -34,7 +36,13 @@ export function VaultCard({ address, agentId, asset, totalAssets, totalShares, t
           </div>
           <div className="flex items-center gap-2">
             <NetworkBadge />
-            <span className="badge-info">Vault</span>
+            {isOptimistic ? (
+              <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium bg-cyan-500/10 text-cyan-400 border-cyan-500/20">
+                Optimistic
+              </span>
+            ) : (
+              <span className="badge-info">Vault</span>
+            )}
           </div>
         </div>
 
@@ -74,6 +82,14 @@ export function VaultCard({ address, agentId, asset, totalAssets, totalShares, t
             className="h-px flex-1 rounded-full transition-all duration-500 origin-left scale-x-0 group-hover:scale-x-100"
             style={{ background: 'linear-gradient(90deg, #A855F7, transparent)' }}
           />
+          {isOptimistic && pendingCount !== undefined && pendingCount > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium bg-blue-500/10 text-blue-400 border-blue-500/20">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {pendingCount} pending
+            </span>
+          )}
           {commentCount !== undefined && commentCount > 0 && (
             <span className="flex items-center gap-1 text-gray-500 text-xs font-mono">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>

@@ -2,7 +2,7 @@
 
 import { useReadContract, usePublicClient } from 'wagmi';
 import { useQuery } from '@tanstack/react-query';
-import { VaultFactoryABI, KernelVaultABI } from '@/lib/contracts';
+import { VaultFactoryABI, KernelVaultABI, OptimisticKernelVaultABI } from '@/lib/contracts';
 import { useNetwork } from '@/lib/NetworkContext';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
@@ -21,6 +21,8 @@ export interface VaultInfo {
   totalValueLocked: bigint;
   assetDecimals: number;
   assetSymbol: string;
+  isOptimistic?: boolean;
+  pendingCount?: number;
 }
 
 export function useIsDeployedVault(vaultAddress: `0x${string}` | undefined) {
@@ -77,6 +79,17 @@ async function fetchVaultInfoDirect(client: any, vaultAddress: `0x${string}`): P
     } catch {}
   }
 
+  let isOptimistic = false;
+  let pendingCount = 0;
+  try {
+    const enabled = await client.readContract({ address: vaultAddress, abi: OptimisticKernelVaultABI, functionName: 'optimisticEnabled' });
+    if (enabled === true) {
+      isOptimistic = true;
+      const count = await client.readContract({ address: vaultAddress, abi: OptimisticKernelVaultABI, functionName: 'pendingCount' });
+      pendingCount = Number(count);
+    }
+  } catch {}
+
   return {
     address: vaultAddress,
     agentId: agentId as string,
@@ -86,6 +99,8 @@ async function fetchVaultInfoDirect(client: any, vaultAddress: `0x${string}`): P
     totalValueLocked,
     assetDecimals,
     assetSymbol,
+    isOptimistic,
+    pendingCount,
   };
 }
 
@@ -137,6 +152,14 @@ export function useDeployedVaultsList() {
         let metaResults: any[] = [];
         try { metaResults = await batchedMulticall(client, metaCalls); } catch {}
 
+        // Detect optimistic vaults via multicall
+        const optimisticCalls = vaultAddresses.flatMap((vaultAddress) => [
+          { address: vaultAddress, abi: OptimisticKernelVaultABI, functionName: 'optimisticEnabled' as const },
+          { address: vaultAddress, abi: OptimisticKernelVaultABI, functionName: 'pendingCount' as const },
+        ]);
+        let optimisticResults: any[] = [];
+        try { optimisticResults = await batchedMulticall(client, optimisticCalls); } catch {}
+
         return vaultAddresses.map((vaultAddress, i) => {
           const base = i * 4;
           const agentId = results[base]?.result as string ?? '0x';
@@ -151,7 +174,12 @@ export function useDeployedVaultsList() {
           const assetDecimals = isEth ? 18 : (metaResults[i * 2]?.status === 'success' ? Number(metaResults[i * 2].result) : 18);
           const assetSymbol = isEth ? 'ETH' : (metaResults[i * 2 + 1]?.status === 'success' ? String(metaResults[i * 2 + 1].result) : 'TOKEN');
 
-          return { address: vaultAddress, agentId, asset, totalAssets, totalShares, totalValueLocked, assetDecimals, assetSymbol };
+          const isOptimistic = optimisticResults[i * 2]?.status === 'success' && optimisticResults[i * 2].result === true;
+          const pendingCount = isOptimistic && optimisticResults[i * 2 + 1]?.status === 'success'
+            ? Number(optimisticResults[i * 2 + 1].result)
+            : 0;
+
+          return { address: vaultAddress, agentId, asset, totalAssets, totalShares, totalValueLocked, assetDecimals, assetSymbol, isOptimistic, pendingCount };
         });
       } catch {
         // Fallback: sequential individual reads (for RPCs with strict limits)

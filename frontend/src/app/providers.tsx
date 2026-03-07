@@ -3,7 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WagmiProvider, createConfig, http } from 'wagmi';
 import { mainnet, sepolia } from 'wagmi/chains';
-import { hyperEvmMainnet, hyperEvmTestnet } from '@/lib/chains';
+import { hyperEvmMainnet, hyperEvmTestnet, thanosSepolia } from '@/lib/chains';
 import { RainbowKitProvider, connectorsForWallets } from '@rainbow-me/rainbowkit';
 import { metaMaskWallet } from '@rainbow-me/rainbowkit/wallets';
 import '@rainbow-me/rainbowkit/styles.css';
@@ -25,12 +25,13 @@ const connectors = connectorsForWallets(
 
 const config = createConfig({
   connectors,
-  chains: [mainnet, hyperEvmMainnet, sepolia, hyperEvmTestnet],
+  chains: [mainnet, hyperEvmMainnet, sepolia, hyperEvmTestnet, thanosSepolia],
   transports: {
     [mainnet.id]: http(process.env.NEXT_PUBLIC_MAINNET_RPC_URL),
     [hyperEvmMainnet.id]: http(process.env.NEXT_PUBLIC_HYPER_MAINNET_RPC_URL || 'https://rpc.hyperliquid.xyz/evm'),
     [sepolia.id]: http(process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL),
     [hyperEvmTestnet.id]: http('https://rpc.hyperliquid-testnet.xyz/evm'),
+    [thanosSepolia.id]: http('https://rpc.thanos-sepolia.tokamak.network'),
   },
   multiInjectedProviderDiscovery: false,
   ssr: true,

@@ -34,20 +34,34 @@ export default function VaultsPage() {
         >
           <span className="italic text-[#A855F7]">Execution</span> Vaults
         </h1>
-        <p className="text-gray-400 max-w-2xl" style={{ fontFamily: 'var(--font-mono), monospace' }}>
+        <p className="text-gray-400 max-w-2xl leading-relaxed">
           Browse and manage vaults for verifiable agent execution with ZK proofs.
         </p>
       </div>
 
       {/* Search */}
       <div className="mb-8">
-        <input
-          type="text"
-          value={searchAddress}
-          onChange={(e) => setSearchAddress(e.target.value)}
-          placeholder="Search by vault address (0x...)..."
-          className="input-dark font-mono w-full"
-        />
+        <div className="input-dark-wrapper">
+          <input
+            type="text"
+            value={searchAddress}
+            onChange={(e) => setSearchAddress(e.target.value)}
+            placeholder="Search by vault address (0x...)..."
+            className="input-dark font-mono w-full pr-10"
+          />
+          {searchAddress && (
+            <button
+              type="button"
+              onClick={() => setSearchAddress('')}
+              className="input-clear"
+              aria-label="Clear search"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Search result */}
@@ -76,8 +90,29 @@ export default function VaultsPage() {
       {!vaultHex && (
         <>
           {isLoadingVaults && (
-            <div className="card text-center py-12">
-              <div className="animate-pulse text-[#A855F7] font-mono text-sm">Fetching on-chain vaults...</div>
+            <div>
+              <div className="h-4 skeleton w-48 mb-4" />
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="card">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="w-10 h-10 skeleton rounded-xl" />
+                      <div className="flex gap-2">
+                        <div className="w-16 h-5 skeleton rounded" />
+                        <div className="w-12 h-5 skeleton rounded" />
+                      </div>
+                    </div>
+                    <div className="h-4 skeleton rounded w-2/3 mb-3" />
+                    <div className="space-y-2">
+                      <div className="h-3 skeleton rounded" />
+                      <div className="h-3 skeleton rounded w-5/6" />
+                      <div className="h-3 skeleton rounded w-4/6" />
+                      <div className="h-3 skeleton rounded w-3/4" />
+                      <div className="h-3 skeleton rounded w-2/3" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -105,6 +140,8 @@ export default function VaultsPage() {
                     assetDecimals={v.assetDecimals}
                     assetSymbol={v.assetSymbol}
                     commentCount={commentCounts?.[v.address.toLowerCase()]}
+                    isOptimistic={v.isOptimistic}
+                    pendingCount={v.pendingCount}
                   />
                 ))}
               </div>
@@ -120,7 +157,19 @@ export default function VaultsPage() {
                   <circle cx="32" cy="32" r="3" fill="#A855F7" fillOpacity="0.5" />
                 </svg>
               </div>
-              <p className="text-gray-500 font-mono text-sm">No vaults deployed yet</p>
+              <p className="text-gray-400 text-sm mb-2">No vaults deployed yet</p>
+              <p className="text-gray-500 text-sm mb-6">Be the first to deploy a vault for verifiable agent execution.</p>
+              <a
+                href="https://docs.tokagent.network"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary inline-flex items-center gap-2"
+              >
+                Read the Docs
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
             </div>
           )}
         </>

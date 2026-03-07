@@ -45,7 +45,7 @@ library OracleVerifier {
         uint256 chainId,
         address vaultAddress,
         uint64 maxOracleAge
-    ) internal view returns (bool) {
+    ) public view returns (bool) {
         if (signature.length != 65) return false;
 
         // Check freshness (guard against future timestamps to prevent underflow)
@@ -77,6 +77,64 @@ library OracleVerifier {
         return recovered == expectedSigner;
     }
 
+    /// @notice Thrown when bond attestation signature is invalid
+    error InvalidBondAttestation();
+
+    // ============ Bond Attestation ============
+
+    /// @notice Verify an oracle attestation that a bond was locked on another chain (reverts on failure)
+    /// @dev Attestation format: oracle signs keccak256("BOND_LOCK_V1" || operator || vault || nonce || amount || chainId)
+    /// @param attestation 65-byte ECDSA signature (r[32] || s[32] || v[1])
+    /// @param expectedSigner The trusted oracle signer address
+    /// @param operator The operator who locked the bond
+    /// @param vault The vault address the bond is for
+    /// @param nonce The execution nonce
+    /// @param amount The bond amount
+    /// @param chainId The chain ID where the bond was locked
+    function requireValidBondAttestation(
+        bytes memory attestation,
+        address expectedSigner,
+        address operator,
+        address vault,
+        uint64 nonce,
+        uint256 amount,
+        uint256 chainId
+    ) public pure {
+        if (attestation.length != 65) {
+            revert InvalidBondAttestation();
+        }
+
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+        assembly {
+            r := mload(add(attestation, 32))
+            s := mload(add(attestation, 64))
+            v := byte(0, mload(add(attestation, 96)))
+        }
+
+        if (v != 27 && v != 28) {
+            revert InvalidBondAttestation();
+        }
+
+        // EIP-2: reject upper-range s values
+        if (uint256(s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
+            revert InvalidBondAttestation();
+        }
+
+        bytes32 bondHash = keccak256(
+            abi.encodePacked("BOND_LOCK_V1", operator, vault, nonce, amount, chainId)
+        );
+        bytes32 ethSignedHash = keccak256(
+            abi.encodePacked("\x19Ethereum Signed Message:\n32", bondHash)
+        );
+
+        address recovered = ecrecover(ethSignedHash, v, r, s);
+        if (recovered == address(0) || recovered != expectedSigner) {
+            revert InvalidBondAttestation();
+        }
+    }
+
     /// @notice Verify an ECDSA signature over a feed hash (reverts on failure)
     /// @param feedHash SHA-256 hash of the oracle price feed body
     /// @param signature 65-byte ECDSA signature (r[32] || s[32] || v[1])
@@ -93,7 +151,7 @@ library OracleVerifier {
         uint256 chainId,
         address vaultAddress,
         uint64 maxOracleAge
-    ) internal view {
+    ) public view {
         if (signature.length != 65) {
             revert InvalidSignatureLength(signature.length);
         }
