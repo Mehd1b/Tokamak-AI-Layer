@@ -395,41 +395,27 @@ contract KernelVault is ReentrancyGuard, Pausable {
         _execute(journal, seal, agentOutputBytes, oracleSignature, oracleTimestamp);
     }
 
-    /// @notice Internal execution logic shared by execute() and executeWithOracle()
-    function _execute(
-        bytes calldata journal,
-        bytes calldata seal,
+    /// @notice Validate parsed journal: agentId, oracle signature, nonce, action commitment
+    /// @dev Shared by execute() and OptimisticKernelVault.executeOptimistic()
+    function _validateParsedJournal(
+        IKernelExecutionVerifier.ParsedJournal memory parsed,
         bytes calldata agentOutputBytes,
         bytes memory oracleSignature,
         uint64 oracleTimestamp
-    ) internal {
-        if (msg.sender != owner) revert NotOwner();
-        // 1. Verify proof and parse journal using pinned trustedImageId
-        IKernelExecutionVerifier.ParsedJournal memory parsed =
-            verifier.verifyAndParseWithImageId(trustedImageId, journal, seal);
-
-        // 2. Verify agent ID matches
+    ) internal returns (uint64 providedNonce) {
         if (parsed.agentId != agentId) {
             revert AgentIdMismatch(agentId, parsed.agentId);
         }
 
-        // 3. Verify oracle signature if oracle signer is configured and signature provided
         if (oracleSigner != address(0) && oracleSignature.length > 0) {
             OracleVerifier.requireValidOracleSignature(
-                parsed.inputRoot,
-                oracleSignature,
-                oracleSigner,
-                oracleTimestamp,
-                block.chainid,
-                address(this),
-                maxOracleAge
+                parsed.inputRoot, oracleSignature, oracleSigner,
+                oracleTimestamp, block.chainid, address(this), maxOracleAge
             );
         }
 
-        // 4. Verify nonce is valid (must be > lastNonce and within MAX_NONCE_GAP)
-        // This allows gaps for liveness while preventing replay and unbounded skips
         uint64 lastNonce = lastExecutionNonce;
-        uint64 providedNonce = parsed.executionNonce;
+        providedNonce = parsed.executionNonce;
 
         if (providedNonce <= lastNonce) {
             revert InvalidNonce(lastNonce, providedNonce);
@@ -440,33 +426,51 @@ contract KernelVault is ReentrancyGuard, Pausable {
             revert NonceGapTooLarge(lastNonce, providedNonce, MAX_NONCE_GAP);
         }
 
-        // Emit event if nonces were skipped
         if (gap > 1) {
             emit NoncesSkipped(lastNonce + 1, providedNonce - 1, gap - 1);
         }
 
-        // 5. Verify action commitment
         bytes32 computedCommitment = sha256(agentOutputBytes);
         if (computedCommitment != parsed.actionCommitment) {
             revert ActionCommitmentMismatch(parsed.actionCommitment, computedCommitment);
         }
+    }
 
-        // 6. Update last execution nonce
+    /// @notice Execute parsed and validated actions
+    function _executeActions(
+        bytes calldata agentOutputBytes,
+        bytes32 parsedAgentId,
+        uint64 providedNonce,
+        bytes32 actionCommitment
+    ) internal {
         lastExecutionNonce = providedNonce;
 
-        // 7. Parse actions from agentOutputBytes
         KernelOutputParser.Action[] memory actions =
             KernelOutputParser.parseActions(agentOutputBytes);
 
-        // 8. Execute actions in order (atomic - any failure reverts entire execution)
         for (uint256 i = 0; i < actions.length; i++) {
             _executeAction(i, actions[i]);
         }
 
-        // 9. Emit execution event
-        emit ExecutionApplied(
-            parsed.agentId, parsed.executionNonce, parsed.actionCommitment, actions.length
-        );
+        emit ExecutionApplied(parsedAgentId, providedNonce, actionCommitment, actions.length);
+    }
+
+    /// @notice Internal execution logic shared by execute() and executeWithOracle()
+    function _execute(
+        bytes calldata journal,
+        bytes calldata seal,
+        bytes calldata agentOutputBytes,
+        bytes memory oracleSignature,
+        uint64 oracleTimestamp
+    ) internal {
+        if (msg.sender != owner) revert NotOwner();
+
+        IKernelExecutionVerifier.ParsedJournal memory parsed =
+            verifier.verifyAndParseWithImageId(trustedImageId, journal, seal);
+
+        uint64 providedNonce = _validateParsedJournal(parsed, agentOutputBytes, oracleSignature, oracleTimestamp);
+
+        _executeActions(agentOutputBytes, parsed.agentId, providedNonce, parsed.actionCommitment);
     }
 
     // ============ Internal Withdraw ============

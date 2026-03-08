@@ -430,4 +430,211 @@ contract WSTONBondManagerTest is Test {
         vm.expectRevert(WSTONBondManager.ZeroOwner.selector);
         bondManager.transferOwnership(address(0));
     }
+
+    // ============ Cross-Chain Bond Tests ============
+
+    function test_lockBondDirect_basic() public {
+        // Set relayer first (required)
+        address relayer = address(0x6666000000000000000000000000000000000006);
+        bondManager.setTrustedRelayer(relayer);
+
+        uint256 bondAmount = 10 ether;
+        vm.prank(operator);
+        bondManager.lockBondDirect(mockVault, NONCE_1, bondAmount);
+
+        (uint256 amount, uint256 lockedAt, WSTONBondManager.BondStatus status) =
+            bondManager.bonds(operator, mockVault, NONCE_1);
+        assertEq(amount, bondAmount);
+        assertEq(lockedAt, block.timestamp);
+        assertEq(uint8(status), uint8(WSTONBondManager.BondStatus.Locked));
+        assertEq(bondManager.totalBonded(operator), bondAmount);
+        assertEq(bondManager.totalLockedGlobal(), bondAmount);
+    }
+
+    function test_lockBondDirect_noRelayer_reverts() public {
+        // trustedRelayer is address(0) by default
+        vm.prank(operator);
+        vm.expectRevert(WSTONBondManager.RelayerNotSet.selector);
+        bondManager.lockBondDirect(mockVault, NONCE_1, 10 ether);
+    }
+
+    function test_releaseBondByRelayer() public {
+        address relayer = address(0x6666000000000000000000000000000000000006);
+        bondManager.setTrustedRelayer(relayer);
+
+        uint256 bondAmount = 10 ether;
+        vm.prank(operator);
+        bondManager.lockBondDirect(mockVault, NONCE_1, bondAmount);
+
+        uint256 operatorBefore = mockWston.balanceOf(operator);
+
+        vm.prank(relayer);
+        bondManager.releaseBondByRelayer(operator, mockVault, NONCE_1);
+
+        assertEq(mockWston.balanceOf(operator), operatorBefore + bondAmount);
+        assertEq(bondManager.totalLockedGlobal(), 0);
+    }
+
+    function test_slashBondByRelayer_allToTreasury() public {
+        address relayer = address(0x6666000000000000000000000000000000000006);
+        bondManager.setTrustedRelayer(relayer);
+
+        uint256 bondAmount = 10 ether;
+        vm.prank(operator);
+        bondManager.lockBondDirect(mockVault, NONCE_1, bondAmount);
+
+        uint256 treasuryBefore = mockWston.balanceOf(treasury);
+
+        vm.prank(relayer);
+        bondManager.slashBondByRelayer(operator, mockVault, NONCE_1, finder);
+
+        // Cross-chain slash: 100% to treasury
+        assertEq(mockWston.balanceOf(treasury), treasuryBefore + bondAmount);
+        assertEq(bondManager.totalLockedGlobal(), 0);
+    }
+
+    function test_releaseBondByRelayer_notRelayer_reverts() public {
+        address relayer = address(0x6666000000000000000000000000000000000006);
+        bondManager.setTrustedRelayer(relayer);
+
+        uint256 bondAmount = 10 ether;
+        vm.prank(operator);
+        bondManager.lockBondDirect(mockVault, NONCE_1, bondAmount);
+
+        vm.prank(unauthorized);
+        vm.expectRevert(
+            abi.encodeWithSelector(WSTONBondManager.NotTrustedRelayer.selector, unauthorized)
+        );
+        bondManager.releaseBondByRelayer(operator, mockVault, NONCE_1);
+    }
+
+    // ============ Reclaim Expired Bond Tests ============
+
+    function test_reclaimExpiredBond_afterExpiry() public {
+        address relayer = address(0x6666000000000000000000000000000000000006);
+        bondManager.setTrustedRelayer(relayer);
+
+        uint256 bondAmount = 10 ether;
+        vm.prank(operator);
+        bondManager.lockBondDirect(mockVault, NONCE_1, bondAmount);
+
+        uint256 operatorBefore = mockWston.balanceOf(operator);
+
+        // Warp past BOND_EXPIRY (30 days)
+        vm.warp(block.timestamp + 30 days + 1);
+
+        vm.prank(operator);
+        bondManager.reclaimExpiredBond(mockVault, NONCE_1);
+
+        assertEq(mockWston.balanceOf(operator), operatorBefore + bondAmount);
+        assertEq(bondManager.totalLockedGlobal(), 0);
+        assertEq(bondManager.totalBonded(operator), 0);
+
+        (, , WSTONBondManager.BondStatus status) =
+            bondManager.bonds(operator, mockVault, NONCE_1);
+        assertEq(uint8(status), uint8(WSTONBondManager.BondStatus.Released));
+    }
+
+    function test_reclaimExpiredBond_beforeExpiry_reverts() public {
+        address relayer = address(0x6666000000000000000000000000000000000006);
+        bondManager.setTrustedRelayer(relayer);
+
+        uint256 bondAmount = 10 ether;
+        vm.prank(operator);
+        bondManager.lockBondDirect(mockVault, NONCE_1, bondAmount);
+
+        // Try before expiry
+        vm.warp(block.timestamp + 15 days);
+
+        vm.prank(operator);
+        vm.expectRevert(); // BondNotExpired
+        bondManager.reclaimExpiredBond(mockVault, NONCE_1);
+    }
+
+    function test_reclaimExpiredBond_afterVaultRevoked() public {
+        // Lock bond via authorized vault
+        uint256 bondAmount = 10 ether;
+        vm.prank(mockVault);
+        bondManager.lockBond(operator, mockVault, NONCE_1, bondAmount);
+
+        // Revoke vault — bond is now stuck via normal paths
+        bondManager.revokeVault(mockVault);
+
+        // Verify normal release is blocked
+        vm.prank(mockVault);
+        vm.expectRevert(
+            abi.encodeWithSelector(WSTONBondManager.NotAuthorizedVault.selector, mockVault)
+        );
+        bondManager.releaseBond(operator, mockVault, NONCE_1);
+
+        // Warp past expiry and reclaim
+        vm.warp(block.timestamp + 30 days + 1);
+
+        uint256 operatorBefore = mockWston.balanceOf(operator);
+        vm.prank(operator);
+        bondManager.reclaimExpiredBond(mockVault, NONCE_1);
+
+        assertEq(mockWston.balanceOf(operator), operatorBefore + bondAmount);
+    }
+
+    // ============ Rescue Token Tests ============
+
+    function test_rescueTokens_nonWSTON() public {
+        MockERC20 otherToken = new MockERC20("Other", "OTH", 18);
+        otherToken.mint(address(bondManager), 50 ether);
+
+        address recipient = address(0x7777000000000000000000000000000000000007);
+        bondManager.rescueTokens(address(otherToken), recipient, 50 ether);
+
+        assertEq(otherToken.balanceOf(recipient), 50 ether);
+    }
+
+    function test_rescueTokens_excessWSTON() public {
+        // Lock a bond (10 WSTON locked)
+        vm.prank(mockVault);
+        bondManager.lockBond(operator, mockVault, NONCE_1, 10 ether);
+
+        // Accidentally send extra WSTON
+        mockWston.mint(address(bondManager), 5 ether);
+
+        // Can rescue the 5 excess
+        address recipient = address(0x7777000000000000000000000000000000000007);
+        bondManager.rescueTokens(address(mockWston), recipient, 5 ether);
+        assertEq(mockWston.balanceOf(recipient), 5 ether);
+
+        // Cannot rescue bonded WSTON
+        vm.expectRevert(
+            abi.encodeWithSelector(WSTONBondManager.InsufficientRescuableBalance.selector, 1, 0)
+        );
+        bondManager.rescueTokens(address(mockWston), recipient, 1);
+    }
+
+    // ============ Zero-Address Guard Tests ============
+
+    function test_setTrustedRelayer_zeroAddress_reverts() public {
+        vm.expectRevert(WSTONBondManager.ZeroRelayer.selector);
+        bondManager.setTrustedRelayer(address(0));
+    }
+
+    // ============ Global Tracking Tests ============
+
+    function test_totalLockedGlobal_tracksCorrectly() public {
+        // Lock two bonds
+        vm.prank(mockVault);
+        bondManager.lockBond(operator, mockVault, NONCE_1, 10 ether);
+        vm.prank(mockVault);
+        bondManager.lockBond(operator, mockVault, NONCE_2, 20 ether);
+
+        assertEq(bondManager.totalLockedGlobal(), 30 ether);
+
+        // Release one
+        vm.prank(mockVault);
+        bondManager.releaseBond(operator, mockVault, NONCE_1);
+        assertEq(bondManager.totalLockedGlobal(), 20 ether);
+
+        // Slash the other
+        vm.prank(mockVault);
+        bondManager.slashBond(operator, mockVault, NONCE_2, finder);
+        assertEq(bondManager.totalLockedGlobal(), 0);
+    }
 }

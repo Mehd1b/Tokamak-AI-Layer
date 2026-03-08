@@ -11,6 +11,7 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 /// @dev Chain-agnostic ERC20 bond manager. Operators stake WSTON as collateral for optimistic
 ///      executions. Bonds are slashed if proofs are not submitted within the challenge window.
 ///      Slash distribution: 10% finder, 80% vault (depositors), 10% treasury.
+///      Safety: bonds that remain locked beyond BOND_EXPIRY can be reclaimed by operators.
 contract WSTONBondManager is IBondManager, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -47,6 +48,10 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     /// @notice Basis points denominator
     uint256 public constant BPS_DENOMINATOR = 10000;
 
+    /// @notice Bond expiry: operators can reclaim bonds after this duration if not released/slashed
+    /// @dev Safety valve against stuck bonds (revoked vaults, lost relayer keys, etc.)
+    uint256 public constant BOND_EXPIRY = 30 days;
+
     // ============ State ============
 
     /// @notice Contract owner
@@ -67,6 +72,9 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     /// @notice Total amount currently bonded per operator
     mapping(address => uint256) public totalBonded;
 
+    /// @notice Global total WSTON locked as bonds (for rescue token accounting)
+    uint256 public totalLockedGlobal;
+
     /// @notice Authorized vaults that can lock/release/slash bonds
     mapping(address => bool) public authorizedVaults;
 
@@ -85,6 +93,8 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event TrustedRelayerUpdated(address indexed newRelayer);
     event CrossChainBondLocked(address indexed operator, address indexed vault, uint64 indexed nonce, uint256 amount);
+    event BondReclaimed(address indexed operator, address indexed vault, uint64 indexed nonce, uint256 amount);
+    event TokensRescued(address indexed token, address indexed to, uint256 amount);
 
     // ============ Errors ============
 
@@ -97,6 +107,10 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     error ZeroToken();
     error ZeroBondAmount();
     error NotTrustedRelayer(address caller);
+    error ZeroRelayer();
+    error RelayerNotSet();
+    error BondNotExpired(uint256 lockedAt, uint256 expiry, uint256 current);
+    error InsufficientRescuableBalance(uint256 requested, uint256 available);
 
     // ============ Modifiers ============
 
@@ -157,6 +171,7 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         bond.status = BondStatus.Locked;
 
         totalBonded[operator] += amount;
+        totalLockedGlobal += amount;
 
         emit BondLocked(operator, vault, nonce, amount);
     }
@@ -175,6 +190,7 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         uint256 amount = bond.amount;
         bond.status = BondStatus.Released;
         totalBonded[operator] -= amount;
+        totalLockedGlobal -= amount;
 
         // Return WSTON to operator
         wston.safeTransfer(operator, amount);
@@ -197,6 +213,7 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         uint256 amount = bond.amount;
         bond.status = BondStatus.Slashed;
         totalBonded[operator] -= amount;
+        totalLockedGlobal -= amount;
 
         // Calculate distribution shares
         uint256 treasuryShare = (amount * TREASURY_SHARE_BPS) / BPS_DENOMINATOR;
@@ -232,11 +249,13 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     /// @notice Lock a bond directly as the operator (no vault intermediary)
     /// @dev Used for cross-chain bonds: operator locks WSTON on L1 before submitting
     ///      an optimistic execution on HyperEVM. The vault address is the cross-chain vault.
+    ///      Requires trustedRelayer to be set, otherwise bonds would be permanently stuck.
     /// @param vault The cross-chain vault address (used as key, not called)
     /// @param nonce The execution nonce
     /// @param amount The bond amount to lock
     function lockBondDirect(address vault, uint64 nonce, uint256 amount) external nonReentrant {
         if (amount == 0) revert ZeroBondAmount();
+        if (trustedRelayer == address(0)) revert RelayerNotSet();
 
         BondInfo storage bond = bonds[msg.sender][vault][nonce];
         if (bond.status != BondStatus.Empty) {
@@ -251,6 +270,7 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         bond.status = BondStatus.Locked;
 
         totalBonded[msg.sender] += amount;
+        totalLockedGlobal += amount;
 
         emit CrossChainBondLocked(msg.sender, vault, nonce, amount);
         emit BondLocked(msg.sender, vault, nonce, amount);
@@ -273,6 +293,7 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         uint256 amount = bond.amount;
         bond.status = BondStatus.Released;
         totalBonded[operator] -= amount;
+        totalLockedGlobal -= amount;
 
         wston.safeTransfer(operator, amount);
 
@@ -280,6 +301,8 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     }
 
     /// @notice Slash a bond via trusted relayer (cross-chain: oracle relays ExecutionSlashed from HyperEVM)
+    /// @dev Cross-chain slash sends 100% to treasury. Treasury handles redistribution to HyperEVM
+    ///      depositors off-chain or via bridge (cannot transfer directly to cross-chain vault).
     /// @param operator The operator address
     /// @param vault The cross-chain vault address
     /// @param nonce The execution nonce
@@ -298,25 +321,42 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         uint256 amount = bond.amount;
         bond.status = BondStatus.Slashed;
         totalBonded[operator] -= amount;
+        totalLockedGlobal -= amount;
 
-        // Calculate distribution shares
-        uint256 treasuryShare = (amount * TREASURY_SHARE_BPS) / BPS_DENOMINATOR;
-        uint256 depositorShare;
-
-        if (slasher == address(0)) {
-            // Self-slash: no finder fee, extra goes to treasury (cross-chain can't send to vault depositors)
-            depositorShare = 0;
-        } else {
-            depositorShare = 0; // Cross-chain: no direct transfer to HyperEVM depositors
-        }
-
-        // Cross-chain slash: all goes to treasury (treasury handles redistribution off-chain or via bridge)
-        uint256 treasuryTotal = amount;
-        if (treasuryTotal > 0) {
-            wston.safeTransfer(treasury, treasuryTotal);
-        }
+        // Cross-chain slash: 100% to treasury (treasury redistributes off-chain or via bridge)
+        wston.safeTransfer(treasury, amount);
 
         emit BondSlashed(operator, vault, nonce, amount, slasher);
+    }
+
+    // ============ Bond Safety Valve ============
+
+    /// @notice Reclaim an expired bond that was never released or slashed
+    /// @dev Safety valve: if a vault is revoked, relayer is lost, or cross-chain relay fails,
+    ///      operators can reclaim their bond after BOND_EXPIRY (30 days) from lock time.
+    ///      This prevents permanent fund lockup from any access control or relay failure.
+    /// @param vault The vault address the bond was locked for
+    /// @param nonce The execution nonce
+    function reclaimExpiredBond(address vault, uint64 nonce) external nonReentrant {
+        BondInfo storage bond = bonds[msg.sender][vault][nonce];
+        if (bond.status != BondStatus.Locked) {
+            revert InvalidBondStatus(msg.sender, vault, nonce, bond.status);
+        }
+
+        uint256 expiry = bond.lockedAt + BOND_EXPIRY;
+        if (block.timestamp < expiry) {
+            revert BondNotExpired(bond.lockedAt, expiry, block.timestamp);
+        }
+
+        uint256 amount = bond.amount;
+        bond.status = BondStatus.Released;
+        totalBonded[msg.sender] -= amount;
+        totalLockedGlobal -= amount;
+
+        wston.safeTransfer(msg.sender, amount);
+
+        emit BondReclaimed(msg.sender, vault, nonce, amount);
+        emit BondReleased(msg.sender, vault, nonce, amount);
     }
 
     // ============ View Functions ============
@@ -360,6 +400,7 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     }
 
     function setTrustedRelayer(address relayer) external onlyOwner {
+        if (relayer == address(0)) revert ZeroRelayer();
         trustedRelayer = relayer;
         emit TrustedRelayerUpdated(relayer);
     }
@@ -368,5 +409,25 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         if (newOwner == address(0)) revert ZeroOwner();
         emit OwnershipTransferred(owner, newOwner);
         owner = newOwner;
+    }
+
+    // ============ Token Rescue ============
+
+    /// @notice Rescue tokens accidentally sent to this contract
+    /// @dev For WSTON: only rescues excess beyond totalLockedGlobal (bonded funds are protected).
+    ///      For other tokens: rescues any amount (they should never be in this contract).
+    /// @param token The ERC20 token to rescue
+    /// @param to The recipient address
+    /// @param amount The amount to rescue
+    function rescueTokens(address token, address to, uint256 amount) external onlyOwner {
+        if (token == address(wston)) {
+            uint256 balance = wston.balanceOf(address(this));
+            uint256 rescuable = balance > totalLockedGlobal ? balance - totalLockedGlobal : 0;
+            if (amount > rescuable) {
+                revert InsufficientRescuableBalance(amount, rescuable);
+            }
+        }
+        IERC20(token).safeTransfer(to, amount);
+        emit TokensRescued(token, to, amount);
     }
 }

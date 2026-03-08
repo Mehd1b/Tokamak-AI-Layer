@@ -251,6 +251,137 @@ The predicted journal is byte-identical to what the zkVM produces. This is what 
 | `minBond` | Application-specific | Should exceed maximum single-execution loss |
 | `maxPending` | 3 | Balance throughput vs. capital lockup |
 
+## Oracle & Relayer Architecture
+
+### Overview
+
+The optimistic execution system relies on two oracle roles and one relayer service:
+
+```
+                    Ethereum L1                          HyperEVM (Chain 999)
+                    ----------                           -------------------
+
+Operator -----> WSTONBondManager                    OptimisticKernelVault
+                lockBondDirect()                    executeOptimistic()
+                     |                                   |
+                     v                                   v
+              Bond locked on L1                 OracleVerifier checks:
+                     |                            1. Bond attestation (Role B)
+                     |                            2. Price feed sig  (Role A, optional)
+                     |                                   |
+                     |                                   v
+                     |                            Actions execute immediately
+                     |                                   |
+                     |                            +------+------+
+                     |                            |             |
+                     |                       submitProof()  slashExpired()
+                     |                            |             |
+                     |                            v             v
+                     |                     ProofSubmitted  ExecutionSlashed
+                     |                       (event)         (event)
+                     |                            |             |
+                     +<--- Trusted Relayer -------+-------------+
+                     |      monitors events
+                     v
+              releaseBondByRelayer()    OR    slashBondByRelayer()
+              (bond returned)                (bond -> treasury)
+```
+
+### Oracle Roles
+
+**Role A — Price Feed Oracle** (medium-trust, high-frequency)
+
+Signs: `keccak256(feedHash || timestamp || chainId || vaultAddress)` via EIP-191.
+Purpose: Attest that the agent's input data (market prices) was fresh at execution time.
+Bypass: Optional — operator can pass empty `oracleSignature` to skip. This is by design: synchronous proven executions don't need oracle attestation since the proof itself validates input correctness.
+
+| Property | Value |
+|---|---|
+| Call frequency | Every execution cycle (~10 min) |
+| Trust level | Medium — can only attest stale data, not fabricate actions |
+| Blast radius (compromised) | Agent executes with stale prices, bounded by bond |
+| Liveness requirement | Non-blocking (execution proceeds without it) |
+| Recommended key | Hot wallet with rate limiting |
+
+**Role B — Bond Attestation Oracle** (high-trust, low-frequency)
+
+Signs: `keccak256("BOND_LOCK_V1" || operator || vault || nonce || amount || chainId)` via EIP-191.
+Purpose: Attest that the operator locked a WSTON bond on Ethereum L1 before executing optimistically on HyperEVM.
+
+| Property | Value |
+|---|---|
+| Call frequency | Per optimistic execution (~1-10 per hour) |
+| Trust level | **High** — a false attestation enables unbonded execution |
+| Blast radius (compromised) | Operator can drain vault without bond collateral |
+| Liveness requirement | Blocking (no optimistic execution without attestation) |
+| Recommended key | HSM or AWS KMS with audit logging |
+
+**Recommendation:** Use separate keys for Role A and Role B. A compromised price feed key has bounded damage (stale prices, operator still bonded). A compromised bond attestation key enables unbonded fraud (catastrophic).
+
+### Key Management
+
+| Component | Key Type | Rotation | Storage |
+|---|---|---|---|
+| Price Feed Oracle (Role A) | ECDSA secp256k1 | Monthly or on suspicion | Hot wallet with firewall |
+| Bond Attestation Oracle (Role B) | ECDSA secp256k1 | Quarterly or on suspicion | HSM / AWS KMS |
+| Trusted Relayer | ECDSA secp256k1 | Quarterly | Dedicated server, not shared |
+
+**Key Rotation Procedure:**
+1. Generate new key pair
+2. Call `vault.setOracleSigner(newSigner, maxOracleAge)` on all vaults
+3. Wait for all in-flight executions to complete (check `pendingCount() == 0`)
+4. Decommission old key
+5. For relayer: call `bondManager.setTrustedRelayer(newRelayer)` on L1
+
+### Trusted Relayer
+
+The relayer bridges events from HyperEVM to Ethereum L1:
+
+- **Monitors:** `ProofSubmitted(nonce, prover)` and `ExecutionSlashed(nonce, slasher, amount)` events on OptimisticKernelVault
+- **Actions:** Calls `releaseBondByRelayer()` or `slashBondByRelayer()` on WSTONBondManager (L1)
+
+**Operational Requirements:**
+- Idempotent relay: track processed events to prevent duplicate calls
+- Historical replay: on restart, replay all unprocessed events from last checkpoint
+- Confirmation depth: wait 10+ blocks on HyperEVM before relaying (reorg safety)
+- Health monitoring: alert if event-to-relay latency exceeds 1 hour
+- Fallback: if relayer is down for >24 hours, operators can wait for BOND_EXPIRY (30 days) and call `reclaimExpiredBond()` on L1
+
+**Should Relayer and Oracle be the same service?**
+No. The oracle signs attestations (stateless, can be load-balanced). The relayer monitors events and executes transactions (stateful, needs nonce management). Separate services with separate keys reduces blast radius.
+
+### Failure Mode Analysis
+
+| Failure | Impact | Recovery |
+|---|---|---|
+| Price oracle down | Executions proceed without oracle check (optional) | No action needed |
+| Bond oracle down | Optimistic executions blocked | Fall back to synchronous `execute()` |
+| Relayer down (<30 days) | Bonds stuck on L1, no impact on HyperEVM vault | Fix relayer, replay missed events |
+| Relayer down (>30 days) | Operators reclaim via `reclaimExpiredBond()` | No action needed |
+| Relayer key compromised | Can release/slash bonds incorrectly | Rotate key via `setTrustedRelayer()` |
+| Bond oracle key compromised | Unbonded optimistic execution possible | Disable optimistic mode, rotate key |
+| WSTON token paused | Bond lock/release/slash all blocked | Wait for WSTON unpause, or reclaim after expiry |
+
+### Configuration Matrix
+
+| Parameter | Recommended | Notes |
+|---|---|---|
+| `maxOracleAge` | 900s (15 min) | 1.5x proving time; increase for high-latency networks |
+| `challengeWindow` | 3600s (1 hour) | 6x proving time; must exceed `maxOracleAge` |
+| `BOND_EXPIRY` | 30 days (constant) | Safety valve; long enough for relayer recovery |
+| `minBond` | Application-specific | Must exceed max single-execution loss |
+| Relayer confirmation depth | 10 blocks | HyperEVM finality |
+| Relayer health alert | >1 hour latency | Event-to-relay lag |
+
+### Bond Safety Mechanisms
+
+The WSTONBondManager includes the following safety valves to prevent permanent fund lockup:
+
+1. **`reclaimExpiredBond()`** — Operator reclaims their own bond after 30 days if not released/slashed. Protects against: revoked vaults, lost relayer keys, relay failures.
+2. **`rescueTokens()`** — Owner rescues accidentally sent tokens. For WSTON, only excess above `totalLockedGlobal` can be rescued.
+3. **Zero-address guards** — `setTrustedRelayer()` requires non-zero address. `lockBondDirect()` requires relayer to be set.
+4. **`totalLockedGlobal`** — Tracks total bonded WSTON globally, preventing rescue of bonded funds.
+
 ## File Index
 
 | File | Role |
@@ -262,3 +393,4 @@ The predicted journal is byte-identical to what the zkVM produces. This is what 
 | `KernelExecutionVerifier.sol` | Added `verify()` for deferred proof check |
 | `VaultFactory.sol` | Added `deployOptimisticVault()` |
 | `VaultCreationCodeStore.sol` | Added `OptimisticVaultCreationCodeStore` |
+| `libraries/OracleVerifier.sol` | ECDSA signature verification for oracle + bond attestation |
