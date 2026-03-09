@@ -1,0 +1,30 @@
+{
+  "name": "@tokamak/oracle-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "migrate": "tsx src/db/migrate.ts"
+  },
+  "dependencies": {
+    "viem": "^2.21.0",
+    "fastify": "^5.1.0",
+    "@fastify/rate-limit": "^10.2.0",
+    "pg": "^8.13.0",
+    "dotenv": "^16.4.5",
+    "pino": "^9.5.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/pg": "^8.11.0",
+    "@types/node": "^22.9.0",
+    "tsx": "^4.19.0",
+    "vitest": "^2.1.0"
+  }
+}

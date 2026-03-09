@@ -67,7 +67,7 @@ export function OptimisticStatusCard({
           <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
             <span className="text-gray-500 text-sm">Min Bond</span>
             <span className="text-gray-300 text-sm">
-              {minBond !== undefined ? `${formatEther(minBond, 18)} WSTON` : '-'}
+              {minBond !== undefined ? `${formatEther(minBond, 27)} WSTON` : '-'}
             </span>
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">

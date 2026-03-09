@@ -137,7 +137,7 @@ export function PendingExecutionsTable({ vaultAddress, executions }: PendingExec
                     <span className="text-[#A855F7]">#{nonceStr}</span>
                   </div>
                 </td>
-                <td className="py-3 px-4 text-gray-300">{formatEther(exec.bondAmount, 18)} WSTON</td>
+                <td className="py-3 px-4 text-gray-300">{formatEther(exec.bondAmount, 27)} WSTON</td>
                 <td className="py-3 px-4 text-gray-400 text-xs">
                   {new Date(Number(exec.deadline) * 1000).toLocaleString()}
                 </td>
