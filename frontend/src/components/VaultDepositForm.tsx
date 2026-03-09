@@ -5,6 +5,7 @@ import { formatUnits, parseEther, parseUnits } from 'viem';
 import { useAccount, useBalance, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useDepositETH, useDepositERC20 } from '@/hooks/useKernelVault';
 import { useNetwork } from '@/lib/NetworkContext';
+import { useLegacyGas } from '@/hooks/useLegacyGas';
 import { parseVaultError } from '@/lib/vaultErrors';
 
 const ERC20_ABI = [
@@ -26,6 +27,7 @@ export function VaultDepositForm({ vaultAddress, isEthVault = true, assetDecimal
   const { address: userAddress } = useAccount();
   const { selectedChainId } = useNetwork();
 
+  const gasOverrides = useLegacyGas();
   const ethDeposit = useDepositETH(vaultAddress);
   const erc20Deposit = useDepositERC20(vaultAddress);
 
@@ -84,14 +86,19 @@ export function VaultDepositForm({ vaultAddress, isEthVault = true, assetDecimal
 
   const hasValidAmount = !!amount && parseFloat(amount) > 0;
 
+  // Some tokens (USDT-style) revert when changing allowance from non-zero to non-zero.
+  // If an existing allowance is insufficient, reset to 0 first — the next click sets the real amount.
+  const needsAllowanceReset = allowance > BigInt(0) && parsedAmount > BigInt(0) && allowance < parsedAmount;
+
   const handleApprove = () => {
     if (!assetAddress || !hasValidAmount) return;
     writeApprove({
       address: assetAddress,
       abi: ERC20_ABI,
       functionName: 'approve',
-      args: [vaultAddress, parsedAmount],
+      args: [vaultAddress, needsAllowanceReset ? BigInt(0) : parsedAmount],
       chainId: selectedChainId,
+      ...gasOverrides,
     });
   };
 
@@ -223,7 +230,9 @@ export function VaultDepositForm({ vaultAddress, isEthVault = true, assetDecimal
               ? 'Approving...'
               : hasSufficientAllowance
                 ? `${assetSymbol} Approved`
-                : `1. Approve ${assetSymbol}`}
+                : needsAllowanceReset
+                  ? `1. Reset ${assetSymbol} Allowance`
+                  : `1. Approve ${assetSymbol}`}
         </button>
 
         {/* Step 2: Deposit (disabled until allowance is sufficient) */}

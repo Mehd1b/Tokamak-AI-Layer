@@ -47,6 +47,9 @@ export function parseVaultError(error: Error | null | undefined): string | null 
   if (msg.includes('insufficient funds') || msg.includes('InsufficientFunds')) {
     return 'Insufficient funds for this transaction.';
   }
+  if (msg.includes('Internal JSON-RPC error') || msg.includes('-32603')) {
+    return 'Transaction reverted during gas estimation. Check that your wallet is on the correct network and that the token supports this operation.';
+  }
   if (msg.includes('gas limit') || msg.includes('exceeds block gas limit')) {
     return 'Transaction reverted. The vault may be in an invalid state or inputs are incorrect.';
   }

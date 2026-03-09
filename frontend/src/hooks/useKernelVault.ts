@@ -4,6 +4,7 @@ import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 
 import { parseEther, parseUnits } from 'viem';
 import { KernelVaultABI, OptimisticKernelVaultABI } from '@/lib/contracts';
 import { useNetwork } from '@/lib/NetworkContext';
+import { useLegacyGas } from '@/hooks/useLegacyGas';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
@@ -197,6 +198,7 @@ export function useVaultShares(vaultAddress: `0x${string}` | undefined, deposito
 
 export function useDepositETH(vaultAddress: `0x${string}` | undefined) {
   const { selectedChainId } = useNetwork();
+  const gasOverrides = useLegacyGas();
   const { data: hash, writeContract, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: selectedChainId });
 
@@ -208,6 +210,7 @@ export function useDepositETH(vaultAddress: `0x${string}` | undefined) {
       functionName: 'depositETH',
       value: parseEther(ethAmount),
       chainId: selectedChainId,
+      ...gasOverrides,
     });
   };
 
@@ -216,6 +219,7 @@ export function useDepositETH(vaultAddress: `0x${string}` | undefined) {
 
 export function useDepositERC20(vaultAddress: `0x${string}` | undefined) {
   const { selectedChainId } = useNetwork();
+  const gasOverrides = useLegacyGas();
   const { data: hash, writeContract, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: selectedChainId });
 
@@ -227,6 +231,7 @@ export function useDepositERC20(vaultAddress: `0x${string}` | undefined) {
       functionName: 'depositERC20Tokens',
       args: [amount],
       chainId: selectedChainId,
+      ...gasOverrides,
     });
   };
 
@@ -235,6 +240,7 @@ export function useDepositERC20(vaultAddress: `0x${string}` | undefined) {
 
 export function useWithdraw(vaultAddress: `0x${string}` | undefined) {
   const { selectedChainId } = useNetwork();
+  const gasOverrides = useLegacyGas();
   const { data: hash, writeContract, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: selectedChainId });
 
@@ -246,6 +252,7 @@ export function useWithdraw(vaultAddress: `0x${string}` | undefined) {
       functionName: 'withdraw',
       args: [shareAmount],
       chainId: selectedChainId,
+      ...gasOverrides,
     });
   };
 
@@ -254,6 +261,7 @@ export function useWithdraw(vaultAddress: `0x${string}` | undefined) {
 
 export function useExecute(vaultAddress: `0x${string}` | undefined) {
   const { selectedChainId } = useNetwork();
+  const gasOverrides = useLegacyGas();
   const { data: hash, writeContract, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: selectedChainId });
 
@@ -265,6 +273,7 @@ export function useExecute(vaultAddress: `0x${string}` | undefined) {
       functionName: 'execute',
       args: [journal, seal, agentOutputBytes],
       chainId: selectedChainId,
+      ...gasOverrides,
     });
   };
 

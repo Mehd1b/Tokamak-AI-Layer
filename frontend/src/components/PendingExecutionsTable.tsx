@@ -5,6 +5,7 @@ import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { OptimisticKernelVaultABI } from '@/lib/contracts';
 import { formatEther, formatCountdown, truncateBytes32 } from '@/lib/utils';
 import { useNetwork } from '@/lib/NetworkContext';
+import { useLegacyGas } from '@/hooks/useLegacyGas';
 import type { OptimisticExecution } from '@/hooks/useOptimisticExecutions';
 
 function StatusBadge({ status }: { status: OptimisticExecution['status'] }) {
@@ -54,6 +55,7 @@ function CountdownCell({ deadline }: { deadline: bigint }) {
 
 function SlashButton({ vaultAddress, nonce, deadline }: { vaultAddress: `0x${string}`; nonce: bigint; deadline: bigint }) {
   const { selectedChainId } = useNetwork();
+  const gasOverrides = useLegacyGas();
   const { data: hash, writeContract, isPending } = useWriteContract();
   const { isLoading: isConfirming } = useWaitForTransactionReceipt({ hash, chainId: selectedChainId });
 
@@ -71,6 +73,7 @@ function SlashButton({ vaultAddress, nonce, deadline }: { vaultAddress: `0x${str
           functionName: 'slashExpired',
           args: [nonce],
           chainId: selectedChainId,
+          ...gasOverrides,
         });
       }}
       disabled={isPending || isConfirming}

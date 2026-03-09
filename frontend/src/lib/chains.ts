@@ -1,4 +1,13 @@
-import { defineChain } from 'viem';
+import { defineChain, type Chain } from 'viem';
+
+// HyperEVM does NOT support EIP-1559 — force legacy gas pricing so wallets
+// send type-0 transactions instead of type-2 (which the RPC rejects).
+const legacyGasFees: Chain['fees'] = {
+  estimateFeesPerGas: async ({ client }) => {
+    const gasPrice = await client.request({ method: 'eth_gasPrice' });
+    return { gasPrice: BigInt(gasPrice) };
+  },
+};
 
 export const thanosSepolia = defineChain({
   id: 111551119090,
@@ -21,6 +30,7 @@ export const hyperEvmMainnet = defineChain({
     },
   },
   testnet: false,
+  fees: legacyGasFees,
 });
 
 export const hyperEvmTestnet = defineChain({
@@ -35,4 +45,5 @@ export const hyperEvmTestnet = defineChain({
     },
   },
   testnet: true,
+  fees: legacyGasFees,
 });

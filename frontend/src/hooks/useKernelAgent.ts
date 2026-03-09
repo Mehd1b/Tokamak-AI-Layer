@@ -4,6 +4,7 @@ import { useReadContract, useWriteContract, useWaitForTransactionReceipt, usePub
 import { useQuery } from '@tanstack/react-query';
 import { AgentRegistryABI } from '@/lib/contracts';
 import { useNetwork } from '@/lib/NetworkContext';
+import { useLegacyGas } from '@/hooks/useLegacyGas';
 
 export function useAgent(agentId: `0x${string}` | undefined) {
   const { contracts, selectedChainId } = useNetwork();
@@ -19,6 +20,7 @@ export function useAgent(agentId: `0x${string}` | undefined) {
 
 export function useUnregisterAgent() {
   const { contracts } = useNetwork();
+  const gasOverrides = useLegacyGas();
   const { data: hash, writeContract, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
@@ -28,6 +30,7 @@ export function useUnregisterAgent() {
       abi: AgentRegistryABI,
       functionName: 'unregister',
       args: [agentId],
+      ...gasOverrides,
     });
   };
 
