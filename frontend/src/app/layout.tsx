@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     description: 'Verifiable agent execution with RISC Zero zkVM on Ethereum',
   },
   icons: {
-    icon: '/favicon.ico',
+    icon: '/icon.svg',
   },
 };
 

@@ -286,6 +286,71 @@ This is safe because:
 
 ---
 
+## Bottleneck 9: spotSend Amount Must Be Less Than Spot Balance (High)
+
+### Problem
+
+CoreWriter action 6 (`spotSend`) silently rejects the transfer if the requested amount is **equal to or greater than the available spot balance**. There is no revert, no error, no event — the EVM tx succeeds (status=1), the CoreWriter event fires, but HyperCore drops the action. The USDC remains in the spot ledger unchanged.
+
+This is different from Bottleneck 7 (HYPE timing). Even with plenty of HYPE settled on HyperCore and correct encoding, spotSend fails for amounts that consume the full spot balance.
+
+### Discovery (2026-03-09)
+
+During OKV fund recovery on sub-account `0x7dacd9fa...`:
+
+| Attempt | Amount (USDC) | Spot Balance | Result |
+|---------|---------------|-------------|--------|
+| 1 | 9.0 | 9.0 | **Silently rejected** |
+| 2 | 8.0 | 9.0 | **Silently rejected** |
+| 3 | 0.1 | 9.0 | **Succeeded** (spot → 7.89) |
+| 4 | 6.5 | 7.89 | **Succeeded** (spot → 1.39) |
+| 5 | 0.5 | 1.25 | **Succeeded** (spot → 0.75) |
+| 6 | 1.2 | 1.25 | **Succeeded** (spot → 0.05) |
+
+The 9.0 USDC and 8.0 USDC transfers were rejected even though the spot balance was 9.0 USDC. Smaller amounts (0.1, 6.5, 0.5, 1.2) succeeded. The common factor: **all successful transfers leave a remaining balance > 0 after the transfer**.
+
+### Root Cause (Hypothesis)
+
+HyperCore likely deducts a small fee or requires a minimum remaining spot balance for spotSend operations. When `amount >= spot_balance`, the post-transfer balance would be 0 or negative, triggering a silent rejection. The fee appears to be small (under $0.1) but sufficient to cause rejection when trying to sweep the entire balance.
+
+This is consistent with HyperCore's design philosophy of never reverting CoreWriter actions — instead, insufficient-balance actions are silently dropped.
+
+### Impact
+
+- **Fund recovery fails when trying to sweep full spot balance** — the most natural operation (send everything) is the one that fails
+- **No error feedback** — EVM tx succeeds, CoreWriter event fires, but HyperCore drops the action
+- **Requires manual retry with smaller amounts** — operator must leave a margin and accept dust
+
+### Workaround
+
+When recovering funds from HyperCore spot to HyperEVM:
+1. **Never try to send the full spot balance** — always leave at least $0.1 margin
+2. **Send in chunks if unsure about the exact fee** — e.g., send `balance - 1 USDC` first
+3. **Accept dust** — a small amount ($0.05-0.10) will remain on HyperCore spot
+
+```rust
+// In the host or recovery script:
+let spot_balance = get_spot_balance(&sub_account).await?;
+// Leave 0.1 USDC margin to avoid silent rejection
+let transfer_amount = spot_balance.saturating_sub(100_000); // 0.1 USDC in 1e6
+if transfer_amount > 0 {
+    adapter.transferSpotToEvm(vault, transfer_amount).await?;
+}
+```
+
+### Fix (Recommended)
+
+Update `HyperliquidAdapter.transferSpotToEvm()` to document this limitation:
+
+```solidity
+/// @notice Send USDC from HyperCore spot back to HyperEVM for a vault's sub-account.
+/// @dev IMPORTANT: HyperCore silently rejects spotSend if amount >= spot balance.
+///      Always leave a small margin (e.g., 0.1 USDC). Attempting to sweep the
+///      full balance will result in silent rejection with no error feedback.
+```
+
+---
+
 ## Current Transaction Flow (Actual)
 
 A complete open→close→recover cycle requires:
@@ -484,6 +549,7 @@ The core insight is: **don't fight HyperCore's async model — embrace it.** The
 |-----|----------|--------|-------------|
 | Close size scaling | Critical | **Fixed (v15)** | `closePositionAtPrice` passed szDecimals-scaled size to CoreWriter (expects 1e8) |
 | spotSend silent failure | High | **Fixed** | Root cause: HYPE bridge async settlement. Fix: 10s wait after HYPE funding |
+| spotSend amount rejection | High | **Documented** | spotSend silently rejected if `amount >= spot_balance` (no overdraft). Must leave margin. See Bottleneck 9. |
 | API wallet stickiness | Medium | Workaround | HyperCore maps API wallets to first sub-account; re-registration doesn't override |
 | HYPE depletion | Medium | Mitigated | Auto-funding added, but no on-chain way to check HyperCore HYPE balance |
 | HYPE bridge async | High | **Fixed** | HYPE bridge takes ~5-10s to settle; CoreWriter actions fail if called too early |

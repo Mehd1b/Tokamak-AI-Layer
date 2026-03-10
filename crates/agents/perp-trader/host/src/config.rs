@@ -183,6 +183,12 @@ pub struct Cli {
     /// Default: 3600 (1 hour).
     #[arg(long, default_value_t = 3600)]
     pub challenge_window: u64,
+
+    /// Oracle service URL for fetching bond attestations.
+    /// Required for optimistic execution. The bot calls POST /api/v1/attest-bond
+    /// to get the oracle's EIP-191 signature attesting the L1 bond lock.
+    #[arg(long, env = "ORACLE_URL")]
+    pub oracle_url: Option<String>,
 }
 
 impl Cli {

@@ -66,27 +66,30 @@ fn main() -> anyhow::Result<()> {
     let worker_status = prove_worker::WorkerStatus::new();
     let last_known_nonce = Arc::new(AtomicU64::new(0));
 
+    let mut prove_handle: Option<std::thread::JoinHandle<()>> = None;
+    let mut monitor_handle: Option<std::thread::JoinHandle<()>> = None;
+
     if cli.optimistic {
         let worker_queue = proof_queue.clone();
         let worker_shutdown = shutdown.clone();
         let worker_status_clone = worker_status.clone();
-        std::thread::spawn(move || {
+        prove_handle = Some(std::thread::spawn(move || {
             prove_worker::run_proving_worker(worker_queue, worker_shutdown, worker_status_clone);
-        });
+        }));
 
         // Start monitor thread for deadline tracking
         let monitor_shutdown = shutdown.clone();
         let monitor_nonce = last_known_nonce.clone();
         let monitor_rpc = cli.rpc.clone();
         let monitor_vault = cli.vault.clone();
-        std::thread::spawn(move || {
+        monitor_handle = Some(std::thread::spawn(move || {
             monitor::run_monitor_loop(
                 monitor::MonitorConfig::new(monitor_rpc, monitor_vault),
                 1, // first_optimistic_nonce (will check from nonce 1)
                 monitor_nonce,
                 monitor_shutdown,
             );
-        });
+        }));
 
         if !cli.json {
             eprintln!("[optimistic] Background proving worker and monitor started.");
@@ -95,17 +98,48 @@ fn main() -> anyhow::Result<()> {
 
     let result = run_pipeline(&cli, &proof_queue, &last_known_nonce);
 
+    // If optimistic mode queued proofs, wait for the prove worker to drain the queue
+    // before shutting down. Proofs must be submitted within the challenge window.
+    if cli.optimistic {
+        let queue_len = proof_queue.lock().unwrap().len();
+        let proving_nonce = worker_status.currently_proving.load(Ordering::Relaxed);
+        if queue_len > 0 || proving_nonce > 0 {
+            if !cli.json {
+                eprintln!(
+                    "[optimistic] Waiting for proof(s) to complete before exiting (queued={}, proving nonce={})...",
+                    queue_len, proving_nonce
+                );
+            }
+            // Poll until queue is empty AND worker is idle
+            loop {
+                std::thread::sleep(Duration::from_secs(30));
+                let remaining = proof_queue.lock().unwrap().len();
+                let active = worker_status.currently_proving.load(Ordering::Relaxed);
+                if remaining == 0 && active == 0 {
+                    if !cli.json {
+                        eprintln!("[optimistic] All proofs submitted. Shutting down.");
+                    }
+                    break;
+                }
+                if !cli.json {
+                    eprintln!(
+                        "[optimistic] Proof status: queued={}, currently proving nonce={}",
+                        remaining, active
+                    );
+                }
+            }
+        }
+    }
+
     // Signal background threads to stop.
-    // In single-shot mode, the main thread exits after one cycle, so background
-    // threads are cleaned up by process termination. In a future daemon mode,
-    // this flag allows graceful shutdown.
     shutdown.store(true, Ordering::Relaxed);
 
-    // Give background threads a moment to notice the shutdown signal before
-    // the process exits and kills them. Only needed if optimistic mode is active
-    // and we want clean log output from the worker.
-    if cli.optimistic {
-        std::thread::sleep(Duration::from_millis(100));
+    // Join background threads for clean shutdown
+    if let Some(h) = prove_handle {
+        let _ = h.join();
+    }
+    if let Some(h) = monitor_handle {
+        let _ = h.join();
     }
 
     result
@@ -476,10 +510,9 @@ fn run_pipeline(
     //   Proof 2 (open_phase=2): openPosition(margin=0) — order against settled margin
     //
     // For closes and holds, a single proof (open_phase=0) suffices.
-    let needs_two_proof = matches!(
-        seed_trade::parse_agent_intent(&agent_output_bytes),
-        seed_trade::AgentIntent::Open(_)
-    ) && snapshot.position_size == 0.0;
+    let agent_intent = seed_trade::parse_agent_intent(&agent_output_bytes);
+    let needs_two_proof = matches!(agent_intent, seed_trade::AgentIntent::Open(_))
+        && snapshot.position_size == 0.0;
 
     // In dry-run mode, skip proving and on-chain submission — just report the signal.
     if cli.dry_run {
@@ -526,6 +559,10 @@ fn run_pipeline(
             use std::time::Instant;
             let pk = Cli::resolve_key(&cli.pk)?;
 
+            if cli.dev_mode && !cli.json {
+                eprintln!("[optimistic] WARNING: --dev-mode ignored for proof generation. Optimistic proofs must be Groth16 for on-chain verification.");
+            }
+
             if needs_two_proof {
                 // ── Two-phase optimistic open ──
                 // Phase 1: deposit margin (optimistic execution #1, bond #1)
@@ -570,6 +607,7 @@ fn run_pipeline(
                         &deposit_journal, &deposit_output_bytes,
                         &signed_feed.onchain_signature, signed_feed.feed.timestamp,
                         cli.bond_amount,
+                        cli.oracle_url.as_deref().unwrap_or(""),
                     ));
 
                     match phase1_result {
@@ -581,6 +619,12 @@ fn run_pipeline(
                                 );
                             }
                             last_known_nonce.store(nonce1, Ordering::Relaxed);
+
+                            // Persist input bytes for proof recovery
+                            let input_path = format!("/tmp/perp-optimistic-nonce-{}.input.bin", nonce1);
+                            if let Err(e) = std::fs::write(&input_path, &deposit_input_bytes) {
+                                eprintln!("[optimistic] WARNING: Failed to persist input bytes: {}", e);
+                            }
 
                             // Queue proof job for phase 1
                             {
@@ -594,7 +638,7 @@ fn run_pipeline(
                                     private_key: pk.clone(),
                                     deadline: Instant::now() + Duration::from_secs(cli.challenge_window),
                                     queued_at: Instant::now(),
-                                    dev_mode: cli.dev_mode,
+                                    dev_mode: if cli.optimistic { false } else { cli.dev_mode },
                                     retry_count: 0,
                                 });
                             }
@@ -605,15 +649,44 @@ fn run_pipeline(
                             }
                             std::thread::sleep(std::time::Duration::from_secs(10));
 
-                            // Set leverage via REST API (CoreWriter has no updateLeverage action)
-                            if cli.api_wallet_key.is_some() {
-                                if !cli.json {
-                                    eprintln!("[optimistic] Setting leverage to {}x via REST API...", cli.seed_leverage);
-                                }
-                                if let Err(e) = seed_trade::set_leverage_only(&cli) {
+                            // Seed trade via REST API: sets leverage + places tiny IOC order.
+                            // This creates the position struct on HyperCore (leverage > 0),
+                            // which is required for CoreWriter limit orders to not be silently rejected.
+                            if let seed_trade::AgentIntent::Open(ref params) = agent_intent {
+                                if cli.api_wallet_key.is_some() {
                                     if !cli.json {
-                                        eprintln!("[optimistic] WARNING: Failed to set leverage: {}", e);
+                                        eprintln!(
+                                            "[optimistic] Seed trade: {} via REST API (leverage={}x) to initialize HyperCore position struct...",
+                                            if params.is_buy { "BUY" } else { "SELL" },
+                                            cli.seed_leverage,
+                                        );
                                     }
+                                    match seed_trade::execute_seed_trade(&cli, params) {
+                                        Ok(result) if result.status == "filled" => {
+                                            if !cli.json {
+                                                eprintln!(
+                                                    "[optimistic] Seed trade filled: {} {}. Position struct initialized.",
+                                                    result.total_size.as_deref().unwrap_or("?"),
+                                                    cli.asset,
+                                                );
+                                            }
+                                        }
+                                        Ok(result) => {
+                                            if !cli.json {
+                                                eprintln!(
+                                                    "[optimistic] WARNING: Seed trade status={}, Phase 2 CoreWriter order may be rejected.",
+                                                    result.status
+                                                );
+                                            }
+                                        }
+                                        Err(e) => {
+                                            if !cli.json {
+                                                eprintln!("[optimistic] WARNING: Seed trade failed: {}. Phase 2 CoreWriter order may be rejected.", e);
+                                            }
+                                        }
+                                    }
+                                } else if !cli.json {
+                                    eprintln!("[optimistic] WARNING: No --api-wallet-key. Cannot seed trade. CoreWriter order may be rejected.");
                                 }
                             }
 
@@ -683,6 +756,7 @@ fn run_pipeline(
                                     &order_journal, &order_output_bytes,
                                     &signed_feed_2.onchain_signature, signed_feed_2.feed.timestamp,
                                     cli.bond_amount,
+                                    cli.oracle_url.as_deref().unwrap_or(""),
                                 ));
 
                                 match phase2_result {
@@ -694,6 +768,12 @@ fn run_pipeline(
                                             );
                                         }
                                         last_known_nonce.store(nonce2, Ordering::Relaxed);
+
+                                        // Persist input bytes for proof recovery
+                                        let input_path = format!("/tmp/perp-optimistic-nonce-{}.input.bin", nonce2);
+                                        if let Err(e) = std::fs::write(&input_path, &order_input_bytes) {
+                                            eprintln!("[optimistic] WARNING: Failed to persist input bytes: {}", e);
+                                        }
 
                                         // Queue proof job for phase 2
                                         {
@@ -707,7 +787,7 @@ fn run_pipeline(
                                                 private_key: pk.clone(),
                                                 deadline: Instant::now() + Duration::from_secs(cli.challenge_window),
                                                 queued_at: Instant::now(),
-                                                dev_mode: cli.dev_mode,
+                                                dev_mode: if cli.optimistic { false } else { cli.dev_mode },
                                                 retry_count: 0,
                                             });
                                         }
@@ -831,6 +911,7 @@ fn run_pipeline(
                     &signed_feed.onchain_signature,
                     signed_feed.feed.timestamp,
                     cli.bond_amount,
+                    cli.oracle_url.as_deref().unwrap_or(""),
                 ));
 
                 match optimistic_result {
@@ -844,6 +925,12 @@ fn run_pipeline(
 
                         last_known_nonce.store(execution_nonce, Ordering::Relaxed);
 
+                        // Persist input bytes for proof recovery
+                        let input_path = format!("/tmp/perp-optimistic-nonce-{}.input.bin", execution_nonce);
+                        if let Err(e) = std::fs::write(&input_path, &input_bytes) {
+                            eprintln!("[optimistic] WARNING: Failed to persist input bytes: {}", e);
+                        }
+
                         let proof_job = prove_worker::PendingProof {
                             execution_nonce,
                             input_bytes: input_bytes.clone(),
@@ -853,7 +940,7 @@ fn run_pipeline(
                             private_key: pk,
                             deadline: Instant::now() + Duration::from_secs(cli.challenge_window),
                             queued_at: Instant::now(),
-                            dev_mode: cli.dev_mode,
+                            dev_mode: if cli.optimistic { false } else { cli.dev_mode },
                             retry_count: 0,
                         };
 
@@ -972,15 +1059,41 @@ fn run_pipeline(
                 eprintln!("[OPEN] HyperCore perp equity after deposit: ${:.2}", perp_equity);
             }
 
-            // Set leverage via REST API (CoreWriter has no updateLeverage action)
-            if cli.api_wallet_key.is_some() {
-                if !cli.json {
-                    eprintln!("[OPEN] Setting leverage to {}x via REST API...", cli.seed_leverage);
-                }
-                if let Err(e) = seed_trade::set_leverage_only(&cli) {
-                    if !cli.json { eprintln!("[OPEN] WARNING: Failed to set leverage: {}", e); }
+            // Seed trade via REST API: sets leverage + places tiny IOC order.
+            // This creates the position struct on HyperCore (leverage > 0),
+            // which is required for CoreWriter limit orders to not be silently rejected.
+            if let seed_trade::AgentIntent::Open(ref params) = agent_intent {
+                if cli.api_wallet_key.is_some() {
+                    if !cli.json {
+                        eprintln!(
+                            "[OPEN] Seed trade: {} via REST API (leverage={}x)...",
+                            if params.is_buy { "BUY" } else { "SELL" },
+                            cli.seed_leverage,
+                        );
+                    }
+                    match seed_trade::execute_seed_trade(&cli, params) {
+                        Ok(result) if result.status == "filled" => {
+                            if !cli.json {
+                                eprintln!(
+                                    "[OPEN] Seed trade filled: {} {}. Position struct initialized.",
+                                    result.total_size.as_deref().unwrap_or("?"),
+                                    cli.asset,
+                                );
+                            }
+                        }
+                        Ok(result) => {
+                            if !cli.json {
+                                eprintln!("[OPEN] WARNING: Seed trade status={}. CoreWriter order may be rejected.", result.status);
+                            }
+                        }
+                        Err(e) => {
+                            if !cli.json {
+                                eprintln!("[OPEN] WARNING: Seed trade failed: {}. CoreWriter order may be rejected.", e);
+                            }
+                        }
+                    }
                 } else if !cli.json {
-                    eprintln!("[OPEN] Leverage set.");
+                    eprintln!("[OPEN] WARNING: No --api-wallet-key. Cannot seed trade.");
                 }
             }
         }
@@ -1427,6 +1540,7 @@ async fn submit_optimistic_execution(
     oracle_signature: &[u8],
     oracle_timestamp: u64,
     bond_amount: u128,
+    oracle_url: &str,
 ) -> anyhow::Result<u64> {
     use alloy::network::EthereumWallet;
     use alloy::primitives::{Address, Bytes, U256};
@@ -1435,9 +1549,6 @@ async fn submit_optimistic_execution(
     use alloy::sol;
     use std::str::FromStr;
 
-    // Match the actual OptimisticKernelVault contract ABI:
-    // - executeOptimistic takes 5 parameters (includes bondAmount as uint256)
-    // - NOT payable: bond is WSTON ERC20 pulled via BondManager.lockBond()
     sol! {
         #[sol(rpc)]
         interface IOptimisticKernelVault {
@@ -1446,18 +1557,16 @@ async fn submit_optimistic_execution(
                 bytes calldata agentOutputBytes,
                 bytes calldata oracleSignature,
                 uint64 oracleTimestamp,
-                uint256 bondAmount
+                uint256 bondAmount,
+                bytes calldata bondAttestation
             ) external;
 
             function lastExecutionNonce() external view returns (uint64);
             function bondManager() external view returns (address);
             function minBond() external view returns (uint256);
+            function bondChainId() external view returns (uint256);
         }
 
-        #[sol(rpc)]
-        interface IBondManager {
-            function getMinBond(address vault) external view returns (uint256);
-        }
     }
 
     let vault = Address::from_str(vault_address)
@@ -1472,6 +1581,7 @@ async fn submit_optimistic_execution(
         .parse()
         .map_err(|_| anyhow::anyhow!("Invalid private key"))?;
 
+    let operator_address = signer.address();
     let wallet = EthereumWallet::from(signer);
     let provider = ProviderBuilder::new()
         .with_recommended_fillers()
@@ -1480,8 +1590,8 @@ async fn submit_optimistic_execution(
 
     let contract = IOptimisticKernelVault::new(vault, &provider);
 
-    // Determine bond amount: use provided value or query on-chain min.
-    // The effective min is max(vault.minBond, bondManager.getMinBond(vault)).
+    // Determine bond amount: use provided value or query vault.minBond().
+    // Note: bondManager lives on L1, not on HyperEVM. We only check the vault's minBond here.
     let bond = if bond_amount > 0 {
         U256::from(bond_amount)
     } else {
@@ -1492,31 +1602,11 @@ async fn submit_optimistic_execution(
             .map_err(|e| anyhow::anyhow!("Failed to query vault minBond: {}", e))?
             ._0;
 
-        let bm_addr = contract
-            .bondManager()
-            .call()
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to query bondManager: {}", e))?
-            ._0;
-
-        let bm = IBondManager::new(bm_addr, &provider);
-        let bm_min = bm
-            .getMinBond(vault)
-            .call()
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to query getMinBond: {}", e))?
-            ._0;
-
-        let effective_min = if vault_min > bm_min {
-            vault_min
-        } else {
-            bm_min
-        };
         eprintln!(
-            "[optimistic] Auto-queried min bond: {} (vault={}, manager={})",
-            effective_min, vault_min, bm_min
+            "[optimistic] Auto-queried min bond from vault: {}",
+            vault_min
         );
-        effective_min
+        vault_min
     };
 
     // Read nonce before submission to detect the new one
@@ -1527,13 +1617,41 @@ async fn submit_optimistic_execution(
         .map_err(|e| anyhow::anyhow!("Failed to read nonce: {}", e))?
         ._0;
 
+    let execution_nonce = nonce_before + 1;
+
+    // Query bondChainId from the contract (this is the L1 chain where bonds are locked)
+    let bond_chain_id = contract
+        .bondChainId()
+        .call()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to query bondChainId: {}", e))?
+        ._0;
+    let bond_chain_id_u64: u64 = bond_chain_id.try_into()
+        .map_err(|_| anyhow::anyhow!("bondChainId too large for u64: {}", bond_chain_id))?;
+
+    // Fetch bond attestation from oracle service
+    let bond_attestation_bytes = fetch_bond_attestation(
+        oracle_url,
+        &operator_address.to_string(),
+        vault_address,
+        execution_nonce,
+        &bond.to_string(),
+        bond_chain_id_u64,
+    )
+    .await?;
+
     let journal = Bytes::copy_from_slice(journal_bytes);
     let output = Bytes::copy_from_slice(agent_output_bytes);
     let oracle_sig = Bytes::copy_from_slice(oracle_signature);
+    let bond_att = Bytes::copy_from_slice(&bond_attestation_bytes);
 
-    // Submit with bondAmount as the 5th parameter (no msg.value — bond is WSTON ERC20)
+    eprintln!(
+        "[optimistic] Submitting executeOptimistic nonce={} bond={} ...",
+        execution_nonce, bond
+    );
+
     let tx = contract
-        .executeOptimistic(journal, output, oracle_sig, oracle_timestamp, bond)
+        .executeOptimistic(journal, output, oracle_sig, oracle_timestamp, bond, bond_att)
         .send()
         .await
         .map_err(|e| anyhow::anyhow!("executeOptimistic tx failed: {}", e))?;
@@ -1557,7 +1675,73 @@ async fn submit_optimistic_execution(
         tx_hash, receipt.block_number
     );
 
-    // The execution nonce is nonce_before + 1 (vault increments atomically)
-    let execution_nonce = nonce_before + 1;
     Ok(execution_nonce)
+}
+
+/// Fetch a bond attestation from the oracle service.
+/// Returns the raw 65-byte ECDSA signature.
+async fn fetch_bond_attestation(
+    oracle_url: &str,
+    operator: &str,
+    vault: &str,
+    nonce: u64,
+    amount: &str,
+    chain_id: u64,
+) -> anyhow::Result<Vec<u8>> {
+    let url = format!("{}/api/v1/attest-bond", oracle_url.trim_end_matches('/'));
+
+    let client = reqwest::Client::new();
+    let body = serde_json::json!({
+        "operator": operator,
+        "vault": vault,
+        "nonce": nonce.to_string(),
+        "amount": amount,
+        "chainId": chain_id.to_string(),
+    });
+
+    eprintln!(
+        "[optimistic] Fetching bond attestation from {} for nonce={}...",
+        url, nonce
+    );
+
+    let resp = client
+        .post(&url)
+        .json(&body)
+        .timeout(std::time::Duration::from_secs(15))
+        .send()
+        .await
+        .map_err(|e| anyhow::anyhow!("Oracle request failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        return Err(anyhow::anyhow!(
+            "Oracle returned {}: {}",
+            status,
+            text
+        ));
+    }
+
+    let json: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to parse oracle response: {}", e))?;
+
+    let attestation_hex = json["attestation"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("Missing 'attestation' in oracle response"))?;
+
+    let clean = attestation_hex
+        .strip_prefix("0x")
+        .unwrap_or(attestation_hex);
+    let bytes = hex::decode(clean)
+        .map_err(|e| anyhow::anyhow!("Invalid attestation hex: {}", e))?;
+
+    eprintln!(
+        "[optimistic] Got bond attestation ({} bytes) from signer {}",
+        bytes.len(),
+        json["signer"].as_str().unwrap_or("unknown")
+    );
+
+    Ok(bytes)
 }
