@@ -4,12 +4,14 @@ import { usePublicClient } from 'wagmi';
 import { useQuery } from '@tanstack/react-query';
 import { KernelVaultABI } from '@/lib/contracts';
 import { useNetwork } from '@/lib/NetworkContext';
+import { isExplorerAvailable, fetchVaultLogs, type DecodedVaultLog } from '@/lib/explorerApi';
 import {
   paginatedGetLogs,
   depositEvent,
   withdrawEvent,
   executionAppliedEvent,
   findVaultDeployBlock,
+  recentFromBlock,
   getLogsClient,
 } from '@/lib/vaultEvents';
 import type { Log } from 'viem';
@@ -81,68 +83,92 @@ export function useVaultHistory(vaultAddress: `0x${string}` | undefined, assetDe
       const livePps = currentShares > BigInt(0) ? Number(currentAssets) / Number(currentShares) : 1.0;
 
       // Try to fetch historical events for richer chart data
-      // Use native RPC for getLogs on chains where third-party RPCs may not support it
-      const logClient = getLogsClient(client, selectedChainId);
       const tvlPoints: TimeSeriesPoint[] = [];
       const ppsPoints: TimeSeriesPoint[] = [];
 
       try {
-        const currentBlock = await logClient.getBlockNumber();
+        // Unified event shape used by both explorer and RPC paths
+        type HistoryEvent = { type: 'deposit' | 'withdraw' | 'execution'; blockNumber: bigint; logIndex: number; timeStamp?: number; args: any };
+        let allEvents: HistoryEvent[] = [];
+        let hasTimestamps = false;
 
-        // Fetch events — try primary path (deploy block + paginated), fallback to small-range direct query
-        let depositLogs: any[] = [];
-        let withdrawLogs: any[] = [];
-        let executionLogs: any[] = [];
+        // ── Primary: Etherscan V2 API (all events, any age, includes timestamps) ──
+        if (isExplorerAvailable()) {
+          try {
+            const logs = await fetchVaultLogs(selectedChainId, vaultAddress);
+            const toHistoryEvent = (type: HistoryEvent['type']) => (l: DecodedVaultLog): HistoryEvent => ({
+              type, blockNumber: l.blockNumber, logIndex: l.logIndex, timeStamp: l.timeStamp, args: l.args,
+            });
+            allEvents = [
+              ...logs.deposits.map(toHistoryEvent('deposit')),
+              ...logs.withdrawals.map(toHistoryEvent('withdraw')),
+              ...logs.executions.map(toHistoryEvent('execution')),
+            ];
+            hasTimestamps = true;
+          } catch {
+            // Fall through to RPC
+          }
+        }
 
-        const fetchEvents = async (fromBlock: bigint, toBlock: bigint) => {
-          const [d, w, e] = await Promise.all([
-            paginatedGetLogs(logClient, { address: vaultAddress, event: depositEvent, fromBlock, toBlock }),
-            paginatedGetLogs(logClient, { address: vaultAddress, event: withdrawEvent, fromBlock, toBlock }),
-            paginatedGetLogs(logClient, { address: vaultAddress, event: executionAppliedEvent, fromBlock, toBlock }),
+        // ── Fallback: RPC paginated getLogs ──
+        if (allEvents.length === 0) {
+          const logClient = getLogsClient(client, selectedChainId);
+          const currentBlock = await logClient.getBlockNumber();
+
+          let fromBlock: bigint;
+          try {
+            fromBlock = await findVaultDeployBlock(
+              logClient, contracts.vaultFactory, vaultAddress, currentBlock, selectedChainId,
+            );
+          } catch {
+            fromBlock = BigInt(0);
+          }
+          if (fromBlock === BigInt(0)) {
+            fromBlock = recentFromBlock(currentBlock);
+          }
+
+          const [depositLogs, withdrawLogs, executionLogs] = await Promise.all([
+            paginatedGetLogs(logClient, { address: vaultAddress, event: depositEvent, fromBlock, toBlock: currentBlock }),
+            paginatedGetLogs(logClient, { address: vaultAddress, event: withdrawEvent, fromBlock, toBlock: currentBlock }),
+            paginatedGetLogs(logClient, { address: vaultAddress, event: executionAppliedEvent, fromBlock, toBlock: currentBlock }),
           ]);
-          return { d, w, e };
-        };
 
-        const fromBlock = await findVaultDeployBlock(
-          logClient, contracts.vaultFactory, vaultAddress, currentBlock,
-        );
-        const result = await fetchEvents(fromBlock, currentBlock);
-        depositLogs = result.d;
-        withdrawLogs = result.w;
-        executionLogs = result.e;
+          const toHistoryEvent = (type: HistoryEvent['type']) => (log: Log): HistoryEvent => ({
+            type, blockNumber: log.blockNumber ?? BigInt(0), logIndex: log.logIndex ?? 0, args: (log as any).args,
+          });
+          allEvents = [
+            ...depositLogs.map(toHistoryEvent('deposit')),
+            ...withdrawLogs.map(toHistoryEvent('withdraw')),
+            ...executionLogs.map(toHistoryEvent('execution')),
+          ];
+        }
 
-        // Merge and sort all events by (blockNumber, logIndex)
-        type TaggedLog = { type: 'deposit' | 'withdraw' | 'execution'; log: Log };
-        const allEvents: TaggedLog[] = [
-          ...depositLogs.map((log) => ({ type: 'deposit' as const, log })),
-          ...withdrawLogs.map((log) => ({ type: 'withdraw' as const, log })),
-          ...executionLogs.map((log) => ({ type: 'execution' as const, log })),
-        ];
-
+        // Sort by (blockNumber, logIndex)
         allEvents.sort((a, b) => {
-          const blockDiff = Number((a.log.blockNumber ?? BigInt(0)) - (b.log.blockNumber ?? BigInt(0)));
-          if (blockDiff !== 0) return blockDiff;
-          return Number((a.log.logIndex ?? 0) - (b.log.logIndex ?? 0));
+          const blockDiff = Number(a.blockNumber - b.blockNumber);
+          return blockDiff !== 0 ? blockDiff : a.logIndex - b.logIndex;
         });
 
         if (allEvents.length > 0) {
-          // Fetch block timestamps for unique blocks
-          const seenBlocks = new Map<string, bigint>();
-          allEvents.forEach((e) => {
-            const bn = e.log.blockNumber!;
-            seenBlocks.set(bn.toString(), bn);
-          });
-          const uniqueBlocks = Array.from(seenBlocks.values());
+          // Resolve timestamps — use explorer timestamps if available, else fetch blocks
           const timestampMap = new Map<string, number>();
-
-          for (let i = 0; i < uniqueBlocks.length; i += 20) {
-            const batch = uniqueBlocks.slice(i, i + 20);
-            const blocks = await Promise.all(
-              batch.map((blockNumber) => client.getBlock({ blockNumber })),
-            );
-            blocks.forEach((block, idx) => {
-              timestampMap.set(batch[idx].toString(), Number(block.timestamp));
-            });
+          if (hasTimestamps) {
+            for (const e of allEvents) {
+              if (e.timeStamp) timestampMap.set(e.blockNumber.toString(), e.timeStamp);
+            }
+          } else {
+            const seenBlocks = new Map<string, bigint>();
+            allEvents.forEach((e) => seenBlocks.set(e.blockNumber.toString(), e.blockNumber));
+            const uniqueBlocks = Array.from(seenBlocks.values());
+            for (let i = 0; i < uniqueBlocks.length; i += 20) {
+              const batch = uniqueBlocks.slice(i, i + 20);
+              const blocks = await Promise.all(
+                batch.map((blockNumber) => client.getBlock({ blockNumber })),
+              );
+              blocks.forEach((block, idx) => {
+                timestampMap.set(batch[idx].toString(), Number(block.timestamp));
+              });
+            }
           }
 
           // Compute TVL + PPS at each event
@@ -152,7 +178,7 @@ export function useVaultHistory(vaultAddress: `0x${string}` | undefined, assetDe
               address: vaultAddress,
               abi: KernelVaultABI,
               functionName: 'totalAssets',
-              blockNumber: allEvents[0].log.blockNumber!,
+              blockNumber: allEvents[0].blockNumber,
             });
           } catch {
             useArchive = false;
@@ -160,7 +186,7 @@ export function useVaultHistory(vaultAddress: `0x${string}` | undefined, assetDe
 
           if (useArchive) {
             for (const event of allEvents) {
-              const blockNumber = event.log.blockNumber!;
+              const blockNumber = event.blockNumber;
               const timestamp = timestampMap.get(blockNumber.toString())!;
 
               const [tvlVal, assets, shares] = await Promise.all([
@@ -187,8 +213,8 @@ export function useVaultHistory(vaultAddress: `0x${string}` | undefined, assetDe
             let cumulativeShares = 0;
 
             for (const event of allEvents) {
-              const timestamp = timestampMap.get(event.log.blockNumber!.toString())!;
-              const args = (event.log as any).args;
+              const timestamp = timestampMap.get(event.blockNumber.toString())!;
+              const args = event.args;
 
               if (event.type === 'deposit') {
                 cumulativeAssets += Number(args.amount ?? BigInt(0)) / divisor;
@@ -204,8 +230,7 @@ export function useVaultHistory(vaultAddress: `0x${string}` | undefined, assetDe
           }
         }
       } catch {
-        // Historical event fetching failed (e.g. RPC doesn't support getLogs well)
-        // Fall through to live-only data point below
+        // Historical event fetching failed — fall through to live-only data point
       }
 
       // Always append live data point

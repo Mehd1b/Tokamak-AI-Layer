@@ -5,6 +5,9 @@ import { hyperEvmMainnet, hyperEvmTestnet } from '@/lib/chains';
 // HyperEVM supports max 1000; Sepolia/mainnet support 500K+.
 const BLOCK_RANGE_TIERS = [BigInt(500_000), BigInt(10_000), BigInt(1_000), BigInt(100)];
 
+// Parallel batch size for concurrent getLogs calls
+const PARALLEL_BATCH_SIZE = 10;
+
 /**
  * Native RPC URLs for chains where third-party RPCs (e.g. Alchemy) may not
  * support eth_getLogs reliably. Used as fallback for event fetching.
@@ -35,48 +38,69 @@ export function getLogsClient(primaryClient: any, chainId?: number): any {
 }
 
 /**
+ * Discover the max block range the RPC supports for getLogs.
+ * Returns the discovered chunk size or throws if no tier works.
+ */
+async function discoverChunkSize(
+  client: any,
+  rest: Record<string, any>,
+  fromBlock: bigint,
+  toBlock: bigint,
+): Promise<{ chunkSize: bigint; initialLogs: Log[]; discoveryEnd: bigint }> {
+  for (const tier of BLOCK_RANGE_TIERS) {
+    const testEnd = fromBlock + tier > toBlock ? toBlock : fromBlock + tier;
+    try {
+      const logs = await client.getLogs({ ...rest, fromBlock, toBlock: testEnd });
+      return { chunkSize: tier, initialLogs: logs as Log[], discoveryEnd: testEnd };
+    } catch {
+      // Tier too large for this RPC, try smaller
+    }
+  }
+  throw new Error('getLogs not supported by this RPC');
+}
+
+/**
  * Paginated getLogs that auto-discovers the max block range the RPC supports.
+ * Uses parallel batching for speed on chains with small max ranges (e.g. HyperEVM).
  * Caps total calls to `maxCalls` to avoid hammering limited RPCs.
  */
 export async function paginatedGetLogs(
   client: any,
   params: { address: `0x${string}`; event: any; args?: any; fromBlock: bigint; toBlock: bigint },
-  maxCalls = 80,
+  maxCalls = 200,
 ): Promise<Log[]> {
   const { fromBlock, toBlock, ...rest } = params;
-  const results: Log[] = [];
 
-  // Discover the largest chunk size the RPC accepts
-  let chunkSize = BLOCK_RANGE_TIERS[BLOCK_RANGE_TIERS.length - 1];
-  let discovered = false;
-  for (const tier of BLOCK_RANGE_TIERS) {
-    const testEnd = fromBlock + tier > toBlock ? toBlock : fromBlock + tier;
-    try {
-      const logs = await client.getLogs({ ...rest, fromBlock, toBlock: testEnd });
-      results.push(...(logs as Log[]));
-      chunkSize = tier;
-      discovered = true;
-      if (testEnd >= toBlock) return results;
-      break;
-    } catch {
-      // Tier too large for this RPC, try smaller
-    }
-  }
+  const { chunkSize, initialLogs, discoveryEnd } = await discoverChunkSize(
+    client, rest, fromBlock, toBlock,
+  );
 
-  // If even the smallest tier failed, throw
-  if (!discovered) {
-    throw new Error('getLogs not supported by this RPC');
-  }
+  // If the discovery call covered the entire range, return immediately
+  if (discoveryEnd >= toBlock) return initialLogs;
 
-  // Paginate the rest with the discovered chunk size
-  let cursor = fromBlock + chunkSize + BigInt(1);
-  let callCount = 1;
-  while (cursor <= toBlock && callCount < maxCalls) {
+  const results: Log[] = [...initialLogs];
+
+  // Build remaining chunks
+  const chunks: Array<{ from: bigint; to: bigint }> = [];
+  let cursor = discoveryEnd + BigInt(1);
+  while (cursor <= toBlock && chunks.length < maxCalls - 1) {
     const end = cursor + chunkSize > toBlock ? toBlock : cursor + chunkSize;
-    const logs = await client.getLogs({ ...rest, fromBlock: cursor, toBlock: end });
-    results.push(...(logs as Log[]));
+    chunks.push({ from: cursor, to: end });
     cursor = end + BigInt(1);
-    callCount++;
+  }
+
+  // Process chunks in parallel batches for speed
+  for (let i = 0; i < chunks.length; i += PARALLEL_BATCH_SIZE) {
+    const batch = chunks.slice(i, i + PARALLEL_BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batch.map(({ from, to }) =>
+        client.getLogs({ ...rest, fromBlock: from, toBlock: to })
+          .catch(() => [] as Log[]),
+      ),
+    );
+    for (const logs of batchResults) {
+      results.push(...(logs as Log[]));
+    }
   }
 
   return results;
@@ -92,6 +116,17 @@ export const vaultDeployedEvent = {
     { name: 'asset', type: 'address' as const, indexed: false },
     { name: 'trustedImageId', type: 'bytes32' as const, indexed: false },
     { name: 'salt', type: 'bytes32' as const, indexed: false },
+  ],
+};
+
+export const optimisticVaultDeployedEvent = {
+  type: 'event' as const,
+  name: 'OptimisticVaultDeployed' as const,
+  inputs: [
+    { name: 'vault', type: 'address' as const, indexed: true },
+    { name: 'agentId', type: 'bytes32' as const, indexed: true },
+    { name: 'owner', type: 'address' as const, indexed: true },
+    { name: 'bondChainId', type: 'uint256' as const, indexed: false },
   ],
 };
 
@@ -156,38 +191,124 @@ export const executionSlashedEvent = {
   ],
 };
 
+export const actionExecutedEvent = {
+  type: 'event' as const,
+  name: 'ActionExecuted' as const,
+  inputs: [
+    { name: 'actionIndex', type: 'uint256' as const, indexed: true },
+    { name: 'actionType', type: 'uint32' as const, indexed: false },
+    { name: 'target', type: 'bytes32' as const, indexed: false },
+    { name: 'success', type: 'bool' as const, indexed: false },
+  ],
+};
+
+export const noOpActionExecutedEvent = {
+  type: 'event' as const,
+  name: 'NoOpActionExecuted' as const,
+  inputs: [
+    { name: 'actionIndex', type: 'uint256' as const, indexed: true },
+    { name: 'actionType', type: 'uint32' as const, indexed: false },
+  ],
+};
+
 /**
- * Find the block at which a vault was deployed via VaultDeployed event.
- * Uses expanding lookback windows to minimize RPC calls.
- * Caps each window scan to avoid excessive calls on RPCs with small max range.
+ * localStorage cache key for deploy blocks to avoid re-scanning.
+ */
+const DEPLOY_BLOCK_CACHE_PREFIX = 'ek-deploy-block';
+
+function getDeployBlockCacheKey(chainId: number, vaultAddress: string): string {
+  return `${DEPLOY_BLOCK_CACHE_PREFIX}:${chainId}:${vaultAddress.toLowerCase()}`;
+}
+
+function getCachedDeployBlock(chainId: number, vaultAddress: string): bigint | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const cached = localStorage.getItem(getDeployBlockCacheKey(chainId, vaultAddress));
+    if (cached) {
+      const val = BigInt(cached);
+      if (val > BigInt(0)) return val;
+    }
+  } catch {
+    // localStorage unavailable or corrupted
+  }
+  return null;
+}
+
+function cacheDeployBlock(chainId: number, vaultAddress: string, block: bigint): void {
+  if (typeof window === 'undefined' || block <= BigInt(0)) return;
+  try {
+    localStorage.setItem(getDeployBlockCacheKey(chainId, vaultAddress), block.toString());
+  } catch {
+    // localStorage full or unavailable
+  }
+}
+
+/**
+ * Find the block at which a vault was deployed via VaultDeployed or
+ * OptimisticVaultDeployed events. Searches both event types and uses
+ * parallel batching to cover large block ranges on fast chains.
+ *
+ * Results are cached in localStorage to avoid re-scanning on page reloads.
  */
 export async function findVaultDeployBlock(
   client: any,
   factoryAddress: `0x${string}`,
   vaultAddress: `0x${string}`,
   currentBlock: bigint,
+  chainId?: number,
 ): Promise<bigint> {
-  // Lookback windows — sized for 12s block chains.
-  // On fast chains (HyperEVM ~0.5s blocks), the maxCalls cap in
-  // paginatedGetLogs prevents excessive requests.
-  const LOOKBACK = [BigInt(15_000), BigInt(100_000), BigInt(500_000), BigInt(2_000_000)];
+  // Check localStorage cache first
+  if (chainId) {
+    const cached = getCachedDeployBlock(chainId, vaultAddress);
+    if (cached) return cached;
+  }
+
+  const deployEvents = [vaultDeployedEvent, optimisticVaultDeployedEvent];
+
+  // Lookback windows — generous sizes for fast-block chains like HyperEVM.
+  // With parallel batching, we can cover much larger ranges efficiently.
+  const LOOKBACK = [BigInt(50_000), BigInt(200_000), BigInt(1_000_000), BigInt(5_000_000)];
 
   for (const window of LOOKBACK) {
     const from = currentBlock > window ? currentBlock - window : BigInt(0);
-    try {
-      const logs = await paginatedGetLogs(
-        client,
-        { address: factoryAddress, event: vaultDeployedEvent, args: { vault: vaultAddress }, fromBlock: from, toBlock: currentBlock },
-        30, // cap at 30 calls per window
-      );
-      if (logs.length > 0 && logs[0].blockNumber != null) {
-        return logs[0].blockNumber;
+
+    // Search both event types in parallel for each window
+    const results = await Promise.allSettled(
+      deployEvents.map((event) =>
+        paginatedGetLogs(
+          client,
+          { address: factoryAddress, event, args: { vault: vaultAddress }, fromBlock: from, toBlock: currentBlock },
+          500,
+        ),
+      ),
+    );
+
+    for (const result of results) {
+      if (result.status === 'fulfilled' && result.value.length > 0) {
+        const deployBlock = result.value[0].blockNumber;
+        if (deployBlock != null) {
+          // Cache for future use
+          if (chainId) cacheDeployBlock(chainId, vaultAddress, deployBlock);
+          return deployBlock;
+        }
       }
-    } catch {
-      // Window failed
     }
+
     if (from === BigInt(0)) return BigInt(0);
   }
 
   return BigInt(0);
+}
+
+/**
+ * Compute a safe fromBlock for scanning recent vault events.
+ * On HyperEVM (1K block limit, 500 maxCalls), covers ~500K blocks (~3 days).
+ * On Ethereum (500K block limit), covers 100M+ blocks (entire history).
+ * Used as fallback when findVaultDeployBlock() can't locate the deploy block.
+ */
+export function recentFromBlock(currentBlock: bigint, maxCalls = 500): bigint {
+  // Pessimistically assume the smallest chunk size (1000 blocks)
+  // to guarantee we cover this many blocks on any chain
+  const coverage = BigInt(maxCalls) * BigInt(1_000);
+  return currentBlock > coverage ? currentBlock - coverage : BigInt(0);
 }

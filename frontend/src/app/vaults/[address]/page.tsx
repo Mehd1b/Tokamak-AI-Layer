@@ -5,14 +5,12 @@ import { useAccount } from 'wagmi';
 import { useVaultInfo, useVaultShares } from '@/hooks/useKernelVault';
 import { useVaultHistory } from '@/hooks/useVaultHistory';
 import { useVaultExecutions } from '@/hooks/useVaultExecutions';
-import { useOptimisticExecutions } from '@/hooks/useOptimisticExecutions';
 import { VaultDepositForm } from '@/components/VaultDepositForm';
 import { VaultWithdrawForm } from '@/components/VaultWithdrawForm';
 import { VaultChart } from '@/components/VaultChart';
 import { ExecutionSubmitForm } from '@/components/ExecutionSubmitForm';
 import { ExecutionHistoryTable } from '@/components/ExecutionHistoryTable';
 import { OptimisticStatusCard } from '@/components/OptimisticStatusCard';
-import { PendingExecutionsTable } from '@/components/PendingExecutionsTable';
 import { formatBytes32, formatEther, timestampToDate, truncateAddress } from '@/lib/utils';
 import { useNetwork } from '@/lib/NetworkContext';
 import { NetworkBadge } from '@/components/NetworkLogo';
@@ -29,10 +27,6 @@ export default function VaultDetailPage() {
   const { data: userShares } = useVaultShares(vaultAddress, userAddress);
   const { tvl, pps, isLoading: historyLoading } = useVaultHistory(vaultAddress, vault.assetDecimals);
   const { executions, isLoading: executionsLoading } = useVaultExecutions(vaultAddress);
-  const { executions: optimisticExecs, isLoading: optimisticLoading } = useOptimisticExecutions(
-    vaultAddress,
-    vault.isOptimistic,
-  );
 
   if (vault.isLoading) {
     return (
@@ -236,34 +230,13 @@ export default function VaultDetailPage() {
             />
           </div>
 
-          {/* Pending Executions (optimistic vaults only) */}
-          {vault.isOptimistic && optimisticExecs.length > 0 && (
-            <div className="card mb-8">
-              <h2 className="text-lg font-light text-white mb-4" style={{ fontFamily: 'var(--font-serif), serif' }}>
-                Optimistic Executions
-              </h2>
-              <p className="text-gray-500 text-sm font-mono mb-4">
-                Executions awaiting ZK proof submission. Expired executions can be slashed by anyone.
-              </p>
-              {optimisticLoading ? (
-                <div className="animate-pulse space-y-3">
-                  {[...Array(2)].map((_, i) => (
-                    <div key={i} className="h-10 bg-white/5 rounded" />
-                  ))}
-                </div>
-              ) : (
-                <PendingExecutionsTable vaultAddress={vaultAddress} executions={optimisticExecs} />
-              )}
-            </div>
-          )}
-
           {/* Execution History */}
           <div className="card">
             <h2 className="text-lg font-light text-white mb-4" style={{ fontFamily: 'var(--font-serif), serif' }}>
               Execution History
             </h2>
             <p className="text-gray-500 text-sm font-mono mb-4">
-              Last 10 verified executions for this vault.
+              All verified executions for this vault.
             </p>
             {executionsLoading ? (
               <div className="animate-pulse space-y-3">
@@ -279,7 +252,7 @@ export default function VaultDetailPage() {
 
         {/* Right column — Discussion (sticky on desktop) */}
         <div className="xl:w-[400px] flex-shrink-0">
-          <div className="xl:sticky xl:top-8 xl:max-h-[calc(100vh-4rem)] xl:overflow-y-auto xl:scrollbar-thin">
+          <div className="xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto xl:scrollbar-thin">
             <CommentSection vaultAddress={vaultAddress} vaultOwner={vault.owner} />
           </div>
         </div>
