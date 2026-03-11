@@ -155,13 +155,11 @@ export default function VaultDetailPage() {
           {/* Key Stats Bar */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <div className="card text-center py-4">
-              <div className="text-xs text-gray-500 font-mono uppercase tracking-wider mb-1">TVL</div>
+              <div className="text-xs text-gray-500 font-mono uppercase tracking-wider mb-1">Balance</div>
               <div className="text-lg font-medium text-white font-mono">
-                {vault.totalValueLocked !== undefined
-                  ? formatEther(vault.totalValueLocked, vault.assetDecimals)
-                  : vault.totalAssets !== undefined
-                    ? formatEther(vault.totalAssets, vault.assetDecimals)
-                    : '-'}{' '}
+                {vault.totalAssets !== undefined
+                  ? formatEther(vault.totalAssets, vault.assetDecimals)
+                  : '-'}{' '}
                 <span className="text-sm text-gray-400">{vault.assetSymbol}</span>
               </div>
             </div>
@@ -205,14 +203,21 @@ export default function VaultDetailPage() {
               <h2 className="text-lg font-light text-white mb-4" style={{ fontFamily: 'var(--font-serif), serif' }}>
                 Withdraw
               </h2>
-              <VaultWithdrawForm vaultAddress={vaultAddress} assetDecimals={vault.assetDecimals} />
+              <VaultWithdrawForm
+                vaultAddress={vaultAddress}
+                assetDecimals={vault.assetDecimals}
+                assetSymbol={vault.assetSymbol}
+                userShares={userShares as bigint | undefined}
+                totalShares={vault.totalShares as bigint | undefined}
+                totalAssets={vault.totalAssets as bigint | undefined}
+              />
             </div>
           </div>
 
-          {/* TVL & PPS Charts */}
+          {/* Balance & PPS Charts */}
           <div className="grid grid-cols-1 gap-6 mb-8">
             <VaultChart
-              title="Total Value Locked"
+              title="Vault Balance"
               data={tvl}
               type="area"
               valueSuffix={vault.assetSymbol}
