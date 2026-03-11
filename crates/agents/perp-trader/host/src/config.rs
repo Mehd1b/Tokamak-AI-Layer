@@ -6,7 +6,7 @@ use clap::Parser;
 ///
 /// Fetches market data, builds inputs, optionally generates a ZK proof,
 /// and submits on-chain via KernelVault.executeWithOracle().
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(name = "perp-host", version, about)]
 pub struct Cli {
     // ---- On-chain config ----
@@ -189,6 +189,19 @@ pub struct Cli {
     /// to get the oracle's EIP-191 signature attesting the L1 bond lock.
     #[arg(long, env = "ORACLE_URL")]
     pub oracle_url: Option<String>,
+
+    /// Maximum time (seconds) to hold a position before auto-closing.
+    /// After opening a position, the bot monitors TP/SL and auto-closes
+    /// when this duration elapses or TP/SL is hit.
+    /// Default: 900 (15 minutes). Set to 0 to disable (exit immediately after open).
+    #[arg(long, default_value_t = 900)]
+    pub max_hold_secs: u64,
+
+    /// Polling interval (seconds) for position monitoring loop.
+    /// How often the bot checks mark price against TP/SL thresholds.
+    /// Default: 15.
+    #[arg(long, default_value_t = 15)]
+    pub monitor_interval: u64,
 }
 
 impl Cli {

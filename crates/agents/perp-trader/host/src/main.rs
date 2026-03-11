@@ -27,6 +27,14 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+/// Pipeline outcome — controls whether main() retries or exits.
+enum PipelineOutcome {
+    /// No action taken (no entry signal, pending settlement, etc.) — retry after interval.
+    Retry,
+    /// Execution completed (position opened/closed, dry run done, etc.) — exit.
+    Done,
+}
+
 /// Persistent state between single-shot cycles to track open positions.
 #[derive(serde::Serialize, serde::Deserialize)]
 struct PositionState {
@@ -96,7 +104,24 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    let result = run_pipeline(&cli, &proof_queue, &last_known_nonce);
+    // Main execution loop: retries every monitor_interval seconds until the agent
+    // finds an entry signal or completes an execution cycle.
+    let result = loop {
+        match run_pipeline(&cli, &proof_queue, &last_known_nonce) {
+            Ok(PipelineOutcome::Retry) => {
+                if !cli.json {
+                    eprintln!(
+                        "[main] No action this cycle. Retrying in {}s...\n",
+                        cli.monitor_interval
+                    );
+                }
+                std::thread::sleep(Duration::from_secs(cli.monitor_interval));
+                continue;
+            }
+            Ok(PipelineOutcome::Done) => break Ok(()),
+            Err(e) => break Err(e),
+        }
+    };
 
     // If optimistic mode queued proofs, wait for the prove worker to drain the queue
     // before shutting down. Proofs must be submitted within the challenge window.
@@ -146,11 +171,13 @@ fn main() -> anyhow::Result<()> {
 }
 
 /// Main execution pipeline, extracted for clean shutdown handling.
+/// Returns `Retry` when the agent has no actions (retry after interval),
+/// or `Done` when execution completed or an unrecoverable condition was hit.
 fn run_pipeline(
     cli: &Cli,
     proof_queue: &prove_worker::ProofQueue,
     last_known_nonce: &Arc<AtomicU64>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<PipelineOutcome> {
     // 1. Load agent-pack bundle
     let bundle = reference_integrator::LoadedBundle::load(&cli.bundle)
         .map_err(|e| anyhow::anyhow!("Failed to load bundle: {}", e))?;
@@ -177,59 +204,10 @@ fn run_pipeline(
     #[cfg(not(feature = "onchain"))]
     let vault_state = onchain::VaultState::default_for_dry_run();
 
-    // 2b. WSTON bond approval for optimistic execution mode.
-    // The operator must approve the BondManager to transferFrom their WSTON.
-    // Runs once at startup with max-uint256 approval. Non-blocking: if it fails,
-    // the optimistic submission will fail later and fall back to synchronous.
-    #[cfg(feature = "onchain")]
-    if cli.optimistic && !cli.dry_run {
-        let rt_bond = tokio::runtime::Runtime::new()?;
-        match rt_bond.block_on(onchain::read_bond_config(&cli.vault, &cli.rpc)) {
-            Ok(bond_config) => {
-                if !cli.json {
-                    eprintln!(
-                        "[2b/8] Bond config: manager={}, wston={}, min_bond={}",
-                        bond_config.bond_manager, bond_config.wston_token, bond_config.min_bond
-                    );
-                }
-                let pk_bond = Cli::resolve_key(&cli.pk)?;
-                match rt_bond.block_on(onchain::ensure_wston_approval(
-                    &bond_config.wston_token,
-                    &bond_config.bond_manager,
-                    &cli.rpc,
-                    &pk_bond,
-                    bond_config.min_bond,
-                )) {
-                    Ok(true) => {
-                        if !cli.json {
-                            eprintln!("[2b/8] WSTON approved for BondManager.");
-                        }
-                    }
-                    Ok(false) => {
-                        if !cli.json {
-                            eprintln!("[2b/8] WSTON allowance already sufficient.");
-                        }
-                    }
-                    Err(e) => {
-                        if !cli.json {
-                            eprintln!(
-                                "[2b/8] WARNING: WSTON approval failed: {}. Optimistic may fail.",
-                                e
-                            );
-                        }
-                    }
-                }
-            }
-            Err(e) => {
-                if !cli.json {
-                    eprintln!(
-                        "[2b/8] WARNING: Failed to read bond config: {}. Optimistic may fail.",
-                        e
-                    );
-                }
-            }
-        }
-    }
+    // 2b. WSTON bond approval — skipped for cross-chain OKV.
+    // The BondManager lives on L1 (bondChainId=1), not on HyperEVM.
+    // WSTON approval must be done on L1 before running the bot.
+    // The vault's bondManager() is not accessible via HyperEVM RPC.
 
     // 3. Fetch market data
     let hl_client = hyperliquid::client::HyperliquidClient::new(&cli.hl_url);
@@ -264,7 +242,7 @@ fn run_pipeline(
                     pos_state.nonce, age
                 );
             }
-            return Ok(());
+            return Ok(PipelineOutcome::Retry);
         }
 
         // Position is now visible OR timed out — clear state and proceed
@@ -351,7 +329,7 @@ fn run_pipeline(
                         } else if recovered > 0 {
                             eprintln!("[RECOVER] Successfully recovered {} USDC to vault.", recovered);
                         }
-                        return Ok(());
+                        return Ok(PipelineOutcome::Retry);
                     }
                     Err(e) => {
                         if !cli.json {
@@ -377,7 +355,7 @@ fn run_pipeline(
                 vault_state.total_assets, cli.min_balance
             );
         }
-        return Ok(());
+        return Ok(PipelineOutcome::Retry);
     }
 
     // Override account equity with vault's on-chain USDC balance in raw units (6 decimals).
@@ -497,7 +475,7 @@ fn run_pipeline(
         } else {
             eprintln!("No-op: {}. Skipping proof generation and on-chain submission.", reason);
         }
-        return Ok(());
+        return Ok(PipelineOutcome::Retry);
     }
 
     // ── Two-proof open: detect if agent wants to open with no existing position ──
@@ -535,7 +513,7 @@ fn run_pipeline(
                 action_count, needs_two_proof
             );
         }
-        return Ok(());
+        return Ok(PipelineOutcome::Done);
     }
 
     // === OPTIMISTIC EXECUTION PATH (RFC-001) ===
@@ -987,9 +965,24 @@ fn run_pipeline(
         }
     }
 
-    // If optimistic succeeded, we're done — proof(s) queued in background.
+    // If optimistic open succeeded and hold monitoring is enabled, enter the
+    // position monitoring loop. Poll HyperCore for TP/SL or max hold timeout,
+    // then auto-close and recover funds.
+    if optimistic_succeeded && cli.max_hold_secs > 0 {
+        // Only monitor if we actually opened a position (not a close or no-op)
+        let is_open_intent = matches!(agent_intent, seed_trade::AgentIntent::Open(_));
+        if is_open_intent {
+            monitor_and_close(
+                cli, &bundle, &hl_client, &snapshot, proof_queue, last_known_nonce,
+                &exchange_addr, &vault_addr, &usdc_addr,
+            )?;
+        }
+        return Ok(PipelineOutcome::Done);
+    }
+
+    // If optimistic succeeded but monitoring disabled, we're done.
     if optimistic_succeeded {
-        return Ok(());
+        return Ok(PipelineOutcome::Done);
     }
 
     // 8. Generate proof(s) and produce the final proof package for submission.
@@ -1154,7 +1147,7 @@ fn run_pipeline(
                     "deposit_tx_submitted": true,
                 }))?);
             }
-            return Ok(());
+            return Ok(PipelineOutcome::Done);
         }
 
         if !cli.json {
@@ -1466,6 +1459,442 @@ fn run_pipeline(
         }
     }
 
+    Ok(PipelineOutcome::Done)
+}
+
+// ============================================================================
+// Position monitoring + auto-close loop
+// ============================================================================
+
+/// After an optimistic open, monitor the position and auto-close when:
+/// - Take profit threshold is reached (mark moved in our favor by take_profit_bps)
+/// - Stop loss threshold is reached (mark moved against us by stop_loss_bps)
+/// - Max hold duration elapsed (cli.max_hold_secs)
+///
+/// Then submits a force-close optimistic execution and triggers fund recovery.
+fn monitor_and_close(
+    cli: &Cli,
+    bundle: &reference_integrator::LoadedBundle,
+    hl_client: &hyperliquid::client::HyperliquidClient,
+    _open_snapshot: &market::MarketSnapshot,
+    proof_queue: &prove_worker::ProofQueue,
+    last_known_nonce: &Arc<AtomicU64>,
+    exchange_addr: &[u8; 20],
+    vault_addr: &[u8; 20],
+    usdc_addr: &[u8; 20],
+) -> anyhow::Result<()> {
+    use std::time::Instant;
+
+    let monitor_start = Instant::now();
+    let max_hold = Duration::from_secs(cli.max_hold_secs);
+    let poll_interval = Duration::from_secs(cli.monitor_interval);
+
+    if !cli.json {
+        eprintln!(
+            "\n[MONITOR] Position monitoring started. TP={}bps, SL={}bps, max_hold={}s, poll={}s",
+            cli.take_profit_bps, cli.stop_loss_bps, cli.max_hold_secs, cli.monitor_interval
+        );
+    }
+
+    // Wait a bit for HyperCore position to become visible
+    std::thread::sleep(Duration::from_secs(10));
+
+    // Fetch initial position state to get entry price
+    let initial_snap = hl_client.fetch_snapshot(&cli.asset, &cli.sub_account, 1)?;
+    if initial_snap.position_size == 0.0 {
+        if !cli.json {
+            eprintln!("[MONITOR] No position visible yet. Waiting 15s more...");
+        }
+        std::thread::sleep(Duration::from_secs(15));
+    }
+
+    let snap = hl_client.fetch_snapshot(&cli.asset, &cli.sub_account, 1)?;
+    if snap.position_size == 0.0 {
+        if !cli.json {
+            eprintln!("[MONITOR] Position still not visible after 25s. Exiting monitor.");
+        }
+        return Ok(());
+    }
+
+    let entry_price = snap.entry_price;
+    let is_long = snap.position_size > 0.0;
+    let tp_bps = cli.take_profit_bps as f64;
+    let sl_bps = cli.stop_loss_bps as f64;
+
+    if !cli.json {
+        eprintln!(
+            "[MONITOR] Position detected: {} {:.5} {} @ ${:.2}",
+            if is_long { "LONG" } else { "SHORT" },
+            snap.position_size.abs(),
+            cli.asset,
+            entry_price,
+        );
+        let tp_price = if is_long {
+            entry_price * (1.0 + tp_bps / 10000.0)
+        } else {
+            entry_price * (1.0 - tp_bps / 10000.0)
+        };
+        let sl_price = if is_long {
+            entry_price * (1.0 - sl_bps / 10000.0)
+        } else {
+            entry_price * (1.0 + sl_bps / 10000.0)
+        };
+        eprintln!(
+            "[MONITOR] TP target: ${:.2}, SL target: ${:.2}",
+            tp_price, sl_price
+        );
+    }
+
+    // Monitoring loop
+    let close_reason;
+    loop {
+        std::thread::sleep(poll_interval);
+
+        let elapsed = monitor_start.elapsed();
+
+        // Check max hold timeout first
+        if elapsed >= max_hold {
+            close_reason = format!("max_hold_timeout ({}s elapsed)", elapsed.as_secs());
+            if !cli.json {
+                eprintln!("[MONITOR] Max hold duration reached ({}s). Closing position.", elapsed.as_secs());
+            }
+            break;
+        }
+
+        // Fetch current mark price
+        let current = match hl_client.fetch_snapshot(&cli.asset, &cli.sub_account, 1) {
+            Ok(s) => s,
+            Err(e) => {
+                if !cli.json {
+                    eprintln!("[MONITOR] Failed to fetch snapshot: {}. Retrying...", e);
+                }
+                continue;
+            }
+        };
+
+        // If position was closed externally (liquidation, manual), exit
+        if current.position_size == 0.0 {
+            if !cli.json {
+                eprintln!("[MONITOR] Position closed externally. Triggering fund recovery.");
+            }
+            clear_position_state(&cli.state_file);
+
+            #[cfg(feature = "onchain")]
+            {
+                let rt = tokio::runtime::Runtime::new()?;
+                match rt.block_on(onchain::recover_funds_to_vault(cli, hl_client)) {
+                    Ok(recovered) => {
+                        if !cli.json && recovered > 0 {
+                            eprintln!("[RECOVER] Recovered {} USDC to vault.", recovered);
+                        }
+                    }
+                    Err(e) => {
+                        if !cli.json {
+                            eprintln!("[RECOVER] Recovery failed: {}", e);
+                        }
+                    }
+                }
+            }
+            return Ok(());
+        }
+
+        let mark = current.mark_price;
+
+        // Calculate PnL in bps
+        let pnl_bps = if is_long {
+            (mark - entry_price) / entry_price * 10000.0
+        } else {
+            (entry_price - mark) / entry_price * 10000.0
+        };
+
+        let remaining = max_hold.saturating_sub(elapsed);
+        if !cli.json {
+            eprintln!(
+                "[MONITOR] mark=${:.2} entry=${:.2} pnl={:+.1}bps (TP={}, SL=-{}) remaining={}s",
+                mark, entry_price, pnl_bps, tp_bps, sl_bps, remaining.as_secs()
+            );
+        }
+
+        // Check take profit
+        if pnl_bps >= tp_bps {
+            close_reason = format!("take_profit (pnl={:.1}bps >= TP={}bps)", pnl_bps, tp_bps);
+            if !cli.json {
+                eprintln!("[MONITOR] Take profit reached! pnl={:+.1}bps. Closing.", pnl_bps);
+            }
+            break;
+        }
+
+        // Check stop loss (pnl_bps is negative when losing)
+        if pnl_bps <= -(sl_bps) {
+            close_reason = format!("stop_loss (pnl={:.1}bps <= -SL={}bps)", pnl_bps, sl_bps);
+            if !cli.json {
+                eprintln!("[MONITOR] Stop loss hit! pnl={:+.1}bps. Closing.", pnl_bps);
+            }
+            break;
+        }
+    }
+
+    // === Execute force-close ===
+    if !cli.json {
+        eprintln!("[MONITOR] Close reason: {}", close_reason);
+        eprintln!("[MONITOR] Building force-close execution (action_flag=1)...");
+    }
+
+    execute_force_close(
+        cli, bundle, hl_client, proof_queue, last_known_nonce,
+        exchange_addr, vault_addr, usdc_addr, &close_reason,
+    )
+}
+
+/// Build and submit a force-close optimistic execution, then recover funds.
+fn execute_force_close(
+    cli: &Cli,
+    bundle: &reference_integrator::LoadedBundle,
+    hl_client: &hyperliquid::client::HyperliquidClient,
+    proof_queue: &prove_worker::ProofQueue,
+    last_known_nonce: &Arc<AtomicU64>,
+    exchange_addr: &[u8; 20],
+    vault_addr: &[u8; 20],
+    usdc_addr: &[u8; 20],
+    close_reason: &str,
+) -> anyhow::Result<()> {
+    use std::time::Instant;
+
+    // Fresh market data for close
+    let mut close_snapshot = hl_client.fetch_snapshot(&cli.asset, &cli.sub_account, cli.candles_needed())?;
+
+    if close_snapshot.position_size == 0.0 {
+        if !cli.json {
+            eprintln!("[CLOSE] No position to close. Skipping.");
+        }
+        return Ok(());
+    }
+
+    // Read vault state
+    #[cfg(feature = "onchain")]
+    let close_vault_state = {
+        let rt = tokio::runtime::Runtime::new()?;
+        rt.block_on(onchain::read_vault_state(&cli.vault, &cli.rpc))?
+    };
+    #[cfg(not(feature = "onchain"))]
+    let close_vault_state = onchain::VaultState::default_for_dry_run();
+
+    // Use HyperCore equity for the close cycle (funds are on HyperCore, not in vault)
+    let hypercore_equity = close_snapshot.account_equity;
+    if hypercore_equity > 0.5 {
+        close_snapshot.account_equity = hypercore_equity * 1_000_000.0;
+        close_snapshot.available_balance = close_snapshot.account_equity - close_snapshot.margin_used;
+    }
+
+    // Compute indicators (needed for input encoding, even though action_flag=1 bypasses strategy)
+    let close_indicators = indicators::compute_indicators(&close_snapshot.candle_closes, cli)?;
+
+    // Build oracle feed
+    let oracle_key = Cli::resolve_key(&cli.oracle_key)?;
+    let close_feed = oracle_signer::build_and_sign_feed(
+        &close_snapshot, &oracle_key, exchange_addr, vault_addr, cli.chain_id,
+    )?;
+
+    // Build force-close input (action_flag=1 makes agent produce close actions)
+    let mut close_cli = cli.clone();
+    close_cli.action_flag = 1;
+
+    let (close_input, close_input_bytes) = input_builder::build_input_with_phase(
+        bundle, &close_vault_state, &close_snapshot, &close_indicators, &close_feed,
+        &close_cli, exchange_addr, vault_addr, usdc_addr, 0,
+    )?;
+    let (close_output_bytes, _close_commitment) =
+        output_reconstruct::reconstruct_output(&close_input, &close_input_bytes)?;
+    let close_action_count = kernel_core::AgentOutput::decode(&close_output_bytes)
+        .map(|o| o.actions.len())
+        .unwrap_or(0);
+
+    if close_action_count == 0 {
+        if !cli.json {
+            eprintln!("[CLOSE] Agent produced 0 close actions. Falling back to adapter admin close.");
+        }
+        // Fallback: use REST API close or adapter admin
+        return fallback_close_and_recover(cli, hl_client, &close_snapshot);
+    }
+
+    if !cli.json {
+        eprintln!(
+            "[CLOSE] Force-close: {} actions, nonce={}",
+            close_action_count, close_input.execution_nonce
+        );
+    }
+
+    // Submit optimistic close
+    #[cfg(feature = "onchain")]
+    {
+        let pk = Cli::resolve_key(&cli.pk)?;
+
+        let close_journal = build_predicted_journal(
+            &close_input,
+            &close_input_bytes,
+            &close_output_bytes,
+        )?;
+
+        let rt = tokio::runtime::Runtime::new()?;
+        let close_result = rt.block_on(submit_optimistic_execution(
+            &cli.vault, &cli.rpc, &pk,
+            &close_journal, &close_output_bytes,
+            &close_feed.onchain_signature, close_feed.feed.timestamp,
+            cli.bond_amount,
+            cli.oracle_url.as_deref().unwrap_or(""),
+        ));
+
+        match close_result {
+            Ok(close_nonce) => {
+                if !cli.json {
+                    eprintln!(
+                        "[CLOSE] Optimistic close submitted (nonce={}). Queuing proof.",
+                        close_nonce
+                    );
+                }
+                last_known_nonce.store(close_nonce, Ordering::Relaxed);
+
+                // Persist input for proof recovery
+                let input_path = format!("/tmp/perp-optimistic-nonce-{}.input.bin", close_nonce);
+                let _ = std::fs::write(&input_path, &close_input_bytes);
+
+                // Queue proof job
+                {
+                    let mut queue = proof_queue.lock().unwrap();
+                    queue.push_back(prove_worker::PendingProof {
+                        execution_nonce: close_nonce,
+                        input_bytes: close_input_bytes,
+                        bundle_path: cli.bundle.clone(),
+                        rpc_url: cli.rpc.clone(),
+                        vault_address: cli.vault.clone(),
+                        private_key: pk.clone(),
+                        deadline: Instant::now() + Duration::from_secs(cli.challenge_window),
+                        queued_at: Instant::now(),
+                        dev_mode: false,
+                        retry_count: 0,
+                    });
+                }
+
+                clear_position_state(&cli.state_file);
+
+                // Wait for HyperCore settlement then recover funds
+                if !cli.json {
+                    eprintln!("[CLOSE] Waiting 15s for HyperCore close settlement...");
+                }
+                std::thread::sleep(Duration::from_secs(15));
+
+                // Verify close
+                let still_open = hl_client.has_position(&cli.sub_account, &cli.asset).unwrap_or(true);
+                if still_open {
+                    if !cli.json {
+                        eprintln!("[CLOSE] CoreWriter close may have been silently rejected. Trying REST API fallback...");
+                    }
+                    return fallback_close_and_recover(cli, hl_client, &close_snapshot);
+                }
+
+                // Recover funds: perp → spot → EVM → vault
+                if !cli.json {
+                    eprintln!("[CLOSE] Position closed. Starting fund recovery...");
+                }
+                match rt.block_on(onchain::recover_funds_to_vault(cli, hl_client)) {
+                    Ok(recovered) => {
+                        if !cli.json && recovered > 0 {
+                            eprintln!("[RECOVER] Successfully recovered {} USDC to vault.", recovered);
+                        }
+                    }
+                    Err(e) => {
+                        if !cli.json {
+                            eprintln!("[RECOVER] Fund recovery failed: {}", e);
+                        }
+                    }
+                }
+
+                if cli.json {
+                    let result = serde_json::json!({
+                        "status": "closed",
+                        "reason": close_reason,
+                        "close_nonce": close_nonce,
+                        "proof_queued": true,
+                    });
+                    println!("{}", serde_json::to_string_pretty(&result)?);
+                }
+            }
+            Err(e) => {
+                if !cli.json {
+                    eprintln!("[CLOSE] Optimistic close failed: {}. Falling back to REST API close.", e);
+                }
+                return fallback_close_and_recover(cli, hl_client, &close_snapshot);
+            }
+        }
+    }
+
+    #[cfg(not(feature = "onchain"))]
+    {
+        return Err(anyhow::anyhow!("Force-close requires --features onchain"));
+    }
+
+    Ok(())
+}
+
+/// Fallback close using REST API (adapter admin or seed_trade close) + fund recovery.
+fn fallback_close_and_recover(
+    cli: &Cli,
+    hl_client: &hyperliquid::client::HyperliquidClient,
+    snapshot: &market::MarketSnapshot,
+) -> anyhow::Result<()> {
+    let is_long = snapshot.position_size > 0.0;
+    let close_is_buy = !is_long;
+    let close_size = snapshot.position_size.abs();
+
+    if cli.api_wallet_key.is_some() {
+        if !cli.json {
+            eprintln!(
+                "[FALLBACK] REST API close: {} {:.5} {} @ ${:.0}",
+                if close_is_buy { "BUY" } else { "SELL" },
+                close_size,
+                cli.asset,
+                snapshot.mark_price,
+            );
+        }
+        match seed_trade::execute_close_trade(cli, close_is_buy, close_size, snapshot.mark_price) {
+            Ok(result) if result.status == "filled" => {
+                if !cli.json {
+                    eprintln!("[FALLBACK] Close filled. Waiting 15s for settlement...");
+                }
+                std::thread::sleep(Duration::from_secs(15));
+                clear_position_state(&cli.state_file);
+
+                #[cfg(feature = "onchain")]
+                {
+                    let rt = tokio::runtime::Runtime::new()?;
+                    match rt.block_on(onchain::recover_funds_to_vault(cli, hl_client)) {
+                        Ok(recovered) => {
+                            if !cli.json && recovered > 0 {
+                                eprintln!("[RECOVER] Recovered {} USDC to vault.", recovered);
+                            }
+                        }
+                        Err(e) => {
+                            if !cli.json {
+                                eprintln!("[RECOVER] Recovery failed: {}", e);
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(result) => {
+                if !cli.json {
+                    eprintln!("[FALLBACK] Close not filled: status={}", result.status);
+                }
+            }
+            Err(e) => {
+                if !cli.json {
+                    eprintln!("[FALLBACK] Close failed: {}", e);
+                }
+            }
+        }
+    } else if !cli.json {
+        eprintln!("[FALLBACK] No API wallet key. Cannot close via REST API.");
+    }
     Ok(())
 }
 

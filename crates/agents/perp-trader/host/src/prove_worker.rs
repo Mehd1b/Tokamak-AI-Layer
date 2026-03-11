@@ -4,6 +4,7 @@
 //! proofs on-chain as they complete. Monitors deadlines and alerts
 //! when proofs are at risk of timing out.
 
+use kernel_core::CanonicalDecode;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -235,6 +236,16 @@ fn process_proof_job(job: &PendingProof, status: &WorkerStatus) -> anyhow::Resul
     let proof_result = crate::prove::generate_proof(&bundle, &job.input_bytes, job.dev_mode)?;
 
     let prove_elapsed = prove_start.elapsed();
+
+    // Debug: compute actual journal hash for comparison with on-chain stored hash
+    let actual_journal_hash = {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(&proof_result.journal_bytes);
+        let hash = hasher.finalize();
+        format!("0x{}", hex::encode(hash))
+    };
+
     eprintln!(
         "[prove-worker] Proof generated for nonce {} in {:.1}s (journal={} bytes, seal={} bytes)",
         nonce,
@@ -242,6 +253,90 @@ fn process_proof_job(job: &PendingProof, status: &WorkerStatus) -> anyhow::Resul
         proof_result.journal_bytes.len(),
         proof_result.seal_bytes.len()
     );
+    eprintln!(
+        "[prove-worker] Actual journal hash: {} (journal hex: {}...)",
+        actual_journal_hash,
+        hex::encode(&proof_result.journal_bytes[..32.min(proof_result.journal_bytes.len())])
+    );
+
+    // Debug: save seal and journal to disk for manual verification
+    {
+        let seal_path = format!("/tmp/perp-optimistic-nonce-{}.seal.bin", nonce);
+        let journal_path = format!("/tmp/perp-optimistic-nonce-{}.journal.bin", nonce);
+        if let Err(e) = std::fs::write(&seal_path, &proof_result.seal_bytes) {
+            eprintln!("[prove-worker] Failed to save seal: {}", e);
+        } else {
+            eprintln!("[prove-worker] Saved seal to {} ({} bytes)", seal_path, proof_result.seal_bytes.len());
+            eprintln!("[prove-worker] Seal selector: 0x{}", hex::encode(&proof_result.seal_bytes[..4]));
+        }
+        if let Err(e) = std::fs::write(&journal_path, &proof_result.journal_bytes) {
+            eprintln!("[prove-worker] Failed to save journal: {}", e);
+        }
+    }
+
+    // Also compare predicted vs actual journals from persisted input
+    {
+        let input_path = format!("/tmp/perp-optimistic-nonce-{}.input.bin", nonce);
+        if let Ok(input_bytes) = std::fs::read(&input_path) {
+            if let Ok(input) = kernel_core::KernelInputV1::decode(&input_bytes) {
+                // Reconstruct agent output (same as main thread did)
+                match crate::output_reconstruct::reconstruct_output(&input, &input_bytes) {
+                    Ok((agent_output_bytes, _)) => {
+                        match reference_integrator::predict::build_predicted_journal(
+                            &input, &input_bytes, &agent_output_bytes,
+                        ) {
+                            Ok(predicted_journal) => {
+                                use sha2::{Digest, Sha256};
+                                let mut hasher = Sha256::new();
+                                hasher.update(&predicted_journal);
+                                let predicted_hash = format!("0x{}", hex::encode(hasher.finalize()));
+                                eprintln!(
+                                    "[prove-worker] Predicted journal hash: {} (match={})",
+                                    predicted_hash,
+                                    predicted_hash == actual_journal_hash
+                                );
+                                if predicted_hash != actual_journal_hash {
+                                    // Find first differing byte
+                                    for (i, (a, b)) in proof_result.journal_bytes.iter()
+                                        .zip(predicted_journal.iter()).enumerate()
+                                    {
+                                        if a != b {
+                                            eprintln!(
+                                                "[prove-worker] MISMATCH at byte {}: actual=0x{:02x} predicted=0x{:02x}",
+                                                i, a, b
+                                            );
+                                            break;
+                                        }
+                                    }
+                                    if proof_result.journal_bytes.len() != predicted_journal.len() {
+                                        eprintln!(
+                                            "[prove-worker] LENGTH MISMATCH: actual={} predicted={}",
+                                            proof_result.journal_bytes.len(), predicted_journal.len()
+                                        );
+                                    }
+                                }
+                            }
+                            Err(e) => eprintln!("[prove-worker] Failed to build predicted journal: {}", e),
+                        }
+                    }
+                    Err(e) => eprintln!("[prove-worker] Failed to reconstruct output: {}", e),
+                }
+            }
+        }
+    }
+
+    // Debug: test verifier directly before submitting through OKV
+    #[cfg(feature = "onchain")]
+    {
+        eprintln!("[prove-worker] Testing verifier directly before submitProof...");
+        let rt = tokio::runtime::Runtime::new()?;
+        rt.block_on(test_verifier_directly(
+            &job.rpc_url,
+            &job.vault_address,
+            &proof_result.seal_bytes,
+            &proof_result.journal_bytes,
+        ))?;
+    }
 
     // Submit proof on-chain
     #[cfg(feature = "onchain")]
@@ -340,6 +435,87 @@ async fn submit_proof_onchain(
         "[prove-worker] submitProof tx confirmed: {} (block {:?})",
         tx_hash, receipt.block_number
     );
+
+    Ok(())
+}
+
+/// Debug: call the verifier directly (not through OKV) to see the actual error.
+#[cfg(feature = "onchain")]
+async fn test_verifier_directly(
+    rpc_url: &str,
+    vault_address: &str,
+    seal_bytes: &[u8],
+    journal_bytes: &[u8],
+) -> anyhow::Result<()> {
+    use alloy::primitives::{Address, Bytes, FixedBytes};
+    use alloy::providers::ProviderBuilder;
+    use alloy::sol;
+    use std::str::FromStr;
+
+    sol! {
+        #[sol(rpc)]
+        interface IVaultReader {
+            function trustedImageId() external view returns (bytes32);
+            function verifier() external view returns (address);
+        }
+
+        #[sol(rpc)]
+        interface IRiscZeroVerifierDirect {
+            function verify(bytes calldata seal, bytes32 imageId, bytes32 journalDigest) external view;
+        }
+
+        #[sol(rpc)]
+        interface IRiscZeroSelectable {
+            function SELECTOR() external view returns (bytes4);
+        }
+    }
+
+    let vault = Address::from_str(vault_address)
+        .map_err(|_| anyhow::anyhow!("Invalid vault address"))?;
+    let url: reqwest::Url = rpc_url.parse()?;
+    let provider = ProviderBuilder::new().on_http(url);
+
+    // Read vault's trusted imageId and verifier address
+    let vault_reader = IVaultReader::new(vault, &provider);
+    let image_id = vault_reader.trustedImageId().call().await?._0;
+    let verifier_addr_raw = vault_reader.verifier().call().await?._0;
+
+    // The vault's verifier is a KernelExecutionVerifier, which wraps the RiscZeroGroth16Verifier
+    // Read the underlying RiscZero verifier address
+    let kev = IVaultReader::new(verifier_addr_raw, &provider);
+    let risc0_verifier_addr = kev.verifier().call().await?._0;
+
+    eprintln!("[prove-worker] DEBUG: imageId = 0x{}", hex::encode(image_id.as_slice()));
+    eprintln!("[prove-worker] DEBUG: KernelExecutionVerifier = 0x{}", hex::encode(verifier_addr_raw.as_slice()));
+    eprintln!("[prove-worker] DEBUG: RiscZeroVerifier = 0x{}", hex::encode(risc0_verifier_addr.as_slice()));
+
+    // Check selector
+    let selectable = IRiscZeroSelectable::new(risc0_verifier_addr, &provider);
+    let selector = selectable.SELECTOR().call().await?._0;
+    eprintln!("[prove-worker] DEBUG: On-chain SELECTOR = 0x{}", hex::encode(selector.as_slice()));
+    eprintln!("[prove-worker] DEBUG: Seal selector = 0x{}", hex::encode(&seal_bytes[..4]));
+
+    // Compute journal digest
+    let journal_digest = {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(journal_bytes);
+        let hash = hasher.finalize();
+        FixedBytes::<32>::from_slice(&hash)
+    };
+    eprintln!("[prove-worker] DEBUG: journalDigest = 0x{}", hex::encode(journal_digest.as_slice()));
+
+    // Call verifier directly (static call)
+    let verifier = IRiscZeroVerifierDirect::new(risc0_verifier_addr, &provider);
+    let seal = Bytes::copy_from_slice(seal_bytes);
+    match verifier.verify(seal, image_id, journal_digest).call().await {
+        Ok(_) => {
+            eprintln!("[prove-worker] DEBUG: Direct verifier call SUCCEEDED!");
+        }
+        Err(e) => {
+            eprintln!("[prove-worker] DEBUG: Direct verifier call FAILED: {:?}", e);
+        }
+    }
 
     Ok(())
 }
