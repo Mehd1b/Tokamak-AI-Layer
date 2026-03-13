@@ -1,17 +1,49 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useIsDeployedVault, useDeployedVaultsList } from '@/hooks/useVaultFactory';
 import { useCommentCounts } from '@/hooks/useCommentCounts';
 import { VaultCard } from '@/components/VaultCard';
 import Link from 'next/link';
 
+type SortKey = 'tvl' | 'balance' | 'newest' | 'oldest' | 'shares';
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'tvl', label: 'TVL' },
+  { key: 'balance', label: 'Balance' },
+  { key: 'newest', label: 'Newest' },
+  { key: 'oldest', label: 'Oldest' },
+  { key: 'shares', label: 'Shares' },
+];
+
 export default function VaultsPage() {
   const [searchAddress, setSearchAddress] = useState('');
+  const [sortBy, setSortBy] = useState<SortKey>('tvl');
   const { data: deployedVaults, isLoading: isLoadingVaults, error: vaultsError } = useDeployedVaultsList();
 
   const vaultAddresses = (deployedVaults ?? []).map((v) => v.address);
   const { data: commentCounts } = useCommentCounts(vaultAddresses);
+
+  const sortedVaults = useMemo(() => {
+    if (!deployedVaults || deployedVaults.length === 0) return deployedVaults;
+    const indexed = deployedVaults.map((v, i) => ({ ...v, _idx: i }));
+    return [...indexed].sort((a, b) => {
+      switch (sortBy) {
+        case 'tvl':
+          return a.totalValueLocked > b.totalValueLocked ? -1 : a.totalValueLocked < b.totalValueLocked ? 1 : 0;
+        case 'balance':
+          return a.totalAssets > b.totalAssets ? -1 : a.totalAssets < b.totalAssets ? 1 : 0;
+        case 'newest':
+          return b._idx - a._idx;
+        case 'oldest':
+          return a._idx - b._idx;
+        case 'shares':
+          return a.totalShares > b.totalShares ? -1 : a.totalShares < b.totalShares ? 1 : 0;
+        default:
+          return 0;
+      }
+    });
+  }, [deployedVaults, sortBy]);
 
   const vaultHex = searchAddress.startsWith('0x') && searchAddress.length === 42
     ? (searchAddress as `0x${string}`)
@@ -122,13 +154,31 @@ export default function VaultsPage() {
             </div>
           )}
 
-          {deployedVaults && deployedVaults.length > 0 && (
+          {sortedVaults && sortedVaults.length > 0 && (
             <div>
-              <h2 className="text-sm font-mono text-gray-500 uppercase tracking-wider mb-4">
-                Deployed Vaults ({deployedVaults.length} vault{deployedVaults.length !== 1 ? 's' : ''})
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-mono text-gray-500 uppercase tracking-wider">
+                  Deployed Vaults ({sortedVaults.length} vault{sortedVaults.length !== 1 ? 's' : ''})
+                </h2>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-500 mr-1">Sort:</span>
+                  {SORT_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.key}
+                      onClick={() => setSortBy(opt.key)}
+                      className={`px-2.5 py-1 rounded text-xs font-mono transition-colors ${
+                        sortBy === opt.key
+                          ? 'bg-[#A855F7]/20 text-[#A855F7] border border-[#A855F7]/30'
+                          : 'bg-white/5 text-gray-400 border border-white/10 hover:border-white/20 hover:text-gray-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {deployedVaults.map((v) => (
+                {sortedVaults.map((v) => (
                   <VaultCard
                     key={v.address}
                     address={v.address}
@@ -149,7 +199,7 @@ export default function VaultsPage() {
             </div>
           )}
 
-          {deployedVaults && deployedVaults.length === 0 && (
+          {sortedVaults && sortedVaults.length === 0 && (
             <div className="card text-center py-16">
               <div className="mb-4">
                 <svg viewBox="0 0 64 64" className="w-16 h-16 mx-auto opacity-30" fill="none">
