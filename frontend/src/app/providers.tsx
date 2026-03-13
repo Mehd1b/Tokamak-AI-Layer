@@ -28,7 +28,7 @@ const config = createConfig({
   chains: [mainnet, hyperEvmMainnet, sepolia, hyperEvmTestnet, thanosSepolia],
   transports: {
     [mainnet.id]: http(process.env.NEXT_PUBLIC_MAINNET_RPC_URL),
-    [hyperEvmMainnet.id]: http(process.env.NEXT_PUBLIC_HYPER_MAINNET_RPC_URL || 'https://rpc.hyperliquid.xyz/evm'),
+    [hyperEvmMainnet.id]: http(process.env.NEXT_PUBLIC_HYPER_MAINNET_RPC_URL),
     [sepolia.id]: http(process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL),
     [hyperEvmTestnet.id]: http('https://rpc.hyperliquid-testnet.xyz/evm'),
     [thanosSepolia.id]: http('https://rpc.thanos-sepolia.tokamak.network'),

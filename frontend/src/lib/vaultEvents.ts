@@ -13,7 +13,7 @@ const PARALLEL_BATCH_SIZE = 10;
  * support eth_getLogs reliably. Used as fallback for event fetching.
  */
 const NATIVE_RPC_URLS: Record<number, string> = {
-  [hyperEvmMainnet.id]: 'https://rpc.hyperliquid.xyz/evm',
+  [hyperEvmMainnet.id]: process.env.NEXT_PUBLIC_HYPER_MAINNET_RPC_URL || '',
   [hyperEvmTestnet.id]: 'https://rpc.hyperliquid-testnet.xyz/evm',
 };
 

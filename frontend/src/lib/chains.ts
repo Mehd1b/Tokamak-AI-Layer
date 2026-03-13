@@ -22,7 +22,7 @@ export const hyperEvmMainnet = defineChain({
   id: 999,
   name: 'HyperEVM',
   nativeCurrency: { name: 'HYPE', symbol: 'HYPE', decimals: 18 },
-  rpcUrls: { default: { http: ['https://rpc.hyperliquid.xyz/evm'] } },
+  rpcUrls: { default: { http: [process.env.NEXT_PUBLIC_HYPER_MAINNET_RPC_URL || ''] } },
   blockExplorers: { default: { name: 'HyperEVM Explorer', url: 'https://hyperevmscan.io' } },
   contracts: {
     multicall3: {
