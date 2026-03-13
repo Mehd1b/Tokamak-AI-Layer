@@ -23,6 +23,7 @@ export interface VaultInfo {
   assetSymbol: string;
   isOptimistic?: boolean;
   pendingCount?: number;
+  protocolType?: number;
 }
 
 export function useIsDeployedVault(vaultAddress: `0x${string}` | undefined) {
@@ -160,6 +161,16 @@ export function useDeployedVaultsList() {
         let optimisticResults: any[] = [];
         try { optimisticResults = await batchedMulticall(client, optimisticCalls); } catch {}
 
+        // Fetch protocol types from factory
+        const protocolTypeCalls = vaultAddresses.map((vaultAddress) => ({
+          address: contracts.vaultFactory,
+          abi: VaultFactoryABI,
+          functionName: 'vaultProtocolType' as const,
+          args: [vaultAddress] as const,
+        }));
+        let protocolTypeResults: any[] = [];
+        try { protocolTypeResults = await batchedMulticall(client, protocolTypeCalls); } catch {}
+
         return vaultAddresses.map((vaultAddress, i) => {
           const base = i * 4;
           const agentId = results[base]?.result as string ?? '0x';
@@ -179,7 +190,11 @@ export function useDeployedVaultsList() {
             ? Number(optimisticResults[i * 2 + 1].result)
             : 0;
 
-          return { address: vaultAddress, agentId, asset, totalAssets, totalShares, totalValueLocked, assetDecimals, assetSymbol, isOptimistic, pendingCount };
+          const protocolType = protocolTypeResults[i]?.status === 'success'
+            ? Number(protocolTypeResults[i].result)
+            : 0;
+
+          return { address: vaultAddress, agentId, asset, totalAssets, totalShares, totalValueLocked, assetDecimals, assetSymbol, isOptimistic, pendingCount, protocolType };
         });
       } catch {
         // Fallback: sequential individual reads (for RPCs with strict limits)

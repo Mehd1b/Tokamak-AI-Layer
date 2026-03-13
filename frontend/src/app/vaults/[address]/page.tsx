@@ -5,12 +5,15 @@ import { useAccount } from 'wagmi';
 import { useVaultInfo, useVaultShares } from '@/hooks/useKernelVault';
 import { useVaultHistory } from '@/hooks/useVaultHistory';
 import { useVaultExecutions } from '@/hooks/useVaultExecutions';
+import { useVaultProtocolType } from '@/hooks/useVaultProtocolType';
 import { VaultDepositForm } from '@/components/VaultDepositForm';
 import { VaultWithdrawForm } from '@/components/VaultWithdrawForm';
 import { VaultChart } from '@/components/VaultChart';
 import { ExecutionSubmitForm } from '@/components/ExecutionSubmitForm';
 import { ExecutionHistoryTable } from '@/components/ExecutionHistoryTable';
 import { OptimisticStatusCard } from '@/components/OptimisticStatusCard';
+import { ProtocolPositionSection } from '@/components/ProtocolPositionSection';
+import { protocolLabel, protocolColor, PROTOCOL_TYPE } from '@/lib/protocolTypes';
 import { formatBytes32, formatEther, timestampToDate, truncateAddress } from '@/lib/utils';
 import { useNetwork } from '@/lib/NetworkContext';
 import { NetworkBadge } from '@/components/NetworkLogo';
@@ -24,6 +27,7 @@ export default function VaultDetailPage() {
 
   const { explorerUrl } = useNetwork();
   const vault = useVaultInfo(vaultAddress);
+  const protocolType = useVaultProtocolType(vaultAddress);
   const { data: userShares } = useVaultShares(vaultAddress, userAddress);
   const { tvl, pps, isLoading: historyLoading } = useVaultHistory(vaultAddress, vault.assetDecimals);
   const { executions, isLoading: executionsLoading } = useVaultExecutions(vaultAddress);
@@ -83,6 +87,14 @@ export default function VaultDetailPage() {
                       Optimistic Vault
                     </span>
                   )}
+                  {protocolType !== PROTOCOL_TYPE.GENERIC && (() => {
+                    const colors = protocolColor(protocolType);
+                    return (
+                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text} ${colors.border}`}>
+                        {protocolLabel(protocolType)}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -151,6 +163,9 @@ export default function VaultDetailPage() {
               bondManagerAddress={vault.bondManagerAddress}
             />
           )}
+
+          {/* Protocol-specific positions */}
+          <ProtocolPositionSection vaultAddress={vaultAddress} protocolType={protocolType} />
 
           {/* Key Stats Bar */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">

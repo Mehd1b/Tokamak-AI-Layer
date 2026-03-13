@@ -132,8 +132,22 @@ interface IVaultFactory {
     /// @param agentId The agent ID the vault is bound to
     function registerExternalVault(address vault, bytes32 agentId) external;
 
+    /// @notice Get the protocol type for a vault
+    /// @param vault The vault address
+    /// @return The protocol type (0=Generic, 1=Hyperliquid, 2=Polymarket)
+    function vaultProtocolType(address vault) external view returns (uint8);
+
+    /// @notice Set the protocol type for a vault
+    /// @dev Only callable by the vault owner or factory owner
+    /// @param vault The vault address (must be deployed by this factory)
+    /// @param protocolType The protocol type to set
+    function setVaultProtocolType(address vault, uint8 protocolType) external;
+
     /// @notice Emitted when an external vault is registered
     event ExternalVaultRegistered(address indexed vault, bytes32 indexed agentId);
+
+    /// @notice Emitted when a vault's protocol type is set
+    event VaultProtocolTypeSet(address indexed vault, uint8 protocolType);
 
     /// @notice Agent not registered in the registry
     error AgentNotRegistered(bytes32 agentId);

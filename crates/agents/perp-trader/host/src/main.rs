@@ -2398,11 +2398,47 @@ async fn submit_optimistic_execution(
         execution_nonce, bond
     );
 
-    let tx = contract
-        .executeOptimistic(journal, output, oracle_sig, oracle_timestamp, bond, bond_att)
-        .send()
-        .await
-        .map_err(|e| anyhow::anyhow!("executeOptimistic tx failed: {}", e))?;
+    // Set explicit gas limit to avoid eth_feeHistory/eth_estimateGas RPC calls
+    // that can fail with "invalid block range" on HyperEVM (1000-block range limit).
+    let mut last_err = None;
+    let mut tx_pending = None;
+    for attempt in 1..=3u32 {
+        let call = contract
+            .executeOptimistic(
+                journal.clone(),
+                output.clone(),
+                oracle_sig.clone(),
+                oracle_timestamp,
+                bond,
+                bond_att.clone(),
+            )
+            .gas(3_000_000u64);
+
+        match call.send().await {
+            Ok(pending) => {
+                tx_pending = Some(pending);
+                break;
+            }
+            Err(e) => {
+                let err_str = format!("{}", e);
+                eprintln!(
+                    "[optimistic] executeOptimistic attempt {}/3 failed: {}",
+                    attempt, err_str
+                );
+                last_err = Some(err_str);
+                if attempt < 3 {
+                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                }
+            }
+        }
+    }
+
+    let tx = tx_pending.ok_or_else(|| {
+        anyhow::anyhow!(
+            "executeOptimistic tx failed after 3 attempts: {}",
+            last_err.unwrap_or_default()
+        )
+    })?;
 
     let receipt = tx
         .get_receipt()

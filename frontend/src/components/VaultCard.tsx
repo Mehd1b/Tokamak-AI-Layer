@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { truncateAddress, truncateBytes32, formatEther } from '@/lib/utils';
 import { NetworkBadge } from '@/components/NetworkLogo';
+import { protocolLabel, protocolColor, PROTOCOL_TYPE, type ProtocolType } from '@/lib/protocolTypes';
 
 interface VaultCardProps {
   address: string;
@@ -16,9 +17,10 @@ interface VaultCardProps {
   commentCount?: number;
   isOptimistic?: boolean;
   pendingCount?: number;
+  protocolType?: number;
 }
 
-export function VaultCard({ address, agentId, asset, totalAssets, totalShares, totalValueLocked, assetDecimals, assetSymbol, commentCount, isOptimistic, pendingCount }: VaultCardProps) {
+export function VaultCard({ address, agentId, asset, totalAssets, totalShares, totalValueLocked, assetDecimals, assetSymbol, commentCount, isOptimistic, pendingCount, protocolType = 0 }: VaultCardProps) {
   return (
     <Link href={`/vaults/${address}`}>
       <div className="card-hover cursor-pointer group">
@@ -43,6 +45,14 @@ export function VaultCard({ address, agentId, asset, totalAssets, totalShares, t
             ) : (
               <span className="badge-info">Vault</span>
             )}
+            {protocolType !== PROTOCOL_TYPE.GENERIC && (() => {
+              const colors = protocolColor(protocolType as ProtocolType);
+              return (
+                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text} ${colors.border}`}>
+                  {protocolLabel(protocolType as ProtocolType)}
+                </span>
+              );
+            })()}
           </div>
         </div>
 

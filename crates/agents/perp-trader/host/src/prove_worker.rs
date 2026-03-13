@@ -206,6 +206,48 @@ fn process_proof_job(job: &PendingProof, status: &WorkerStatus) -> anyhow::Resul
     let nonce = job.execution_nonce;
     status.currently_proving.store(nonce, Ordering::Relaxed);
 
+    // Check if execution is already finalized on-chain (skip redundant proving)
+    #[cfg(feature = "onchain")]
+    {
+        if let Ok(on_chain_status) = check_execution_status(&job.rpc_url, &job.vault_address, nonce)
+        {
+            // 0=empty, 1=pending, 2=finalized, 3=slashed
+            if on_chain_status != 1 {
+                eprintln!(
+                    "[prove-worker] Nonce {} already resolved on-chain (status={}). Skipping proof.",
+                    nonce, on_chain_status
+                );
+                // If finalized, also try to release the L1 bond
+                if on_chain_status == 2 {
+                    if let (Some(l1_rpc), Some(bond_mgr)) = (&job.l1_rpc, &job.bond_manager) {
+                        eprintln!(
+                            "[prove-worker] Attempting L1 bond release for already-finalized nonce {}...",
+                            nonce
+                        );
+                        let rt = tokio::runtime::Runtime::new()?;
+                        match rt.block_on(crate::onchain::release_bond_on_l1(
+                            l1_rpc,
+                            bond_mgr,
+                            &job.private_key,
+                            &job.vault_address,
+                            nonce,
+                        )) {
+                            Ok(()) => eprintln!(
+                                "[prove-worker] Bond released on L1 for nonce {}.",
+                                nonce
+                            ),
+                            Err(e) => eprintln!(
+                                "[prove-worker] Bond release failed for nonce {} (may already be released): {}",
+                                nonce, e
+                            ),
+                        }
+                    }
+                }
+                return Ok(());
+            }
+        }
+    }
+
     // Check deadline proximity
     let now = Instant::now();
     if now >= job.deadline {
@@ -558,4 +600,33 @@ async fn test_verifier_directly(
     }
 
     Ok(())
+}
+
+/// Check the on-chain status of a pending execution (0=empty, 1=pending, 2=finalized, 3=slashed).
+#[cfg(feature = "onchain")]
+fn check_execution_status(rpc_url: &str, vault_address: &str, nonce: u64) -> anyhow::Result<u8> {
+    use alloy::primitives::Address;
+    use alloy::providers::ProviderBuilder;
+    use alloy::sol;
+    use std::str::FromStr;
+
+    sol! {
+        #[sol(rpc)]
+        interface IVaultStatus {
+            function getPendingExecution(uint64 nonce) external view returns (bytes32, bytes32, uint256, uint256, uint8);
+        }
+    }
+
+    let vault = Address::from_str(vault_address)
+        .map_err(|_| anyhow::anyhow!("Invalid vault address"))?;
+    let url: reqwest::Url = rpc_url.parse()?;
+    let provider = ProviderBuilder::new().on_http(url);
+
+    let rt = tokio::runtime::Runtime::new()?;
+    let result = rt.block_on(async {
+        let contract = IVaultStatus::new(vault, &provider);
+        contract.getPendingExecution(nonce).call().await
+    })?;
+
+    Ok(result._4)
 }

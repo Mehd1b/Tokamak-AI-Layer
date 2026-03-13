@@ -24,7 +24,7 @@ fi
 # ── Configuration (override via env) ─────────────────────────────────────────
 # Optimistic KernelVault (OKV) on HyperEVM mainnet
 VAULT="${VAULT:-0x90bdcc34907e7a387e394f10179cf3328e5b0d82}"
-RPC="${RPC:-https://rpc.hyperliquid.xyz/evm}"
+RPC="${RPC:-${RPC_URL_HYPER_MAINNET:-https://rpc.hyperliquid.xyz/evm}}"
 PK="${PK:-env:PRIVATE_KEY}"
 ORACLE="${ORACLE:-env:ORACLE_KEY}"
 BUNDLE="${BUNDLE:-${EK_ROOT}/crates/agents/perp-trader/bundle}"

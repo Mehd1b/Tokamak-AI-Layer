@@ -38,8 +38,11 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     /// @notice Contract whose runtime bytecode is OptimisticKernelVault creation code
     address public _optimisticVaultCreationCodeStore;
 
+    /// @notice Protocol type for each vault (0=Generic, 1=Hyperliquid, 2=Polymarket)
+    mapping(address => uint8) public _vaultProtocolType;
+
     /// @notice Storage gap for future upgrades
-    uint256[43] private __gap;
+    uint256[42] private __gap;
 
     // ============ Errors ============
 
@@ -316,6 +319,26 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         );
 
         return (vault, salt);
+    }
+
+    /// @inheritdoc IVaultFactory
+    function vaultProtocolType(address vault) external view returns (uint8) {
+        return _vaultProtocolType[vault];
+    }
+
+    /// @inheritdoc IVaultFactory
+    function setVaultProtocolType(address vault, uint8 protocolType) external {
+        require(isDeployedVault[vault], "vault not deployed");
+        // Allow factory owner or vault owner to set protocol type
+        if (msg.sender != _owner) {
+            // Check if caller is the vault owner
+            (bool success, bytes memory data) = vault.staticcall(abi.encodeWithSignature("owner()"));
+            require(success && data.length >= 32, "cannot read vault owner");
+            address vaultOwner = abi.decode(data, (address));
+            require(msg.sender == vaultOwner, "not vault or factory owner");
+        }
+        _vaultProtocolType[vault] = protocolType;
+        emit VaultProtocolTypeSet(vault, protocolType);
     }
 
     /// @inheritdoc IVaultFactory

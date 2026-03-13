@@ -142,6 +142,7 @@ export default function VaultsPage() {
                     commentCount={commentCounts?.[v.address.toLowerCase()]}
                     isOptimistic={v.isOptimistic}
                     pendingCount={v.pendingCount}
+                    protocolType={v.protocolType}
                   />
                 ))}
               </div>
