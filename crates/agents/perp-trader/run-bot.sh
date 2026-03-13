@@ -58,12 +58,17 @@ HYPE_TOPUP="${HYPE_TOPUP:-10000000000000000}"
 ORACLE_URL="${ORACLE_URL:-https://oracle-service-production-bf63.up.railway.app}"
 CHALLENGE_WINDOW="${CHALLENGE_WINDOW:-3600}"
 
+# L1 bond management (auto-lock WSTON before each optimistic execution)
+L1_RPC="${L1_RPC:-${RPC_URL_MAINNET:-https://eth.llamarpc.com}}"
+BOND_MANAGER="${BOND_MANAGER:-0xF2045A808F96Ca8E7BB6E78A04d635690dfB07e4}"
+WSTON="${WSTON:-0x26C8F112769fb3A3A8de267CfFf60E9f317445e5}"
+
 STATE_FILE="${STATE_FILE:-/tmp/perp-trader-mainnet-state.json}"
 POSITION_TIMEOUT="${POSITION_TIMEOUT:-1800}"
 
 # ── Resolve sub-account ──────────────────────────────────────────────────────
 echo "Resolving sub-account for vault ${VAULT}..."
-SUB_ACCOUNT=$(cast call "$ADAPTER" "getSubAccount(address)(address)" "$VAULT" --rpc-url "$RPC" 2>/dev/null | tr -d '[]' | xargs)
+SUB_ACCOUNT=$(cast call "$ADAPTER" "getSubAccount(address)(address)" "$VAULT" --rpc-url "$RPC" 2>/dev/null | tr -d '[]' | xargs) || true
 
 if [[ -z "$SUB_ACCOUNT" || "$SUB_ACCOUNT" == "0x0000000000000000000000000000000000000000" ]]; then
   echo "ERROR: Could not resolve sub-account. Is the vault registered on the adapter?"
@@ -90,6 +95,7 @@ echo "  Vault:       ${VAULT:0:10}...${VAULT: -4}"
 echo "  Sub-acct:    ${SUB_ACCOUNT:0:10}...${SUB_ACCOUNT: -4}"
 echo "  Adapter:     ${ADAPTER:0:10}...${ADAPTER: -4}"
 echo "  Oracle:      ${ORACLE_URL}"
+echo "  BondMgr:     ${BOND_MANAGER:0:10}...${BOND_MANAGER: -4}"
 echo "  Retry:       ${MONITOR_INTERVAL}s  |  Max hold: ${MAX_HOLD}s"
 echo "  SL: ${STOP_LOSS_BPS}bps  |  TP: ${TAKE_PROFIT_BPS}bps"
 echo "================================================"
@@ -124,5 +130,8 @@ exec "$BINARY" \
   --optimistic \
   --oracle-url "$ORACLE_URL" \
   --challenge-window "$CHALLENGE_WINDOW" \
+  --l1-rpc "$L1_RPC" \
+  --bond-manager "$BOND_MANAGER" \
+  --wston-address "$WSTON" \
   --max-hold-secs "$MAX_HOLD" \
   --monitor-interval "$MONITOR_INTERVAL"

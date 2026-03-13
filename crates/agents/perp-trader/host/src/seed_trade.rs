@@ -274,8 +274,8 @@ pub fn execute_close_trade(
         price_rounded,
     );
 
-    let child = std::process::Command::new("python3")
-        .arg(&script_path)
+    let mut cmd = std::process::Command::new("python3");
+    cmd.arg(&script_path)
         .arg("close_position")
         .arg("--key")
         .arg(&api_key)
@@ -288,7 +288,8 @@ pub fn execute_close_trade(
         .arg("--size")
         .arg(format!("{:.width$}", size, width = cli.sz_decimals as usize))
         .arg("--price")
-        .arg(format!("{:.0}", price_rounded))
+        .arg(format!("{:.0}", price_rounded));
+    let child = cmd
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::inherit())
         .spawn()

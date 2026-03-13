@@ -34,7 +34,7 @@ export interface ExecutionEvent {
   transactionHash?: string;
   blockNumber?: string;
   timestamp?: number;
-  optimisticStatus?: 'proven' | 'pending' | 'finalized' | 'slashed';
+  optimisticStatus?: 'pending' | 'finalized' | 'slashed';
 }
 
 /**
@@ -57,7 +57,7 @@ async function fetchViaExplorer(
   return logs.executions.reverse().map((log) => {
     const nonce = String(log.args.executionNonce ?? '0');
 
-    let optimisticStatus: ExecutionEvent['optimisticStatus'] = 'proven';
+    let optimisticStatus: ExecutionEvent['optimisticStatus'] = 'finalized';
     if (optimisticNonces.has(nonce)) {
       if (proofNonces.has(nonce)) optimisticStatus = 'finalized';
       else if (slashNonces.has(nonce)) optimisticStatus = 'slashed';
@@ -145,7 +145,7 @@ async function fetchViaRpc(
   return execLogs.reverse().map((log: any) => {
     const nonce = String(log.args?.executionNonce ?? '0');
 
-    let optimisticStatus: ExecutionEvent['optimisticStatus'] = 'proven';
+    let optimisticStatus: ExecutionEvent['optimisticStatus'] = 'finalized';
     if (optimisticNonces.has(nonce)) {
       if (proofNonces.has(nonce)) optimisticStatus = 'finalized';
       else if (slashNonces.has(nonce)) optimisticStatus = 'slashed';

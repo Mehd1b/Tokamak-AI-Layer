@@ -458,21 +458,40 @@ pub async fn recover_funds_to_vault(
         }
     }
 
-    // Step 3: Withdraw from sub-account EVM to vault
+    // Step 3: Withdraw from sub-account EVM to vault (retry up to 3 times for transient RPC errors)
     let evm_balance = usdc_contract.balanceOf(sub).call().await
         .map_err(|e| Error::OnChain(format!("balanceOf failed: {}", e)))?._0;
     if !evm_balance.is_zero() {
         eprintln!("  [RECOVER] Step 3: withdrawToVault({} raw USDC)...", evm_balance);
-        let tx = contract.withdrawToVaultAdmin(vault).send().await
-            .map_err(|e| Error::OnChain(format!("withdrawToVault tx failed: {}", e)))?;
-        let receipt = tx.get_receipt().await
-            .map_err(|e| Error::OnChain(format!("withdrawToVault receipt failed: {}", e)))?;
-        if !receipt.status() {
-            return Err(Error::OnChain("withdrawToVault transaction reverted".into()));
+        let mut last_err = None;
+        for attempt in 1..=3 {
+            match contract.withdrawToVaultAdmin(vault).send().await {
+                Ok(tx) => {
+                    match tx.get_receipt().await {
+                        Ok(receipt) if receipt.status() => {
+                            let recovered: u64 = evm_balance.try_into().unwrap_or(0);
+                            eprintln!("  [RECOVER] Recovered {} USDC (${:.2}) to vault", recovered, recovered as f64 / 1e6);
+                            return Ok(recovered);
+                        }
+                        Ok(_receipt) => {
+                            last_err = Some("withdrawToVault transaction reverted".to_string());
+                            break; // Revert is not transient
+                        }
+                        Err(e) => {
+                            last_err = Some(format!("withdrawToVault receipt failed: {}", e));
+                        }
+                    }
+                }
+                Err(e) => {
+                    last_err = Some(format!("withdrawToVault tx failed: {}", e));
+                }
+            }
+            if attempt < 3 {
+                eprintln!("  [RECOVER] Step 3 attempt {} failed, retrying in 5s...", attempt);
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            }
         }
-        let recovered: u64 = evm_balance.try_into().unwrap_or(0);
-        eprintln!("  [RECOVER] Recovered {} USDC (${:.2}) to vault", recovered, recovered as f64 / 1e6);
-        return Ok(recovered);
+        return Err(Error::OnChain(last_err.unwrap_or_else(|| "withdrawToVault failed".into())));
     }
 
     Ok(0)
@@ -799,6 +818,337 @@ pub async fn self_slash(
         "[self-slash] selfSlash tx confirmed: {} (nonce {})",
         tx_hash, execution_nonce
     );
+
+    Ok(())
+}
+
+/// Lock a WSTON bond on Ethereum L1 before optimistic execution.
+///
+/// 1. Checks operator's WSTON balance on L1
+/// 2. Approves WSTONBondManager to spend WSTON (if needed)
+/// 3. Calls lockBondDirect(vault, nonce, amount)
+///
+/// Returns Ok(()) on success or if bond already exists for this nonce.
+#[cfg(feature = "onchain")]
+pub async fn lock_bond_on_l1(
+    cli: &crate::config::Cli,
+    vault_address: &str,
+    execution_nonce: u64,
+    bond_amount_u256: &str,
+) -> Result<()> {
+    use alloy::network::EthereumWallet;
+    use alloy::primitives::{Address, U256};
+    use alloy::providers::ProviderBuilder;
+    use alloy::signers::local::PrivateKeySigner;
+    use alloy::sol;
+    use std::str::FromStr;
+
+    sol! {
+        #[sol(rpc)]
+        interface IERC20 {
+            function balanceOf(address account) external view returns (uint256);
+            function allowance(address owner, address spender) external view returns (uint256);
+            function approve(address spender, uint256 amount) external returns (bool);
+        }
+
+        #[sol(rpc)]
+        interface IBondManager {
+            function lockBondDirect(address vault, uint64 nonce, uint256 amount) external;
+
+            struct BondInfo {
+                uint256 amount;
+                uint256 lockedAt;
+                uint8 status; // 0=Empty, 1=Locked, 2=Released, 3=Slashed
+            }
+            function bonds(address operator, address vault, uint64 nonce) external view returns (BondInfo);
+        }
+    }
+
+    let l1_rpc = cli.l1_rpc.as_deref()
+        .ok_or_else(|| Error::Config("--l1-rpc is required for auto bond locking".into()))?;
+    let bond_manager_addr = cli.bond_manager.as_deref()
+        .ok_or_else(|| Error::Config("--bond-manager is required for auto bond locking".into()))?;
+    let wston_addr = cli.wston_address.as_deref()
+        .ok_or_else(|| Error::Config("--wston-address is required for auto bond locking".into()))?;
+
+    let url: reqwest::Url = l1_rpc.parse()
+        .map_err(|_| Error::Config(format!("Invalid L1 RPC URL: {}", l1_rpc)))?;
+
+    let pk = crate::config::Cli::resolve_key(&cli.pk)?;
+    let pk_clean = pk.strip_prefix("0x").unwrap_or(&pk);
+    let signer: PrivateKeySigner = pk_clean.parse()
+        .map_err(|_| Error::OnChain("Invalid private key for L1 bond".into()))?;
+    let operator = signer.address();
+
+    let wallet = EthereumWallet::from(signer);
+    let provider = ProviderBuilder::new()
+        .with_recommended_fillers()
+        .wallet(wallet)
+        .on_http(url.clone());
+    let read_provider = ProviderBuilder::new().on_http(url);
+
+    let vault = Address::from_str(vault_address)
+        .map_err(|_| Error::OnChain(format!("Invalid vault address: {}", vault_address)))?;
+    let bm = Address::from_str(bond_manager_addr)
+        .map_err(|_| Error::OnChain(format!("Invalid bond manager address: {}", bond_manager_addr)))?;
+    let wston = Address::from_str(wston_addr)
+        .map_err(|_| Error::OnChain(format!("Invalid WSTON address: {}", wston_addr)))?;
+
+    let amount = U256::from_str(bond_amount_u256)
+        .map_err(|_| Error::OnChain(format!("Invalid bond amount: {}", bond_amount_u256)))?;
+
+    let bm_contract = IBondManager::new(bm, &provider);
+    let wston_contract = IERC20::new(wston, &provider);
+    let wston_read = IERC20::new(wston, &read_provider);
+
+    // Check if bond already locked for this nonce
+    let existing = bm_contract.bonds(operator, vault, execution_nonce).call().await
+        .map_err(|e| Error::OnChain(format!("Failed to query bond status: {}", e)))?;
+    if existing._0.status != 0 {
+        eprintln!(
+            "[L1-BOND] Bond already exists for nonce {} (status={}). Skipping lock.",
+            execution_nonce, existing._0.status
+        );
+        return Ok(());
+    }
+
+    // Check WSTON balance
+    let balance = wston_read.balanceOf(operator).call().await
+        .map_err(|e| Error::OnChain(format!("Failed to read WSTON balance: {}", e)))?._0;
+
+    if balance < amount {
+        return Err(Error::OnChain(format!(
+            "Insufficient WSTON balance: have {}, need {}",
+            balance, amount
+        )));
+    }
+    eprintln!(
+        "[L1-BOND] WSTON balance: {} (need {})",
+        balance, amount
+    );
+
+    // Check and set approval if needed
+    let allowance = wston_read.allowance(operator, bm).call().await
+        .map_err(|e| Error::OnChain(format!("Failed to read WSTON allowance: {}", e)))?._0;
+
+    if allowance < amount {
+        eprintln!("[L1-BOND] Approving WSTONBondManager to spend WSTON...");
+        let approve_tx = wston_contract.approve(bm, U256::MAX).send().await
+            .map_err(|e| Error::OnChain(format!("WSTON approve tx failed: {}", e)))?;
+        let approve_receipt = approve_tx.get_receipt().await
+            .map_err(|e| Error::OnChain(format!("WSTON approve receipt failed: {}", e)))?;
+        if !approve_receipt.status() {
+            return Err(Error::OnChain("WSTON approve transaction reverted".into()));
+        }
+        eprintln!("[L1-BOND] WSTON approved.");
+    }
+
+    // Lock bond (retry up to 3 times for transient RPC errors)
+    eprintln!(
+        "[L1-BOND] Locking bond: nonce={}, amount={}, vault={}",
+        execution_nonce, amount, vault
+    );
+    let mut last_err = String::new();
+    for attempt in 1..=3u32 {
+        match bm_contract.lockBondDirect(vault, execution_nonce, amount).send().await {
+            Ok(pending_tx) => {
+                match pending_tx.get_receipt().await {
+                    Ok(receipt) if receipt.status() => {
+                        let tx_hash = format!("0x{}", hex::encode(receipt.transaction_hash.as_slice()));
+                        eprintln!(
+                            "[L1-BOND] Bond locked on L1: {} (nonce={})",
+                            tx_hash, execution_nonce
+                        );
+                        return Ok(());
+                    }
+                    Ok(_) => {
+                        return Err(Error::OnChain(format!(
+                            "lockBondDirect reverted for nonce {}",
+                            execution_nonce
+                        )));
+                    }
+                    Err(e) => {
+                        last_err = format!("lockBondDirect receipt failed: {}", e);
+                    }
+                }
+            }
+            Err(e) => {
+                last_err = format!("lockBondDirect tx failed: {}", e);
+            }
+        }
+        if attempt < 3 {
+            eprintln!(
+                "[L1-BOND] Attempt {}/3 failed: {}. Retrying in 10s...",
+                attempt, last_err
+            );
+            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+
+            // Re-check if bond was actually locked (tx may have succeeded despite receipt timeout)
+            if let Ok(existing) = bm_contract.bonds(operator, vault, execution_nonce).call().await {
+                if existing._0.status == 1 {
+                    eprintln!("[L1-BOND] Bond was actually locked (receipt lost). Continuing.");
+                    return Ok(());
+                }
+            }
+        }
+    }
+
+    Err(Error::OnChain(last_err))
+}
+
+/// Release a WSTON bond on Ethereum L1 after proof submission.
+///
+/// Calls `WSTONBondManager.releaseBondByRelayer(operator, vault, nonce)`.
+/// The operator wallet must be the trusted relayer on the bond manager.
+#[cfg(feature = "onchain")]
+pub async fn release_bond_on_l1(
+    l1_rpc: &str,
+    bond_manager_addr: &str,
+    private_key: &str,
+    vault_address: &str,
+    execution_nonce: u64,
+) -> Result<()> {
+    use alloy::network::EthereumWallet;
+    use alloy::primitives::Address;
+    use alloy::providers::ProviderBuilder;
+    use alloy::signers::local::PrivateKeySigner;
+    use alloy::sol;
+    use std::str::FromStr;
+
+    sol! {
+        #[sol(rpc)]
+        interface IBondManager {
+            struct BondInfo {
+                uint256 amount;
+                uint256 lockedAt;
+                uint8 status; // 0=Empty, 1=Locked, 2=Released, 3=Slashed
+            }
+            function bonds(address operator, address vault, uint64 nonce) external view returns (BondInfo);
+            function releaseBondByRelayer(address operator, address vault, uint64 nonce) external;
+        }
+    }
+
+    let url: reqwest::Url = l1_rpc.parse()
+        .map_err(|_| Error::Config(format!("Invalid L1 RPC URL: {}", l1_rpc)))?;
+
+    let pk_clean = private_key.strip_prefix("0x").unwrap_or(private_key);
+    let signer: PrivateKeySigner = pk_clean.parse()
+        .map_err(|_| Error::OnChain("Invalid private key for bond release".into()))?;
+    let operator = signer.address();
+
+    let wallet = EthereumWallet::from(signer);
+    let provider = ProviderBuilder::new()
+        .with_recommended_fillers()
+        .wallet(wallet)
+        .on_http(url);
+
+    let bm = Address::from_str(bond_manager_addr)
+        .map_err(|_| Error::OnChain(format!("Invalid bond manager address: {}", bond_manager_addr)))?;
+    let vault = Address::from_str(vault_address)
+        .map_err(|_| Error::OnChain(format!("Invalid vault address: {}", vault_address)))?;
+
+    let contract = IBondManager::new(bm, &provider);
+
+    // Check bond status — skip if not locked
+    let bond = contract.bonds(operator, vault, execution_nonce).call().await
+        .map_err(|e| Error::OnChain(format!("Failed to query bond status: {}", e)))?;
+    if bond._0.status != 1 {
+        eprintln!(
+            "[L1-BOND] Bond for nonce {} not locked (status={}). Skipping release.",
+            execution_nonce, bond._0.status
+        );
+        return Ok(());
+    }
+
+    // Release bond
+    let tx = contract.releaseBondByRelayer(operator, vault, execution_nonce).send().await
+        .map_err(|e| Error::OnChain(format!("releaseBondByRelayer tx failed: {}", e)))?;
+    let receipt = tx.get_receipt().await
+        .map_err(|e| Error::OnChain(format!("releaseBondByRelayer receipt failed: {}", e)))?;
+
+    if !receipt.status() {
+        return Err(Error::OnChain(format!(
+            "releaseBondByRelayer reverted for nonce {}", execution_nonce
+        )));
+    }
+
+    let tx_hash = format!("0x{}", hex::encode(receipt.transaction_hash.as_slice()));
+    eprintln!(
+        "[L1-BOND] Bond released on L1: {} (nonce={})",
+        tx_hash, execution_nonce
+    );
+
+    Ok(())
+}
+
+/// Close an existing position via the adapter's `closePositionAtPriceAdmin()`.
+///
+/// This uses CoreWriter directly (no API wallet needed). The vault owner calls the
+/// adapter which routes the close order through the sub-account's CoreWriter.
+///
+/// `close_price_1e8` is the limit price in 1e8 units (e.g., 72000_00000000 for $72000).
+/// Should be within the oracle price band (~3-5% from mark).
+#[cfg(feature = "onchain")]
+pub async fn close_position_admin(cli: &crate::config::Cli, close_price_1e8: u64) -> Result<()> {
+    use alloy::network::EthereumWallet;
+    use alloy::primitives::Address;
+    use alloy::providers::ProviderBuilder;
+    use alloy::signers::local::PrivateKeySigner;
+    use alloy::sol;
+    use std::str::FromStr;
+
+    sol! {
+        #[sol(rpc)]
+        interface IAdapter {
+            function closePositionAtPriceAdmin(address vault, uint64 px) external;
+        }
+    }
+
+    let adapter_addr_str = cli
+        .adapter_address
+        .as_deref()
+        .unwrap_or(&cli.exchange_contract);
+    let adapter = Address::from_str(adapter_addr_str)
+        .map_err(|_| Error::OnChain(format!("Invalid adapter address: {}", adapter_addr_str)))?;
+    let vault = Address::from_str(&cli.vault)
+        .map_err(|_| Error::OnChain(format!("Invalid vault address: {}", cli.vault)))?;
+
+    let url: reqwest::Url = cli
+        .rpc
+        .parse()
+        .map_err(|_| Error::OnChain(format!("Invalid RPC URL: {}", cli.rpc)))?;
+
+    let pk = crate::config::Cli::resolve_key(&cli.pk)?;
+    let pk_clean = pk.strip_prefix("0x").unwrap_or(&pk);
+    let signer: PrivateKeySigner = pk_clean
+        .parse()
+        .map_err(|_| Error::OnChain("Invalid private key for admin close".into()))?;
+
+    let wallet = EthereumWallet::from(signer);
+    let provider = ProviderBuilder::new()
+        .with_recommended_fillers()
+        .wallet(wallet)
+        .on_http(url);
+
+    let contract = IAdapter::new(adapter, &provider);
+    let tx = contract
+        .closePositionAtPriceAdmin(vault, close_price_1e8)
+        .send()
+        .await
+        .map_err(|e| Error::OnChain(format!("closePositionAtPriceAdmin tx failed: {}", e)))?;
+
+    let receipt = tx
+        .get_receipt()
+        .await
+        .map_err(|e| {
+            Error::OnChain(format!("closePositionAtPriceAdmin receipt failed: {}", e))
+        })?;
+
+    if !receipt.status() {
+        return Err(Error::OnChain(
+            "closePositionAtPriceAdmin transaction reverted".into(),
+        ));
+    }
 
     Ok(())
 }

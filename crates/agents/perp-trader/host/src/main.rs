@@ -104,6 +104,103 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
+    // Close any existing position at startup to start clean.
+    // Stale positions from previous runs cause silent CoreWriter rejections
+    // and leave funds stranded on HyperCore.
+    //
+    // Uses adapter.closePositionAtPriceAdmin() (CoreWriter) instead of REST API
+    // because the API wallet may not be registered on the current sub-account.
+    if !cli.dry_run {
+        let hl_startup = hyperliquid::client::HyperliquidClient::new(&cli.hl_url);
+        if let Ok(snap) = hl_startup.fetch_snapshot(&cli.asset, &cli.sub_account, 1) {
+            if snap.position_size != 0.0 {
+                let side = if snap.position_size > 0.0 { "LONG" } else { "SHORT" };
+                eprintln!(
+                    "[startup] Existing {} {:.5} {} position @ ${:.2}. Closing via CoreWriter...",
+                    side,
+                    snap.position_size.abs(),
+                    cli.asset,
+                    snap.entry_price,
+                );
+
+                #[cfg(feature = "onchain")]
+                {
+                    // Ensure HYPE for CoreWriter gas
+                    let rt_startup = tokio::runtime::Runtime::new()?;
+                    if let Ok(funded) = rt_startup.block_on(onchain::check_and_fund_hype(&cli)) {
+                        if funded {
+                            eprintln!("[startup] HYPE funded. Waiting 15s for bridge settlement...");
+                            std::thread::sleep(Duration::from_secs(15));
+                        }
+                    }
+
+                    // Compute close price: 3% away from mark within oracle band
+                    // For SHORT (szi < 0): close by BUY → price above mark
+                    // For LONG (szi > 0): close by SELL → price below mark
+                    let is_long = snap.position_size > 0.0;
+                    let close_price = if is_long {
+                        (snap.mark_price * 0.97 * 1e8) as u64
+                    } else {
+                        (snap.mark_price * 1.03 * 1e8) as u64
+                    };
+                    // Round to $1 tick (1e8 units)
+                    let close_price = (close_price / 100_000_000) * 100_000_000;
+
+                    eprintln!(
+                        "[startup] closePositionAtPriceAdmin(px={}=${})",
+                        close_price,
+                        close_price as f64 / 1e8,
+                    );
+
+                    let mut closed = false;
+                    for attempt in 1..=3u32 {
+                        match rt_startup.block_on(onchain::close_position_admin(&cli, close_price)) {
+                            Ok(()) => {
+                                eprintln!("[startup] Close tx confirmed on attempt {}. Waiting 15s for settlement...", attempt);
+                                std::thread::sleep(Duration::from_secs(15));
+
+                                // Verify position closed
+                                if let Ok(fresh) = hl_startup.fetch_snapshot(&cli.asset, &cli.sub_account, 1) {
+                                    if fresh.position_size == 0.0 {
+                                        eprintln!("[startup] Position closed successfully.");
+                                        closed = true;
+                                        break;
+                                    } else {
+                                        eprintln!(
+                                            "[startup] Position still open after settlement (szi={:.5}). Retrying with wider price...",
+                                            fresh.position_size,
+                                        );
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("[startup] Attempt {} error: {}", attempt, e);
+                            }
+                        }
+                        if attempt < 3 {
+                            std::thread::sleep(Duration::from_secs(5));
+                        }
+                    }
+
+                    if closed {
+                        clear_position_state(&cli.state_file);
+                        match rt_startup.block_on(onchain::recover_funds_to_vault(&cli, &hl_startup)) {
+                            Ok(recovered) if recovered > 0 => {
+                                eprintln!("[startup] Recovered {} USDC to vault.", recovered);
+                            }
+                            Ok(_) => {}
+                            Err(e) => eprintln!("[startup] Fund recovery failed: {}", e),
+                        }
+                    } else {
+                        eprintln!(
+                            "[startup] WARNING: Could not close existing position after 3 attempts. Proceeding anyway."
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     // Main execution loop: retries every monitor_interval seconds until the agent
     // finds an entry signal or completes an execution cycle.
     let result = loop {
@@ -151,6 +248,30 @@ fn main() -> anyhow::Result<()> {
                         "[optimistic] Proof status: queued={}, currently proving nonce={}",
                         remaining, active
                     );
+                }
+            }
+        }
+    }
+
+    // Before shutting down, recover any stranded funds on HyperCore back to vault.
+    #[cfg(feature = "onchain")]
+    {
+        if !cli.json {
+            eprintln!("[shutdown] Checking for stranded funds on HyperCore...");
+        }
+        let hl_client = hyperliquid::client::HyperliquidClient::new(&cli.hl_url);
+        let rt_cleanup = tokio::runtime::Runtime::new().ok();
+        if let Some(rt) = rt_cleanup {
+            match rt.block_on(onchain::recover_funds_to_vault(&cli, &hl_client)) {
+                Ok(recovered) => {
+                    if !cli.json && recovered > 0 {
+                        eprintln!("[shutdown] Recovered {} USDC to vault.", recovered);
+                    }
+                }
+                Err(e) => {
+                    if !cli.json {
+                        eprintln!("[shutdown] Fund recovery failed: {}", e);
+                    }
                 }
             }
         }
@@ -294,68 +415,116 @@ fn run_pipeline(
     }
 
     // Minimum balance guard: skip execution if vault balance is below threshold
-    // AND no position is open. When a position IS open, the vault balance being
-    // low is expected (USDC was sent to the sub-account for margin). The agent
-    // must still run to evaluate exit conditions (stop-loss, take-profit, etc.).
+    // AND no position is open AND HyperCore has no usable funds.
     //
-    // Exception: when action_flag == 1 (force-close), bypass this guard entirely.
-    // Force-close is triggered by the hold timer and must run to close + recover funds.
-    // Also: if no position is open but HyperCore has stranded funds, attempt recovery.
+    // When a position IS open, the vault balance being low is expected.
+    // When HyperCore has funds (perp margin, spot, or EVM USDC), proceed to
+    // trade with those funds instead of requiring a vault deposit.
+    //
+    // Exception: action_flag == 1 (force-close) always bypasses this guard.
     if snapshot.position_size == 0.0 && vault_state.total_assets < cli.min_balance && cli.action_flag != 1 {
-        // Before giving up, check if HyperCore has stranded funds from a previous
-        // close that didn't recover (e.g., bot was restarted mid-cycle).
-        #[cfg(feature = "onchain")]
-        {
-            let sub_equity = hl_client.get_perp_withdrawable(&cli.sub_account).unwrap_or(0.0);
-            if sub_equity > 0.5 {
-                if !cli.json {
-                    eprintln!(
-                        "Vault balance {} < min_balance {}, but sub-account has ${:.2} stranded on HyperCore.",
-                        vault_state.total_assets, cli.min_balance, sub_equity
-                    );
-                    eprintln!("Attempting fund recovery...");
-                }
-                let rt_recover = tokio::runtime::Runtime::new()?;
-                match rt_recover.block_on(onchain::recover_funds_to_vault(&cli, &hl_client)) {
-                    Ok(recovered) => {
-                        if cli.json {
-                            let result = serde_json::json!({
-                                "status": "recovered",
-                                "reason": "stranded_funds_on_hypercore",
-                                "recovered_usdc": recovered,
-                                "vault_balance": vault_state.total_assets,
-                            });
-                            println!("{}", serde_json::to_string_pretty(&result)?);
-                        } else if recovered > 0 {
-                            eprintln!("[RECOVER] Successfully recovered {} USDC to vault.", recovered);
-                        }
-                        return Ok(PipelineOutcome::Retry);
-                    }
-                    Err(e) => {
-                        if !cli.json {
-                            eprintln!("[RECOVER] Fund recovery failed: {}", e);
-                        }
-                    }
-                }
-            }
-        }
+        // Check ALL fund sources on the sub-account:
+        // 1. Perp margin (withdrawable) — can trade or recover
+        // 2. Spot USDC — needs spotToEvm → withdrawToVault, or can deposit to perp
+        // 3. EVM USDC balance — needs withdrawToVault only
+        // 4. HyperCore account equity — includes margin + unrealized PnL
+        let perp_equity = hl_client.get_perp_withdrawable(&cli.sub_account).unwrap_or(0.0);
+        let spot_usdc = hl_client.get_spot_usdc(&cli.sub_account).unwrap_or(0.0);
+        let hypercore_equity = snapshot.account_equity; // from margin_summary.account_value
 
-        if cli.json {
-            let result = serde_json::json!({
-                "status": "no_op",
-                "reason": "vault_balance_below_minimum",
-                "actions": 0,
-                "vault_balance": vault_state.total_assets,
-                "min_balance": cli.min_balance,
-            });
-            println!("{}", serde_json::to_string_pretty(&result)?);
+        // Total usable funds across all HyperCore locations
+        let total_hypercore = perp_equity.max(hypercore_equity) + spot_usdc;
+
+        #[cfg(feature = "onchain")]
+        let evm_usdc = {
+            // Check sub-account's EVM USDC balance (from a previous partial recovery)
+            let rt_check = tokio::runtime::Runtime::new()?;
+            rt_check.block_on(async {
+                use alloy::primitives::Address;
+                use alloy::providers::ProviderBuilder;
+                use alloy::sol;
+                use std::str::FromStr;
+
+                sol! {
+                    #[sol(rpc)]
+                    interface IERC20 {
+                        function balanceOf(address account) external view returns (uint256);
+                    }
+                }
+
+                let url: reqwest::Url = cli.rpc.parse().unwrap();
+                let provider = ProviderBuilder::new().on_http(url);
+                let usdc = Address::from_str(&cli.usdc_address).unwrap();
+                let sub = Address::from_str(&cli.sub_account).unwrap();
+                let contract = IERC20::new(usdc, &provider);
+                let bal: u64 = contract.balanceOf(sub).call().await
+                    .map(|r| r._0.try_into().unwrap_or(0u64))
+                    .unwrap_or(0);
+                bal as f64 / 1_000_000.0
+            })
+        };
+        #[cfg(not(feature = "onchain"))]
+        let evm_usdc = 0.0_f64;
+
+        let total_all = total_hypercore + evm_usdc;
+
+        if total_all > 0.5 {
+            // Funds exist on HyperCore/EVM — decide whether to recover or trade
+            if !cli.json {
+                eprintln!(
+                    "Vault balance {} < min_balance {}, but sub-account has funds: perp=${:.2}, spot=${:.2}, evm=${:.2}",
+                    vault_state.total_assets, cli.min_balance, perp_equity, spot_usdc, evm_usdc
+                );
+            }
+
+            // If funds are only on spot/EVM (not in perp margin), recover them to vault
+            if hypercore_equity < 0.5 && (spot_usdc > 0.5 || evm_usdc > 0.5) {
+                if !cli.json {
+                    eprintln!("Funds are in spot/EVM only. Attempting recovery to vault...");
+                }
+                #[cfg(feature = "onchain")]
+                {
+                    let rt_recover = tokio::runtime::Runtime::new()?;
+                    match rt_recover.block_on(onchain::recover_funds_to_vault(&cli, &hl_client)) {
+                        Ok(recovered) => {
+                            if !cli.json && recovered > 0 {
+                                eprintln!("[RECOVER] Successfully recovered {} USDC to vault.", recovered);
+                            }
+                        }
+                        Err(e) => {
+                            if !cli.json {
+                                eprintln!("[RECOVER] Recovery failed: {}. Will retry.", e);
+                            }
+                        }
+                    }
+                }
+                return Ok(PipelineOutcome::Retry);
+            }
+
+            // Funds are in perp margin — proceed to trade with HyperCore equity.
+            // The equity override below (line ~370) will pick up HyperCore equity.
+            if !cli.json {
+                eprintln!("Proceeding with HyperCore equity (${:.2}).", hypercore_equity);
+            }
         } else {
-            eprintln!(
-                "Vault balance {} < min_balance {}. Skipping execution.",
-                vault_state.total_assets, cli.min_balance
-            );
+            // Truly no funds anywhere
+            if cli.json {
+                let result = serde_json::json!({
+                    "status": "no_op",
+                    "reason": "vault_balance_below_minimum",
+                    "actions": 0,
+                    "vault_balance": vault_state.total_assets,
+                    "min_balance": cli.min_balance,
+                });
+                println!("{}", serde_json::to_string_pretty(&result)?);
+            } else {
+                eprintln!(
+                    "Vault balance {} < min_balance {}. No funds on HyperCore either. Skipping.",
+                    vault_state.total_assets, cli.min_balance
+                );
+            }
+            return Ok(PipelineOutcome::Retry);
         }
-        return Ok(PipelineOutcome::Retry);
     }
 
     // Override account equity with vault's on-chain USDC balance in raw units (6 decimals).
@@ -581,6 +750,7 @@ fn run_pipeline(
 
                     let rt = tokio::runtime::Runtime::new()?;
                     let phase1_result = rt.block_on(submit_optimistic_execution(
+                        &cli,
                         &cli.vault, &cli.rpc, &pk,
                         &deposit_journal, &deposit_output_bytes,
                         &signed_feed.onchain_signature, signed_feed.feed.timestamp,
@@ -618,6 +788,8 @@ fn run_pipeline(
                                     queued_at: Instant::now(),
                                     dev_mode: if cli.optimistic { false } else { cli.dev_mode },
                                     retry_count: 0,
+                                    l1_rpc: cli.l1_rpc.clone(),
+                                    bond_manager: cli.bond_manager.clone(),
                                 });
                             }
 
@@ -703,8 +875,27 @@ fn run_pipeline(
 
                             if order_action_count == 0 {
                                 if !cli.json {
-                                    eprintln!("[optimistic] Phase 2: agent produced 0 actions (market changed). Deposit on HyperCore will be recovered next cycle.");
+                                    eprintln!("[optimistic] Phase 2: agent produced 0 actions (market changed). Recovering deposited funds...");
                                 }
+
+                                // Recover funds deposited to HyperCore back to vault
+                                #[cfg(feature = "onchain")]
+                                {
+                                    let rt_recover = tokio::runtime::Runtime::new()?;
+                                    match rt_recover.block_on(onchain::recover_funds_to_vault(&cli, &hl_client)) {
+                                        Ok(recovered) => {
+                                            if !cli.json && recovered > 0 {
+                                                eprintln!("[RECOVER] Recovered {} USDC to vault.", recovered);
+                                            }
+                                        }
+                                        Err(e) => {
+                                            if !cli.json {
+                                                eprintln!("[RECOVER] Fund recovery failed (will retry next cycle): {}", e);
+                                            }
+                                        }
+                                    }
+                                }
+
                                 if cli.json {
                                     println!("{}", serde_json::to_string_pretty(&serde_json::json!({
                                         "status": "optimistic_partial",
@@ -713,7 +904,10 @@ fn run_pipeline(
                                         "phase1_proof_queued": true,
                                     }))?);
                                 }
-                                optimistic_succeeded = true;
+                                // Phase 1 deposit succeeded but no order was placed.
+                                // Do NOT enter monitoring — no position to watch.
+                                // Return Retry so the next cycle can try again.
+                                return Ok(PipelineOutcome::Retry);
                             } else {
                                 // Build predicted journal for phase 2
                                 let order_journal = build_predicted_journal(
@@ -730,6 +924,7 @@ fn run_pipeline(
                                 }
 
                                 let phase2_result = rt.block_on(submit_optimistic_execution(
+                                    &cli,
                                     &cli.vault, &cli.rpc, &pk,
                                     &order_journal, &order_output_bytes,
                                     &signed_feed_2.onchain_signature, signed_feed_2.feed.timestamp,
@@ -767,6 +962,8 @@ fn run_pipeline(
                                                 queued_at: Instant::now(),
                                                 dev_mode: if cli.optimistic { false } else { cli.dev_mode },
                                                 retry_count: 0,
+                                                l1_rpc: cli.l1_rpc.clone(),
+                                                bond_manager: cli.bond_manager.clone(),
                                             });
                                         }
 
@@ -833,15 +1030,18 @@ fn run_pipeline(
                                             }
                                             Ok(tx) => {
                                                 if !cli.json {
-                                                    eprintln!("[optimistic] Phase 2 synchronous fallback reverted: {}", tx.tx_hash);
+                                                    eprintln!("[optimistic] Phase 2 synchronous fallback reverted: {}. Retrying next cycle.", tx.tx_hash);
                                                 }
-                                                optimistic_succeeded = true; // Phase 1 still succeeded
+                                                // Phase 1 deposit succeeded but order failed.
+                                                // Return Retry — no position to monitor.
+                                                return Ok(PipelineOutcome::Retry);
                                             }
                                             Err(e) => {
                                                 if !cli.json {
-                                                    eprintln!("[optimistic] Phase 2 synchronous fallback failed: {}", e);
+                                                    eprintln!("[optimistic] Phase 2 synchronous fallback failed: {}. Retrying next cycle.", e);
                                                 }
-                                                optimistic_succeeded = true; // Phase 1 still succeeded
+                                                // Phase 1 deposit succeeded but order failed.
+                                                return Ok(PipelineOutcome::Retry);
                                             }
                                         }
                                     }
@@ -881,6 +1081,7 @@ fn run_pipeline(
 
                 let rt = tokio::runtime::Runtime::new()?;
                 let optimistic_result = rt.block_on(submit_optimistic_execution(
+                    &cli,
                     &cli.vault,
                     &cli.rpc,
                     &pk,
@@ -920,6 +1121,8 @@ fn run_pipeline(
                             queued_at: Instant::now(),
                             dev_mode: if cli.optimistic { false } else { cli.dev_mode },
                             retry_count: 0,
+                            l1_rpc: cli.l1_rpc.clone(),
+                            bond_manager: cli.bond_manager.clone(),
                         };
 
                         {
@@ -972,10 +1175,15 @@ fn run_pipeline(
         // Only monitor if we actually opened a position (not a close or no-op)
         let is_open_intent = matches!(agent_intent, seed_trade::AgentIntent::Open(_));
         if is_open_intent {
-            monitor_and_close(
+            let position_found = monitor_and_close(
                 cli, &bundle, &hl_client, &snapshot, proof_queue, last_known_nonce,
                 &exchange_addr, &vault_addr, &usdc_addr,
             )?;
+            if !position_found {
+                // Position never appeared on HyperCore — seed trade may have been
+                // silently rejected. Retry next cycle (deposit stays on HyperCore).
+                return Ok(PipelineOutcome::Retry);
+            }
         }
         return Ok(PipelineOutcome::Done);
     }
@@ -1138,8 +1346,27 @@ fn run_pipeline(
 
         if order_action_count == 0 {
             if !cli.json {
-                eprintln!("[OPEN] Phase 2: agent produced 0 actions (market changed). Deposit on HyperCore will be recovered next cycle.");
+                eprintln!("[OPEN] Phase 2: agent produced 0 actions (market changed). Recovering deposited funds...");
             }
+
+            // Recover funds deposited to HyperCore back to vault
+            #[cfg(feature = "onchain")]
+            {
+                let rt_recover = tokio::runtime::Runtime::new()?;
+                match rt_recover.block_on(onchain::recover_funds_to_vault(&cli, &hl_client)) {
+                    Ok(recovered) => {
+                        if !cli.json && recovered > 0 {
+                            eprintln!("[RECOVER] Recovered {} USDC to vault.", recovered);
+                        }
+                    }
+                    Err(e) => {
+                        if !cli.json {
+                            eprintln!("[RECOVER] Fund recovery failed: {}", e);
+                        }
+                    }
+                }
+            }
+
             if cli.json {
                 println!("{}", serde_json::to_string_pretty(&serde_json::json!({
                     "status": "no_op",
@@ -1482,7 +1709,7 @@ fn monitor_and_close(
     exchange_addr: &[u8; 20],
     vault_addr: &[u8; 20],
     usdc_addr: &[u8; 20],
-) -> anyhow::Result<()> {
+) -> anyhow::Result<bool> {
     use std::time::Instant;
 
     let monitor_start = Instant::now();
@@ -1511,9 +1738,9 @@ fn monitor_and_close(
     let snap = hl_client.fetch_snapshot(&cli.asset, &cli.sub_account, 1)?;
     if snap.position_size == 0.0 {
         if !cli.json {
-            eprintln!("[MONITOR] Position still not visible after 25s. Exiting monitor.");
+            eprintln!("[MONITOR] Position still not visible after 25s. Will retry next cycle.");
         }
-        return Ok(());
+        return Ok(false);
     }
 
     let entry_price = snap.entry_price;
@@ -1595,7 +1822,7 @@ fn monitor_and_close(
                     }
                 }
             }
-            return Ok(());
+            return Ok(true);
         }
 
         let mark = current.mark_price;
@@ -1643,7 +1870,8 @@ fn monitor_and_close(
     execute_force_close(
         cli, bundle, hl_client, proof_queue, last_known_nonce,
         exchange_addr, vault_addr, usdc_addr, &close_reason,
-    )
+    )?;
+    Ok(true)
 }
 
 /// Build and submit a force-close optimistic execution, then recover funds.
@@ -1737,6 +1965,7 @@ fn execute_force_close(
 
         let rt = tokio::runtime::Runtime::new()?;
         let close_result = rt.block_on(submit_optimistic_execution(
+            cli,
             &cli.vault, &cli.rpc, &pk,
             &close_journal, &close_output_bytes,
             &close_feed.onchain_signature, close_feed.feed.timestamp,
@@ -1772,24 +2001,35 @@ fn execute_force_close(
                         queued_at: Instant::now(),
                         dev_mode: false,
                         retry_count: 0,
+                        l1_rpc: cli.l1_rpc.clone(),
+                        bond_manager: cli.bond_manager.clone(),
                     });
                 }
 
                 clear_position_state(&cli.state_file);
 
-                // Wait for HyperCore settlement then recover funds
+                // Wait for HyperCore close settlement (CoreWriter is async)
                 if !cli.json {
-                    eprintln!("[CLOSE] Waiting 15s for HyperCore close settlement...");
+                    eprintln!("[CLOSE] Waiting 30s for HyperCore close settlement...");
                 }
-                std::thread::sleep(Duration::from_secs(15));
+                std::thread::sleep(Duration::from_secs(30));
 
-                // Verify close
-                let still_open = hl_client.has_position(&cli.sub_account, &cli.asset).unwrap_or(true);
+                // Verify close with retries (settlement can take up to 60s)
+                let mut still_open = hl_client.has_position(&cli.sub_account, &cli.asset).unwrap_or(true);
                 if still_open {
                     if !cli.json {
-                        eprintln!("[CLOSE] CoreWriter close may have been silently rejected. Trying REST API fallback...");
+                        eprintln!("[CLOSE] Position still open after 30s. Waiting 30s more...");
                     }
-                    return fallback_close_and_recover(cli, hl_client, &close_snapshot);
+                    std::thread::sleep(Duration::from_secs(30));
+                    still_open = hl_client.has_position(&cli.sub_account, &cli.asset).unwrap_or(true);
+                }
+                if still_open {
+                    if !cli.json {
+                        eprintln!("[CLOSE] CoreWriter close silently rejected after 60s. Using REST API fallback...");
+                    }
+                    // Re-fetch fresh market data for the fallback close
+                    let fresh_snap = hl_client.fetch_snapshot(&cli.asset, &cli.sub_account, 1)?;
+                    return fallback_close_and_recover(cli, hl_client, &fresh_snap);
                 }
 
                 // Recover funds: perp → spot → EVM → vault
@@ -1836,65 +2076,120 @@ fn execute_force_close(
     Ok(())
 }
 
-/// Fallback close using REST API (adapter admin or seed_trade close) + fund recovery.
+/// Fallback close via adapter.closePositionAtPriceAdmin() (CoreWriter) + fund recovery.
+///
+/// Uses CoreWriter directly, which doesn't require an API wallet to be registered
+/// on the sub-account. Retries with increasing wait times for HyperCore settlement.
 fn fallback_close_and_recover(
     cli: &Cli,
     hl_client: &hyperliquid::client::HyperliquidClient,
     snapshot: &market::MarketSnapshot,
 ) -> anyhow::Result<()> {
-    let is_long = snapshot.position_size > 0.0;
-    let close_is_buy = !is_long;
-    let close_size = snapshot.position_size.abs();
+    let mut closed = false;
 
-    if cli.api_wallet_key.is_some() {
+    #[cfg(feature = "onchain")]
+    {
+        // Compute close price: 3% away from mark within oracle band
+        let is_long = snapshot.position_size > 0.0;
+        let close_price = if is_long {
+            (snapshot.mark_price * 0.97 * 1e8) as u64
+        } else {
+            (snapshot.mark_price * 1.03 * 1e8) as u64
+        };
+        let close_price = (close_price / 100_000_000) * 100_000_000;
+
         if !cli.json {
             eprintln!(
-                "[FALLBACK] REST API close: {} {:.5} {} @ ${:.0}",
-                if close_is_buy { "BUY" } else { "SELL" },
-                close_size,
+                "[FALLBACK] CoreWriter close: {} {:.5} {} @ ${:.0}",
+                if is_long { "SELL" } else { "BUY" },
+                snapshot.position_size.abs(),
                 cli.asset,
-                snapshot.mark_price,
+                close_price as f64 / 1e8,
             );
         }
-        match seed_trade::execute_close_trade(cli, close_is_buy, close_size, snapshot.mark_price) {
-            Ok(result) if result.status == "filled" => {
-                if !cli.json {
-                    eprintln!("[FALLBACK] Close filled. Waiting 15s for settlement...");
-                }
-                std::thread::sleep(Duration::from_secs(15));
-                clear_position_state(&cli.state_file);
 
-                #[cfg(feature = "onchain")]
-                {
-                    let rt = tokio::runtime::Runtime::new()?;
-                    match rt.block_on(onchain::recover_funds_to_vault(cli, hl_client)) {
-                        Ok(recovered) => {
-                            if !cli.json && recovered > 0 {
-                                eprintln!("[RECOVER] Recovered {} USDC to vault.", recovered);
+        let rt = tokio::runtime::Runtime::new()?;
+
+        for attempt in 1..=2u32 {
+            match rt.block_on(onchain::close_position_admin(cli, close_price)) {
+                Ok(()) => {
+                    if !cli.json {
+                        eprintln!("[FALLBACK] Close tx confirmed. Waiting 15s for settlement...");
+                    }
+                    std::thread::sleep(Duration::from_secs(15));
+
+                    // Verify position closed
+                    match hl_client.fetch_snapshot(&cli.asset, &cli.sub_account, 1) {
+                        Ok(fresh) if fresh.position_size == 0.0 => {
+                            closed = true;
+                            break;
+                        }
+                        Ok(fresh) => {
+                            if !cli.json {
+                                eprintln!(
+                                    "[FALLBACK] Position still open (szi={:.5}). Waiting 15s more...",
+                                    fresh.position_size,
+                                );
+                            }
+                            std::thread::sleep(Duration::from_secs(15));
+
+                            // Re-check
+                            if let Ok(fresh2) = hl_client.fetch_snapshot(&cli.asset, &cli.sub_account, 1) {
+                                if fresh2.position_size == 0.0 {
+                                    closed = true;
+                                    break;
+                                }
                             }
                         }
                         Err(e) => {
                             if !cli.json {
-                                eprintln!("[RECOVER] Recovery failed: {}", e);
+                                eprintln!("[FALLBACK] Failed to verify close: {}", e);
                             }
                         }
                     }
                 }
-            }
-            Ok(result) => {
-                if !cli.json {
-                    eprintln!("[FALLBACK] Close not filled: status={}", result.status);
+                Err(e) => {
+                    if !cli.json {
+                        eprintln!("[FALLBACK] Attempt {} error: {}", attempt, e);
+                    }
                 }
             }
-            Err(e) => {
-                if !cli.json {
-                    eprintln!("[FALLBACK] Close failed: {}", e);
-                }
+            if attempt < 2 {
+                std::thread::sleep(Duration::from_secs(5));
             }
         }
-    } else if !cli.json {
-        eprintln!("[FALLBACK] No API wallet key. Cannot close via REST API.");
+
+        if closed {
+            if !cli.json {
+                eprintln!("[FALLBACK] Position closed. Waiting 10s then recovering funds...");
+            }
+            std::thread::sleep(Duration::from_secs(10));
+            clear_position_state(&cli.state_file);
+
+            match rt.block_on(onchain::recover_funds_to_vault(cli, hl_client)) {
+                Ok(recovered) if recovered > 0 => {
+                    if !cli.json {
+                        eprintln!("[RECOVER] Recovered {} USDC to vault.", recovered);
+                    }
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    if !cli.json {
+                        eprintln!("[RECOVER] Recovery failed: {}", e);
+                    }
+                }
+            }
+        } else if !cli.json {
+            eprintln!("[FALLBACK] All close attempts failed. Position remains open.");
+        }
     }
+
+    #[cfg(not(feature = "onchain"))]
+    {
+        let _ = (cli, hl_client, snapshot);
+        eprintln!("[FALLBACK] CoreWriter close requires --features onchain.");
+    }
+
     Ok(())
 }
 
@@ -1961,6 +2256,7 @@ fn build_predicted_journal(
 /// WSTON tokens (handled by ensure_wston_approval at startup).
 #[cfg(feature = "onchain")]
 async fn submit_optimistic_execution(
+    cli: &Cli,
     vault_address: &str,
     rpc_url: &str,
     private_key: &str,
@@ -2047,6 +2343,29 @@ async fn submit_optimistic_execution(
         ._0;
 
     let execution_nonce = nonce_before + 1;
+
+    // Lock WSTON bond on L1 before optimistic execution (if L1 config is provided).
+    // Non-fatal: if lock fails (RPC issue, already locked), proceed anyway —
+    // the oracle attestation will verify the bond status independently.
+    if cli.l1_rpc.is_some() && cli.bond_manager.is_some() && cli.wston_address.is_some() {
+        eprintln!("[optimistic] Locking WSTON bond on L1 for nonce {}...", execution_nonce);
+        match onchain::lock_bond_on_l1(cli, vault_address, execution_nonce, &bond.to_string()).await {
+            Ok(()) => {}
+            Err(e) => {
+                let err_msg = format!("{}", e);
+                // Insufficient balance is fatal — can't proceed without a bond
+                if err_msg.contains("Insufficient WSTON") {
+                    return Err(anyhow::anyhow!("L1 bond lock failed: {}", e));
+                }
+                eprintln!(
+                    "[optimistic] WARNING: L1 bond lock failed (non-fatal): {}. Proceeding with oracle attestation.",
+                    e
+                );
+            }
+        }
+    } else {
+        eprintln!("[optimistic] Skipping auto bond lock (no L1 config). Ensure bond is pre-locked.");
+    }
 
     // Query bondChainId from the contract (this is the L1 chain where bonds are locked)
     let bond_chain_id = contract

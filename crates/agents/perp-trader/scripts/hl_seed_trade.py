@@ -37,11 +37,11 @@ signal.alarm(25)
 SDK_TIMEOUT = 10
 
 
-def make_exchange(key, hl_url):
+def make_exchange(key, hl_url, account_address=None):
     """Create a Hyperliquid Exchange client with timeout and skip_ws."""
     from hyperliquid.exchange import Exchange
     account = Account.from_key(key)
-    return Exchange(account, hl_url, timeout=SDK_TIMEOUT)
+    return Exchange(account, hl_url, account_address=account_address, timeout=SDK_TIMEOUT)
 
 
 def do_set_leverage(args):
@@ -105,37 +105,63 @@ def do_seed_trade(args):
 
 
 def do_close_position(args):
-    """Place a reduce-only closing IOC order."""
-    try:
-        exchange = make_exchange(args.key, args.hl_url)
+    """Place a closing IOC order with aggressive retry and increasing slippage.
 
-        # Use exchange.info (skip_ws=True internally) instead of separate Info client.
-        l2 = exchange.info.l2_snapshot(args.asset)
-        if args.is_buy:
-            # Closing a short: buy at slightly above ask
-            best_ask = float(l2["levels"][1][0]["px"]) if l2.get("levels") and len(l2["levels"]) > 1 and l2["levels"][1] else args.price
-            ioc_price = round(best_ask * 1.005)
-        else:
-            # Closing a long: sell at slightly below bid
-            best_bid = float(l2["levels"][0][0]["px"]) if l2.get("levels") and l2["levels"][0] else args.price
-            ioc_price = round(best_bid * 0.995)
+    HyperCore rejects orders outside the oracle price band (~5-10%).
+    We retry with 3%, 5%, and 10% slippage to ensure fills even when
+    the orderbook is thin or the price is volatile.
+    """
+    import time
+    SLIPPAGE_LEVELS = [0.03, 0.05, 0.10]  # 3%, 5%, 10%
+    last_result = None
 
-        print(f"Closing via REST API: {'BUY' if args.is_buy else 'SELL'} {args.size} {args.asset} @ ${ioc_price} (mark=${l2['levels'][0][0]['px'] if l2.get('levels') and l2['levels'][0] else 'unknown'})", file=sys.stderr, flush=True)
+    for attempt, slippage in enumerate(SLIPPAGE_LEVELS, 1):
+        try:
+            exchange = make_exchange(args.key, args.hl_url)
+            l2 = exchange.info.l2_snapshot(args.asset)
 
-        # Close = sell if long (is_buy=false), buy if short (is_buy=true)
-        # reduce_only=True prevents flipping the position
-        order_result = exchange.order(
-            args.asset,
-            args.is_buy,
-            args.size,
-            ioc_price,
-            {"limit": {"tif": "Ioc"}},
-            reduce_only=True,
-        )
+            if args.is_buy:
+                best_ask = float(l2["levels"][1][0]["px"]) if l2.get("levels") and len(l2["levels"]) > 1 and l2["levels"][1] else args.price
+                ioc_price = round(best_ask * (1.0 + slippage))
+            else:
+                best_bid = float(l2["levels"][0][0]["px"]) if l2.get("levels") and l2["levels"][0] else args.price
+                ioc_price = round(best_bid * (1.0 - slippage))
 
-        return parse_order_result(order_result)
-    except Exception as e:
-        return {"status": "error", "step": "exception", "detail": str(e)}
+            mark = l2["levels"][0][0]["px"] if l2.get("levels") and l2["levels"][0] else "unknown"
+            print(
+                f"Close attempt {attempt}/{len(SLIPPAGE_LEVELS)}: "
+                f"{'BUY' if args.is_buy else 'SELL'} {args.size} {args.asset} "
+                f"@ ${ioc_price} (slippage={slippage*100:.0f}%, mark=${mark})",
+                file=sys.stderr, flush=True,
+            )
+
+            # reduce_only=True is critical: when the sub-account's margin is fully
+            # backing the existing position (withdrawable=0), a non-reduce-only order
+            # is rejected with "Insufficient margin". reduce_only tells HyperCore this
+            # order only reduces the existing position and needs no additional margin.
+            order_result = exchange.order(
+                args.asset,
+                args.is_buy,
+                args.size,
+                ioc_price,
+                {"limit": {"tif": "Ioc"}},
+                reduce_only=True,
+            )
+
+            last_result = parse_order_result(order_result)
+            if last_result["status"] == "filled":
+                return last_result
+
+            print(f"  Attempt {attempt} result: {last_result}", file=sys.stderr, flush=True)
+
+        except Exception as e:
+            last_result = {"status": "error", "step": "exception", "detail": str(e)}
+            print(f"  Attempt {attempt} exception: {e}", file=sys.stderr, flush=True)
+
+        if attempt < len(SLIPPAGE_LEVELS):
+            time.sleep(2)
+
+    return last_result or {"status": "error", "step": "all_attempts_failed", "detail": f"Failed after {len(SLIPPAGE_LEVELS)} attempts"}
 
 
 def parse_order_result(order_result):
@@ -170,6 +196,7 @@ def main():
     parser.add_argument("--is-buy", type=lambda x: x.lower() == "true", default=True, help="Order side")
     parser.add_argument("--size", type=float, default=0.0, help="Order size in base asset")
     parser.add_argument("--price", type=float, default=0.0, help="Limit price in USD")
+    parser.add_argument("--sub-account", default=None, help="Sub-account address to trade on behalf of")
 
     args = parser.parse_args()
 

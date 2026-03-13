@@ -14,14 +14,14 @@ interface ExecutionEvent {
   transactionHash?: string;
   blockNumber?: string;
   timestamp?: number;
-  optimisticStatus?: 'proven' | 'pending' | 'finalized' | 'slashed';
+  optimisticStatus?: 'pending' | 'finalized' | 'slashed';
 }
 
 function ExecutionStatusBadge({ status }: { status?: string }) {
-  if (!status || status === 'proven') {
+  if (!status) {
     return (
-      <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium bg-white/5 text-gray-400 border-white/10">
-        Proven
+      <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium bg-green-500/10 text-green-400 border-green-500/20">
+        Finalized
       </span>
     );
   }

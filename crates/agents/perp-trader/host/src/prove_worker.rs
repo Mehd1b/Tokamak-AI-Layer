@@ -42,6 +42,10 @@ pub struct PendingProof {
     pub dev_mode: bool,
     /// Number of retry attempts so far
     pub retry_count: u32,
+    /// L1 RPC URL for bond release after proof submission
+    pub l1_rpc: Option<String>,
+    /// WSTONBondManager address on L1
+    pub bond_manager: Option<String>,
 }
 
 /// Shared proof queue between main thread and worker.
@@ -352,6 +356,42 @@ fn process_proof_job(job: &PendingProof, status: &WorkerStatus) -> anyhow::Resul
             &proof_result.journal_bytes,
         ))?;
         eprintln!("[prove-worker] Proof for nonce {} submitted and confirmed.", nonce);
+
+        // Release WSTON bond on L1 now that proof is verified (retry up to 3 times)
+        if let (Some(l1_rpc), Some(bond_mgr)) = (&job.l1_rpc, &job.bond_manager) {
+            eprintln!("[prove-worker] Releasing bond on L1 for nonce {}...", nonce);
+            let mut released = false;
+            for attempt in 1..=3 {
+                match rt.block_on(crate::onchain::release_bond_on_l1(
+                    l1_rpc,
+                    bond_mgr,
+                    &job.private_key,
+                    &job.vault_address,
+                    nonce,
+                )) {
+                    Ok(()) => {
+                        eprintln!("[prove-worker] Bond released on L1 for nonce {}.", nonce);
+                        released = true;
+                        break;
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "[prove-worker] Bond release attempt {}/3 failed for nonce {}: {}",
+                            attempt, nonce, e
+                        );
+                        if attempt < 3 {
+                            std::thread::sleep(Duration::from_secs(10));
+                        }
+                    }
+                }
+            }
+            if !released {
+                eprintln!(
+                    "[prove-worker] WARNING: Bond release failed after 3 attempts for nonce {} (non-fatal).",
+                    nonce
+                );
+            }
+        }
     }
 
     #[cfg(not(feature = "onchain"))]

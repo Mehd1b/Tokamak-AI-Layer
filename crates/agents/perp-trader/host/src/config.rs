@@ -190,6 +190,20 @@ pub struct Cli {
     #[arg(long, env = "ORACLE_URL")]
     pub oracle_url: Option<String>,
 
+    // ---- L1 bond management ----
+    /// Ethereum L1 RPC endpoint for WSTON bond locking.
+    /// Required for optimistic execution to auto-lock bonds before each execution.
+    #[arg(long, env = "L1_RPC_URL")]
+    pub l1_rpc: Option<String>,
+
+    /// WSTONBondManager contract address on Ethereum L1 (0x-prefixed).
+    #[arg(long, env = "BOND_MANAGER_ADDRESS")]
+    pub bond_manager: Option<String>,
+
+    /// WSTON token contract address on Ethereum L1 (0x-prefixed).
+    #[arg(long, env = "WSTON_ADDRESS")]
+    pub wston_address: Option<String>,
+
     /// Maximum time (seconds) to hold a position before auto-closing.
     /// After opening a position, the bot monitors TP/SL and auto-closes
     /// when this duration elapses or TP/SL is hit.
