@@ -470,6 +470,22 @@
   100% { transform: translateY(0); opacity: 1; }
 }
 
+/* ===== VAULT CARD ENTRANCE ===== */
+@keyframes vault-card-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.vault-card-enter {
+  animation: vault-card-enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* ===== BREADCRUMB ===== */
 .breadcrumb {
   @apply flex items-center gap-2 text-sm font-mono text-gray-500 mb-8;
