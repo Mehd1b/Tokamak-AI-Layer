@@ -2,6 +2,28 @@
 //!
 //! See `spec/codec.md` for encoding specification.
 //!
+//! # KernelJournalV1 Binary Layout (exactly 209 bytes)
+//!
+//! ```text
+//! Offset  Size  Field                  Type
+//! ------  ----  ---------------------  ----------
+//!   0       4   protocol_version       u32 LE
+//!   4       4   kernel_version         u32 LE
+//!   8      32   agent_id               bytes32
+//!  40      32   agent_code_hash        bytes32
+//!  72      32   constraint_set_hash    bytes32
+//! 104      32   input_root             bytes32
+//! 136       8   execution_nonce        u64 LE
+//! 144      32   input_commitment       bytes32
+//! 176      32   action_commitment      bytes32
+//! 208       1   execution_status       u8
+//! ------  ----
+//! Total: 209 bytes
+//! ```
+//!
+//! All integers are little-endian. This layout MUST match `KernelOutputParser.sol`
+//! in the Solidity contracts byte-for-byte.
+//!
 //! # Action Ordering
 //!
 //! The codec preserves the agent's action order as-is. **No sorting is performed

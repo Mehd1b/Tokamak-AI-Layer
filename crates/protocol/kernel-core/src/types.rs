@@ -245,6 +245,39 @@ pub enum CodecError {
     ActionTooLarge { size: u32, limit: usize },
 }
 
+impl core::fmt::Display for CodecError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::InvalidLength => write!(f, "Invalid data length"),
+            Self::InvalidVersion { expected, actual } => {
+                write!(f, "Version mismatch: expected {}, got {}", expected, actual)
+            }
+            Self::InputTooLarge { size, limit } => {
+                write!(f, "Input too large: {} bytes (limit: {})", size, limit)
+            }
+            Self::OutputTooLarge { size, limit } => {
+                write!(f, "Output too large: {} bytes (limit: {})", size, limit)
+            }
+            Self::UnexpectedEndOfInput => {
+                write!(f, "Unexpected end of input — data is truncated")
+            }
+            Self::InvalidExecutionStatus(code) => {
+                write!(f, "Invalid execution status byte: 0x{:02x}", code)
+            }
+            Self::ArithmeticOverflow => write!(f, "Arithmetic overflow during encoding"),
+            Self::TooManyActions { count, limit } => {
+                write!(f, "Too many actions: {} (limit: {})", count, limit)
+            }
+            Self::ActionPayloadTooLarge { size, limit } => {
+                write!(f, "Action payload too large: {} bytes (limit: {})", size, limit)
+            }
+            Self::ActionTooLarge { size, limit } => {
+                write!(f, "Action too large: {} bytes (limit: {})", size, limit)
+            }
+        }
+    }
+}
+
 /// Kernel-level execution errors.
 ///
 /// Separate from CodecError to distinguish parsing failures from
@@ -270,6 +303,36 @@ pub enum KernelError {
     EncodingFailed(CodecError),
 }
 
+impl core::fmt::Display for KernelError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Codec(e) => write!(f, "Codec error: {}", e),
+            Self::UnsupportedProtocolVersion { expected, actual } => {
+                write!(
+                    f,
+                    "Unsupported protocol version: expected {}, got {}",
+                    expected, actual
+                )
+            }
+            Self::UnsupportedKernelVersion { expected, actual } => {
+                write!(
+                    f,
+                    "Unsupported kernel version: expected {}, got {}",
+                    expected, actual
+                )
+            }
+            Self::AgentExecutionFailed(e) => write!(f, "Agent execution failed: {}", e),
+            Self::ConstraintViolation(e) => write!(f, "Constraint error: {}", e),
+            Self::InvalidAgentId => write!(f, "Agent ID validation failed"),
+            Self::AgentCodeHashMismatch => write!(
+                f,
+                "Agent code hash mismatch — the proven agent binary does not match the registered hash"
+            ),
+            Self::EncodingFailed(e) => write!(f, "Output encoding failed: {}", e),
+        }
+    }
+}
+
 /// Agent execution errors
 #[derive(Clone, Debug, PartialEq)]
 pub enum AgentError {
@@ -281,6 +344,17 @@ pub enum AgentError {
     OutputTooLarge,
     /// Too many actions produced
     TooManyActions,
+}
+
+impl core::fmt::Display for AgentError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::InvalidInput => write!(f, "Agent received invalid input data"),
+            Self::ExecutionFailed => write!(f, "Agent panicked or failed during execution"),
+            Self::OutputTooLarge => write!(f, "Agent output exceeds size limits"),
+            Self::TooManyActions => write!(f, "Agent produced too many actions"),
+        }
+    }
 }
 
 /// Constraint violation reason codes (stable numeric codes for determinism).
@@ -319,6 +393,30 @@ impl ConstraintViolationReason {
     }
 }
 
+impl core::fmt::Display for ConstraintViolationReason {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::InvalidOutputStructure => write!(f, "Invalid output structure"),
+            Self::UnknownActionType => write!(
+                f,
+                "Unknown action type. Allowed: CALL (0x02), ERC20_TRANSFER (0x03), NO_OP (0x04)"
+            ),
+            Self::AssetNotWhitelisted => write!(f, "Asset not in whitelist"),
+            Self::PositionTooLarge => {
+                write!(f, "Position exceeds max_position_notional limit")
+            }
+            Self::LeverageTooHigh => write!(f, "Leverage exceeds max_leverage_bps limit"),
+            Self::DrawdownExceeded => write!(f, "Drawdown exceeds max_drawdown_bps limit"),
+            Self::CooldownNotElapsed => {
+                write!(f, "Cooldown period has not elapsed since last execution")
+            }
+            Self::InvalidStateSnapshot => write!(f, "Invalid state snapshot encoding"),
+            Self::InvalidConstraintSet => write!(f, "Invalid constraint set encoding"),
+            Self::InvalidActionPayload => write!(f, "Invalid action payload encoding"),
+        }
+    }
+}
+
 /// Detailed constraint violation information.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ConstraintViolation {
@@ -347,6 +445,15 @@ impl ConstraintViolation {
     }
 }
 
+impl core::fmt::Display for ConstraintViolation {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self.action_index {
+            Some(idx) => write!(f, "Constraint violation in action #{}: {}", idx, self.reason),
+            None => write!(f, "Constraint violation (global): {}", self.reason),
+        }
+    }
+}
+
 /// Constraint checking errors (legacy compatibility + detailed violations)
 #[derive(Clone, Debug, PartialEq)]
 pub enum ConstraintError {
@@ -354,6 +461,15 @@ pub enum ConstraintError {
     Violation(ConstraintViolation),
     /// Output structure is invalid (legacy)
     InvalidOutput,
+}
+
+impl core::fmt::Display for ConstraintError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Violation(v) => write!(f, "{}", v),
+            Self::InvalidOutput => write!(f, "Invalid output structure"),
+        }
+    }
 }
 
 impl From<ConstraintViolation> for ConstraintError {

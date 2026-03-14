@@ -1,0 +1,29 @@
+[package]
+name = "tal-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Unified CLI for the Tokamak AI Layer — scaffold, validate, test, and deploy agents"
+license = "MIT OR Apache-2.0"
+
+[[bin]]
+name = "tal"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+colored = "2"
+anyhow = "1"
+sha2 = { workspace = true }
+hex = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dialoguer = "0.11"
+which = "7"
+
+# On-chain interaction
+alloy = { version = "0.8", features = ["providers", "transports", "contract", "signer-local", "rpc-types", "sol-types"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+reqwest = { version = "0.12", features = ["json"] }
+
+[dev-dependencies]
+tempfile = "3"

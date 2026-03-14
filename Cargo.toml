@@ -29,6 +29,7 @@ members = [
     "crates/agent-pack",
     "crates/tools/cargo-agent",
     "crates/reference-integrator",
+    "crates/tal-cli",
 ]
 
 [workspace.dependencies]
