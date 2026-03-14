@@ -21,6 +21,12 @@ interface VaultCardProps {
   index?: number;
 }
 
+/* Strip trailing zeros and decimal point: "20.0000" → "20", "3.5000" → "3.5" */
+function formatClean(value: bigint, decimals: number): string {
+  const raw = formatEther(value, decimals);
+  return raw.replace(/\.?0+$/, '');
+}
+
 /* Protocol-specific accent color mapping */
 function protocolAccent(type: number): { border: string; glow: string; text: string; bg: string; dot: string } {
   switch (type) {
@@ -67,8 +73,8 @@ export function VaultCard({
   index = 0,
 }: VaultCardProps) {
   const accent = protocolAccent(protocolType);
-  const tvl = formatEther(totalValueLocked ?? totalAssets, assetDecimals);
-  const balance = formatEther(totalAssets, assetDecimals);
+  const tvl = formatClean(totalValueLocked ?? totalAssets, assetDecimals);
+  const balance = formatClean(totalAssets, assetDecimals);
   const hasActivity = totalAssets > 0n;
 
   return (
@@ -196,8 +202,8 @@ export function VaultRow({
   index = 0,
 }: VaultCardProps) {
   const accent = protocolAccent(protocolType);
-  const tvl = formatEther(totalValueLocked ?? totalAssets, assetDecimals);
-  const balance = formatEther(totalAssets, assetDecimals);
+  const tvl = formatClean(totalValueLocked ?? totalAssets, assetDecimals);
+  const balance = formatClean(totalAssets, assetDecimals);
   const hasActivity = totalAssets > 0n;
 
   return (
