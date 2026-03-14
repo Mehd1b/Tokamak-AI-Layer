@@ -36,7 +36,7 @@ const PROTOCOL_LINKS: DropdownLink[] = [
 
 // Socials dropdown links
 const SOCIALS_LINKS: DropdownLink[] = [
-  { title: 'X', description: 'Follow us on X', href: 'https://x.com/Tokamak_Network', icon: SOCIAL_ICONS.x },
+  { title: 'X', description: 'Follow us on X', href: 'https://x.com/tokagent', icon: SOCIAL_ICONS.x },
   { title: 'GitHub', description: 'View the source code', href: 'https://github.com/tokamak-network', icon: SOCIAL_ICONS.github },
   { title: 'LinkedIn', description: 'Connect with us', href: 'https://www.linkedin.com/company/tokamaknetwork/', icon: SOCIAL_ICONS.linkedin },
 ];

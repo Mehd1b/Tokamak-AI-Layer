@@ -69,7 +69,6 @@ export function VaultCard({
   const accent = protocolAccent(protocolType);
   const tvl = formatEther(totalValueLocked ?? totalAssets, assetDecimals);
   const balance = formatEther(totalAssets, assetDecimals);
-  const shares = formatEther(totalShares, assetDecimals);
   const hasActivity = totalAssets > 0n;
 
   return (
@@ -128,10 +127,7 @@ export function VaultCard({
             Total Value Locked
           </p>
           <div className="flex items-baseline gap-2">
-            <span
-              className="text-2xl font-light tracking-tight text-white"
-              style={{ fontFamily: 'var(--font-serif), serif' }}
-            >
+            <span className="text-2xl font-light tracking-tight text-white font-mono">
               {tvl}
             </span>
             <span className={`text-xs font-mono font-medium ${accent.text}`}>
@@ -140,15 +136,11 @@ export function VaultCard({
           </div>
         </div>
 
-        {/* Row 3: Metric bar */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
+        {/* Row 3: Balance */}
+        <div className="mb-4">
           <div className="rounded-lg bg-white/[0.03] px-3 py-2">
             <p className="text-[10px] text-gray-500 font-mono uppercase tracking-wider mb-0.5">Balance</p>
             <p className="text-xs text-gray-300 font-mono">{balance} <span className="text-gray-500">{assetSymbol}</span></p>
-          </div>
-          <div className="rounded-lg bg-white/[0.03] px-3 py-2">
-            <p className="text-[10px] text-gray-500 font-mono uppercase tracking-wider mb-0.5">Shares</p>
-            <p className="text-xs text-gray-300 font-mono">{shares}</p>
           </div>
         </div>
 
@@ -206,7 +198,6 @@ export function VaultRow({
   const accent = protocolAccent(protocolType);
   const tvl = formatEther(totalValueLocked ?? totalAssets, assetDecimals);
   const balance = formatEther(totalAssets, assetDecimals);
-  const shares = formatEther(totalShares, assetDecimals);
   const hasActivity = totalAssets > 0n;
 
   return (
@@ -265,11 +256,6 @@ export function VaultRow({
         {/* Balance */}
         <div className="w-32 text-right hidden lg:block">
           <span className="text-xs font-mono text-gray-400">{balance}</span>
-        </div>
-
-        {/* Shares */}
-        <div className="w-28 text-right hidden xl:block">
-          <span className="text-xs font-mono text-gray-400">{shares}</span>
         </div>
 
         {/* Comments / Pending */}

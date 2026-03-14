@@ -6,7 +6,7 @@ import { useCommentCounts } from '@/hooks/useCommentCounts';
 import { VaultCard, VaultRow } from '@/components/VaultCard';
 import Link from 'next/link';
 
-type SortKey = 'tvl' | 'balance' | 'newest' | 'oldest' | 'shares';
+type SortKey = 'tvl' | 'balance' | 'newest' | 'oldest' | 'shares' | 'comments';
 type ViewMode = 'grid' | 'list';
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
@@ -15,6 +15,7 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'newest', label: 'Newest' },
   { key: 'oldest', label: 'Oldest' },
   { key: 'shares', label: 'Shares' },
+  { key: 'comments', label: 'Comments' },
 ];
 
 export default function VaultsPage() {
@@ -41,11 +42,16 @@ export default function VaultsPage() {
           return a._idx - b._idx;
         case 'shares':
           return a.totalShares > b.totalShares ? -1 : a.totalShares < b.totalShares ? 1 : 0;
+        case 'comments': {
+          const ac = commentCounts?.[a.address.toLowerCase()] ?? 0;
+          const bc = commentCounts?.[b.address.toLowerCase()] ?? 0;
+          return bc - ac;
+        }
         default:
           return 0;
       }
     });
-  }, [deployedVaults, sortBy]);
+  }, [deployedVaults, sortBy, commentCounts]);
 
   const vaultHex = searchAddress.startsWith('0x') && searchAddress.length === 42
     ? (searchAddress as `0x${string}`)
@@ -81,7 +87,7 @@ export default function VaultsPage() {
         {/* Search */}
         <div className="flex-1">
           <div className="input-dark-wrapper">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 pointer-events-none">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
               </svg>
@@ -265,7 +271,6 @@ export default function VaultsPage() {
                     <div className="w-24 shrink-0">Type</div>
                     <div className="flex-1 text-right">TVL</div>
                     <div className="w-32 text-right hidden lg:block">Balance</div>
-                    <div className="w-28 text-right hidden xl:block">Shares</div>
                     <div className="w-20 text-right shrink-0">Info</div>
                     <div className="w-5 shrink-0" />
                   </div>
