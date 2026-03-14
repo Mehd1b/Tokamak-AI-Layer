@@ -456,6 +456,31 @@ var VaultFactoryABI = [
     ]
   },
   {
+    type: "function",
+    name: "vaultProtocolType",
+    inputs: [{ name: "vault", type: "address" }],
+    outputs: [{ name: "", type: "uint8" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "setVaultProtocolType",
+    inputs: [
+      { name: "vault", type: "address" },
+      { name: "protocolType", type: "uint8" }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "event",
+    name: "VaultProtocolTypeSet",
+    inputs: [
+      { name: "vault", type: "address", indexed: true },
+      { name: "protocolType", type: "uint8", indexed: false }
+    ]
+  },
+  {
     type: "error",
     name: "OwnableUnauthorizedAccount",
     inputs: [{ name: "account", type: "address" }]
@@ -555,6 +580,13 @@ import { decodeEventLog as decodeEventLog3 } from "viem";
 
 // src/abi/KernelVault.ts
 var KernelVaultABI = [
+  {
+    type: "function",
+    name: "owner",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view"
+  },
   {
     type: "function",
     name: "asset",

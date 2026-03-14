@@ -733,6 +733,42 @@ declare const VaultFactoryABI: readonly [{
         readonly type: "bytes32";
     }];
 }, {
+    readonly type: "function";
+    readonly name: "vaultProtocolType";
+    readonly inputs: readonly [{
+        readonly name: "vault";
+        readonly type: "address";
+    }];
+    readonly outputs: readonly [{
+        readonly name: "";
+        readonly type: "uint8";
+    }];
+    readonly stateMutability: "view";
+}, {
+    readonly type: "function";
+    readonly name: "setVaultProtocolType";
+    readonly inputs: readonly [{
+        readonly name: "vault";
+        readonly type: "address";
+    }, {
+        readonly name: "protocolType";
+        readonly type: "uint8";
+    }];
+    readonly outputs: readonly [];
+    readonly stateMutability: "nonpayable";
+}, {
+    readonly type: "event";
+    readonly name: "VaultProtocolTypeSet";
+    readonly inputs: readonly [{
+        readonly name: "vault";
+        readonly type: "address";
+        readonly indexed: true;
+    }, {
+        readonly name: "protocolType";
+        readonly type: "uint8";
+        readonly indexed: false;
+    }];
+}, {
     readonly type: "error";
     readonly name: "OwnableUnauthorizedAccount";
     readonly inputs: readonly [{
@@ -754,6 +790,15 @@ declare const VaultFactoryABI: readonly [{
 }];
 
 declare const KernelVaultABI: readonly [{
+    readonly type: "function";
+    readonly name: "owner";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly name: "";
+        readonly type: "address";
+    }];
+    readonly stateMutability: "view";
+}, {
     readonly type: "function";
     readonly name: "asset";
     readonly inputs: readonly [];
