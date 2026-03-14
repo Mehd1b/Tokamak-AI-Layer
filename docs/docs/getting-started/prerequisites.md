@@ -88,19 +88,33 @@ cargo install just
 
 ```bash
 git clone https://github.com/tokamak-network/Tokamak-AI-Layer.git
-cd Tokamak-AI-Layer/execution-kernel
+cd Tokamak-AI-Layer
+```
+
+### Install the `tal` CLI
+
+```bash
+cargo install --path crates/tal-cli
 ```
 
 ### Verify Setup
 
-Run the test suite to verify your environment is configured correctly:
+Run the diagnostic tool to verify your environment is configured correctly:
 
 ```bash
-# Run all unit tests
-cargo test
+tal doctor
+```
 
-# Run with verbose output
-cargo test -- --nocapture
+This checks Rust, RISC Zero, Foundry, and Node.js in one command. To auto-install missing dependencies:
+
+```bash
+tal doctor --install
+```
+
+You can also run the test suite directly:
+
+```bash
+cargo test
 ```
 
 ## Hardware Requirements
@@ -125,9 +139,24 @@ For development, you can run tests without proof generation using the default fe
 
 ## Network Configuration
 
-### Sepolia Testnet
+### HyperEVM Testnet (Chain 998)
 
 For on-chain testing, you'll need:
+
+1. **Testnet HYPE**: Get tokens from `https://app.hyperliquid-testnet.xyz/drip`
+2. **Bridge to HyperEVM**: Send HYPE to `0x2222222222222222222222222222222222222222`
+3. **Private Key**: A wallet private key for signing transactions
+
+The `tal init` command generates a `.env.example` with testnet defaults. Copy and configure:
+
+```bash
+cp .env.example .env
+# Edit .env with your private key
+```
+
+### Sepolia Testnet
+
+For Ethereum L1 testing:
 
 1. **Sepolia ETH**: Get testnet ETH from a faucet
 2. **RPC URL**: An Ethereum Sepolia RPC endpoint (Alchemy, Infura, etc.)
@@ -158,3 +187,5 @@ Once your environment is set up:
 1. [Build the project locally](/getting-started/local-build)
 2. [Run the example yield agent](/getting-started/run-an-example)
 3. [Start writing your own agent](/sdk/writing-an-agent)
+4. [Deploy to testnet](/sdk/deploy-guide)
+5. [Monitor your agent](/sdk/monitoring)

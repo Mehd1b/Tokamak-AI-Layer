@@ -1,60 +1,81 @@
 ---
-title: cargo-agent CLI Reference
+title: CLI Reference
 sidebar_position: 7
 ---
 
-# `cargo agent` CLI Reference
+# `tal` CLI Reference
 
-The `cargo-agent` CLI provides a unified workflow for agent development: scaffolding, building, testing, and packaging.
+The `tal` CLI is the unified developer tool for the Execution Kernel. It covers the full agent lifecycle: scaffolding, validation, testing, building, deployment, and monitoring.
 
 ## Installation
 
 ```bash
-cargo install --path crates/tools/cargo-agent
+cargo install --path crates/tal-cli
 ```
 
-After installation, all commands are available as `cargo agent <subcommand>`.
+After installation, all commands are available as `tal <subcommand>`.
 
-## `cargo agent new`
+:::tip
+The older `cargo agent` CLI (`cargo install --path crates/tools/cargo-agent`) is still available for basic operations. `tal` is the recommended tool — it includes all `cargo agent` functionality plus deployment, monitoring, and diagnostics.
+:::
 
-Create a new agent project.
+## `tal init`
+
+Scaffold a new agent project.
 
 ```
-cargo agent new <NAME> [OPTIONS]
+tal init <NAME> [OPTIONS]
 ```
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--template <TYPE>` | `minimal` | Template: `minimal` or `yield` |
-| `--out <PATH>` | `crates/agents/<NAME>` | Output directory |
-| `--agent-id <HEX>` | `0x00...00` | Pre-set agent ID (64-char hex with `0x` prefix) |
-| `--no-git` | false | Skip `git init` |
+| `--template <TYPE>` | interactive | Template: `minimal`, `yield` (or `yield-farmer`), `perp-trader` (or `perp`, `trading`) |
+| `--output <PATH>` | `crates/agents/<NAME>` | Output directory |
+| `--no-interactive` | false | Skip interactive prompts |
+
+### Templates
+
+| Template | Description | Generates |
+|----------|-------------|-----------|
+| `minimal` | Bare agent returning NO_OP | agent/ + risc0-methods/ |
+| `yield` | DeFi yield farming pattern | agent/ + risc0-methods/ |
+| `perp-trader` | Perpetual trading with Hyperliquid | agent/ + risc0-methods/ + **host/** |
 
 ### Examples
 
 ```bash
-# Minimal agent (no-op template)
-cargo agent new my-agent
+# Interactive — prompts for template selection
+tal init my-agent
 
-# Yield farming template with custom ID
-cargo agent new my-yield-agent --template yield \
-  --agent-id 0x0000000000000000000000000000000000000000000000000000000000000042
+# Yield farming agent
+tal init my-yield-agent --template yield
+
+# Perpetual trading agent (includes host orchestrator)
+tal init my-trader --template perp-trader
 ```
 
 ### Generated Structure
 
 ```
-my-agent/
-├── Cargo.toml           # Workspace manifest
-├── agent/               # Agent logic + kernel binding
+crates/agents/my-agent/
+├── agent/
+│   ├── Cargo.toml           # Dependencies: kernel-sdk, kernel-core
+│   ├── build.rs             # AGENT_CODE_HASH computation
+│   └── src/lib.rs           # agent_main() — your logic
+├── risc0-methods/
+│   ├── Cargo.toml           # risc0-build integration
+│   ├── build.rs             # embed_methods()
+│   ├── src/lib.rs            # IMAGE_ID placeholder
+│   └── zkvm-guest/
+│       ├── Cargo.toml
+│       └── src/main.rs      # Calls kernel_guest::kernel_main_with_agent
+├── host/                     # (perp-trader only)
 │   ├── Cargo.toml
-│   ├── build.rs         # AGENT_CODE_HASH computation
-│   └── src/lib.rs       # agent_main() + agent_entrypoint! macro
-├── tests/               # Test harness
-│   ├── Cargo.toml
-│   └── src/lib.rs
+│   └── src/main.rs          # Data fetching + orchestration stubs
+├── .env.example              # Testnet defaults (chain 998)
+├── README.md
 └── dist/
-    └── agent-pack.json  # Agent manifest
+    └── agent-pack.json      # Agent manifest with placeholder hashes
 ```
 
 After scaffolding, add the new crates to your workspace `Cargo.toml`:
@@ -64,101 +85,262 @@ After scaffolding, add the new crates to your workspace `Cargo.toml`:
 members = [
     # ...existing members...
     "crates/agents/my-agent/agent",
-    "crates/agents/my-agent/tests",
+    "crates/agents/my-agent/risc0-methods",
 ]
 ```
 
-## `cargo agent build`
+---
 
-Build an agent crate.
+## `tal doctor`
 
-```
-cargo agent build <NAME> [OPTIONS]
-```
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--release` | false | Build in release mode |
-
-```bash
-cargo agent build my-agent
-cargo agent build my-agent --release
-```
-
-Internally runs `cargo build -p <NAME>` from the workspace root.
-
-## `cargo agent test`
-
-Run agent tests.
+Pre-flight configuration validator. Checks toolchain, build state, and configuration.
 
 ```
-cargo agent test <NAME> [-- <EXTRA_ARGS>...]
-```
-
-Extra arguments are passed through to `cargo test`:
-
-```bash
-cargo agent test my-agent
-cargo agent test my-agent -- --nocapture
-cargo agent test my-agent -- test_supply
-```
-
-Internally runs `cargo test -p <NAME>` from the workspace root.
-
-## `cargo agent pack`
-
-Verify the agent manifest (wraps `agent-pack verify`).
-
-```
-cargo agent pack <NAME> [OPTIONS]
+tal doctor [OPTIONS]
 ```
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--version <VER>` | `0.1.0` | Agent version for the manifest |
+| `--install` | false | Auto-install missing toolchains |
+| `--chain <ID>` | auto | Chain ID for chain-specific checks |
+| `--path <PATH>` | `.` | Agent project directory |
+
+### What It Checks
+
+**Toolchain:**
+- Rust (`rustc --version`)
+- RISC Zero (detects `r0vm`, `rzup`, or `cargo risczero`)
+- Foundry (`forge --version`)
+- Node.js (`node --version`)
+
+**Build State:**
+- Agent crate exists (`agent/src/lib.rs` + `agent/Cargo.toml`)
+- ELF binary staleness (compares source hash vs ELF mtime)
+- Workspace membership (agent in workspace Cargo.toml)
+
+**Configuration:**
+- `.env` file exists
+- Required variables: `RPC_URL`, `PRIVATE_KEY`, `VAULT_ADDRESS`
+
+### Example Output
+
+```
+tal doctor
+
+✓ Rust toolchain (1.88.0)
+✓ RISC Zero toolchain (r0vm)
+✓ Foundry (forge 0.3.1)
+✓ Node.js (v20.11.0)
+✓ Agent crate found
+✗ ELF is stale — source changed since last build
+  → Run: tal build --elf
+✓ .env file found
+✗ VAULT_ADDRESS not set
+  → Add VAULT_ADDRESS to .env
+
+5 passed, 2 failed
+```
+
+### Auto-Install
 
 ```bash
-cargo agent pack my-agent
+# Install missing toolchains automatically
+tal doctor --install
 ```
 
-Checks `<agent-dir>/dist/agent-pack.json` for structural validity. For full bundle creation with ELF, use the `agent-pack` CLI directly.
+Installs Rust (via rustup), RISC Zero (via rzup), and Foundry (via foundryup) as needed.
 
-## `cargo agent list`
+---
 
-List all agents in `crates/agents/`.
+## `tal test`
+
+Test agent logic at multiple levels.
+
+```
+tal test [OPTIONS]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--local` | *(default)* | Run `cargo test` natively (instant, no zkVM) |
+| `--dry-run` | | Run host with live data, no proof or submission |
+| `--prove` | | Full ZK proof generation (~8-10 min) |
+| `--determinism-check` | false | Run twice and verify consistent output |
+| `--input <PATH>` | | Test with a JSON fixture file |
+| `--generate-fixture` | | Show how to capture live data to a fixture |
+| `--agent <NAME>` | auto-detect | Agent name (inferred from current directory) |
+
+### Test Modes
 
 ```bash
-cargo agent list
+# Default: run unit tests natively (2-5 seconds)
+tal test --local
+
+# With live market data, no proof
+tal test --dry-run
+
+# Full ZK proof generation
+tal test --prove
+
+# Verify determinism (runs twice, compares output)
+tal test --local --determinism-check
+
+# Test with a saved fixture
+tal test --local --input fixtures/btc-long.json
 ```
 
-Output:
+### Output
 
 ```
-Agents (2):
-  defi-yield-farmer
-  example-yield-agent
+tal test --local
+
+Running tests for perp-trader-agent...
+  ✓ test_bullish_sma_crossover_long_entry
+  ✓ test_oracle_price_overrides_perp_mark_price
+  ✓ test_stale_oracle_feed_returns_empty
+  ✓ test_force_close_emits_single_action
+
+4 passed, 0 failed
 ```
+
+---
+
+## `tal build`
+
+Compile agent crate and optionally build the zkVM ELF binary.
+
+```
+tal build [OPTIONS]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--elf` | false | Also build the zkVM guest ELF binary |
+| `--agent <NAME>` | auto-detect | Agent name |
+
+### Examples
+
+```bash
+# Build agent crate only (fast)
+tal build
+
+# Build agent + zkVM ELF (required before deploy)
+tal build --elf
+```
+
+When `--elf` is specified, `tal build`:
+
+1. Cleans stale riscv-guest target (`rm -rf target/riscv-guest/{agent}-risc0-methods`)
+2. Builds via `cargo build -p {agent}-risc0-methods --release`
+3. Warns about using the `.bin` file (not raw ELF) for bundling
+
+---
+
+## `tal deploy`
+
+End-to-end on-chain deployment via alloy.
+
+```
+tal deploy [OPTIONS]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--testnet` | false | Deploy to testnet (chain 998) instead of mainnet (999) |
+| `--step <STEP>` | all | Run a single step: `register`, `vault`, `adapter`, `fund` |
+| `--agent <NAME>` | auto-detect | Agent name |
+| `--config <PATH>` | `.env` | Path to .env file |
+
+### Full Pipeline
+
+```bash
+# Deploy everything to testnet
+tal deploy --testnet
+
+# Deploy to mainnet
+tal deploy
+```
+
+Steps: preflight → register agent → deploy vault → adapter setup → summary.
+
+Each step has skip-if-exists logic. Vault imageId mismatch is detected automatically — deploys a new vault with incremented salt.
+
+See the [Deployment Guide](/sdk/deploy-guide) for full details.
+
+---
+
+## `tal monitor`
+
+Live execution dashboard for deployed vaults.
+
+```
+tal monitor [OPTIONS]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--vault <ADDRESS>` | Required | Vault address to monitor |
+| `--interval <SECONDS>` | `30` | Poll frequency |
+| `--chain <ID>` | `999` | Chain ID |
+| `--json` | false | Output machine-readable JSON per poll |
+
+### Examples
+
+```bash
+# Live colored terminal dashboard
+tal monitor --vault 0xae55...
+
+# JSON output for automation/logging
+tal monitor --vault 0xae55... --json | jq '.vault.total_assets'
+
+# Faster polling on testnet
+tal monitor --vault 0x... --chain 998 --interval 10
+```
+
+See the [Monitoring Guide](/sdk/monitoring) for full details.
+
+---
+
+## `cargo agent` (Legacy)
+
+The `cargo agent` CLI is still available for basic operations:
+
+| Command | Equivalent `tal` Command |
+|---------|--------------------------|
+| `cargo agent new <name>` | `tal init <name>` |
+| `cargo agent build <name>` | `tal build --agent <name>` |
+| `cargo agent test <name>` | `tal test --agent <name>` |
+| `cargo agent pack <name>` | `agent-pack verify` |
+| `cargo agent list` | `cargo agent list` |
+
+Install: `cargo install --path crates/tools/cargo-agent`
+
+---
 
 ## Typical Workflow
 
 ```bash
-# 1. Create a new agent
-cargo agent new my-defi-agent --template yield
+# 1. Scaffold a new agent
+tal init my-agent --template yield
 
-# 2. Add to workspace Cargo.toml members
+# 2. Add to workspace Cargo.toml, then edit agent logic
+$EDITOR crates/agents/my-agent/agent/src/lib.rs
 
-# 3. Edit agent logic
-$EDITOR crates/agents/my-defi-agent/agent/src/lib.rs
+# 3. Test locally (instant feedback)
+tal test --local
 
-# 4. Build
-cargo agent build my-defi-agent
+# 4. Validate environment
+tal doctor
 
-# 5. Test
-cargo agent test my-defi-agent
+# 5. Build agent + ELF
+tal build --elf
 
-# 6. Verify manifest
-cargo agent pack my-defi-agent
+# 6. Deploy to testnet
+tal deploy --testnet
 
-# 7. List all agents
-cargo agent list
+# 7. Monitor
+tal monitor --vault 0x...
+
+# 8. Deploy to mainnet
+tal deploy
 ```

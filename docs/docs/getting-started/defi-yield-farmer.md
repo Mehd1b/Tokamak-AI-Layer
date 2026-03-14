@@ -163,7 +163,7 @@ cargo test -p kernel-host-tests -- defi_yield_farmer
 ## Deployment
 
 :::tip Placeholder variables
-Shell variables like `$AGENT_REGISTRY`, `$VAULT_FACTORY`, and `$PRIVATE_KEY` are placeholders. See [Deployed Contracts](/onchain/verifier-overview#deployed-contracts-sepolia) for actual contract addresses.
+Shell variables like `$AGENT_REGISTRY`, `$VAULT_FACTORY`, and `$PRIVATE_KEY` are placeholders. See [Deployed Contracts](/onchain/verifier-overview#ethereum-sepolia-testnet) for actual contract addresses.
 :::
 
 ### Prerequisites

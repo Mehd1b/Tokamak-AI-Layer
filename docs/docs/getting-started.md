@@ -24,23 +24,23 @@ curl -L https://risczero.com/install | bash && rzup install
 curl -L https://foundry.paradigm.xyz | bash && foundryup
 ```
 
-Clone the repository and install the agent CLI:
+Clone the repository and install the `tal` CLI:
 
 ```bash
 git clone https://github.com/tokamak-network/Tokamak-AI-Layer.git
 cd Tokamak-AI-Layer
 
-# Install the cargo-agent CLI
-cargo install --path crates/tools/cargo-agent
+# Install the tal CLI
+cargo install --path crates/tal-cli
 ```
 
 Validate everything is working:
 
 ```bash
-rustc --version          # Rust 1.75.0+
-cargo risczero --version # RISC Zero toolchain
-forge --version          # Foundry
+tal doctor
 ```
+
+This checks Rust, RISC Zero, Foundry, and Node.js in one command. If anything is missing, run `tal doctor --install` to auto-install.
 
 :::tip Hardware
 Development and testing works on any modern machine (8GB+ RAM). Proof generation is CPU-intensive and benefits from 8+ cores and 32GB+ RAM. You can develop and test without generating proofs -- only the final build step requires the RISC Zero toolchain.
@@ -50,7 +50,7 @@ Development and testing works on any modern machine (8GB+ RAM). Proof generation
 
 ```bash
 # Scaffold a yield farming agent from the built-in template
-cargo agent new my-first-agent --template yield
+tal init my-first-agent --template yield
 ```
 
 This creates a complete project structure:
@@ -61,9 +61,12 @@ crates/agents/my-first-agent/
 │   ├── Cargo.toml           # Dependencies: kernel-sdk, kernel-core
 │   ├── build.rs             # Computes AGENT_CODE_HASH at build time
 │   └── src/lib.rs           # agent_main() — your decision logic
-├── tests/                   # Test harness
+├── risc0-methods/           # zkVM guest compilation
 │   ├── Cargo.toml
-│   └── src/lib.rs           # Unit and integration tests
+│   ├── build.rs
+│   └── zkvm-guest/          # Entry point for zkVM execution
+├── .env.example             # Testnet defaults (chain 998)
+├── README.md
 └── dist/
     └── agent-pack.json      # Agent manifest for deployment
 ```
@@ -71,8 +74,8 @@ crates/agents/my-first-agent/
 Other available templates:
 
 ```bash
-cargo agent new my-trader --template perp-trader   # Perpetual futures trading
-cargo agent new my-agent  --template minimal       # Bare-bones starting point
+tal init my-trader --template perp-trader   # Perpetual futures trading (includes host/)
+tal init my-agent  --template minimal       # Bare-bones starting point
 ```
 
 ## Understand the Code (5 min)
@@ -171,11 +174,18 @@ flowchart LR
 Run your agent's unit tests without any zkVM or proof generation:
 
 ```bash
-# Run agent unit tests
-cargo agent test my-first-agent
+# Run agent unit tests (instant — 2-5 seconds)
+tal test --local
 ```
 
 This tests input parsing, action construction, and code hash consistency.
+
+To verify your agent is fully deterministic (same input always produces same output):
+
+```bash
+# Run twice and compare outputs
+tal test --local --determinism-check
+```
 
 For integration tests through the full kernel pipeline (still no proof generation):
 
@@ -184,30 +194,24 @@ For integration tests through the full kernel pipeline (still no proof generatio
 cargo test -p kernel-host-tests -- --nocapture
 ```
 
-To verify your agent is fully deterministic (same input always produces same output):
-
-```bash
-# Run the determinism test
-cargo test test_determinism -- --nocapture
-```
-
 :::note Why determinism matters
 The zkVM generates proofs of execution. If your agent is non-deterministic (e.g., uses randomness or system time), the proof would be for a different execution than what actually ran. The kernel SDK enforces this: `#![no_std]`, no I/O, no randomness, no unsafe code.
 :::
 
 ## Build the Proof (8 min)
 
-This is the step that compiles your agent into a zkVM guest binary and generates the `IMAGE_ID` — a unique fingerprint of your compiled agent that gets registered on-chain.
+This step compiles your agent into a zkVM guest binary and generates the `IMAGE_ID` — a unique fingerprint of your compiled agent that gets registered on-chain.
 
 ```bash
-# Install the RISC Zero toolchain if you haven't already
-cargo risczero install
-
-# Build the zkVM guest ELF binary
-cargo agent build my-first-agent
+# Build agent + zkVM ELF binary
+tal build --elf
 ```
 
-Under the hood, this compiles your agent + the kernel runtime into a RISC-V ELF binary targeting the RISC Zero zkVM. The build produces:
+Under the hood, this:
+
+1. Cleans stale riscv-guest artifacts (avoids the `cargo clean -p` footgun)
+2. Compiles your agent + kernel runtime into a RISC-V ELF binary
+3. Produces `IMAGE_ID` and `AGENT_CODE_HASH`
 
 | Artifact | Location | Purpose |
 |----------|----------|---------|
@@ -218,80 +222,62 @@ Under the hood, this compiles your agent + the kernel runtime into a RISC-V ELF 
 For reproducible builds (required for production — ensures identical `IMAGE_ID` across machines):
 
 ```bash
-RISC0_USE_DOCKER=1 cargo agent build my-first-agent
-```
-
-To run a full end-to-end proof generation test:
-
-```bash
-cargo test -p e2e-tests --features risc0-e2e -- --nocapture
+RISC0_USE_DOCKER=1 tal build --elf
 ```
 
 :::warning
-Proof generation is CPU-intensive. Expect 8-10 minutes on a modern machine. For development iteration, use `cargo agent test` (instant) and only generate proofs when you are ready to deploy.
+Proof generation is CPU-intensive. Expect 8-10 minutes on a modern machine. For development iteration, use `tal test --local` (instant) and only generate proofs when you are ready to deploy.
 :::
 
-## Deploy to Testnet (3 min)
+## Deploy (3 min)
 
-With your agent built and tested, deploy it to Ethereum Sepolia.
+With your agent built and tested, deploy to HyperEVM testnet:
 
-### Step 1: Set environment variables
-
-```bash
-export RPC_URL="https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY"
-export PRIVATE_KEY="0x..."
-```
-
-### Step 2: Register your agent
-
-Every agent is identified on-chain by its `agentId = keccak256(author, salt)`. Registration is permissionless — anyone can register.
+### Step 1: Configure environment
 
 ```bash
-# Get your IMAGE_ID from the build output
-export IMAGE_ID="0x..."
-
-# Register the agent in the AgentRegistry
-cast send 0xED27f8fbB7D576f02D516d01593eEfBaAfe4b168 \
-    "registerAgent(bytes32,bytes32,string)" \
-    $IMAGE_ID \
-    $(cast keccak "my-first-agent-salt") \
-    "ipfs://QmYourManifestCID" \
-    --private-key $PRIVATE_KEY \
-    --rpc-url $RPC_URL
+cp .env.example .env
+# Edit .env with your private key and RPC URL
 ```
 
-### Step 3: Deploy a vault
+The `.env.example` generated by `tal init` includes testnet defaults (chain 998).
 
-Vaults hold capital and execute agent-produced actions after proof verification. The `trustedImageId` is pinned at deployment — only proofs from your specific agent binary are accepted.
+### Step 2: Validate configuration
 
 ```bash
-# Deploy via the VaultFactory (Sepolia)
-cast send 0x580e55fDE87fFC1cF1B6a446d6DBf8068EB07b8C \
-    "deployVault(bytes32,bytes32)" \
-    $IMAGE_ID \
-    $(cast keccak "my-vault-salt") \
-    --private-key $PRIVATE_KEY \
-    --rpc-url $RPC_URL
+tal doctor
 ```
 
-### Step 4: Execute with proof
+### Step 3: Deploy
 
 ```bash
-# Generate a proof for a specific execution
-cargo run -p e2e-tests --release --features risc0-e2e -- \
-    --rpc-url $RPC_URL \
-    --private-key $PRIVATE_KEY \
-    --vault $VAULT_ADDRESS
+# Deploy to testnet — registers agent + deploys vault automatically
+tal deploy --testnet
 ```
 
-### Testnet Contract Addresses
+`tal deploy` handles the full pipeline:
+1. Reads `IMAGE_ID` and `AGENT_CODE_HASH` from `dist/agent-pack.json`
+2. Registers your agent in the on-chain AgentRegistry (skips if already registered)
+3. Deploys a vault via VaultFactory (detects stale imageId, auto-increments salt)
+4. Prints deployment summary with all addresses
 
-| Contract | Sepolia Address |
-|----------|----------------|
-| AgentRegistry | [`0xED27f8fbB7D576f02D516d01593eEfBaAfe4b168`](https://sepolia.etherscan.io/address/0xED27f8fbB7D576f02D516d01593eEfBaAfe4b168) |
-| VaultFactory | [`0x580e55fDE87fFC1cF1B6a446d6DBf8068EB07b8C`](https://sepolia.etherscan.io/address/0x580e55fDE87fFC1cF1B6a446d6DBf8068EB07b8C) |
-| KernelExecutionVerifier | [`0x1eB41537037fB771CBA8Cd088C7c806936325eB5`](https://sepolia.etherscan.io/address/0x1eB41537037fB771CBA8Cd088C7c806936325eB5) |
-| RISC Zero Verifier Router | [`0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187`](https://sepolia.etherscan.io/address/0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187) |
+### Step 4: Monitor
+
+```bash
+tal monitor --vault <VAULT_ADDRESS> --chain 998
+```
+
+### Testnet Tokens
+
+To get testnet tokens for HyperEVM testnet (chain 998):
+
+1. Get testnet HYPE from `https://app.hyperliquid-testnet.xyz/drip`
+2. Bridge to HyperEVM: send HYPE to `0x2222222222222222222222222222222222222222`
+3. Wait 10 seconds, then deploy
+
+### Contract Addresses
+
+See [Permissionless System](/onchain/permissionless-system) for deployed contract addresses on all chains.
 
 ## What's Next?
 
@@ -304,6 +290,8 @@ Now that you have a working agent, explore these topics:
 | [CallBuilder & ERC20 Helpers](/sdk/call-builder) | Fluent action builder, ERC20 approve/transfer shortcuts |
 | [Constraints](/sdk/constraints-and-commitments) | Position limits, leverage bounds, cooldown periods |
 | [Testing](/sdk/testing) | TestHarness, ContextBuilder, and snapshot testing |
+| [Deployment Guide](/sdk/deploy-guide) | Full `tal deploy` reference with step-by-step details |
+| [Monitoring](/sdk/monitoring) | Live dashboard for deployed agents |
 | [Agent Pack](/agent-pack/format) | Bundle and publish your agent for deployment |
 | [Architecture Overview](/architecture/overview) | Full system design and security model |
 | [On-Chain Verification](/onchain/verifier-overview) | How proofs are verified and actions executed on-chain |
@@ -328,6 +316,10 @@ cp target/riscv-guest/.../release/zkvm-guest bundle/guest.elf
 
 The raw ELF is ~893KB while the processed `.bin` is ~926KB. If you see `Malformed ProgramBinary` during proof generation, this is almost certainly the cause.
 
+:::tip
+`tal build --elf` handles this correctly and warns about the `.bin` requirement.
+:::
+
 ### 2. Force ELF rebuild with `rm -rf`, not `cargo clean -p`
 
 After modifying agent source code, `cargo clean -p` does **not** clean the RISC-V guest target. You must manually delete the build directory:
@@ -341,13 +333,19 @@ rm -rf target/riscv-guest/my-first-agent-risc0-methods
 cargo build -p my-first-agent-risc0-methods --release
 ```
 
-If your code changes are not reflected in the proof, stale ELF artifacts are the reason.
+:::tip
+`tal build --elf` handles this automatically — it cleans the stale target before building.
+:::
 
 ### 3. Vault `trustedImageId` is immutable
 
 The `IMAGE_ID` is pinned at vault creation and cannot be updated. If you rebuild your agent (changing the `IMAGE_ID`), you must deploy a **new vault**. The old vault will only accept proofs from the old agent binary.
 
 This is a security feature: depositors can audit exactly which code their vault runs.
+
+:::tip
+`tal deploy` detects stale imageId automatically and deploys a new vault with an incremented salt.
+:::
 
 ### 4. HyperEVM has a 3M block gas limit
 
@@ -363,6 +361,10 @@ forge create --private-key $PK --legacy --gas-limit 3000000 --broadcast \
 ```
 
 Also note: HyperEVM does **not** support EIP-1559. Always use `--legacy` for deployments.
+
+:::tip
+`tal deploy` handles gas limits and legacy transactions automatically.
+:::
 
 ### 5. CoreWriter actions are async intents, not immediate state changes
 

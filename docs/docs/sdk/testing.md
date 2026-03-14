@@ -196,7 +196,17 @@ mod tests {
 Run unit tests:
 
 ```bash
-cargo agent test my-agent
+# Using the tal CLI (recommended)
+tal test --local
+
+# Or directly via cargo
+cargo test -p my-agent
+```
+
+For determinism verification:
+
+```bash
+tal test --local --determinism-check
 ```
 
 ## Integration Tests
@@ -272,9 +282,24 @@ jobs:
           cargo test -p e2e-tests --features risc0-e2e -- --nocapture
 ```
 
+## `tal test` CLI
+
+The `tal test` command provides multiple testing modes from a single interface:
+
+```bash
+tal test --local               # Unit tests (instant, default)
+tal test --dry-run             # Live data, no proof
+tal test --prove               # Full ZK proof (~8-10 min)
+tal test --determinism-check   # Run twice, compare outputs
+tal test --input fixture.json  # Test with saved fixture
+```
+
+See the [CLI Reference](/sdk/cli-reference#tal-test) for all flags.
+
 ## Related
 
 - [`agent_input!` Macro](/sdk/agent-input-macro) - Declarative input parsing
 - [CallBuilder & ERC20 Helpers](/sdk/call-builder) - Action construction
 - [Constraints](/sdk/constraints-and-commitments) - Constraint system details
 - [Run an Example](/getting-started/run-an-example) - Running the yield agent
+- [Deployment Guide](/sdk/deploy-guide) - Deploy after testing

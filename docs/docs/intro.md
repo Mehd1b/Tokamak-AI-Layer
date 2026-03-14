@@ -16,6 +16,8 @@ The Execution Kernel is a **consensus-critical, deterministic agent execution fr
 | **Understand how it works** | [Architecture Overview](/architecture/overview) |
 | **Write a full agent** | [Writing an Agent](/sdk/writing-an-agent) |
 | **Set up your dev environment** | [Prerequisites](/getting-started/prerequisites) |
+| **Deploy an agent on-chain** | [Deployment Guide](/sdk/deploy-guide) |
+| **Monitor a deployed agent** | [Monitoring](/sdk/monitoring) |
 | **Integrate with smart contracts** | [On-Chain Verification](/onchain/verifier-overview) |
 | **Understand the binary formats** | [Input Format](/kernel/input-format) |
 | **Package an agent for deployment** | [Agent Pack Format](/agent-pack/format) |
@@ -60,17 +62,26 @@ The constraint engine validates agent outputs against safety rules:
 ## Quick Start
 
 ```bash
-# Install the cargo agent CLI
-cargo install --path crates/tools/cargo-agent
+# Install the tal CLI
+cargo install --path crates/tal-cli
+
+# Validate your environment
+tal doctor
 
 # Scaffold a new agent
-cargo agent new my-agent --template yield
+tal init my-agent --template yield
 
-# Run tests
-cargo agent test my-agent
+# Test locally (instant — no zkVM needed)
+tal test --local
 
-# Build with zkVM support
-cargo build --release --features risc0
+# Build with zkVM ELF
+tal build --elf
+
+# Deploy to testnet
+tal deploy --testnet
+
+# Monitor your vault
+tal monitor --vault <ADDRESS> --chain 998
 ```
 
 ## Protocol Constants
@@ -131,4 +142,6 @@ The system is **fully permissionless**: anyone can register agents via `AgentReg
 - [Architecture Overview](/architecture/overview) - Understand the system design
 - [Prerequisites](/getting-started/prerequisites) - Set up your development environment
 - [Writing an Agent](/sdk/writing-an-agent) - Full agent development guide
+- [Deployment Guide](/sdk/deploy-guide) - Deploy agents on-chain with `tal deploy`
+- [Monitoring](/sdk/monitoring) - Live dashboard for deployed agents
 - [Cryptographic Chain](/architecture/cryptographic-chain) - How imageId and commitments work

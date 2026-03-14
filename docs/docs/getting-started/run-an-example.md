@@ -16,7 +16,11 @@ The `example-yield-agent` demonstrates a complete agent lifecycle using the mode
 Run the agent logic without proof generation:
 
 ```bash
-cargo agent test example-yield-agent
+# Using the tal CLI
+tal test --local --agent example-yield-agent
+
+# Or directly via cargo
+cargo test -p example-yield-agent
 ```
 
 This tests:
@@ -125,4 +129,5 @@ After running the example:
 
 1. [Understand the SDK](/sdk/overview)
 2. [Write your own agent](/sdk/writing-an-agent)
-3. [Deploy to production](/agent-pack/format)
+3. [Deploy to testnet](/sdk/deploy-guide)
+4. [Monitor your agent](/sdk/monitoring)

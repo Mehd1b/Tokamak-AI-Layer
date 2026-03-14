@@ -29,6 +29,8 @@ const sidebars: SidebarsConfig = {
         'sdk/testing',
         'sdk/constraints-and-commitments',
         'sdk/cli-reference',
+        'sdk/deploy-guide',
+        'sdk/monitoring',
       ],
     },
     {

@@ -5,7 +5,7 @@ sidebar_position: 2
 
 # Build an Agent in 5 Minutes
 
-This guide takes you from zero to a working, tested agent using the `cargo agent` CLI.
+This guide takes you from zero to a working, tested agent using the `tal` CLI.
 
 ## Prerequisites
 
@@ -15,14 +15,22 @@ This guide takes you from zero to a working, tested agent using the `cargo agent
 ## Step 1: Install the CLI
 
 ```bash
-cd execution-kernel
-cargo install --path crates/tools/cargo-agent
+cd Tokamak-AI-Layer
+cargo install --path crates/tal-cli
 ```
 
-## Step 2: Scaffold a new agent
+## Step 2: Validate your environment
 
 ```bash
-cargo agent new my-agent
+tal doctor
+```
+
+If anything is missing, run `tal doctor --install` to auto-install toolchains.
+
+## Step 3: Scaffold a new agent
+
+```bash
+tal init my-agent --template yield
 ```
 
 This creates a ready-to-build project:
@@ -33,14 +41,13 @@ crates/agents/my-agent/
 │   ├── Cargo.toml
 │   ├── build.rs         # AGENT_CODE_HASH computation
 │   └── src/lib.rs       # agent_main() + agent_entrypoint! macro
-├── tests/               # Test harness
-│   ├── Cargo.toml
-│   └── src/lib.rs
+├── risc0-methods/       # zkVM guest compilation
+├── .env.example         # Testnet defaults
 └── dist/
     └── agent-pack.json  # Agent manifest
 ```
 
-## Step 3: Edit your agent
+## Step 4: Edit your agent
 
 Open `crates/agents/my-agent/agent/src/lib.rs` and implement your logic:
 
@@ -73,16 +80,29 @@ const _: AgentEntrypoint = agent_main;
 kernel_sdk::agent_entrypoint!(agent_main);
 ```
 
-## Step 4: Test
+## Step 5: Test
 
 ```bash
-cargo agent test my-agent
+tal test --local
 ```
 
-## Step 5: Build
+## Step 6: Build
 
 ```bash
-cargo agent build my-agent
+tal build
+```
+
+## Step 7: Deploy to testnet
+
+```bash
+# Build the zkVM ELF binary
+tal build --elf
+
+# Deploy agent + vault
+tal deploy --testnet
+
+# Monitor your vault
+tal monitor --vault <VAULT_ADDRESS> --chain 998
 ```
 
 ## What's next?
@@ -91,4 +111,6 @@ cargo agent build my-agent
 - [`agent_input!` Macro](/sdk/agent-input-macro) — Declarative input parsing
 - [CallBuilder & ERC20 Helpers](/sdk/call-builder) — Fluent action construction
 - [Testing](/sdk/testing) — `TestHarness`, `ContextBuilder`, and snapshot testing
-- [`cargo agent` CLI Reference](/sdk/cli-reference) — All subcommands and flags
+- [Deployment Guide](/sdk/deploy-guide) — Full `tal deploy` reference
+- [Monitoring](/sdk/monitoring) — Live dashboard for deployed agents
+- [`tal` CLI Reference](/sdk/cli-reference) — All subcommands and flags
