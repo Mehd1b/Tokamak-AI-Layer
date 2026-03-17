@@ -122,9 +122,17 @@ These constants are defined in [`kernel-core/src/lib.rs`](https://github.com/tok
 | VaultFactory | `0xc7Fc0dD5f1B03E3De0C313eE0D3b06Cb2Dc017BB` |
 | KernelExecutionVerifier | `0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30` |
 | RISC Zero Verifier Router | `0x9f8d4D1f7AAf06aab1640abd565A731399862Bc8` |
-| HyperliquidAdapter | `0x30C1ab0F82CDE134A9eb91CC8AEBAD503aa736dA` |
+| HyperliquidAdapter | `0x47660230D9B8e343bdecD2e35008Bd06E47bb3e0` |
 
 See [Hyperliquid Integration](/onchain/hyperliquid-integration) for details on the HyperEVM adapter contracts.
+
+### HyperEVM Testnet (Chain ID: 998)
+
+| Contract | Address |
+|----------|---------|
+| AgentRegistry | `0x09447147C6E75a60A449f38532F06E19F5F632F3` |
+| VaultFactory | `0x4c36bCA87f21E16f5af8A6d7Df2D86a5aD13049F` |
+| KernelExecutionVerifier | `0x0052258E517835081c94c0B685409f2EfC4D502b` |
 
 ### Ethereum Sepolia (Testnet)
 
