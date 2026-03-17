@@ -143,7 +143,7 @@ To get testnet tokens:
 | Chain | ID | AgentRegistry | VaultFactory |
 |-------|-----|---------------|--------------|
 | HyperEVM Mainnet | 999 | `0xAf58D219...` | `0xc7Fc0dD5...` |
-| HyperEVM Testnet | 998 | `0x09447147...` | `0xc7Fc0dD5...` |
+| HyperEVM Testnet | 998 | `0x09447147...` | `0x4c36bCA8...` |
 
 Addresses are sourced from `crates/tal-cli/src/onchain.rs` and match the on-chain deployments in `sdk/src/addresses.ts`.
 

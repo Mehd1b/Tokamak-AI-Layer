@@ -54,7 +54,7 @@ pub fn get_chain_config(chain_id: u64) -> Result<ChainConfig> {
             name: "HyperEVM Testnet",
             rpc_url: "https://rpc.hyperliquid-testnet.xyz/evm",
             agent_registry: "0x09447147C6E75a60A449f38532F06E19F5F632F3".parse().unwrap(),
-            vault_factory: "0xc7Fc0dD5f1B03E3De0C313eE0D3b06Cb2Dc017BB".parse().unwrap(),
+            vault_factory: "0x4c36bCA87f21E16f5af8A6d7Df2D86a5aD13049F".parse().unwrap(),
             usdc: "0x2B3370eE501B4a559b57D449569354196457D8Ab".parse().unwrap(),
             libraries: HashMap::new(),
         }),
