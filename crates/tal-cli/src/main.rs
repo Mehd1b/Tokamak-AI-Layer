@@ -218,12 +218,15 @@ fn build_agent(elf: bool, agent: Option<&str>, verbose: bool) -> anyhow::Result<
     use colored::Colorize;
     use std::process::Command;
 
-    let agent_name = agent.unwrap_or(".");
+    let agent_name = match agent {
+        Some(name) => name.to_string(),
+        None => resolve_agent_name_from_cwd()?,
+    };
 
     // Build the agent crate
     println!("{} Building agent crate...", "●".cyan());
     let mut cmd = Command::new("cargo");
-    cmd.args(["build", "--release", "-p", agent_name]);
+    cmd.args(["build", "--release", "-p", &agent_name]);
     if verbose {
         println!("  Running: {:?}", cmd);
     }
@@ -269,4 +272,69 @@ fn build_agent(elf: bool, agent: Option<&str>, verbose: bool) -> anyhow::Result<
     }
 
     Ok(())
+}
+
+/// Resolve the agent crate name from the current directory structure.
+fn resolve_agent_name_from_cwd() -> anyhow::Result<String> {
+    let cwd = std::env::current_dir()?;
+
+    // Check if we're in a project root with agent/ subdirectory
+    if cwd.join("agent/src/lib.rs").exists() {
+        // Read the agent's Cargo.toml to get the package name
+        let agent_cargo = cwd.join("agent/Cargo.toml");
+        if let Ok(content) = std::fs::read_to_string(&agent_cargo) {
+            for line in content.lines() {
+                if let Some(name) = line.strip_prefix("name = \"") {
+                    if let Some(name) = name.strip_suffix('"') {
+                        return Ok(name.to_string());
+                    }
+                }
+            }
+        }
+        // Fall back to directory name
+        if let Some(name) = cwd.file_name() {
+            return Ok(name.to_string_lossy().to_string());
+        }
+    }
+
+    // Check if we're in the agent/ subdirectory itself
+    if cwd.join("src/lib.rs").exists() {
+        let cargo_toml = cwd.join("Cargo.toml");
+        if let Ok(content) = std::fs::read_to_string(&cargo_toml) {
+            for line in content.lines() {
+                if let Some(name) = line.strip_prefix("name = \"") {
+                    if let Some(name) = name.strip_suffix('"') {
+                        return Ok(name.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    // Try reading the workspace Cargo.toml for the first member
+    let cargo_toml = cwd.join("Cargo.toml");
+    if let Ok(content) = std::fs::read_to_string(&cargo_toml) {
+        if content.contains("[workspace]") {
+            // Parse first member that looks like an agent crate
+            for line in content.lines() {
+                let trimmed = line.trim().trim_matches(',').trim_matches('"');
+                if trimmed == "agent" {
+                    // Read agent/Cargo.toml
+                    if let Ok(agent_content) = std::fs::read_to_string(cwd.join("agent/Cargo.toml")) {
+                        for aline in agent_content.lines() {
+                            if let Some(name) = aline.strip_prefix("name = \"") {
+                                if let Some(name) = name.strip_suffix('"') {
+                                    return Ok(name.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    anyhow::bail!(
+        "Cannot determine agent name. Use --agent <name> or run from an agent project directory."
+    )
 }
