@@ -5,7 +5,16 @@ sidebar_position: 2
 
 # Local Build
 
-This guide walks through building the Execution Kernel and its components locally.
+:::tip Standalone agent projects
+If you installed `tal` via `cargo install tal-cli` and scaffolded a standalone project with `tal init`, you don't need to clone the repository. Use `tal build` and `tal build --elf` instead — they handle everything automatically. This page covers building the **full Execution Kernel workspace** from a cloned repo.
+:::
+
+This guide walks through building the Execution Kernel and its components from a cloned repository.
+
+```bash
+git clone https://github.com/tokamak-network/Tokamak-AI-Layer.git
+cd Tokamak-AI-Layer
+```
 
 ## Quick Build
 
