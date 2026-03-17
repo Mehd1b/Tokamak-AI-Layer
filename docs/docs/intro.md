@@ -62,8 +62,11 @@ The constraint engine validates agent outputs against safety rules:
 ## Quick Start
 
 ```bash
-# Install the tal CLI
-cargo install --path crates/tal-cli
+# Install the tal CLI (no repo clone needed)
+curl -sSL https://raw.githubusercontent.com/tokamak-network/Tokamak-AI-Layer/master/install-tal.sh | sh
+
+# Or via crates.io (requires Rust)
+cargo install tal-cli
 
 # Validate your environment
 tal doctor
