@@ -84,32 +84,26 @@ cargo install just
 
 ## Environment Setup
 
-### Clone the Repository
-
-```bash
-git clone https://github.com/tokamak-network/Tokamak-AI-Layer.git
-cd Tokamak-AI-Layer
-```
-
 ### Install the `tal` CLI
 
-Install from prebuilt binaries (no Rust required):
+No repository clone is needed. Install the CLI directly:
 
 ```bash
+# Option 1: Prebuilt binary (fastest — no Rust required)
 curl -sSL https://raw.githubusercontent.com/tokamak-network/Tokamak-AI-Layer/master/install-tal.sh | sh
-```
 
-Or from [crates.io](https://crates.io/crates/tal-cli):
-
-```bash
+# Option 2: From crates.io (requires Rust)
 cargo install tal-cli
 ```
 
-Or from source (inside a cloned repo):
-
+:::tip Contributing or building from source?
+If you want to contribute or build from source, clone the repository first:
 ```bash
+git clone https://github.com/tokamak-network/Tokamak-AI-Layer.git
+cd Tokamak-AI-Layer
 cargo install --path crates/tal-cli
 ```
+:::
 
 ### Verify Setup
 
@@ -123,12 +117,6 @@ This checks Rust, RISC Zero, Foundry, and Node.js in one command. To auto-instal
 
 ```bash
 tal doctor --install
-```
-
-You can also run the test suite directly:
-
-```bash
-cargo test
 ```
 
 ## Hardware Requirements
