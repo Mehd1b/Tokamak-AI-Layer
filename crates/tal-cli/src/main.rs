@@ -262,13 +262,10 @@ fn build_agent(elf: bool, agent: Option<&str>, verbose: bool) -> anyhow::Result<
         println!("  {} ELF binary built successfully", "✓".green());
         println!();
         println!(
-            "  {} Use the .bin file (NOT raw ELF) when creating bundles:",
+            "  {} Use the .bin file (NOT raw ELF) when creating bundles.",
             "⚠".yellow()
         );
-        println!(
-            "    target/riscv-guest/{}/zkvm-guest/riscv32im-risc0-zkvm-elf/release/zkvm-guest.bin",
-            methods_crate
-        );
+        println!("    Check target/riscv-guest/{}/", methods_crate);
     }
 
     Ok(())

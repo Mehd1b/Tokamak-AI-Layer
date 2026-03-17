@@ -364,46 +364,58 @@ fn check_elf_staleness(agent_dir: &Path) -> CheckResult {
     }
 
     // Check if ELF exists in target
+    // Read agent name from agent/Cargo.toml for accurate path resolution
     let agent_name = agent_dir
         .file_name()
         .unwrap_or_default()
-        .to_string_lossy();
-    let elf_path = format!(
-        "target/riscv-guest/{}-risc0-methods/zkvm-guest/riscv32im-risc0-zkvm-elf/release/zkvm-guest.bin",
-        agent_name
-    );
+        .to_string_lossy()
+        .to_string();
+    let crate_name = read_crate_name(&agent_dir.join("agent/Cargo.toml"))
+        .unwrap_or_else(|| agent_name.clone());
+
+    // Try both possible ELF path patterns
+    let elf_paths = vec![
+        format!(
+            "target/riscv-guest/{crate_name}-risc0-methods/{crate_name}-zkvm-guest/riscv32im-risc0-zkvm-elf/release/{crate_name}-zkvm-guest.bin",
+        ),
+        format!(
+            "target/riscv-guest/{crate_name}-risc0-methods/zkvm-guest/riscv32im-risc0-zkvm-elf/release/zkvm-guest.bin",
+        ),
+    ];
 
     // Find workspace root to check target/
     if let Ok(workspace) = find_workspace_root_from(agent_dir) {
-        let full_elf_path = workspace.join(&elf_path);
-        if full_elf_path.exists() {
-            // ELF exists — check modification time vs source
-            let elf_modified = std::fs::metadata(&full_elf_path)
-                .and_then(|m| m.modified())
-                .ok();
-            let src_modified = std::fs::metadata(&agent_lib)
-                .and_then(|m| m.modified())
-                .ok();
+        for elf_path in &elf_paths {
+            let full_elf_path = workspace.join(elf_path);
+            if full_elf_path.exists() {
+                // ELF exists — check modification time vs source
+                let elf_modified = std::fs::metadata(&full_elf_path)
+                    .and_then(|m| m.modified())
+                    .ok();
+                let src_modified = std::fs::metadata(&agent_lib)
+                    .and_then(|m| m.modified())
+                    .ok();
 
-            if let (Some(elf_time), Some(src_time)) = (elf_modified, src_modified) {
-                if src_time > elf_time {
-                    return CheckResult::fail(
-                        "ELF binary",
-                        format!(
-                            "Stale — agent source changed since last ELF build\n    Source hash: 0x{}",
-                            &current_hash_hex[..16]
-                        ),
-                        "tal build --elf",
-                    );
-                } else {
-                    return CheckResult::pass(
-                        "ELF binary",
-                        format!("Up-to-date (source hash: 0x{}...)", &current_hash_hex[..12]),
-                    );
+                if let (Some(elf_time), Some(src_time)) = (elf_modified, src_modified) {
+                    if src_time > elf_time {
+                        return CheckResult::fail(
+                            "ELF binary",
+                            format!(
+                                "Stale — agent source changed since last ELF build\n    Source hash: 0x{}",
+                                &current_hash_hex[..16]
+                            ),
+                            "tal build --elf",
+                        );
+                    } else {
+                        return CheckResult::pass(
+                            "ELF binary",
+                            format!("Up-to-date (source hash: 0x{}...)", &current_hash_hex[..12]),
+                        );
+                    }
                 }
-            }
 
-            return CheckResult::pass("ELF binary", "Found (unable to check staleness)");
+                return CheckResult::pass("ELF binary", "Found (unable to check staleness)");
+            }
         }
     }
 
@@ -537,6 +549,18 @@ fn get_command_version(cmd: &str, args: &[&str]) -> Option<String> {
                 .unwrap_or("")
                 .to_string()
         })
+}
+
+fn read_crate_name(cargo_toml: &Path) -> Option<String> {
+    let content = std::fs::read_to_string(cargo_toml).ok()?;
+    for line in content.lines() {
+        if let Some(name) = line.strip_prefix("name = \"") {
+            if let Some(name) = name.strip_suffix('"') {
+                return Some(name.to_string());
+            }
+        }
+    }
+    None
 }
 
 fn find_workspace_root_from(start: &Path) -> Result<PathBuf> {
