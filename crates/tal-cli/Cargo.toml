@@ -1,6 +1,6 @@
 [package]
 name = "tal-cli"
-version = "0.2.7"
+version = "0.2.8"
 edition = "2021"
 description = "Unified CLI for the Tokamak AI Layer — scaffold, validate, test, and deploy verifiable agents on RISC Zero zkVM"
 license = "MIT OR Apache-2.0"

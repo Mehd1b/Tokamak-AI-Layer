@@ -260,12 +260,135 @@ fn build_agent(elf: bool, agent: Option<&str>, verbose: bool) -> anyhow::Result<
             );
         }
         println!("  {} ELF binary built successfully", "✓".green());
-        println!();
-        println!(
-            "  {} Use the .bin file (NOT raw ELF) when creating bundles.",
-            "⚠".yellow()
-        );
-        println!("    Check target/riscv-guest/{}/", methods_crate);
+
+        // Update dist/agent-pack.json with computed values
+        if let Err(e) = update_manifest_from_build(&agent_name, &methods_crate, verbose) {
+            println!(
+                "  {} Could not auto-update manifest: {}",
+                "⚠".yellow(),
+                e
+            );
+            println!("    Update dist/agent-pack.json manually with IMAGE_ID and AGENT_CODE_HASH.");
+        }
+    }
+
+    Ok(())
+}
+
+/// After a successful ELF build, parse the generated methods.rs to extract
+/// IMAGE_ID and update dist/agent-pack.json automatically.
+fn update_manifest_from_build(
+    agent_name: &str,
+    methods_crate: &str,
+    verbose: bool,
+) -> anyhow::Result<()> {
+    use colored::Colorize;
+
+    let manifest_path = "dist/agent-pack.json";
+    if !std::path::Path::new(manifest_path).exists() {
+        anyhow::bail!("dist/agent-pack.json not found");
+    }
+
+    // Find the generated methods.rs in the build output
+    let build_dir = format!("target/release/build/{}-", methods_crate);
+    let mut methods_rs_path = None;
+
+    if let Ok(entries) = std::fs::read_dir("target/release/build") {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with(&format!("{}-", methods_crate)) {
+                let candidate = entry.path().join("out/methods.rs");
+                if candidate.exists() {
+                    methods_rs_path = Some(candidate);
+                    break;
+                }
+            }
+        }
+    }
+
+    let methods_rs = methods_rs_path
+        .ok_or_else(|| anyhow::anyhow!("Cannot find generated methods.rs in target/release/build/"))?;
+
+    let content = std::fs::read_to_string(&methods_rs)?;
+
+    // Parse IMAGE_ID: `pub const ..._ID: [u32; 8] = [n1, n2, ..., n8];`
+    let image_id_hex = if let Some(id_line) = content.lines().find(|l| l.contains("_ID: [u32; 8]")) {
+        let bracket_start = id_line.find('[').and_then(|i| id_line[i+1..].find('[').map(|j| i + 1 + j));
+        if let Some(start) = bracket_start {
+            let end = id_line[start..].find(']').map(|e| start + e).unwrap_or(id_line.len());
+            let nums: Vec<u32> = id_line[start+1..end]
+                .split(',')
+                .filter_map(|s| s.trim().parse().ok())
+                .collect();
+            if nums.len() == 8 {
+                // Convert [u32; 8] to bytes32 hex (little-endian per u32)
+                let mut bytes = Vec::with_capacity(32);
+                for n in &nums {
+                    bytes.extend_from_slice(&n.to_le_bytes());
+                }
+                format!("0x{}", hex::encode(&bytes))
+            } else {
+                anyhow::bail!("Cannot parse IMAGE_ID array from methods.rs");
+            }
+        } else {
+            anyhow::bail!("Cannot find IMAGE_ID array brackets in methods.rs");
+        }
+    } else {
+        anyhow::bail!("No _ID: [u32; 8] found in methods.rs");
+    };
+
+    // Compute AGENT_CODE_HASH from source
+    let agent_lib = std::path::Path::new("agent/src/lib.rs");
+    let agent_cargo = std::path::Path::new("agent/Cargo.toml");
+    let agent_code_hash = if agent_lib.exists() && agent_cargo.exists() {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(std::fs::read(agent_lib)?);
+        hasher.update([0x00]);
+        hasher.update(std::fs::read(agent_cargo)?);
+        let hash: [u8; 32] = hasher.finalize().into();
+        format!("0x{}", hex::encode(hash))
+    } else {
+        anyhow::bail!("Cannot find agent/src/lib.rs or agent/Cargo.toml");
+    };
+
+    // Find the ELF path from methods.rs
+    let elf_sha256 = if let Some(path_line) = content.lines().find(|l| l.contains("_PATH: &str")) {
+        if let Some(start) = path_line.find('"') {
+            if let Some(end) = path_line[start+1..].find('"') {
+                let elf_path = &path_line[start+1..start+1+end];
+                if std::path::Path::new(elf_path).exists() {
+                    use sha2::{Digest, Sha256};
+                    let elf_bytes = std::fs::read(elf_path)?;
+                    let hash: [u8; 32] = Sha256::digest(&elf_bytes).into();
+                    format!("0x{}", hex::encode(hash))
+                } else {
+                    "unknown".to_string()
+                }
+            } else { "unknown".to_string() }
+        } else { "unknown".to_string() }
+    } else { "unknown".to_string() };
+
+    // Update the manifest
+    let manifest_content = std::fs::read_to_string(manifest_path)?;
+    let mut manifest: serde_json::Value = serde_json::from_str(&manifest_content)?;
+
+    manifest["image_id"] = serde_json::Value::String(image_id_hex.clone());
+    manifest["agent_code_hash"] = serde_json::Value::String(agent_code_hash.clone());
+    if let Some(artifacts) = manifest.get_mut("artifacts") {
+        artifacts["elf_sha256"] = serde_json::Value::String(elf_sha256);
+    }
+
+    std::fs::write(manifest_path, serde_json::to_string_pretty(&manifest)?)?;
+
+    println!();
+    println!("{} Updated dist/agent-pack.json", "●".cyan());
+    println!("  IMAGE_ID:        {}", &image_id_hex[..18]);
+    println!("  AGENT_CODE_HASH: {}", &agent_code_hash[..18]);
+
+    if verbose {
+        println!("  IMAGE_ID (full):        {}", image_id_hex);
+        println!("  AGENT_CODE_HASH (full): {}", agent_code_hash);
     }
 
     Ok(())
