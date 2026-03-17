@@ -1,0 +1,155 @@
+name: Release tal-cli
+
+on:
+  push:
+    tags:
+      - "tal-v*"
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  BINARY_NAME: tal
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            archive: tar.gz
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            archive: tar.gz
+            cross: true
+          - target: x86_64-apple-darwin
+            os: macos-13
+            archive: tar.gz
+          - target: aarch64-apple-darwin
+            os: macos-14
+            archive: tar.gz
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            archive: zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Install cross (Linux ARM)
+        if: matrix.cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build binary
+        run: |
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            cross build --release --target ${{ matrix.target }} -p tal-cli
+          else
+            cargo build --release --target ${{ matrix.target }} -p tal-cli
+          fi
+        shell: bash
+
+      - name: Package (unix)
+        if: matrix.archive == 'tar.gz'
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          ARCHIVE_NAME="${BINARY_NAME}-${TAG}-${{ matrix.target }}"
+          mkdir -p "dist/${ARCHIVE_NAME}"
+          cp "target/${{ matrix.target }}/release/${BINARY_NAME}" "dist/${ARCHIVE_NAME}/"
+          cp crates/tal-cli/README.md "dist/${ARCHIVE_NAME}/"
+          cd dist
+          tar czf "${ARCHIVE_NAME}.tar.gz" "${ARCHIVE_NAME}"
+          shasum -a 256 "${ARCHIVE_NAME}.tar.gz" > "${ARCHIVE_NAME}.tar.gz.sha256"
+        shell: bash
+
+      - name: Package (windows)
+        if: matrix.archive == 'zip'
+        run: |
+          $TAG = $env:GITHUB_REF -replace 'refs/tags/', ''
+          $ARCHIVE_NAME = "${env:BINARY_NAME}-${TAG}-${{ matrix.target }}"
+          New-Item -ItemType Directory -Force -Path "dist/$ARCHIVE_NAME"
+          Copy-Item "target/${{ matrix.target }}/release/${env:BINARY_NAME}.exe" "dist/$ARCHIVE_NAME/"
+          Copy-Item "crates/tal-cli/README.md" "dist/$ARCHIVE_NAME/"
+          Compress-Archive -Path "dist/$ARCHIVE_NAME" -DestinationPath "dist/$ARCHIVE_NAME.zip"
+          Get-FileHash "dist/$ARCHIVE_NAME.zip" -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $ARCHIVE_NAME.zip" } | Set-Content "dist/$ARCHIVE_NAME.zip.sha256"
+        shell: pwsh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tal-${{ matrix.target }}
+          path: dist/tal-*.*
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: tal-*
+
+      - name: Collect release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.sha256" \) -exec cp {} release-assets/ \;
+          ls -la release-assets/
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/tal-v}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "tal v${{ steps.version.outputs.version }}"
+          body: |
+            ## Install
+
+            ### Quick install (macOS/Linux)
+            ```bash
+            curl -sSL https://raw.githubusercontent.com/tokamak-network/Tokamak-AI-Layer/master/install-tal.sh | sh
+            ```
+
+            ### From crates.io
+            ```bash
+            cargo install tal-cli
+            ```
+
+            ### Manual download
+            Download the archive for your platform below, extract, and add `tal` to your PATH.
+
+            ## Checksums
+            SHA-256 checksums are provided alongside each archive.
+          files: release-assets/*
+          generate_release_notes: true
+
+  publish-crate:
+    name: Publish to crates.io
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish tal-cli
+        run: cargo publish -p tal-cli --allow-dirty
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
