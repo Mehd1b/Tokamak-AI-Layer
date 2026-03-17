@@ -192,13 +192,6 @@ To verify your agent is fully deterministic (same input always produces same out
 tal test --local --determinism-check
 ```
 
-For integration tests through the full kernel pipeline (requires cloned repo):
-
-```bash
-# Run kernel integration tests (inside the Tokamak-AI-Layer repo only)
-cargo test -p kernel-host-tests -- --nocapture
-```
-
 :::note Why determinism matters
 The zkVM generates proofs of execution. If your agent is non-deterministic (e.g., uses randomness or system time), the proof would be for a different execution than what actually ran. The kernel SDK enforces this: `#![no_std]`, no I/O, no randomness, no unsafe code.
 :::
