@@ -1,6 +1,6 @@
 [package]
 name = "tal-cli"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 description = "Unified CLI for the Tokamak AI Layer — scaffold, validate, test, and deploy verifiable agents on RISC Zero zkVM"
 license = "MIT OR Apache-2.0"
@@ -24,6 +24,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 dialoguer = "0.11"
 which = "7"
+tempfile = "3"
 
 # On-chain interaction
 alloy = { version = "0.8", features = ["providers", "transports", "contract", "signer-local", "rpc-types", "sol-types"] }
@@ -31,4 +32,3 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 reqwest = { version = "0.12", features = ["json"] }
 
 [dev-dependencies]
-tempfile = "3"

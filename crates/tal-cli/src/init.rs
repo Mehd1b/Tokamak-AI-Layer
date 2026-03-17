@@ -96,25 +96,26 @@ pub fn run(
     println!("  Template: {}", template.description());
     println!();
 
-    // Create directory structure
-    create_dirs(&output_dir)?;
-
-    // Generate all files
-    generate_agent_files(&output_dir, name, template, standalone)?;
-    generate_risc0_methods(&output_dir, name, standalone)?;
-    generate_env_example(&output_dir, template)?;
-    generate_readme(&output_dir, name, template)?;
-
+    // For perp-trader, clone the real agent from the repository
     if matches!(template, Template::PerpTrader) {
-        generate_host(&output_dir, name, standalone)?;
-    }
+        clone_perp_trader_template(&output_dir, name, standalone)?;
+    } else {
+        // Create directory structure
+        create_dirs(&output_dir)?;
 
-    // Generate manifest
-    generate_manifest(&output_dir, name)?;
+        // Generate all files
+        generate_agent_files(&output_dir, name, template, standalone)?;
+        generate_risc0_methods(&output_dir, name, standalone)?;
+        generate_env_example(&output_dir, template)?;
+        generate_readme(&output_dir, name, template)?;
 
-    // In standalone mode, generate a root workspace Cargo.toml
-    if standalone {
-        generate_workspace_toml(&output_dir, name, template)?;
+        // Generate manifest
+        generate_manifest(&output_dir, name)?;
+
+        // In standalone mode, generate a root workspace Cargo.toml
+        if standalone {
+            generate_workspace_toml(&output_dir, name, template)?;
+        }
     }
 
     // Print post-scaffolding instructions
@@ -141,11 +142,20 @@ pub fn run(
 
     println!();
     println!("  {} Next steps:", "→".yellow());
-    println!("    1. Edit agent/src/lib.rs — implement your agent logic");
-    println!("    2. tal test --local — test with instant feedback");
-    println!("    3. tal build --elf — build zkVM binary");
-    println!("    4. tal doctor — validate everything before deploy");
-    println!("    5. tal deploy --testnet — deploy to testnet");
+    if matches!(template, Template::PerpTrader) {
+        println!("    1. Read README.md and PERP_TRADER_GUIDE.md for full details");
+        println!("    2. Configure .env with your private key and RPC URL");
+        println!("    3. tal test --local — run agent unit tests");
+        println!("    4. tal build --elf — build zkVM binary");
+        println!("    5. tal deploy --testnet — deploy agent + vault");
+        println!("    6. ./run-bot.sh — start the trading bot");
+    } else {
+        println!("    1. Edit agent/src/lib.rs — implement your agent logic");
+        println!("    2. tal test --local — test with instant feedback");
+        println!("    3. tal build --elf — build zkVM binary");
+        println!("    4. tal doctor — validate everything before deploy");
+        println!("    5. tal deploy --testnet — deploy to testnet");
+    }
 
     if verbose {
         println!();
@@ -217,6 +227,159 @@ fn find_workspace_root() -> Result<PathBuf> {
             bail!("Could not find workspace root (no Cargo.toml with [workspace] found)");
         }
     }
+}
+
+/// Clone the real perp-trader agent from the Tokamak-AI-Layer repository.
+///
+/// Uses git sparse checkout to fetch only the perp-trader directory,
+/// then copies it to the output location. If running inside the workspace,
+/// copies directly from the local crates/agents/perp-trader/ instead.
+fn clone_perp_trader_template(output_dir: &Path, _name: &str, standalone: bool) -> Result<()> {
+    use std::process::Command;
+
+    // If inside the workspace, copy from local
+    if !standalone {
+        if let Ok(workspace) = find_workspace_root() {
+            let source = workspace.join("crates/agents/perp-trader");
+            if source.exists() {
+                println!("  Copying from local workspace...");
+                copy_dir_recursive(&source, output_dir)?;
+                // Remove build artifacts
+                let _ = fs::remove_dir_all(output_dir.join("target"));
+                let _ = fs::remove_dir_all(output_dir.join("bundle"));
+                let _ = fs::remove_dir_all(output_dir.join(".claude"));
+                return Ok(());
+            }
+        }
+    }
+
+    // Standalone: clone from GitHub using sparse checkout
+    println!("  Fetching perp-trader template from GitHub...");
+
+    let tmp_dir = tempfile::tempdir()
+        .context("Failed to create temp directory")?;
+    let tmp_path = tmp_dir.path();
+
+    // Clone with minimal data
+    let status = Command::new("git")
+        .args([
+            "clone",
+            "--depth", "1",
+            "--filter=blob:none",
+            "--sparse",
+            "https://github.com/tokamak-network/Tokamak-AI-Layer.git",
+            &tmp_path.join("repo").to_string_lossy(),
+        ])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped())
+        .status()
+        .context("Failed to run git clone. Is git installed?")?;
+
+    if !status.success() {
+        bail!("git clone failed. Check your internet connection.");
+    }
+
+    // Sparse checkout just the perp-trader directory
+    let repo_dir = tmp_path.join("repo");
+    let status = Command::new("git")
+        .args(["sparse-checkout", "set", "crates/agents/perp-trader"])
+        .current_dir(&repo_dir)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .context("git sparse-checkout failed")?;
+
+    if !status.success() {
+        bail!("git sparse-checkout failed");
+    }
+
+    let source = repo_dir.join("crates/agents/perp-trader");
+    if !source.exists() {
+        bail!("perp-trader template not found in repository");
+    }
+
+    // Copy to output directory
+    copy_dir_recursive(&source, output_dir)?;
+
+    // Remove build artifacts
+    let _ = fs::remove_dir_all(output_dir.join("target"));
+    let _ = fs::remove_dir_all(output_dir.join("bundle"));
+    let _ = fs::remove_dir_all(output_dir.join(".claude"));
+
+    // For standalone mode, rewrite path dependencies to git dependencies
+    if standalone {
+        rewrite_perp_trader_deps(output_dir)?;
+
+        // Generate a workspace Cargo.toml
+        generate_workspace_toml(output_dir, "perp-trader", Template::PerpTrader)?;
+    }
+
+    // Temp dir is cleaned up automatically on drop
+    Ok(())
+}
+
+/// Rewrite path dependencies in perp-trader Cargo.toml files to git dependencies.
+fn rewrite_perp_trader_deps(root: &Path) -> Result<()> {
+    let git_source = "git = \"https://github.com/tokamak-network/Tokamak-AI-Layer.git\", branch = \"master\"";
+
+    let replacements = [
+        // agent/Cargo.toml
+        (
+            "agent/Cargo.toml",
+            vec![
+                ("path = \"../../../sdk/kernel-sdk\"", git_source),
+                ("path = \"../../../runtime/kernel-guest\"", git_source),
+                ("path = \"../../../protocol/constraints\"", git_source),
+                ("path = \"../../../protocol/kernel-core\"", git_source),
+            ],
+        ),
+        // host/Cargo.toml
+        (
+            "host/Cargo.toml",
+            vec![
+                ("path = \"../../../protocol/kernel-core\"", git_source),
+                ("path = \"../../../sdk/kernel-sdk\"", git_source),
+                ("path = \"../../../protocol/constraints\"", git_source),
+                ("path = \"../../../reference-integrator\"", git_source),
+            ],
+        ),
+        // risc0-methods/zkvm-guest/Cargo.toml
+        (
+            "risc0-methods/zkvm-guest/Cargo.toml",
+            vec![
+                ("path = \"../../../runtime/kernel-guest\"", git_source),
+            ],
+        ),
+    ];
+
+    for (file, subs) in &replacements {
+        let path = root.join(file);
+        if let Ok(mut content) = fs::read_to_string(&path) {
+            for (old, new) in subs {
+                content = content.replace(old, new);
+            }
+            fs::write(&path, content)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Recursively copy a directory.
+fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+
+        if src_path.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path)?;
+        }
+    }
+    Ok(())
 }
 
 fn create_dirs(root: &Path) -> Result<()> {
