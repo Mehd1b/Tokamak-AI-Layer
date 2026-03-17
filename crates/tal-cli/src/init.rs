@@ -247,10 +247,18 @@ fn write_file(path: &Path, content: &str) -> Result<()> {
 fn generate_agent_files(root: &Path, name: &str, template: Template, standalone: bool) -> Result<()> {
     let _name_snake = name.replace('-', "_");
 
-    let kernel_sdk_dep = if standalone {
-        r#"kernel-sdk = { git = "https://github.com/tokamak-network/Tokamak-AI-Layer.git", branch = "master" }"#
+    let (kernel_sdk_dep, kernel_guest_dep, constraints_dep) = if standalone {
+        (
+            r#"kernel-sdk = { git = "https://github.com/tokamak-network/Tokamak-AI-Layer.git", branch = "master" }"#,
+            r#"kernel-guest = { git = "https://github.com/tokamak-network/Tokamak-AI-Layer.git", branch = "master" }"#,
+            r#"constraints = { git = "https://github.com/tokamak-network/Tokamak-AI-Layer.git", branch = "master" }"#,
+        )
     } else {
-        r#"kernel-sdk = { path = "../../../../crates/sdk/kernel-sdk" }"#
+        (
+            r#"kernel-sdk = { path = "../../../../crates/sdk/kernel-sdk" }"#,
+            r#"kernel-guest = { path = "../../../../crates/runtime/kernel-guest" }"#,
+            r#"constraints = { path = "../../../../crates/protocol/constraints" }"#,
+        )
     };
 
     // Cargo.toml
@@ -267,6 +275,8 @@ crate-type = ["rlib"]
 
 [dependencies]
 {kernel_sdk_dep}
+{kernel_guest_dep}
+{constraints_dep}
 
 [build-dependencies]
 sha2 = {{ version = "0.10", default-features = false }}
