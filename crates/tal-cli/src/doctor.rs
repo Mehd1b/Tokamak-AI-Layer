@@ -96,30 +96,47 @@ pub fn run(
     println!();
 
     // =======================================================================
-    // Build Checks
+    // Build Checks (only if inside an agent project or workspace)
     // =======================================================================
-    println!("{}", "Build State".bold().underline());
-
     let agent_dir = agent_path.map(PathBuf::from).unwrap_or_else(|| {
         std::env::current_dir().unwrap_or_default()
     });
 
-    let build_checks = vec![
-        check_agent_crate(&agent_dir),
-        check_elf_staleness(&agent_dir),
-        check_workspace_membership(&agent_dir),
-    ];
+    let has_agent = agent_dir.join("agent/src/lib.rs").exists()
+        || agent_dir.join("src/lib.rs").exists();
+    let has_workspace = find_workspace_root_from(&agent_dir).is_ok();
 
-    for check in &build_checks {
-        check.print();
-        total += 1;
-        if check.passed {
-            passed += 1;
-        } else {
-            failed += 1;
+    if has_agent || has_workspace {
+        println!("{}", "Build State".bold().underline());
+
+        let mut build_checks = vec![
+            check_agent_crate(&agent_dir),
+            check_elf_staleness(&agent_dir),
+        ];
+
+        if has_workspace {
+            build_checks.push(check_workspace_membership(&agent_dir));
         }
+
+        for check in &build_checks {
+            check.print();
+            total += 1;
+            if check.passed {
+                passed += 1;
+            } else {
+                failed += 1;
+            }
+        }
+        println!();
+    } else {
+        println!("{}", "Build State".bold().underline());
+        println!(
+            "  {} Not inside an agent project or workspace — skipping build checks",
+            "ℹ".blue()
+        );
+        println!("    Run {} to scaffold a new agent", "tal init <name>".bold());
+        println!();
     }
-    println!();
 
     // =======================================================================
     // Configuration Checks

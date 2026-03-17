@@ -63,10 +63,20 @@ pub fn run(
     // Validate name
     validate_name(name)?;
 
-    // Determine output directory
+    // Determine output directory and whether we're inside the workspace
+    let workspace_root = find_workspace_root().ok();
+    let standalone = workspace_root.is_none();
+
     let output_dir = match output {
         Some(dir) => PathBuf::from(dir),
-        None => find_workspace_root()?.join(format!("crates/agents/{}", name)),
+        None => {
+            if let Some(ref root) = workspace_root {
+                root.join(format!("crates/agents/{}", name))
+            } else {
+                // Standalone mode: create in current directory
+                PathBuf::from(name)
+            }
+        }
     };
 
     if output_dir.exists() {
@@ -90,31 +100,38 @@ pub fn run(
     create_dirs(&output_dir)?;
 
     // Generate all files
-    generate_agent_files(&output_dir, name, template)?;
-    generate_risc0_methods(&output_dir, name)?;
+    generate_agent_files(&output_dir, name, template, standalone)?;
+    generate_risc0_methods(&output_dir, name, standalone)?;
     generate_env_example(&output_dir, template)?;
     generate_readme(&output_dir, name, template)?;
 
     if matches!(template, Template::PerpTrader) {
-        generate_host(&output_dir, name)?;
+        generate_host(&output_dir, name, standalone)?;
     }
 
     // Generate manifest
     generate_manifest(&output_dir, name)?;
 
-    // Print workspace integration instructions
+    // Print post-scaffolding instructions
     println!();
     println!("  {} Agent scaffolded successfully!", "✓".green());
-    println!();
-    println!("  {} Add to workspace Cargo.toml:", "→".yellow());
 
-    let rel = output_dir
-        .strip_prefix(find_workspace_root().unwrap_or_default())
-        .unwrap_or(&output_dir);
-    println!("    \"{}/agent\",", rel.display());
-    println!("    \"{}/risc0-methods\",", rel.display());
-    if matches!(template, Template::PerpTrader) {
-        println!("    \"{}/host\",", rel.display());
+    if standalone {
+        println!();
+        println!("  {} Standalone project created at: {}", "ℹ".blue(), output_dir.display());
+        println!("    Dependencies use git sources from the Tokamak-AI-Layer repo.");
+    } else {
+        println!();
+        println!("  {} Add to workspace Cargo.toml:", "→".yellow());
+
+        let rel = output_dir
+            .strip_prefix(workspace_root.as_deref().unwrap_or(Path::new("")))
+            .unwrap_or(&output_dir);
+        println!("    \"{}/agent\",", rel.display());
+        println!("    \"{}/risc0-methods\",", rel.display());
+        if matches!(template, Template::PerpTrader) {
+            println!("    \"{}/host\",", rel.display());
+        }
     }
 
     println!();
@@ -222,8 +239,14 @@ fn write_file(path: &Path, content: &str) -> Result<()> {
 // Agent Files
 // ===========================================================================
 
-fn generate_agent_files(root: &Path, name: &str, template: Template) -> Result<()> {
+fn generate_agent_files(root: &Path, name: &str, template: Template, standalone: bool) -> Result<()> {
     let _name_snake = name.replace('-', "_");
+
+    let kernel_sdk_dep = if standalone {
+        r#"kernel-sdk = { git = "https://github.com/tokamak-network/Tokamak-AI-Layer.git", branch = "master" }"#
+    } else {
+        r#"kernel-sdk = { path = "../../../../crates/sdk/kernel-sdk" }"#
+    };
 
     // Cargo.toml
     write_file(
@@ -238,7 +261,7 @@ edition = "2021"
 crate-type = ["rlib"]
 
 [dependencies]
-kernel-sdk = {{ path = "../../../../crates/sdk/kernel-sdk" }}
+{kernel_sdk_dep}
 
 [build-dependencies]
 sha2 = {{ version = "0.10", default-features = false }}
@@ -745,7 +768,7 @@ mod tests {
 // RISC Zero Methods
 // ===========================================================================
 
-fn generate_risc0_methods(root: &Path, name: &str) -> Result<()> {
+fn generate_risc0_methods(root: &Path, name: &str, standalone: bool) -> Result<()> {
     let methods_name = format!("{}-risc0-methods", name);
 
     // risc0-methods/Cargo.toml
@@ -789,6 +812,12 @@ include!(concat!(env!("OUT_DIR"), "/methods.rs"));
     )?;
 
     // risc0-methods/zkvm-guest/Cargo.toml
+    let kernel_guest_dep = if standalone {
+        r#"kernel-guest = { git = "https://github.com/tokamak-network/Tokamak-AI-Layer.git", branch = "master" }"#
+    } else {
+        r#"kernel-guest = { path = "../../../../crates/runtime/kernel-guest" }"#
+    };
+
     write_file(
         &root.join("risc0-methods/zkvm-guest/Cargo.toml"),
         &format!(
@@ -801,7 +830,7 @@ edition = "2021"
 
 [dependencies]
 risc0-zkvm = {{ version = "3.0", default-features = false, features = ["guest"] }}
-kernel-guest = {{ path = "../../../../crates/runtime/kernel-guest" }}
+{kernel_guest_dep}
 {name} = {{ path = "../../agent" }}
 "#
         ),
@@ -844,8 +873,20 @@ fn main() {{
 // Host (perp-trader template only)
 // ===========================================================================
 
-fn generate_host(root: &Path, name: &str) -> Result<()> {
+fn generate_host(root: &Path, name: &str, standalone: bool) -> Result<()> {
     fs::create_dir_all(root.join("host/src"))?;
+
+    let (kernel_core_dep, constraints_dep) = if standalone {
+        (
+            r#"kernel-core = { git = "https://github.com/tokamak-network/Tokamak-AI-Layer.git", branch = "master" }"#,
+            r#"constraints = { git = "https://github.com/tokamak-network/Tokamak-AI-Layer.git", branch = "master" }"#,
+        )
+    } else {
+        (
+            r#"kernel-core = { path = "../../../../crates/protocol/kernel-core" }"#,
+            r#"constraints = { path = "../../../../crates/protocol/constraints" }"#,
+        )
+    };
 
     // host/Cargo.toml
     write_file(
@@ -875,8 +916,8 @@ sha2 = {{ version = "0.10" }}
 {name} = {{ path = "../agent" }}
 
 # Kernel types
-kernel-core = {{ path = "../../../../crates/protocol/kernel-core" }}
-constraints = {{ path = "../../../../crates/protocol/constraints" }}
+{kernel_core_dep}
+{constraints_dep}
 
 # Optional: proving
 # risc0-zkvm = {{ version = "3.0", optional = true }}
