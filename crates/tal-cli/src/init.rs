@@ -112,6 +112,11 @@ pub fn run(
     // Generate manifest
     generate_manifest(&output_dir, name)?;
 
+    // In standalone mode, generate a root workspace Cargo.toml
+    if standalone {
+        generate_workspace_toml(&output_dir, name, template)?;
+    }
+
     // Print post-scaffolding instructions
     println!();
     println!("  {} Agent scaffolded successfully!", "✓".green());
@@ -1215,6 +1220,35 @@ tal test --local --agent {name} --determinism-check
     );
 
     write_file(&root.join("README.md"), &content)
+}
+
+fn generate_workspace_toml(root: &Path, _name: &str, template: Template) -> Result<()> {
+    let mut members = format!(
+        r#"    "agent",
+    "risc0-methods","#
+    );
+
+    if matches!(template, Template::PerpTrader) {
+        members.push_str("\n    \"host\",");
+    }
+
+    let content = format!(
+        r#"[workspace]
+resolver = "2"
+members = [
+{members}
+]
+
+[workspace.dependencies]
+sha2 = {{ version = "0.10", default-features = false }}
+
+[profile.release]
+debug = 1
+lto = "thin"
+"#
+    );
+
+    write_file(&root.join("Cargo.toml"), &content)
 }
 
 fn generate_manifest(root: &Path, name: &str) -> Result<()> {
