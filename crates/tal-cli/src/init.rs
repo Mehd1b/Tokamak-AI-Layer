@@ -857,24 +857,33 @@ risc0-zkvm = {{ version = "3.0", default-features = false, features = ["std"] }}
         &format!(
             r#"//! zkVM guest entry point.
 //!
-//! This is a thin wrapper that calls the kernel runtime with your agent.
+//! This is a thin wrapper that delegates to the agent crate for zkVM execution.
+//! The agent crate generates kernel_main via the agent_entrypoint! macro.
 //! You should NOT modify this file — edit agent/src/lib.rs instead.
-
-#![no_main]
-
-risc0_zkvm::guest::entry!(main);
+//!
+//! # Execution Flow
+//!
+//! 1. Read KernelInputV1 bytes from the host via env::read()
+//! 2. Execute kernel_main() which runs the agent and enforces constraints
+//! 3. Commit the KernelJournalV1 bytes to the journal via env::commit_slice()
 
 fn main() {{
-    // The kernel runtime handles:
-    // 1. Decoding KernelInputV1 from the host
-    // 2. Verifying agent_code_hash matches this agent
-    // 3. Calling your agent_main() function
-    // 4. Enforcing constraints (unskippable)
-    // 5. Computing action/input commitments
-    // 6. Writing KernelJournalV1 (exactly 209 bytes)
-    kernel_guest::kernel_main_with_agent(
-        {name_snake}::kernel_main_with_constraints,
-    );
+    use risc0_zkvm::guest::env;
+
+    // Read input bytes from the host
+    let input_bytes: Vec<u8> = env::read();
+
+    // Execute kernel via the agent crate (which binds the specific agent)
+    match {name_snake}::kernel_main(&input_bytes) {{
+        Ok(journal_bytes) => {{
+            // Commit journal to the proof receipt
+            env::commit_slice(&journal_bytes);
+        }}
+        Err(error) => {{
+            // Panic aborts proof generation — this is intentional
+            panic!("Kernel execution failed: {{:?}}", error);
+        }}
+    }}
 }}
 "#,
             name_snake = name.replace('-', "_")
