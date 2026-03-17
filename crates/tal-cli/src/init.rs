@@ -844,7 +844,7 @@ edition = "2021"
 [workspace]
 
 [dependencies]
-risc0-zkvm = {{ version = "3.0", default-features = false, features = ["guest"] }}
+risc0-zkvm = {{ version = "3.0", default-features = false, features = ["std"] }}
 {kernel_guest_dep}
 {name} = {{ path = "../../agent" }}
 "#
