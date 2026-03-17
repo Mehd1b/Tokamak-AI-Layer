@@ -24,13 +24,18 @@ curl -L https://risczero.com/install | bash && rzup install
 curl -L https://foundry.paradigm.xyz | bash && foundryup
 ```
 
-Clone the repository and install the `tal` CLI:
+Install the `tal` CLI:
 
 ```bash
+# Option 1: Prebuilt binary (fastest — no Rust required)
+curl -sSL https://raw.githubusercontent.com/tokamak-network/Tokamak-AI-Layer/master/install-tal.sh | sh
+
+# Option 2: From crates.io (requires Rust)
+cargo install tal-cli
+
+# Option 3: From source (requires Rust + cloned repo)
 git clone https://github.com/tokamak-network/Tokamak-AI-Layer.git
 cd Tokamak-AI-Layer
-
-# Install the tal CLI
 cargo install --path crates/tal-cli
 ```
 

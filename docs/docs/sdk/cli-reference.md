@@ -9,6 +9,20 @@ The `tal` CLI is the unified developer tool for the Execution Kernel. It covers 
 
 ## Installation
 
+Install from prebuilt binaries (no Rust toolchain required):
+
+```bash
+curl -sSL https://raw.githubusercontent.com/tokamak-network/Tokamak-AI-Layer/master/install-tal.sh | sh
+```
+
+Or from [crates.io](https://crates.io/crates/tal-cli) (requires Rust):
+
+```bash
+cargo install tal-cli
+```
+
+Or from source (inside a cloned repo):
+
 ```bash
 cargo install --path crates/tal-cli
 ```

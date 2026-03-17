@@ -9,15 +9,25 @@ This guide takes you from zero to a working, tested agent using the `tal` CLI.
 
 ## Prerequisites
 
-- Rust toolchain (`rustup`)
-- The Execution Kernel repository cloned locally
+- Rust toolchain (`rustup`) — only needed if installing via `cargo install`
 
 ## Step 1: Install the CLI
 
+Install from prebuilt binaries (fastest — no Rust required):
+
 ```bash
-cd Tokamak-AI-Layer
-cargo install --path crates/tal-cli
+curl -sSL https://raw.githubusercontent.com/tokamak-network/Tokamak-AI-Layer/master/install-tal.sh | sh
 ```
+
+Or from [crates.io](https://crates.io/crates/tal-cli):
+
+```bash
+cargo install tal-cli
+```
+
+:::tip No repo clone needed
+`tal` can be installed and used without cloning the repository. You only need the repo if you want to build from source or contribute.
+:::
 
 ## Step 2: Validate your environment
 
