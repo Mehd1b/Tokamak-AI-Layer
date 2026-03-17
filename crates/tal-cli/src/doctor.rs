@@ -422,6 +422,14 @@ fn check_workspace_membership(agent_dir: &Path) -> CheckResult {
         .to_string();
 
     if let Ok(workspace) = find_workspace_root_from(agent_dir) {
+        // Standalone project: workspace root is the agent dir itself
+        if workspace == agent_dir {
+            return CheckResult::pass(
+                "Workspace membership",
+                "Standalone project (self-contained workspace)",
+            );
+        }
+
         let cargo_toml = workspace.join("Cargo.toml");
         if let Ok(content) = std::fs::read_to_string(&cargo_toml) {
             if content.contains(&agent_name) {
