@@ -46,6 +46,8 @@ sol! {
         function computeVaultAddress(address owner, bytes32 agentId, address asset, bytes32 userSalt) external view returns (address vault, bytes32 salt);
         function isDeployedVault(address vault) external view returns (bool);
         function getAgentVaults(bytes32 agentId) external view returns (address[] memory);
+        function setVaultProtocolType(address vault, uint8 protocolType) external;
+        function vaultProtocolType(address vault) external view returns (uint8);
     }
 
     #[sol(rpc)]
@@ -221,6 +223,29 @@ async fn run_async(
     // Step 3: DEPLOY VAULT
     // ===================================================================
     let vault_addr = step_deploy_vault(&provider, &chain, deployer_addr, agent_id, image_id, vault_salt, verbose, optimistic, total_steps).await?;
+
+    // ===================================================================
+    // Set protocol type on VaultFactory
+    // ===================================================================
+    if hyperliquid {
+        let factory = IVaultFactory::new(chain.vault_factory, &provider);
+        let current_type = factory.vaultProtocolType(vault_addr).call().await.map(|r| r._0).unwrap_or(0);
+
+        if current_type != 1 {
+            println!("  Setting vault protocol type to Hyperliquid (1)...");
+            let tx_data = IVaultFactory::setVaultProtocolTypeCall {
+                vault: vault_addr,
+                protocolType: 1, // HYPERLIQUID
+            }
+            .abi_encode();
+
+            let result = send_tx(&provider, Some(chain.vault_factory), tx_data, U256::ZERO, None).await?;
+            println!("  {} Protocol type set (tx: {:?})", "✓".green(), result.tx_hash);
+        } else {
+            println!("  {} Vault protocol type already set to Hyperliquid", "✓".green());
+        }
+        println!();
+    }
 
     // ===================================================================
     // Step 4+: HYPERLIQUID STACK
