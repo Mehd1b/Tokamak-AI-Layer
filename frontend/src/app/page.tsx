@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { StatCard } from '@/components/StatCard';
-import AnimatedBackground from '@/components/AnimatedBackground';
 import AuroraBackground from '@/components/AuroraBackground';
 
 /* Redesigned SVG Icons — Purple geometric style */
@@ -204,9 +203,6 @@ export default function HomePage() {
 
   return (
     <div>
-      {/* Global animated backgrounds */}
-      <AnimatedBackground />
-
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center overflow-hidden">
         {/* Aurora noise background */}
