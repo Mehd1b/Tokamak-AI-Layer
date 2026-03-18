@@ -60,6 +60,14 @@ sol! {
     }
 
     #[sol(rpc)]
+    interface IOptimisticKernelVault {
+        function optimisticEnabled() external view returns (bool);
+        function setOptimisticEnabled(bool enabled) external;
+        function setOracleSigner(address signer, uint64 maxAge) external;
+        function oracleSigner() external view returns (address);
+    }
+
+    #[sol(rpc)]
     interface IHyperliquidAdapter {
         function registerVault(address vault, uint32 perpAsset, uint8 szDecimals) external returns (address subAccount);
         function fundSubAccountHype(address vault) external payable;
@@ -243,6 +251,53 @@ async fn run_async(
             println!("  {} Protocol type set (tx: {:?})", "✓".green(), result.tx_hash);
         } else {
             println!("  {} Vault protocol type already set to Hyperliquid", "✓".green());
+        }
+        println!();
+    }
+
+    // ===================================================================
+    // Configure optimistic vault (oracle signer + enable)
+    // ===================================================================
+    if optimistic {
+        let okv = IOptimisticKernelVault::new(vault_addr, &provider);
+        let already_enabled = okv.optimisticEnabled().call().await.map(|r| r._0).unwrap_or(false);
+
+        if !already_enabled {
+            // Set oracle signer (required before enabling optimistic)
+            if let Some(oracle_signer_str) = resolve_env("ORACLE_SIGNER") {
+                let oracle_signer: Address = oracle_signer_str.parse().context("Invalid ORACLE_SIGNER")?;
+                let current_signer = okv.oracleSigner().call().await.map(|r| r._0).unwrap_or(Address::ZERO);
+
+                if current_signer == Address::ZERO {
+                    let max_oracle_age: u64 = resolve_env("ORACLE_MAX_AGE")
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(900); // Default: 900s (15 min)
+                    println!("  Setting oracle signer to {} (maxAge={}s)...", oracle_signer, max_oracle_age);
+                    let tx_data = IOptimisticKernelVault::setOracleSignerCall {
+                        signer: oracle_signer,
+                        maxAge: max_oracle_age,
+                    }
+                    .abi_encode();
+                    let result = send_tx(&provider, Some(vault_addr), tx_data, U256::ZERO, None).await?;
+                    println!("  {} Oracle signer set (tx: {:?})", "✓".green(), result.tx_hash);
+                }
+
+                // Enable optimistic execution
+                println!("  Enabling optimistic execution...");
+                let tx_data = IOptimisticKernelVault::setOptimisticEnabledCall {
+                    enabled: true,
+                }
+                .abi_encode();
+                let result = send_tx(&provider, Some(vault_addr), tx_data, U256::ZERO, None).await?;
+                println!("  {} Optimistic execution enabled (tx: {:?})", "✓".green(), result.tx_hash);
+            } else {
+                println!("  {} ORACLE_SIGNER not set — optimistic execution not enabled", "⚠".yellow());
+                println!("    Set ORACLE_SIGNER in .env, then run:");
+                println!("    cast send {} 'setOracleSigner(address)' <signer> --private-key $PK --legacy --rpc-url $RPC", vault_addr);
+                println!("    cast send {} 'setOptimisticEnabled(bool)' true --private-key $PK --legacy --rpc-url $RPC", vault_addr);
+            }
+        } else {
+            println!("  {} Optimistic execution already enabled", "✓".green());
         }
         println!();
     }
