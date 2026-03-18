@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { StatCard } from '@/components/StatCard';
+import AnimatedBackground from '@/components/AnimatedBackground';
+import AuroraBackground from '@/components/AuroraBackground';
 
 /* Redesigned SVG Icons — Purple geometric style */
 
@@ -166,93 +168,8 @@ export default function HomePage() {
     features.map(() => ({ x: 50, y: 50 }))
   );
 
-  // Constellation particle state
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animFrameRef = useRef<number>(0);
-
   useEffect(() => {
     setIsLoaded(true);
-  }, []);
-
-  // Constellation animation
-  useEffect(() => {
-    // Respect prefers-reduced-motion
-    const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    if (motionQuery.matches) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const resize = () => {
-      canvas.width = canvas.offsetWidth * 2;
-      canvas.height = canvas.offsetHeight * 2;
-      ctx.scale(2, 2);
-    };
-    resize();
-    window.addEventListener('resize', resize);
-
-    const particles: { x: number; y: number; vx: number; vy: number; r: number; opacity: number }[] = [];
-    const w = () => canvas.offsetWidth;
-    const h = () => canvas.offsetHeight;
-    const count = 50;
-    for (let i = 0; i < count; i++) {
-      particles.push({
-        x: Math.random() * w(),
-        y: Math.random() * h(),
-        vx: (Math.random() - 0.5) * 0.3,
-        vy: (Math.random() - 0.5) * 0.3,
-        r: Math.random() * 2 + 1,
-        opacity: Math.random() * 0.5 + 0.2,
-      });
-    }
-
-    const draw = () => {
-      ctx.clearRect(0, 0, w(), h());
-      // Draw connections
-      for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
-          const dx = particles[i].x - particles[j].x;
-          const dy = particles[i].y - particles[j].y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 120) {
-            ctx.strokeStyle = `rgba(168, 85, 247, ${0.15 * (1 - dist / 120)})`;
-            ctx.lineWidth = 0.5;
-            ctx.beginPath();
-            ctx.moveTo(particles[i].x, particles[i].y);
-            ctx.lineTo(particles[j].x, particles[j].y);
-            ctx.stroke();
-          }
-        }
-      }
-      // Draw particles
-      for (const p of particles) {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(168, 85, 247, ${p.opacity})`;
-        ctx.fill();
-
-        // Glow
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r * 2, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(168, 85, 247, ${p.opacity * 0.15})`;
-        ctx.fill();
-
-        // Move
-        p.x += p.vx;
-        p.y += p.vy;
-        if (p.x < 0 || p.x > w()) p.vx *= -1;
-        if (p.y < 0 || p.y > h()) p.vy *= -1;
-      }
-      animFrameRef.current = requestAnimationFrame(draw);
-    };
-    draw();
-
-    return () => {
-      window.removeEventListener('resize', resize);
-      cancelAnimationFrame(animFrameRef.current);
-    };
   }, []);
 
   // Intersection observers
@@ -287,32 +204,15 @@ export default function HomePage() {
 
   return (
     <div>
+      {/* Global animated backgrounds */}
+      <AnimatedBackground />
+
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center overflow-hidden">
-        {/* Aurora/gradient mesh background */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: 'radial-gradient(ellipse 80% 50% at 50% 40%, rgba(168, 85, 247, 0.08) 0%, transparent 70%)',
-          }}
-        />
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: 'radial-gradient(ellipse 60% 40% at 70% 50%, rgba(124, 58, 237, 0.06) 0%, transparent 60%)',
-          }}
-        />
-
-        {/* Dot Pattern */}
-        <div
-          className="absolute top-0 right-0 w-1/2 h-full pointer-events-none"
-          style={{
-            backgroundImage: 'radial-gradient(rgb(255, 255, 255) 0.5px, transparent 0.5px)',
-            backgroundSize: '18px 18px',
-            opacity: 0.2,
-            maskImage: 'linear-gradient(to left, rgba(0,0,0,0.4) 0%, transparent 60%)',
-          }}
-        />
+        {/* Aurora noise background */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-40">
+          <AuroraBackground />
+        </div>
 
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-12 flex flex-col lg:flex-row items-center justify-between gap-12 pt-32 pb-20 lg:py-20">
           {/* Left Side - Text */}
@@ -419,48 +319,39 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Right Side - Constellation Particle Visualization */}
+          {/* Right Side — the AnimatedBackground particles serve as the visual */}
           <div
             className={`hidden lg:flex flex-1 justify-center lg:justify-end transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'}`}
             style={{ transitionDelay: '400ms' }}
           >
-            <div className="relative w-[450px] h-[550px] md:w-[600px] md:h-[700px]">
+            <div className="relative w-[450px] h-[550px] md:w-[600px] md:h-[700px] flex items-center justify-center">
               {/* Glow */}
               <div
                 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] md:w-[500px] md:h-[500px] rounded-full pointer-events-none animate-breathe"
                 style={{
-                  background: 'radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.06) 50%, transparent 70%)',
+                  background: 'radial-gradient(circle, rgba(168, 85, 247, 0.15) 0%, rgba(168, 85, 247, 0.04) 50%, transparent 70%)',
                 }}
               />
 
-              {/* Canvas constellation */}
-              <canvas
-                ref={canvasRef}
-                className="absolute inset-0 w-full h-full"
-                style={{ opacity: 0.9 }}
-              />
-
               {/* Center label overlay */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="text-center">
-                  <div
-                    className="w-20 h-20 mx-auto mb-3 rounded-2xl border border-[#A855F7]/30 bg-[#0a0a0f]/80 flex items-center justify-center backdrop-blur-sm"
-                    style={{ boxShadow: '0 0 30px rgba(168, 85, 247, 0.15)' }}
-                  >
-                    <span
-                      className="text-[#A855F7] text-2xl font-light"
-                      style={{ fontFamily: 'var(--font-mono), monospace', filter: 'drop-shadow(0 0 8px rgba(168, 85, 247, 0.5))' }}
-                    >
-                      EK
-                    </span>
-                  </div>
+              <div className="relative text-center pointer-events-none">
+                <div
+                  className="w-24 h-24 mx-auto mb-4 rounded-2xl border border-[#A855F7]/30 bg-[#0a0a0f]/80 flex items-center justify-center backdrop-blur-sm"
+                  style={{ boxShadow: '0 0 40px rgba(168, 85, 247, 0.2)' }}
+                >
                   <span
-                    className="text-[10px] uppercase tracking-[0.2em] text-[#A855F7]/60"
-                    style={{ fontFamily: 'var(--font-mono), monospace' }}
+                    className="text-[#A855F7] text-3xl font-light"
+                    style={{ fontFamily: 'var(--font-mono), monospace', filter: 'drop-shadow(0 0 10px rgba(168, 85, 247, 0.6))' }}
                   >
-                    zkVM Verified
+                    TAL
                   </span>
                 </div>
+                <span
+                  className="text-[10px] uppercase tracking-[0.25em] text-[#A855F7]/60"
+                  style={{ fontFamily: 'var(--font-mono), monospace' }}
+                >
+                  Tokamak AI Layer
+                </span>
               </div>
             </div>
           </div>
