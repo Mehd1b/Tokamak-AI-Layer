@@ -28,7 +28,7 @@
 //! of the feed body is bound to `ctx.input_root` in the journal, and the ECDSA
 //! signature is verified on-chain via `ecrecover`.
 //!
-//! ## Part 3: PerpInput (238 bytes)
+//! ## Part 3: PerpInput (240 bytes)
 //!
 //! Agent-specific market data, position state, and strategy parameters.
 //! All prices are 1e8-scaled u64 values. Signed values use magnitude + bool flag.
@@ -859,6 +859,7 @@ mod tests {
             in_drawdown_cooldown: false,
             strategy_mode: STRATEGY_SMA_CROSSOVER,
             sz_decimals: 5,                // BTC default
+            open_phase: 0,                 // Normal single-proof mode
         }
     }
 
@@ -900,6 +901,7 @@ mod tests {
         in_drawdown_cooldown: bool,
         strategy_mode: u8,
         sz_decimals: u8,
+        open_phase: u8,
     }
 
     impl PerpInputBuilder {
@@ -942,6 +944,7 @@ mod tests {
             buf.push(if self.in_drawdown_cooldown { 1 } else { 0 });
             buf.push(self.strategy_mode);
             buf.push(self.sz_decimals);
+            buf.push(self.open_phase);
             buf
         }
     }
@@ -982,8 +985,8 @@ mod tests {
 
     #[test]
     fn test_perp_input_encoded_size() {
-        // Original 228 + 10 new bytes + 1 sz_decimals = 239
-        assert_eq!(PerpInput::ENCODED_SIZE, 239);
+        // Original 228 + 10 new bytes + 1 sz_decimals + 1 open_phase = 240
+        assert_eq!(PerpInput::ENCODED_SIZE, 240);
     }
 
     #[test]
