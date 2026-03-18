@@ -286,7 +286,13 @@ fn update_manifest_from_build(
 
     let manifest_path = "dist/agent-pack.json";
     if !std::path::Path::new(manifest_path).exists() {
-        anyhow::bail!("dist/agent-pack.json not found");
+        // Create dist/ and a skeleton manifest
+        std::fs::create_dir_all("dist")?;
+        let skeleton = format!(
+            r#"{{"format_version":"1","agent_name":"{}","agent_version":"0.1.0","agent_id":"0x0","protocol_version":1,"kernel_version":1,"agent_code_hash":"","image_id":"","artifacts":{{"elf_path":"","elf_sha256":""}}}}"#,
+            agent_name
+        );
+        std::fs::write(manifest_path, &skeleton)?;
     }
 
     // Find the generated methods.rs in the build output
