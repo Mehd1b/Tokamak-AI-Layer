@@ -390,30 +390,21 @@ async fn step_deploy_vault(
         println!("  {} All existing vaults have stale imageId — deploying new vault with salt 0x{:02x}", "⚠".yellow(), new_salt_val);
     }
 
-    // Compute expected address
-    let (expected_addr, _) = factory
-        .computeVaultAddress(deployer, agent_id, chain.usdc, vault_salt)
+    // Deploy vault
+    let vault_count_before = factory
+        .getAgentVaults(agent_id)
         .call()
         .await
-        .context("Failed to compute vault address")?
-        .into();
+        .map(|r| r._0.len())
+        .unwrap_or(0);
 
-    println!("  Expected vault address: {}", expected_addr);
-
-    let code = provider.get_code_at(expected_addr).await?;
-    if !code.is_empty() {
-        println!("  {} Vault already deployed at {}", "✓".green(), expected_addr);
-        return Ok(expected_addr);
-    }
-
-    // Deploy vault
     if optimistic {
         let bond_chain_id = resolve_env("BOND_CHAIN_ID")
             .and_then(|s| s.parse::<u64>().ok())
-            .unwrap_or(1); // Default: Ethereum mainnet
+            .unwrap_or(1);
         let challenge_window = resolve_env("CHALLENGE_WINDOW")
             .and_then(|s| s.parse::<u64>().ok())
-            .unwrap_or(3600); // Default: 1 hour
+            .unwrap_or(3600);
 
         println!("  Deploying OptimisticKernelVault (bondChainId={}, challengeWindow={}s)...", bond_chain_id, challenge_window);
 
@@ -428,8 +419,24 @@ async fn step_deploy_vault(
         .abi_encode();
 
         let result = send_tx(provider, Some(chain.vault_factory), tx_data, U256::ZERO, Some(3_000_000)).await?;
-        println!("  {} OptimisticKernelVault deployed at {} (tx: {:?}, gas: {})", "✓".green(), expected_addr, result.tx_hash, result.gas_used);
+        println!("  {} OptimisticKernelVault deployed (tx: {:?}, gas: {})", "✓".green(), result.tx_hash, result.gas_used);
     } else {
+        // For regular vaults, compute expected address first
+        let (expected_addr, _) = factory
+            .computeVaultAddress(deployer, agent_id, chain.usdc, vault_salt)
+            .call()
+            .await
+            .context("Failed to compute vault address")?
+            .into();
+
+        println!("  Expected vault address: {}", expected_addr);
+
+        let code = provider.get_code_at(expected_addr).await?;
+        if !code.is_empty() {
+            println!("  {} Vault already deployed at {}", "✓".green(), expected_addr);
+            return Ok(expected_addr);
+        }
+
         println!("  Deploying vault via VaultFactory...");
 
         let tx_data = IVaultFactory::deployVaultCall {
@@ -441,23 +448,39 @@ async fn step_deploy_vault(
         .abi_encode();
 
         let result = send_tx(provider, Some(chain.vault_factory), tx_data, U256::ZERO, Some(3_000_000)).await?;
-        println!("  {} Vault deployed at {} (tx: {:?}, gas: {})", "✓".green(), expected_addr, result.tx_hash, result.gas_used);
+        println!("  {} Vault deployed (tx: {:?}, gas: {})", "✓".green(), result.tx_hash, result.gas_used);
     }
 
-    // Verify
+    // Get the actual deployed vault address from the factory
+    let vaults_after = factory
+        .getAgentVaults(agent_id)
+        .call()
+        .await
+        .map(|r| r._0)
+        .unwrap_or_default();
+
+    let deployed_addr = if vaults_after.len() > vault_count_before {
+        *vaults_after.last().unwrap()
+    } else {
+        bail!("Vault deployment tx succeeded but no new vault found in factory.\n  Check VaultFactory events.");
+    };
+
+    // Verify it's tracked
     let is_deployed = factory
-        .isDeployedVault(expected_addr)
+        .isDeployedVault(deployed_addr)
         .call()
         .await
         .map(|r| r._0)
         .unwrap_or(false);
 
     if !is_deployed {
-        bail!("Vault deployment tx succeeded but vault not found at {}.\n  Check VaultFactory events for the actual deployed address.", expected_addr);
+        bail!("Vault {} not tracked by factory", deployed_addr);
     }
 
+    println!("  Vault address: {}", deployed_addr);
+
     println!();
-    Ok(expected_addr)
+    Ok(deployed_addr)
 }
 
 // ===========================================================================
