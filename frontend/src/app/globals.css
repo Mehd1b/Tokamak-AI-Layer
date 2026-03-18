@@ -498,3 +498,54 @@
 .breadcrumb .separator {
   @apply text-gray-700;
 }
+
+/* ============ Radar SVG Animations ============ */
+
+@keyframes sonar-wave {
+  0% {
+    r: 15;
+    opacity: 0.8;
+    stroke-width: 1.5;
+  }
+  100% {
+    r: 150;
+    opacity: 0;
+    stroke-width: 0;
+  }
+}
+
+.sonar-wave {
+  animation: sonar-wave 3s ease-out infinite;
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg) translateZ(0); }
+  to { transform: rotate(360deg) translateZ(0); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 12s linear infinite;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+@keyframes spin-slower {
+  from { transform: rotate(0deg) translateZ(0); }
+  to { transform: rotate(-360deg) translateZ(0); }
+}
+
+.animate-spin-slower {
+  animation: spin-slower 15s linear infinite;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.2); opacity: 0.8; }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+  transform-origin: 300px 300px;
+}

@@ -277,13 +277,6 @@ export default function HomePage() {
                 </span>
               </Link>
 
-              <Link
-                href="/agents"
-                className="px-8 py-4 rounded-full border border-white/10 text-gray-400 hover:text-white hover:border-white/20 transition-all duration-300"
-                style={{ fontFamily: 'var(--font-mono), monospace' }}
-              >
-                Register Agent
-              </Link>
             </div>
           </div>
 
@@ -319,40 +312,124 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Right Side — the AnimatedBackground particles serve as the visual */}
+          {/* Right Side - Radar Visualization */}
           <div
             className={`hidden lg:flex flex-1 justify-center lg:justify-end transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'}`}
             style={{ transitionDelay: '400ms' }}
           >
-            <div className="relative w-[450px] h-[550px] md:w-[600px] md:h-[700px] flex items-center justify-center">
-              {/* Glow */}
+            <div className="relative w-[450px] h-[550px] md:w-[600px] md:h-[700px] lg:w-[700px] lg:h-[850px]">
+              {/* Glow behind radar */}
               <div
                 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] md:w-[500px] md:h-[500px] rounded-full pointer-events-none animate-breathe"
                 style={{
-                  background: 'radial-gradient(circle, rgba(168, 85, 247, 0.15) 0%, rgba(168, 85, 247, 0.04) 50%, transparent 70%)',
+                  background: 'radial-gradient(circle, rgba(168, 85, 247, 0.25) 0%, rgba(168, 85, 247, 0.08) 50%, transparent 70%)',
                 }}
               />
 
-              {/* Center label overlay */}
-              <div className="relative text-center pointer-events-none">
-                <div
-                  className="w-24 h-24 mx-auto mb-4 rounded-2xl border border-[#A855F7]/30 bg-[#0a0a0f]/80 flex items-center justify-center backdrop-blur-sm"
-                  style={{ boxShadow: '0 0 40px rgba(168, 85, 247, 0.2)' }}
-                >
-                  <span
-                    className="text-[#A855F7] text-3xl font-light"
-                    style={{ fontFamily: 'var(--font-mono), monospace', filter: 'drop-shadow(0 0 10px rgba(168, 85, 247, 0.6))' }}
-                  >
-                    TAL
-                  </span>
-                </div>
-                <span
-                  className="text-[10px] uppercase tracking-[0.25em] text-[#A855F7]/60"
-                  style={{ fontFamily: 'var(--font-mono), monospace' }}
-                >
-                  Tokamak AI Layer
-                </span>
-              </div>
+              <svg viewBox="0 0 600 600" className="w-full h-full">
+                <defs>
+                  <radialGradient id="center-glow" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stopColor="#A855F7" stopOpacity="0.4" />
+                    <stop offset="50%" stopColor="#A855F7" stopOpacity="0.1" />
+                    <stop offset="100%" stopColor="#A855F7" stopOpacity="0" />
+                  </radialGradient>
+                </defs>
+
+                {/* Pulsing Glow */}
+                <circle cx="300" cy="300" r="120" fill="url(#center-glow)" className="animate-pulse-glow" />
+
+                {/* Sonar Waves */}
+                {[0, 1, 2].map((i) => (
+                  <circle
+                    key={`sonar-${i}`}
+                    cx="300" cy="300" r="10"
+                    fill="none" stroke="#A855F7" strokeWidth="1"
+                    className="sonar-wave"
+                    style={{ animationDelay: `${i}s` }}
+                  />
+                ))}
+
+                {/* Outer Dashed Orbit */}
+                <circle
+                  cx="300" cy="300" r="160"
+                  fill="none" stroke="white" strokeOpacity="0.1" strokeWidth="1"
+                  strokeDasharray="10 20" shapeRendering="geometricPrecision"
+                  className="animate-spin-slow"
+                  style={{ transformOrigin: '300px 300px' }}
+                />
+
+                {/* Inner Dashed Orbit */}
+                <circle
+                  cx="300" cy="300" r="110"
+                  fill="none" stroke="#A855F7" strokeOpacity="0.2" strokeWidth="1"
+                  strokeDasharray="4 6" shapeRendering="geometricPrecision"
+                  className="animate-spin-slower"
+                  style={{ transformOrigin: '300px 300px' }}
+                />
+
+                {/* Bezier Lines - Upper Left */}
+                <path d="M 50 200 C 150 200, 200 300, 300 300" fill="none" stroke="white" strokeWidth="1" strokeOpacity="0.1" />
+                <path d="M 50 200 C 150 200, 200 300, 300 300" fill="none" stroke="#A855F7" strokeWidth="1.5" strokeDasharray="80 320" strokeDashoffset="320" opacity="0" shapeRendering="geometricPrecision">
+                  <animate attributeName="opacity" from="0" to="1" dur="0.01s" begin="0s" fill="freeze" />
+                  <animate attributeName="stroke-dashoffset" from="320" to="-80" dur="3s" repeatCount="indefinite" calcMode="linear" />
+                </path>
+
+                {/* Bezier Lines - Lower Left */}
+                <path d="M 50 400 C 150 400, 200 300, 300 300" fill="none" stroke="white" strokeWidth="1" strokeOpacity="0.1" />
+                <path d="M 50 400 C 150 400, 200 300, 300 300" fill="none" stroke="#A855F7" strokeWidth="1.5" strokeDasharray="80 320" strokeDashoffset="320" opacity="0" shapeRendering="geometricPrecision">
+                  <animate attributeName="opacity" from="0" to="1" dur="0.01s" begin="1.5s" fill="freeze" />
+                  <animate attributeName="stroke-dashoffset" from="320" to="-80" dur="3s" begin="1.5s" repeatCount="indefinite" calcMode="linear" />
+                </path>
+
+                {/* Bezier Lines - Upper Right */}
+                <path d="M 550 200 C 450 200, 400 300, 300 300" fill="none" stroke="white" strokeWidth="1" strokeOpacity="0.1" />
+                <path d="M 550 200 C 450 200, 400 300, 300 300" fill="none" stroke="#A855F7" strokeWidth="1.5" strokeDasharray="60 320" strokeDashoffset="320" opacity="0" shapeRendering="geometricPrecision">
+                  <animate attributeName="opacity" from="0" to="1" dur="0.01s" begin="0.75s" fill="freeze" />
+                  <animate attributeName="stroke-dashoffset" from="320" to="-60" dur="3s" begin="0.75s" repeatCount="indefinite" calcMode="linear" />
+                </path>
+
+                {/* Bezier Lines - Lower Right */}
+                <path d="M 550 400 C 450 400, 400 300, 300 300" fill="none" stroke="white" strokeWidth="1" strokeOpacity="0.1" />
+                <path d="M 550 400 C 450 400, 400 300, 300 300" fill="none" stroke="#C084FC" strokeWidth="1.5" strokeDasharray="60 320" strokeDashoffset="320" opacity="0" shapeRendering="geometricPrecision">
+                  <animate attributeName="opacity" from="0" to="1" dur="0.01s" begin="2.25s" fill="freeze" />
+                  <animate attributeName="stroke-dashoffset" from="320" to="-60" dur="3s" begin="2.25s" repeatCount="indefinite" calcMode="linear" />
+                </path>
+
+                {/* Center Focal Point */}
+                <circle cx="300" cy="300" r="8" fill="#0A0A0A" stroke="#A855F7" strokeWidth="2" />
+                <circle cx="300" cy="300" r="4" fill="#A855F7" style={{ filter: 'drop-shadow(0 0 6px #A855F7)' }} />
+
+                {/* Data Points */}
+                <circle cx="200" cy="220" r="2" fill="#A855F7" fillOpacity="0.6" />
+                <circle cx="380" cy="180" r="1.5" fill="#C084FC" fillOpacity="0.4" />
+                <circle cx="420" cy="350" r="2" fill="#A855F7" fillOpacity="0.5" />
+                <circle cx="180" cy="380" r="1.5" fill="#C084FC" fillOpacity="0.3" />
+                <circle cx="350" cy="420" r="2" fill="#A855F7" fillOpacity="0.4" />
+                <circle cx="240" cy="160" r="1.5" fill="#C084FC" fillOpacity="0.5" />
+
+                {/* ZK VERIFIED Label */}
+                <g transform="translate(80, 120)">
+                  <text fill="#A855F7" fontSize="12" letterSpacing="1.2" style={{ fontFamily: 'var(--font-mono), monospace' }}>
+                    ZK VERIFIED
+                  </text>
+                  <line x1="0" y1="16" x2="85" y2="16" stroke="#A855F7" strokeWidth="1" strokeOpacity="0.5" />
+                </g>
+
+                {/* ON-CHAIN Label */}
+                <g transform="translate(420, 480)">
+                  <text fill="#A855F7" fontSize="12" letterSpacing="1.2" style={{ fontFamily: 'var(--font-mono), monospace' }}>
+                    ON-CHAIN
+                  </text>
+                  <line x1="0" y1="16" x2="70" y2="16" stroke="#A855F7" strokeWidth="1" strokeOpacity="0.5" />
+                </g>
+
+                {/* Status Indicators */}
+                <g transform="translate(520, 300)">
+                  <rect x="0" y="0" width="4" height="4" fill="rgba(255,255,255,0.2)" />
+                  <rect x="8" y="0" width="4" height="4" fill="rgba(255,255,255,0.2)" />
+                  <rect x="16" y="0" width="4" height="4" fill="#A855F7" className="animate-pulse" />
+                </g>
+              </svg>
             </div>
           </div>
         </div>
