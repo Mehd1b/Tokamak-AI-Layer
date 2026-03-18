@@ -252,7 +252,7 @@ When `--elf` is specified, `tal build`:
 
 ## `tal deploy`
 
-End-to-end on-chain deployment via alloy.
+End-to-end on-chain deployment via alloy. Supports three deployment modes: standard vaults, optimistic vaults (with WSTON bonds), and Hyperliquid perp trading (full adapter stack).
 
 ```
 tal deploy [OPTIONS]
@@ -261,21 +261,71 @@ tal deploy [OPTIONS]
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--testnet` | false | Deploy to testnet (chain 998) instead of mainnet (999) |
+| `--hyperliquid` | false | Deploy full Hyperliquid stack (adapter + sub-account + HYPE funding) |
+| `--optimistic` | false | Deploy OptimisticKernelVault instead of regular KernelVault |
+| `--min-bond <AMOUNT>` | — | Minimum bond amount in wei for optimistic vaults (e.g. `1000000000000000000000000000` for 1e27 WSTON) |
 | `--step <STEP>` | all | Run a single step: `register`, `vault`, `adapter`, `fund` |
 | `--agent <NAME>` | auto-detect | Agent name |
 | `--config <PATH>` | `.env` | Path to .env file |
 
-### Full Pipeline
+### Deployment Modes
 
 ```bash
-# Deploy everything to testnet
+# Standard vault (simplest)
 tal deploy --testnet
 
-# Deploy to mainnet
-tal deploy
+# Optimistic vault (WSTON-bonded, deferred proofs)
+tal deploy --testnet --optimistic --min-bond 1000000000000000000000000000
+
+# Hyperliquid perp trading (full stack: vault + adapter + sub-account)
+tal deploy --testnet --hyperliquid
+
+# Hyperliquid + optimistic (production perp trading)
+tal deploy --testnet --hyperliquid --optimistic --min-bond 1000000000000000000000000000
 ```
 
-Steps: preflight → register agent → deploy vault → adapter setup → summary.
+### What Each Mode Does
+
+**Standard** (`tal deploy`):
+1. Register agent on AgentRegistry
+2. Deploy KernelVault via VaultFactory
+
+**`--optimistic`** adds:
+3. Set oracle signer (`ORACLE_SIGNER` env var)
+4. Set minimum bond (`--min-bond` or `MIN_BOND` env var)
+5. Enable optimistic execution
+
+**`--hyperliquid`** adds:
+3. Set vault protocol type to Hyperliquid (1) on VaultFactory
+4. Register vault on HyperliquidAdapter (`ADAPTER_ADDRESS` env var)
+5. Fund sub-account with HYPE for CoreWriter gas
+6. Register API wallet (`API_WALLET_ADDRESS` env var, optional)
+
+### Environment Variables
+
+| Variable | Used by | Description |
+|----------|---------|-------------|
+| `ADAPTER_ADDRESS` | `--hyperliquid` | Deployed HyperliquidAdapter address |
+| `PERP_ASSET` | `--hyperliquid` | Asset index (0=BTC, 1=ETH, 3=SOL, default: 0) |
+| `SZ_DECIMALS` | `--hyperliquid` | Size decimals (BTC=5, ETH=4, SOL=2, default: 5) |
+| `HYPE_FUND_AMOUNT` | `--hyperliquid` | HYPE to fund sub-account (default: 0.01) |
+| `API_WALLET_ADDRESS` | `--hyperliquid` | API wallet to register (optional) |
+| `ORACLE_SIGNER` | `--optimistic` | Oracle signer address (required to enable optimistic) |
+| `ORACLE_MAX_AGE` | `--optimistic` | Max oracle data age in seconds (default: 900) |
+| `MIN_BOND` | `--optimistic` | Min bond amount in wei (alternative to `--min-bond` flag) |
+| `BOND_CHAIN_ID` | `--optimistic` | L1 chain ID for bonds (default: 1) |
+| `CHALLENGE_WINDOW` | `--optimistic` | Challenge period in seconds (default: 3600) |
+
+### Step-by-Step Execution
+
+Run individual steps with `--step`:
+
+```bash
+tal deploy --step register              # Only register agent
+tal deploy --step vault                 # Only deploy vault
+tal deploy --hyperliquid --step adapter # Only register vault on adapter
+tal deploy --hyperliquid --step fund    # Only fund HYPE + API wallet
+```
 
 Each step has skip-if-exists logic. Vault imageId mismatch is detected automatically — deploys a new vault with incremented salt.
 
@@ -331,30 +381,35 @@ Install: `cargo install --path crates/tools/cargo-agent`
 
 ---
 
-## Typical Workflow
+## Typical Workflows
+
+### Yield / Generic Agent
 
 ```bash
-# 1. Scaffold a new agent
 tal init my-agent --template yield
-
-# 2. Add to workspace Cargo.toml, then edit agent logic
-$EDITOR crates/agents/my-agent/agent/src/lib.rs
-
-# 3. Test locally (instant feedback)
 tal test --local
-
-# 4. Validate environment
-tal doctor
-
-# 5. Build agent + ELF
 tal build --elf
-
-# 6. Deploy to testnet
 tal deploy --testnet
-
-# 7. Monitor
 tal monitor --vault 0x...
+```
 
-# 8. Deploy to mainnet
-tal deploy
+### Perp-Trader (Hyperliquid)
+
+```bash
+tal init my-trader --template perp-trader
+tal test --local
+tal build --elf
+tal deploy --testnet --hyperliquid
+tal monitor --vault 0x...
+./run-bot.sh
+```
+
+### Optimistic Perp-Trader (Production)
+
+```bash
+tal init my-trader --template perp-trader
+tal build --elf
+tal deploy --testnet --hyperliquid --optimistic --min-bond 1000000000000000000000000000
+tal monitor --vault 0x...
+./run-bot.sh
 ```

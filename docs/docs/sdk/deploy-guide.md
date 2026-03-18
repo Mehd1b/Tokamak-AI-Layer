@@ -24,10 +24,19 @@ tal doctor
 ## Quick Deploy
 
 ```bash
-# Deploy to HyperEVM testnet (chain 998)
+# Standard vault
 tal deploy --testnet
 
-# Deploy to HyperEVM mainnet (chain 999)
+# Hyperliquid perp trading (full stack)
+tal deploy --testnet --hyperliquid
+
+# Optimistic vault (WSTON-bonded, deferred proofs)
+tal deploy --testnet --optimistic --min-bond 1000000000000000000000000000
+
+# Hyperliquid + optimistic (production perp trading)
+tal deploy --testnet --hyperliquid --optimistic --min-bond 1000000000000000000000000000
+
+# Deploy to mainnet
 tal deploy
 ```
 
