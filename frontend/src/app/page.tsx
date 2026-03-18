@@ -214,13 +214,6 @@ export default function HomePage() {
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-12 flex flex-col lg:flex-row items-center justify-between gap-12 pt-32 pb-20 lg:py-20">
           {/* Left Side - Text */}
           <div className="flex-1 max-w-2xl text-center lg:text-left">
-            <span
-              className={`inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-8 transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-              style={{ fontFamily: 'var(--font-mono), monospace' }}
-            >
-              RISC Zero zkVM &bull; Ethereum Sepolia
-            </span>
-
             <h1
               className={`text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-light leading-tight mb-6 transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
               style={{
@@ -694,21 +687,32 @@ export default function HomePage() {
               <div className="p-4 font-mono text-sm">
                 <div className="flex items-center gap-2 text-white/50">
                   <span className="text-[#A855F7]">$</span>
-                  <span>ek deploy --agent yield-optimizer</span>
+                  <span>tal init my-agent --template yield</span>
                 </div>
                 <div className="mt-2 text-white/30">
-                  <span className="text-green-400">&#10003;</span> Compiling agent to RISC-V...
+                  <span className="text-green-400">&#10003;</span> Agent scaffolded successfully!
+                </div>
+                <div className="mt-2 flex items-center gap-2 text-white/50">
+                  <span className="text-[#A855F7]">$</span>
+                  <span>tal build --elf</span>
                 </div>
                 <div className="mt-1 text-white/30">
-                  <span className="text-green-400">&#10003;</span> Computing image commitment...
+                  <span className="text-green-400">&#10003;</span> ELF binary built
+                </div>
+                <div className="mt-2 flex items-center gap-2 text-white/50">
+                  <span className="text-[#A855F7]">$</span>
+                  <span>tal deploy --testnet --hyperliquid</span>
                 </div>
                 <div className="mt-1 text-white/30">
-                  <span className="text-green-400">&#10003;</span> Registering on-chain...
+                  <span className="text-green-400">&#10003;</span> Agent registered
                 </div>
-                <div className="mt-2 flex items-center gap-2">
+                <div className="mt-1 text-white/30">
+                  <span className="text-green-400">&#10003;</span> Vault deployed
+                </div>
+                <div className="mt-1 flex items-center gap-2">
                   <span className="text-[#A855F7]">&rarr;</span>
-                  <span className="text-white/70">Agent deployed:</span>
-                  <span className="text-[#A855F7]">0x7a3f...8b2c</span>
+                  <span className="text-white/70">Vault:</span>
+                  <span className="text-[#A855F7]">0x34E9...e2E4</span>
                 </div>
               </div>
             </div>
