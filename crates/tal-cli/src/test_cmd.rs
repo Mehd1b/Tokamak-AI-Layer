@@ -359,8 +359,19 @@ fn resolve_agent_name(agent: Option<&str>) -> Result<String> {
     // Try to detect from current directory
     let cwd = std::env::current_dir()?;
 
-    // Check if we're in an agent directory
+    // Check if we're in a project root with agent/ subdirectory
     if cwd.join("agent/src/lib.rs").exists() {
+        // Read the actual crate name from agent/Cargo.toml
+        if let Ok(content) = std::fs::read_to_string(cwd.join("agent/Cargo.toml")) {
+            for line in content.lines() {
+                if let Some(name) = line.strip_prefix("name = \"") {
+                    if let Some(name) = name.strip_suffix('"') {
+                        return Ok(name.to_string());
+                    }
+                }
+            }
+        }
+        // Fall back to directory name
         if let Some(name) = cwd.file_name() {
             return Ok(name.to_string_lossy().to_string());
         }
