@@ -119,13 +119,21 @@ enum Commands {
         #[arg(long)]
         testnet: bool,
 
-        /// Run only a specific step: register, vault
+        /// Run only a specific step: register, vault, adapter, fund
         #[arg(long)]
         step: Option<String>,
 
         /// Agent name or path
         #[arg(short, long)]
         agent: Option<String>,
+
+        /// Deploy Hyperliquid stack (adapter + sub-account + HYPE funding)
+        #[arg(long)]
+        hyperliquid: bool,
+
+        /// Deploy OptimisticKernelVault instead of regular KernelVault
+        #[arg(long)]
+        optimistic: bool,
     },
 
     /// Live agent execution dashboard
@@ -196,12 +204,16 @@ fn main() -> anyhow::Result<()> {
             testnet,
             step,
             agent,
+            hyperliquid,
+            optimistic,
         } => deploy::run(
             testnet,
             step.as_deref(),
             agent.as_deref(),
             &cli.config,
             cli.verbose,
+            hyperliquid,
+            optimistic,
         ),
 
         Commands::Monitor {
