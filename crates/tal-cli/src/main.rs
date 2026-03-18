@@ -134,6 +134,10 @@ enum Commands {
         /// Deploy OptimisticKernelVault instead of regular KernelVault
         #[arg(long)]
         optimistic: bool,
+
+        /// Minimum bond amount for optimistic execution (in wei, e.g. 1000000000000000000000000000 = 1e27 for 1 WSTON)
+        #[arg(long)]
+        min_bond: Option<String>,
     },
 
     /// Live agent execution dashboard
@@ -206,6 +210,7 @@ fn main() -> anyhow::Result<()> {
             agent,
             hyperliquid,
             optimistic,
+            min_bond,
         } => deploy::run(
             testnet,
             step.as_deref(),
@@ -214,6 +219,7 @@ fn main() -> anyhow::Result<()> {
             cli.verbose,
             hyperliquid,
             optimistic,
+            min_bond.as_deref(),
         ),
 
         Commands::Monitor {

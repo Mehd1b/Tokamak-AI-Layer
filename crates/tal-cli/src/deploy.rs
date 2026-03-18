@@ -65,6 +65,8 @@ sol! {
         function setOptimisticEnabled(bool enabled) external;
         function setOracleSigner(address signer, uint64 maxAge) external;
         function oracleSigner() external view returns (address);
+        function setMinBond(uint256 amount) external;
+        function minBond() external view returns (uint256);
     }
 
     #[sol(rpc)]
@@ -88,9 +90,10 @@ pub fn run(
     verbose: bool,
     hyperliquid: bool,
     optimistic: bool,
+    min_bond: Option<&str>,
 ) -> Result<()> {
     let rt = tokio::runtime::Runtime::new()?;
-    rt.block_on(run_async(testnet, step, config_path, verbose, hyperliquid, optimistic))
+    rt.block_on(run_async(testnet, step, config_path, verbose, hyperliquid, optimistic, min_bond))
 }
 
 async fn run_async(
@@ -100,6 +103,7 @@ async fn run_async(
     verbose: bool,
     hyperliquid: bool,
     optimistic: bool,
+    min_bond: Option<&str>,
 ) -> Result<()> {
     let mode = if hyperliquid && optimistic {
         "Hyperliquid + Optimistic"
@@ -280,6 +284,34 @@ async fn run_async(
                     .abi_encode();
                     let result = send_tx(&provider, Some(vault_addr), tx_data, U256::ZERO, None).await?;
                     println!("  {} Oracle signer set (tx: {:?})", "✓".green(), result.tx_hash);
+                }
+
+                // Set minimum bond amount
+                let bond_str = min_bond
+                    .map(|s| s.to_string())
+                    .or_else(|| resolve_env("MIN_BOND"));
+                let bond_amount = bond_str
+                    .map(|s| {
+                        let clean = s.strip_prefix("0x").unwrap_or(&s);
+                        let radix = if s.starts_with("0x") { 16 } else { 10 };
+                        U256::from_str_radix(clean, radix)
+                    })
+                    .transpose()
+                    .context("Invalid --min-bond value")?;
+
+                if let Some(amount) = bond_amount {
+                    let current_bond = okv.minBond().call().await.map(|r| r._0).unwrap_or(U256::ZERO);
+                    if current_bond != amount {
+                        println!("  Setting minimum bond to {}...", amount);
+                        let tx_data = IOptimisticKernelVault::setMinBondCall {
+                            amount,
+                        }
+                        .abi_encode();
+                        let result = send_tx(&provider, Some(vault_addr), tx_data, U256::ZERO, None).await?;
+                        println!("  {} Min bond set (tx: {:?})", "✓".green(), result.tx_hash);
+                    } else {
+                        println!("  {} Min bond already set to {}", "✓".green(), amount);
+                    }
                 }
 
                 // Enable optimistic execution
