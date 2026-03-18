@@ -684,7 +684,7 @@ export default function HomePage() {
                 <span className="ml-2 text-[10px] font-mono text-white/30 uppercase tracking-wider">terminal</span>
               </div>
               {/* Terminal content */}
-              <div className="p-4 font-mono text-sm">
+              <div className="p-3 font-mono text-xs leading-relaxed">
                 <div className="flex items-center gap-2 text-white/50">
                   <span className="text-[#A855F7]">$</span>
                   <span>tal init my-agent --template yield</span>
