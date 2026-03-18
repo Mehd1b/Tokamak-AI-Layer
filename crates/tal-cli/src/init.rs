@@ -319,50 +319,61 @@ fn clone_perp_trader_template(output_dir: &Path, _name: &str, standalone: bool) 
 }
 
 /// Rewrite path dependencies in perp-trader Cargo.toml files to git dependencies.
+///
+/// Replaces any `path = "../../../..."` (pointing outside the project) with
+/// git dependencies pointing to the Tokamak-AI-Layer repo. Internal path deps
+/// like `path = "../agent"` are left unchanged.
 fn rewrite_perp_trader_deps(root: &Path) -> Result<()> {
     let git_source = "git = \"https://github.com/tokamak-network/Tokamak-AI-Layer.git\", branch = \"master\"";
 
-    let replacements = [
-        // agent/Cargo.toml
-        (
-            "agent/Cargo.toml",
-            vec![
-                ("path = \"../../../sdk/kernel-sdk\"", git_source),
-                ("path = \"../../../runtime/kernel-guest\"", git_source),
-                ("path = \"../../../protocol/constraints\"", git_source),
-                ("path = \"../../../protocol/kernel-core\"", git_source),
-            ],
-        ),
-        // host/Cargo.toml
-        (
-            "host/Cargo.toml",
-            vec![
-                ("path = \"../../../protocol/kernel-core\"", git_source),
-                ("path = \"../../../sdk/kernel-sdk\"", git_source),
-                ("path = \"../../../protocol/constraints\"", git_source),
-                ("path = \"../../../reference-integrator\"", git_source),
-            ],
-        ),
-        // risc0-methods/zkvm-guest/Cargo.toml
-        (
-            "risc0-methods/zkvm-guest/Cargo.toml",
-            vec![
-                ("path = \"../../../runtime/kernel-guest\"", git_source),
-            ],
-        ),
+    let cargo_files = [
+        "agent/Cargo.toml",
+        "host/Cargo.toml",
+        "risc0-methods/Cargo.toml",
+        "risc0-methods/zkvm-guest/Cargo.toml",
     ];
 
-    for (file, subs) in &replacements {
+    for file in &cargo_files {
         let path = root.join(file);
-        if let Ok(mut content) = fs::read_to_string(&path) {
-            for (old, new) in subs {
-                content = content.replace(old, new);
+        if let Ok(content) = fs::read_to_string(&path) {
+            let mut new_lines = Vec::new();
+            for line in content.lines() {
+                if line.contains("path = \"../../../") {
+                    // Replace the path = "..." portion with git source,
+                    // preserving any features or other attributes
+                    let rewritten = rewrite_path_to_git(line, git_source);
+                    new_lines.push(rewritten);
+                } else {
+                    new_lines.push(line.to_string());
+                }
             }
-            fs::write(&path, content)?;
+            let mut result = new_lines.join("\n");
+            if content.ends_with('\n') {
+                result.push('\n');
+            }
+            fs::write(&path, result)?;
         }
     }
 
     Ok(())
+}
+
+/// Rewrite a single Cargo.toml line from path dep to git dep.
+///
+/// Input:  `kernel-core = { path = "../../../protocol/kernel-core", features = ["std"] }`
+/// Output: `kernel-core = { git = "https://...", branch = "master", features = ["std"] }`
+fn rewrite_path_to_git(line: &str, git_source: &str) -> String {
+    // Find and replace the `path = "..."` segment
+    if let Some(path_start) = line.find("path = \"../../../") {
+        // Find the closing quote
+        let after_path = &line[path_start + 8..]; // skip `path = "`
+        if let Some(close_quote) = after_path.find('"') {
+            let before = &line[..path_start];
+            let after = &line[path_start + 8 + close_quote + 1..]; // after closing quote
+            return format!("{}{}{}", before, git_source, after);
+        }
+    }
+    line.to_string()
 }
 
 /// Recursively copy a directory.
