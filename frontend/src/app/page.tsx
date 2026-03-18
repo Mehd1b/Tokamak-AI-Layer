@@ -203,12 +203,13 @@ export default function HomePage() {
 
   return (
     <div>
+      {/* Aurora — fixed behind everything, visible through the transparent navbar */}
+      <div className="fixed inset-0 z-0 pointer-events-none opacity-40">
+        <AuroraBackground />
+      </div>
+
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center overflow-hidden">
-        {/* Aurora noise background */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-40">
-          <AuroraBackground />
-        </div>
 
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-12 flex flex-col lg:flex-row items-center justify-between gap-12 pt-32 pb-20 lg:py-20">
           {/* Left Side - Text */}
