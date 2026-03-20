@@ -128,14 +128,14 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
         // 6. Deploy TradingSubAccount via CREATE2 (salt = keccak256(vault))
         bytes32 salt = keccak256(abi.encodePacked(vault));
         subAccount = address(
-            new TradingSubAccount{salt: salt}(
+            new TradingSubAccount{ salt: salt }(
                 address(this), vault, usdc, coreDepositWallet, perpAsset, szDecimals
             )
         );
 
         // 7. Store config
         vaultConfigs[vault] =
-            VaultConfig({subAccount: subAccount, perpAsset: perpAsset, szDecimals: szDecimals});
+            VaultConfig({ subAccount: subAccount, perpAsset: perpAsset, szDecimals: szDecimals });
 
         // 8. Emit event
         emit VaultRegistered(vault, subAccount, perpAsset);
@@ -236,13 +236,12 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
         if (msg.value == 0) revert ZeroDeposit();
 
         // Send HYPE to sub-account (it has receive())
-        (bool success,) = config.subAccount.call{value: msg.value}("");
+        (bool success,) = config.subAccount.call{ value: msg.value }("");
         if (!success) revert HypeTransferFailed();
 
         // Bridge from HyperEVM to HyperCore
         TradingSubAccount(payable(config.subAccount)).bridgeHypeToCore();
     }
-
 
     // ============ Admin Position Management (vault owner only) ============
 
@@ -324,7 +323,10 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
     /// @param vault The vault whose sub-account to add the API wallet for
     /// @param wallet The EOA address to authorize
     /// @param name A human-readable name for the wallet
-    function addApiWalletAdmin(address vault, address wallet, string calldata name) external nonReentrant {
+    function addApiWalletAdmin(address vault, address wallet, string calldata name)
+        external
+        nonReentrant
+    {
         VaultConfig memory config = vaultConfigs[vault];
         if (config.subAccount == address(0)) revert VaultNotRegistered();
         if (msg.sender != IKernelVaultOwner(vault).owner()) revert NotVaultOwner();
@@ -384,13 +386,7 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
     }
 
     /// @inheritdoc IHyperliquidAdapter
-    function getVaultConfig(address vault)
-        external
-        view
-        override
-        returns (VaultConfig memory)
-    {
+    function getVaultConfig(address vault) external view override returns (VaultConfig memory) {
         return vaultConfigs[vault];
     }
-
 }

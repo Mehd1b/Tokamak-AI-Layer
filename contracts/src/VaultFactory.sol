@@ -76,10 +76,12 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     /// @param verifier_ The KernelExecutionVerifier contract address
     /// @param initialOwner The address that will own this contract
     /// @param vaultCodeStore_ The VaultCreationCodeStore contract address
-    function initialize(address registry_, address verifier_, address initialOwner, address vaultCodeStore_)
-        external
-        initializer
-    {
+    function initialize(
+        address registry_,
+        address verifier_,
+        address initialOwner,
+        address vaultCodeStore_
+    ) external initializer {
         require(registry_ != address(0), "zero registry");
         require(verifier_ != address(0), "zero verifier");
         require(initialOwner != address(0), "zero owner");
@@ -109,7 +111,7 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     // ============ UUPS ============
 
     /// @notice Authorize upgrade (only owner)
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address) internal override onlyOwner { }
 
     /// @notice Update the VaultCreationCodeStore (owner only).
     /// @dev Used when KernelVault bytecode changes (e.g., adding rescueTokens).
@@ -154,12 +156,11 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     }
 
     /// @inheritdoc IVaultFactory
-    function computeVaultAddress(
-        address owner_,
-        bytes32 agentId,
-        address asset,
-        bytes32 userSalt
-    ) external view returns (address vault, bytes32 salt) {
+    function computeVaultAddress(address owner_, bytes32 agentId, address asset, bytes32 userSalt)
+        external
+        view
+        returns (address vault, bytes32 salt)
+    {
         // Compute CREATE2 salt
         salt = _computeSalt(owner_, agentId, asset, userSalt);
 
@@ -185,12 +186,10 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     }
 
     /// @inheritdoc IVaultFactory
-    function deployVault(
-        bytes32 agentId,
-        address asset,
-        bytes32 userSalt,
-        bytes32 expectedImageId
-    ) external returns (address vault) {
+    function deployVault(bytes32 agentId, address asset, bytes32 userSalt, bytes32 expectedImageId)
+        external
+        returns (address vault)
+    {
         // Get agent info from registry
         IAgentRegistry.AgentInfo memory agentInfo = _registry.get(agentId);
         if (!agentInfo.exists) {
@@ -305,9 +304,8 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         }
 
         // Compute CREATE2 address
-        bytes memory bytecode = _getOptimisticCreationBytecode(
-            asset, agentId, agentInfo.imageId, owner_, bondChainId
-        );
+        bytes memory bytecode =
+            _getOptimisticCreationBytecode(asset, agentId, agentInfo.imageId, owner_, bondChainId);
         bytes32 bytecodeHash = keccak256(bytecode);
 
         vault = address(
@@ -382,12 +380,11 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     /// @param asset The asset address
     /// @param userSalt User-provided salt for uniqueness
     /// @return The CREATE2 salt
-    function _computeSalt(
-        address owner_,
-        bytes32 agentId,
-        address asset,
-        bytes32 userSalt
-    ) internal pure returns (bytes32) {
+    function _computeSalt(address owner_, bytes32 agentId, address asset, bytes32 userSalt)
+        internal
+        pure
+        returns (bytes32)
+    {
         return keccak256(abi.encodePacked(owner_, agentId, asset, userSalt));
     }
 
@@ -404,8 +401,7 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         address vaultOwner
     ) internal view returns (bytes memory) {
         return abi.encodePacked(
-            _vaultCreationCodeStore.code,
-            abi.encode(asset, _verifier, agentId, imageId, vaultOwner)
+            _vaultCreationCodeStore.code, abi.encode(asset, _verifier, agentId, imageId, vaultOwner)
         );
     }
 

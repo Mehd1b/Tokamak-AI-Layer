@@ -111,6 +111,41 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @dev Only meaningful when asset == address(0). Updated in depositETH, withdraw, execute, receive.
     uint256 public trackedETHBalance;
 
+    // ============ Performance Tracking ============
+
+    /// @notice PPS scaled by 1e18 at first deposit (set once)
+    uint256 public initialPps;
+
+    /// @notice Timestamp when initialPps was recorded
+    uint256 public initialPpsTimestamp;
+
+    /// @notice All-time peak PPS (scaled by 1e18)
+    uint256 public peakPps;
+
+    /// @notice Maximum drawdown from peak in basis points (e.g., 500 = 5%)
+    uint256 public maxDrawdownBps;
+
+    /// @notice Number of executions where PPS did not decrease
+    uint256 public executionWins;
+
+    /// @notice Total number of completed executions
+    uint256 public totalExecutionCount;
+
+    /// @notice PPS before the most recent execution (scaled by 1e18)
+    uint256 public preExecutionPps;
+
+    /// @notice Circular buffer of PPS checkpoints for time-windowed returns
+    uint256 public constant MAX_PPS_CHECKPOINTS = 30;
+
+    /// @notice PPS values in the circular buffer (scaled by 1e18)
+    uint256[30] public ppsCheckpointValues;
+
+    /// @notice Timestamps in the circular buffer
+    uint256[30] public ppsCheckpointTimestamps;
+
+    /// @notice Next write index in the circular buffer
+    uint256 public ppsCheckpointIndex;
+
     // ============ Events ============
 
     /// @notice Emitted when tokens are deposited
@@ -244,7 +279,13 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @param _agentId The agent ID this vault is bound to
     /// @param _trustedImageId The trusted RISC Zero image ID (pinned at deployment)
     /// @param _owner The vault owner (agent author) who can submit executions
-    constructor(address _asset, address _verifier, bytes32 _agentId, bytes32 _trustedImageId, address _owner) {
+    constructor(
+        address _asset,
+        address _verifier,
+        bytes32 _agentId,
+        bytes32 _trustedImageId,
+        address _owner
+    ) {
         if (_trustedImageId == bytes32(0)) revert InvalidTrustedImageId();
         require(_verifier != address(0), "zero verifier");
         require(_owner != address(0), "zero owner");
@@ -318,6 +359,14 @@ contract KernelVault is ReentrancyGuard, Pausable {
         totalShares += sharesMinted;
         totalDeposited += actualReceived;
 
+        // Initialize performance tracking on first deposit
+        if (initialPps == 0) {
+            uint256 pps = currentPps();
+            initialPps = pps;
+            initialPpsTimestamp = block.timestamp;
+            peakPps = pps;
+        }
+
         emit Deposit(msg.sender, actualReceived, sharesMinted);
     }
 
@@ -326,15 +375,20 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @dev MVP uses simple PPS math. First deposit is 1:1, subsequent deposits use
     ///      shares = msg.value * totalShares / totalAssets.
     ///      Only works when vault asset is address(0) (ETH vault).
-    function depositETH() external payable nonReentrant whenNotPaused returns (uint256 sharesMinted) {
+    function depositETH()
+        external
+        payable
+        nonReentrant
+        whenNotPaused
+        returns (uint256 sharesMinted)
+    {
         if (strategyActive) revert DepositsLockedDuringStrategy();
         if (address(asset) != address(0)) revert WrongDepositFunction();
         if (msg.value == 0) revert ZeroDeposit();
 
         // Calculate shares using virtual offset formula (ERC4626)
         // Use tracked balance (pre-deposit) for PPS calculation
-        uint256 effectiveAssets =
-            strategyActive ? snapshotTotalAssets : trackedETHBalance;
+        uint256 effectiveAssets = strategyActive ? snapshotTotalAssets : trackedETHBalance;
 
         // shares = assets * (totalShares + OFFSET) / (effectiveAssets + 1)
         sharesMinted = (msg.value * (totalShares + _DECIMALS_OFFSET)) / (effectiveAssets + 1);
@@ -346,13 +400,26 @@ contract KernelVault is ReentrancyGuard, Pausable {
         totalDeposited += msg.value;
         trackedETHBalance += msg.value;
 
+        // Initialize performance tracking on first deposit
+        if (initialPps == 0) {
+            uint256 pps = currentPps();
+            initialPps = pps;
+            initialPpsTimestamp = block.timestamp;
+            peakPps = pps;
+        }
+
         emit Deposit(msg.sender, msg.value, sharesMinted);
     }
 
     /// @notice Withdraw tokens (or ETH if asset is address(0)) by burning shares based on current PPS
     /// @param shareAmount Number of shares to burn
     /// @return assetsOut Amount of tokens returned based on current exchange rate
-    function withdraw(uint256 shareAmount) external nonReentrant whenNotPaused returns (uint256 assetsOut) {
+    function withdraw(uint256 shareAmount)
+        external
+        nonReentrant
+        whenNotPaused
+        returns (uint256 assetsOut)
+    {
         return _processWithdraw(shareAmount, msg.sender);
     }
 
@@ -360,7 +427,12 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @param shareAmount Number of shares to burn
     /// @param to Recipient address for the withdrawn assets
     /// @return assetsOut Amount of tokens returned based on current exchange rate
-    function withdrawTo(uint256 shareAmount, address to) external nonReentrant whenNotPaused returns (uint256 assetsOut) {
+    function withdrawTo(uint256 shareAmount, address to)
+        external
+        nonReentrant
+        whenNotPaused
+        returns (uint256 assetsOut)
+    {
         require(to != address(0), "zero recipient");
         return _processWithdraw(shareAmount, to);
     }
@@ -409,8 +481,13 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
         if (oracleSigner != address(0) && oracleSignature.length > 0) {
             OracleVerifier.requireValidOracleSignature(
-                parsed.inputRoot, oracleSignature, oracleSigner,
-                oracleTimestamp, block.chainid, address(this), maxOracleAge
+                parsed.inputRoot,
+                oracleSignature,
+                oracleSigner,
+                oracleTimestamp,
+                block.chainid,
+                address(this),
+                maxOracleAge
             );
         }
 
@@ -445,6 +522,10 @@ contract KernelVault is ReentrancyGuard, Pausable {
     ) internal {
         lastExecutionNonce = providedNonce;
 
+        // Snapshot PPS before execution for performance tracking
+        uint256 ppsBefore = currentPps();
+        preExecutionPps = ppsBefore;
+
         KernelOutputParser.Action[] memory actions =
             KernelOutputParser.parseActions(agentOutputBytes);
 
@@ -452,7 +533,40 @@ contract KernelVault is ReentrancyGuard, Pausable {
             _executeAction(i, actions[i]);
         }
 
+        // Update performance metrics after execution
+        _updatePerformanceMetrics(ppsBefore);
+
         emit ExecutionApplied(parsedAgentId, providedNonce, actionCommitment, actions.length);
+    }
+
+    /// @notice Update on-chain performance tracking after an execution
+    function _updatePerformanceMetrics(uint256 ppsBefore) internal {
+        uint256 ppsAfter = currentPps();
+        totalExecutionCount++;
+
+        // Win tracking: PPS did not decrease
+        if (ppsAfter >= ppsBefore) {
+            executionWins++;
+        }
+
+        // Peak PPS tracking
+        if (ppsAfter > peakPps) {
+            peakPps = ppsAfter;
+        }
+
+        // Max drawdown tracking (from peak)
+        if (peakPps > 0 && ppsAfter < peakPps) {
+            uint256 drawdownBps = ((peakPps - ppsAfter) * 10000) / peakPps;
+            if (drawdownBps > maxDrawdownBps) {
+                maxDrawdownBps = drawdownBps;
+            }
+        }
+
+        // Write PPS checkpoint to circular buffer
+        uint256 idx = ppsCheckpointIndex % MAX_PPS_CHECKPOINTS;
+        ppsCheckpointValues[idx] = ppsAfter;
+        ppsCheckpointTimestamps[idx] = block.timestamp;
+        ppsCheckpointIndex++;
     }
 
     /// @notice Internal execution logic shared by execute() and executeWithOracle()
@@ -468,7 +582,8 @@ contract KernelVault is ReentrancyGuard, Pausable {
         IKernelExecutionVerifier.ParsedJournal memory parsed =
             verifier.verifyAndParseWithImageId(trustedImageId, journal, seal);
 
-        uint64 providedNonce = _validateParsedJournal(parsed, agentOutputBytes, oracleSignature, oracleTimestamp);
+        uint64 providedNonce =
+            _validateParsedJournal(parsed, agentOutputBytes, oracleSignature, oracleTimestamp);
 
         _executeActions(agentOutputBytes, parsed.agentId, providedNonce, parsed.actionCommitment);
     }
@@ -476,7 +591,10 @@ contract KernelVault is ReentrancyGuard, Pausable {
     // ============ Internal Withdraw ============
 
     /// @notice Internal withdrawal logic shared by withdraw() and withdrawTo()
-    function _processWithdraw(uint256 shareAmount, address to) internal returns (uint256 assetsOut) {
+    function _processWithdraw(uint256 shareAmount, address to)
+        internal
+        returns (uint256 assetsOut)
+    {
         if (shareAmount == 0) revert ZeroWithdraw();
         if (shares[msg.sender] < shareAmount) {
             revert InsufficientShares(shareAmount, shares[msg.sender]);
@@ -686,7 +804,11 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @dev Allows depositors to exit if the vault is paused and the owner disappears
     /// @param shareAmount Number of shares to burn
     /// @return assetsOut Amount of tokens returned
-    function emergencyWithdraw(uint256 shareAmount) external nonReentrant returns (uint256 assetsOut) {
+    function emergencyWithdraw(uint256 shareAmount)
+        external
+        nonReentrant
+        returns (uint256 assetsOut)
+    {
         return _processEmergencyWithdraw(shareAmount, msg.sender);
     }
 
@@ -694,13 +816,20 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @param shareAmount Number of shares to burn
     /// @param to Recipient address for the withdrawn assets
     /// @return assetsOut Amount of tokens returned
-    function emergencyWithdrawTo(uint256 shareAmount, address to) external nonReentrant returns (uint256 assetsOut) {
+    function emergencyWithdrawTo(uint256 shareAmount, address to)
+        external
+        nonReentrant
+        returns (uint256 assetsOut)
+    {
         require(to != address(0), "zero recipient");
         return _processEmergencyWithdraw(shareAmount, to);
     }
 
     /// @notice Internal emergency withdrawal logic
-    function _processEmergencyWithdraw(uint256 shareAmount, address to) internal returns (uint256 assetsOut) {
+    function _processEmergencyWithdraw(uint256 shareAmount, address to)
+        internal
+        returns (uint256 assetsOut)
+    {
         require(paused(), "not paused");
         uint256 earliest = pausedAt + EMERGENCY_WITHDRAW_DELAY;
         if (block.timestamp < earliest) revert EmergencyWithdrawTooEarly(earliest, block.timestamp);
@@ -782,6 +911,49 @@ contract KernelVault is ReentrancyGuard, Pausable {
     function totalValueLocked() public view returns (uint256) {
         if (totalWithdrawn > totalDeposited) return 0;
         return totalDeposited - totalWithdrawn;
+    }
+
+    /// @notice Returns current PPS scaled by 1e18
+    function currentPps() public view returns (uint256) {
+        uint256 ts = totalShares;
+        if (ts == 0) return 1e18;
+        return (effectiveTotalAssets() * 1e18) / ts;
+    }
+
+    /// @notice Returns performance metrics in a single call
+    function getPerformanceMetrics()
+        external
+        view
+        returns (
+            uint256 _initialPps,
+            uint256 _initialPpsTimestamp,
+            uint256 _currentPps,
+            uint256 _peakPps,
+            uint256 _maxDrawdownBps,
+            uint256 _executionWins,
+            uint256 _totalExecutionCount,
+            uint256 _checkpointIndex
+        )
+    {
+        return (
+            initialPps,
+            initialPpsTimestamp,
+            currentPps(),
+            peakPps,
+            maxDrawdownBps,
+            executionWins,
+            totalExecutionCount,
+            ppsCheckpointIndex
+        );
+    }
+
+    /// @notice Returns a batch of PPS checkpoints for time-windowed return computation
+    function getPpsCheckpoints()
+        external
+        view
+        returns (uint256[30] memory values, uint256[30] memory timestamps, uint256 index)
+    {
+        return (ppsCheckpointValues, ppsCheckpointTimestamps, ppsCheckpointIndex);
     }
 
     /// @notice Convert assets to shares using current exchange rate (virtual offset)

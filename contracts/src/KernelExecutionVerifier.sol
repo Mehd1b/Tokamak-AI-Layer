@@ -122,7 +122,7 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
     // ============ UUPS ============
 
     /// @notice Authorize upgrade (only owner)
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address) internal override onlyOwner { }
 
     // ============ Core Verification ============
 

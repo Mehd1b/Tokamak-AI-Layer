@@ -49,7 +49,9 @@ contract OptimisticKernelVaultTest is Test {
         KernelExecutionVerifier verifierImpl = new KernelExecutionVerifier();
         ERC1967Proxy verifierProxy = new ERC1967Proxy(
             address(verifierImpl),
-            abi.encodeCall(KernelExecutionVerifier.initialize, (address(mockRiscZeroVerifier), address(this)))
+            abi.encodeCall(
+                KernelExecutionVerifier.initialize, (address(mockRiscZeroVerifier), address(this))
+            )
         );
         executionVerifier = KernelExecutionVerifier(address(verifierProxy));
 
@@ -93,12 +95,10 @@ contract OptimisticKernelVaultTest is Test {
         uint256 amount,
         uint256 chainId
     ) internal pure returns (bytes memory) {
-        bytes32 bondHash = keccak256(
-            abi.encodePacked("BOND_LOCK_V1", operator, vaultAddr, nonce, amount, chainId)
-        );
-        bytes32 ethSignedHash = keccak256(
-            abi.encodePacked("\x19Ethereum Signed Message:\n32", bondHash)
-        );
+        bytes32 bondHash =
+            keccak256(abi.encodePacked("BOND_LOCK_V1", operator, vaultAddr, nonce, amount, chainId));
+        bytes32 ethSignedHash =
+            keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", bondHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(ORACLE_PRIVATE_KEY, ethSignedHash);
         return abi.encodePacked(r, s, v);
     }
@@ -110,19 +110,33 @@ contract OptimisticKernelVaultTest is Test {
     {
         bytes memory journal = new bytes(209);
 
-        journal[0] = 0x01; journal[1] = 0x00; journal[2] = 0x00; journal[3] = 0x00;
-        journal[4] = 0x01; journal[5] = 0x00; journal[6] = 0x00; journal[7] = 0x00;
+        journal[0] = 0x01;
+        journal[1] = 0x00;
+        journal[2] = 0x00;
+        journal[3] = 0x00;
+        journal[4] = 0x01;
+        journal[5] = 0x00;
+        journal[6] = 0x00;
+        journal[7] = 0x00;
 
-        for (uint256 i = 0; i < 32; i++) { journal[8 + i] = agentId[i]; }
+        for (uint256 i = 0; i < 32; i++) {
+            journal[8 + i] = agentId[i];
+        }
 
         bytes32 codeHash = TEST_CODE_HASH;
-        for (uint256 i = 0; i < 32; i++) { journal[40 + i] = codeHash[i]; }
+        for (uint256 i = 0; i < 32; i++) {
+            journal[40 + i] = codeHash[i];
+        }
 
         bytes32 constraintHash = TEST_CONSTRAINT_HASH;
-        for (uint256 i = 0; i < 32; i++) { journal[72 + i] = constraintHash[i]; }
+        for (uint256 i = 0; i < 32; i++) {
+            journal[72 + i] = constraintHash[i];
+        }
 
         bytes32 inputRoot = TEST_INPUT_ROOT;
-        for (uint256 i = 0; i < 32; i++) { journal[104 + i] = inputRoot[i]; }
+        for (uint256 i = 0; i < 32; i++) {
+            journal[104 + i] = inputRoot[i];
+        }
 
         journal[136] = bytes1(uint8(nonce & 0xFF));
         journal[137] = bytes1(uint8((nonce >> 8) & 0xFF));
@@ -134,9 +148,13 @@ contract OptimisticKernelVaultTest is Test {
         journal[143] = bytes1(uint8((nonce >> 56) & 0xFF));
 
         bytes32 inputCommitment = TEST_INPUT_COMMITMENT;
-        for (uint256 i = 0; i < 32; i++) { journal[144 + i] = inputCommitment[i]; }
+        for (uint256 i = 0; i < 32; i++) {
+            journal[144 + i] = inputCommitment[i];
+        }
 
-        for (uint256 i = 0; i < 32; i++) { journal[176 + i] = actionCommitment[i]; }
+        for (uint256 i = 0; i < 32; i++) {
+            journal[176 + i] = actionCommitment[i];
+        }
 
         journal[208] = 0x01;
         return journal;
@@ -163,10 +181,12 @@ contract OptimisticKernelVaultTest is Test {
     }
 
     function _submitOptimistic(uint64 nonce, uint256 transferAmount) internal {
-        bytes memory agentOutputBytes = _buildTransferAction(address(token), recipient, transferAmount);
+        bytes memory agentOutputBytes =
+            _buildTransferAction(address(token), recipient, transferAmount);
         bytes32 actionCommitment = sha256(agentOutputBytes);
         bytes memory journal = _buildJournal(TEST_AGENT_ID, nonce, actionCommitment);
-        bytes memory bondAttestation = _signBondAttestation(owner, address(vault), nonce, BOND_AMOUNT, BOND_CHAIN_ID);
+        bytes memory bondAttestation =
+            _signBondAttestation(owner, address(vault), nonce, BOND_AMOUNT, BOND_CHAIN_ID);
 
         vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
     }
@@ -175,7 +195,8 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory agentOutputBytes = _buildEmptyAction();
         bytes32 actionCommitment = sha256(agentOutputBytes);
         bytes memory journal = _buildJournal(TEST_AGENT_ID, nonce, actionCommitment);
-        bytes memory bondAttestation = _signBondAttestation(owner, address(vault), nonce, BOND_AMOUNT, BOND_CHAIN_ID);
+        bytes memory bondAttestation =
+            _signBondAttestation(owner, address(vault), nonce, BOND_AMOUNT, BOND_CHAIN_ID);
 
         vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
     }
@@ -189,7 +210,8 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory agentOutputBytes = _buildEmptyAction();
         bytes32 actionCommitment = sha256(agentOutputBytes);
         bytes memory journal = _buildJournal(TEST_AGENT_ID, 1, actionCommitment);
-        bytes memory bondAttestation = _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
+        bytes memory bondAttestation =
+            _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
 
         vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
 
@@ -275,7 +297,9 @@ contract OptimisticKernelVaultTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IOptimisticKernelVault.DeadlineNotReached.selector,
-                uint64(1), deadline, block.timestamp
+                uint64(1),
+                deadline,
+                block.timestamp
             )
         );
         vault.slashExpired(1);
@@ -342,7 +366,8 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory journal = _buildJournal(TEST_AGENT_ID, 1, actionCommitment);
 
         uint256 lowBond = BOND_AMOUNT - 1;
-        bytes memory bondAttestation = _signBondAttestation(owner, address(vault), 1, lowBond, BOND_CHAIN_ID);
+        bytes memory bondAttestation =
+            _signBondAttestation(owner, address(vault), 1, lowBond, BOND_CHAIN_ID);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -359,7 +384,8 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory agentOutputBytes = _buildEmptyAction();
         bytes32 actionCommitment = sha256(agentOutputBytes);
         bytes memory journal = _buildJournal(TEST_AGENT_ID, 1, actionCommitment);
-        bytes memory bondAttestation = _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
+        bytes memory bondAttestation =
+            _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
 
         vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
         assertEq(vault.pendingCount(), 1);
@@ -374,7 +400,8 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory journal = _buildJournal(TEST_AGENT_ID, 1, actionCommitment);
 
         uint256 excessBond = BOND_AMOUNT + 5 ether;
-        bytes memory bondAttestation = _signBondAttestation(owner, address(vault), 1, excessBond, BOND_CHAIN_ID);
+        bytes memory bondAttestation =
+            _signBondAttestation(owner, address(vault), 1, excessBond, BOND_CHAIN_ID);
 
         vault.executeOptimistic(journal, agentOutputBytes, "", 0, excessBond, bondAttestation);
 
@@ -393,11 +420,12 @@ contract OptimisticKernelVaultTest is Test {
         // Sign with wrong key
         uint256 wrongKey = 0xBAD;
         bytes32 bondHash = keccak256(
-            abi.encodePacked("BOND_LOCK_V1", owner, address(vault), uint64(1), BOND_AMOUNT, BOND_CHAIN_ID)
+            abi.encodePacked(
+                "BOND_LOCK_V1", owner, address(vault), uint64(1), BOND_AMOUNT, BOND_CHAIN_ID
+            )
         );
-        bytes32 ethSignedHash = keccak256(
-            abi.encodePacked("\x19Ethereum Signed Message:\n32", bondHash)
-        );
+        bytes32 ethSignedHash =
+            keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", bondHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongKey, ethSignedHash);
         bytes memory badAttestation = abi.encodePacked(r, s, v);
 
@@ -414,10 +442,13 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory journal = _buildJournal(TEST_AGENT_ID, 1, actionCommitment);
 
         // Attestation signed for nonce 99, executing nonce 1
-        bytes memory wrongNonceAttestation = _signBondAttestation(owner, address(vault), 99, BOND_AMOUNT, BOND_CHAIN_ID);
+        bytes memory wrongNonceAttestation =
+            _signBondAttestation(owner, address(vault), 99, BOND_AMOUNT, BOND_CHAIN_ID);
 
         vm.expectRevert();
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, wrongNonceAttestation);
+        vault.executeOptimistic(
+            journal, agentOutputBytes, "", 0, BOND_AMOUNT, wrongNonceAttestation
+        );
     }
 
     function test_invalidAttestation_wrongChainId_reverts() public {
@@ -429,10 +460,13 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory journal = _buildJournal(TEST_AGENT_ID, 1, actionCommitment);
 
         // Attestation signed for chainId 137, vault expects chainId 1
-        bytes memory wrongChainAttestation = _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, 137);
+        bytes memory wrongChainAttestation =
+            _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, 137);
 
         vm.expectRevert();
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, wrongChainAttestation);
+        vault.executeOptimistic(
+            journal, agentOutputBytes, "", 0, BOND_AMOUNT, wrongChainAttestation
+        );
     }
 
     function test_invalidAttestation_emptyBytes_reverts() public {
@@ -469,7 +503,8 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory agentOutputBytes = _buildEmptyAction();
         bytes32 actionCommitment = sha256(agentOutputBytes);
         bytes memory journal = _buildJournal(TEST_AGENT_ID, 1, actionCommitment);
-        bytes memory bondAttestation = _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
+        bytes memory bondAttestation =
+            _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
 
         vm.expectRevert(
             abi.encodeWithSelector(KernelVault.InvalidNonce.selector, uint64(1), uint64(1))
@@ -486,7 +521,8 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory agentOutputBytes = _buildEmptyAction();
         bytes32 actionCommitment = sha256(agentOutputBytes);
         bytes memory journal = _buildJournal(TEST_AGENT_ID, 102, actionCommitment);
-        bytes memory bondAttestation = _signBondAttestation(owner, address(vault), 102, BOND_AMOUNT, BOND_CHAIN_ID);
+        bytes memory bondAttestation =
+            _signBondAttestation(owner, address(vault), 102, BOND_AMOUNT, BOND_CHAIN_ID);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -534,9 +570,7 @@ contract OptimisticKernelVaultTest is Test {
         );
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IOptimisticKernelVault.TooManyPending.selector, maxPend, maxPend
-            )
+            abi.encodeWithSelector(IOptimisticKernelVault.TooManyPending.selector, maxPend, maxPend)
         );
         vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
     }
@@ -593,7 +627,8 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory agentOutputBytes = _buildEmptyAction();
         bytes32 actionCommitment = sha256(agentOutputBytes);
         bytes memory journal = _buildJournal(TEST_AGENT_ID, 1, actionCommitment);
-        bytes memory bondAttestation = _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
+        bytes memory bondAttestation =
+            _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
 
         vm.expectRevert();
         vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
@@ -637,7 +672,9 @@ contract OptimisticKernelVaultTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IOptimisticKernelVault.InvalidChallengeWindow.selector,
-                tooLow, vault.MIN_CHALLENGE_WINDOW(), vault.MAX_CHALLENGE_WINDOW()
+                tooLow,
+                vault.MIN_CHALLENGE_WINDOW(),
+                vault.MAX_CHALLENGE_WINDOW()
             )
         );
         vault.setChallengeWindow(tooLow);
@@ -648,7 +685,9 @@ contract OptimisticKernelVaultTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IOptimisticKernelVault.InvalidChallengeWindow.selector,
-                tooHigh, vault.MIN_CHALLENGE_WINDOW(), vault.MAX_CHALLENGE_WINDOW()
+                tooHigh,
+                vault.MIN_CHALLENGE_WINDOW(),
+                vault.MAX_CHALLENGE_WINDOW()
             )
         );
         vault.setChallengeWindow(tooHigh);
@@ -707,7 +746,8 @@ contract OptimisticKernelVaultTest is Test {
         vault.depositERC20Tokens(DEPOSIT_AMOUNT);
 
         uint256 transferAmount = 5 ether;
-        bytes memory agentOutputBytes = _buildTransferAction(address(token), recipient, transferAmount);
+        bytes memory agentOutputBytes =
+            _buildTransferAction(address(token), recipient, transferAmount);
         bytes32 actionCommitment = sha256(agentOutputBytes);
         bytes memory journal = _buildJournal(TEST_AGENT_ID, 1, actionCommitment);
 
@@ -769,13 +809,16 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory journal = _buildJournal(TEST_AGENT_ID, 1, actionCommitment);
         bytes32 journalHash = sha256(journal);
         uint256 deadline = block.timestamp + vault.challengeWindow();
-        bytes memory bondAttestation = _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
+        bytes memory bondAttestation =
+            _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
 
         vm.expectEmit(true, true, false, true);
         emit KernelVault.ExecutionApplied(TEST_AGENT_ID, 1, actionCommitment, 0);
 
         vm.expectEmit(true, false, false, true);
-        emit IOptimisticKernelVault.OptimisticExecutionSubmitted(1, journalHash, BOND_AMOUNT, deadline);
+        emit IOptimisticKernelVault.OptimisticExecutionSubmitted(
+            1, journalHash, BOND_AMOUNT, deadline
+        );
 
         vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
     }
@@ -802,7 +845,8 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory agentOutputBytes = _buildEmptyAction();
         bytes32 actionCommitment = sha256(agentOutputBytes);
         bytes memory journal = _buildJournal(TEST_AGENT_ID, 1, actionCommitment);
-        bytes memory bondAttestation = _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
+        bytes memory bondAttestation =
+            _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
 
         vm.prank(nonOwner);
         vm.expectRevert(KernelVault.NotOwner.selector);
@@ -815,7 +859,8 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory agentOutputBytes = _buildEmptyAction();
         bytes32 actionCommitment = sha256(agentOutputBytes);
         bytes memory journal = _buildJournal(TEST_AGENT_ID, 1, actionCommitment);
-        bytes memory bondAttestation = _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
+        bytes memory bondAttestation =
+            _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
 
         vm.expectRevert(IOptimisticKernelVault.OptimisticNotEnabled.selector);
         vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
@@ -829,10 +874,13 @@ contract OptimisticKernelVaultTest is Test {
         bytes32 actionCommitment = sha256(agentOutputBytes);
         bytes32 wrongAgentId = bytes32(uint256(0xBADA6E17));
         bytes memory journal = _buildJournal(wrongAgentId, 1, actionCommitment);
-        bytes memory bondAttestation = _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
+        bytes memory bondAttestation =
+            _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
 
         vm.expectRevert(
-            abi.encodeWithSelector(KernelVault.AgentIdMismatch.selector, TEST_AGENT_ID, wrongAgentId)
+            abi.encodeWithSelector(
+                KernelVault.AgentIdMismatch.selector, TEST_AGENT_ID, wrongAgentId
+            )
         );
         vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
     }
@@ -844,7 +892,8 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory agentOutputBytes = _buildEmptyAction();
         bytes32 wrongCommitment = bytes32(uint256(0xBADBAD));
         bytes memory journal = _buildJournal(TEST_AGENT_ID, 1, wrongCommitment);
-        bytes memory bondAttestation = _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
+        bytes memory bondAttestation =
+            _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
 
         bytes32 actualCommitment = sha256(agentOutputBytes);
         vm.expectRevert(
@@ -903,11 +952,17 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory agentOutputBytes = _buildEmptyAction();
         bytes32 actionCommitment = sha256(agentOutputBytes);
         bytes memory journal = _buildJournal(TEST_AGENT_ID, 1, actionCommitment);
-        bytes memory bondAttestation = _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
+        bytes memory bondAttestation =
+            _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
 
         vm.expectRevert();
         vault.executeOptimistic(
-            journal, agentOutputBytes, hex"0000", uint64(block.timestamp), BOND_AMOUNT, bondAttestation
+            journal,
+            agentOutputBytes,
+            hex"0000",
+            uint64(block.timestamp),
+            BOND_AMOUNT,
+            bondAttestation
         );
     }
 }

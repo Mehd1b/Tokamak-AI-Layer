@@ -50,7 +50,9 @@ contract OptimisticIntegrationTest is Test {
         KernelExecutionVerifier verifierImpl = new KernelExecutionVerifier();
         ERC1967Proxy verifierProxy = new ERC1967Proxy(
             address(verifierImpl),
-            abi.encodeCall(KernelExecutionVerifier.initialize, (address(mockRiscZeroVerifier), address(this)))
+            abi.encodeCall(
+                KernelExecutionVerifier.initialize, (address(mockRiscZeroVerifier), address(this))
+            )
         );
         executionVerifier = KernelExecutionVerifier(address(verifierProxy));
 
@@ -86,9 +88,12 @@ contract OptimisticIntegrationTest is Test {
         returns (bytes memory)
     {
         bytes32 bondHash = keccak256(
-            abi.encodePacked("BOND_LOCK_V1", operator, address(vault), nonce, bondAmount, BOND_CHAIN_ID)
+            abi.encodePacked(
+                "BOND_LOCK_V1", operator, address(vault), nonce, bondAmount, BOND_CHAIN_ID
+            )
         );
-        bytes32 ethSignedHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", bondHash));
+        bytes32 ethSignedHash =
+            keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", bondHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(ORACLE_PRIVATE_KEY, ethSignedHash);
         return abi.encodePacked(r, s, v);
     }
@@ -100,19 +105,33 @@ contract OptimisticIntegrationTest is Test {
     {
         bytes memory journal = new bytes(209);
 
-        journal[0] = 0x01; journal[1] = 0x00; journal[2] = 0x00; journal[3] = 0x00;
-        journal[4] = 0x01; journal[5] = 0x00; journal[6] = 0x00; journal[7] = 0x00;
+        journal[0] = 0x01;
+        journal[1] = 0x00;
+        journal[2] = 0x00;
+        journal[3] = 0x00;
+        journal[4] = 0x01;
+        journal[5] = 0x00;
+        journal[6] = 0x00;
+        journal[7] = 0x00;
 
-        for (uint256 i = 0; i < 32; i++) { journal[8 + i] = agentId[i]; }
+        for (uint256 i = 0; i < 32; i++) {
+            journal[8 + i] = agentId[i];
+        }
 
         bytes32 codeHash = TEST_CODE_HASH;
-        for (uint256 i = 0; i < 32; i++) { journal[40 + i] = codeHash[i]; }
+        for (uint256 i = 0; i < 32; i++) {
+            journal[40 + i] = codeHash[i];
+        }
 
         bytes32 constraintHash = TEST_CONSTRAINT_HASH;
-        for (uint256 i = 0; i < 32; i++) { journal[72 + i] = constraintHash[i]; }
+        for (uint256 i = 0; i < 32; i++) {
+            journal[72 + i] = constraintHash[i];
+        }
 
         bytes32 inputRoot = TEST_INPUT_ROOT;
-        for (uint256 i = 0; i < 32; i++) { journal[104 + i] = inputRoot[i]; }
+        for (uint256 i = 0; i < 32; i++) {
+            journal[104 + i] = inputRoot[i];
+        }
 
         journal[136] = bytes1(uint8(nonce & 0xFF));
         journal[137] = bytes1(uint8((nonce >> 8) & 0xFF));
@@ -124,9 +143,13 @@ contract OptimisticIntegrationTest is Test {
         journal[143] = bytes1(uint8((nonce >> 56) & 0xFF));
 
         bytes32 inputCommitment = TEST_INPUT_COMMITMENT;
-        for (uint256 i = 0; i < 32; i++) { journal[144 + i] = inputCommitment[i]; }
+        for (uint256 i = 0; i < 32; i++) {
+            journal[144 + i] = inputCommitment[i];
+        }
 
-        for (uint256 i = 0; i < 32; i++) { journal[176 + i] = actionCommitment[i]; }
+        for (uint256 i = 0; i < 32; i++) {
+            journal[176 + i] = actionCommitment[i];
+        }
 
         journal[208] = 0x01;
         return journal;
@@ -161,7 +184,8 @@ contract OptimisticIntegrationTest is Test {
     }
 
     function _submitOptimisticTransfer(uint64 nonce, uint256 transferAmount) internal {
-        bytes memory agentOutputBytes = _buildTransferAction(address(token), recipient, transferAmount);
+        bytes memory agentOutputBytes =
+            _buildTransferAction(address(token), recipient, transferAmount);
         bytes32 actionCommitment = sha256(agentOutputBytes);
         bytes memory journal = _buildJournal(TEST_AGENT_ID, nonce, actionCommitment);
         bytes memory bondAttestation = _signBondAttestation(address(this), nonce, BOND_AMOUNT);
@@ -177,7 +201,8 @@ contract OptimisticIntegrationTest is Test {
     }
 
     function _submitSyncTransfer(uint64 nonce, uint256 transferAmount) internal {
-        bytes memory agentOutputBytes = _buildTransferAction(address(token), recipient, transferAmount);
+        bytes memory agentOutputBytes =
+            _buildTransferAction(address(token), recipient, transferAmount);
         bytes32 actionCommitment = sha256(agentOutputBytes);
         bytes memory journal = _buildJournal(TEST_AGENT_ID, nonce, actionCommitment);
         bytes memory seal = hex"deadbeef";
@@ -354,5 +379,4 @@ contract OptimisticIntegrationTest is Test {
         // Approximately 70 ether remaining (100 - 20 - 10)
         assertEq(assetsOut, 70 ether);
     }
-
 }

@@ -12,6 +12,15 @@ All notable changes to this project will be documented in this file. The format 
 ## Unreleased
 
 ### Added
+- **Agent Deprecation** — `AgentRegistry` now supports `deprecate()`, `undeprecate()`, and `setSuccessor()` for clean agent version migration
+- **Bond Batch Locking** — `WSTONBondManager.lockBondBatch()` reduces L1 gas costs ~80% for multi-execution operators
+- **Bond Query Views** — `getBondInfo()` and `getOperatorBondCount()` for transparent bond status inspection
+- **Performance Dashboard** — Frontend component showing total return, 7d/30d returns, max drawdown, win rate, and Sharpe ratio
+- **Strategy Status Banner** — Frontend warning when vault is in active strategy mode (deposits paused)
+- **Bond Transparency Card** — Frontend component showing slash distribution, bond expiry, and relayer status
+- **Deprecation Banner** — Frontend warning on deprecated agent vaults with successor link
+- Bond Manager documentation page
+- Glossary entries for Agent Deprecation, OptimisticKernelVault, WSTONBondManager
 - Initial Docusaurus documentation site
 - Comprehensive SDK documentation
 - Agent Pack specification
@@ -19,6 +28,7 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Changed
 - Documentation structure reorganized into categories
+- `AgentRegistry` storage gap reduced from 46 to 44 slots (2 new state mappings)
 
 ### Fixed
 - N/A
@@ -105,7 +115,7 @@ Bug fixes and documentation updates. No protocol changes.
 
 ## Deprecation Notices
 
-None currently.
+- `AgentInfo._deprecated` field (formerly `metadataURI`) — retained for storage layout compatibility only. Use `isDeprecated()` / `getSuccessor()` for agent lifecycle management.
 
 ---
 

@@ -71,12 +71,19 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
         IKernelExecutionVerifier.ParsedJournal memory parsed = verifier.parseJournal(journal);
 
         // 2. Validate agentId, nonce, oracle sig, action commitment (shared with KernelVault)
-        uint64 providedNonce = _validateParsedJournal(parsed, agentOutputBytes, oracleSignature, oracleTimestamp);
+        uint64 providedNonce =
+            _validateParsedJournal(parsed, agentOutputBytes, oracleSignature, oracleTimestamp);
 
         // 3. Verify oracle attestation of L1 bond lock
         if (oracleSigner == address(0)) revert OracleSignerNotSet();
         OracleVerifier.requireValidBondAttestation(
-            bondAttestation, oracleSigner, msg.sender, address(this), providedNonce, bondAmount, bondChainId
+            bondAttestation,
+            oracleSigner,
+            msg.sender,
+            address(this),
+            providedNonce,
+            bondAmount,
+            bondChainId
         );
         if (bondAmount < minBond) {
             revert InsufficientBond(bondAmount, minBond);
@@ -96,7 +103,9 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
         // 5. Execute actions (shared with KernelVault)
         _executeActions(agentOutputBytes, parsed.agentId, providedNonce, parsed.actionCommitment);
 
-        emit OptimisticExecutionSubmitted(providedNonce, pendingExecutions[providedNonce].journalHash, bondAmount, deadline);
+        emit OptimisticExecutionSubmitted(
+            providedNonce, pendingExecutions[providedNonce].journalHash, bondAmount, deadline
+        );
     }
 
     // ============ Proof Submission ============
@@ -108,8 +117,10 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
             revert ExecutionNotPending(executionNonce, pending.status);
         }
 
-        try verifier.verify(seal, trustedImageId, pending.journalHash) {}
-        catch { revert ProofVerificationFailed(); }
+        try verifier.verify(seal, trustedImageId, pending.journalHash) { }
+        catch {
+            revert ProofVerificationFailed();
+        }
 
         pending.status = STATUS_FINALIZED;
         _pendingCount--;

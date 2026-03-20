@@ -52,10 +52,13 @@ contract KernelVaultSnapshotPPSTest is Test {
         token = new MockERC20("Test Token", "TEST", 18);
 
         // Deploy ERC20 vault
-        vault = new KernelVault(address(token), address(mockVerifier), AGENT_ID, IMAGE_ID, address(this));
+        vault = new KernelVault(
+            address(token), address(mockVerifier), AGENT_ID, IMAGE_ID, address(this)
+        );
 
         // Deploy ETH vault
-        ethVault = new KernelVault(address(0), address(mockVerifier), AGENT_ID, IMAGE_ID, address(this));
+        ethVault =
+            new KernelVault(address(0), address(mockVerifier), AGENT_ID, IMAGE_ID, address(this));
 
         // Deploy mock call target (for tests that need a non-asset CALL target)
         callTarget = new MockCallTarget();
@@ -91,11 +94,7 @@ contract KernelVaultSnapshotPPSTest is Test {
     }
 
     /// @notice Build a CALL action that sends ETH from vault to an external address
-    function _buildETHSendCall(address to, uint256 amount)
-        internal
-        pure
-        returns (bytes memory)
-    {
+    function _buildETHSendCall(address to, uint256 amount) internal pure returns (bytes memory) {
         bytes memory payload = abi.encode(amount, bytes(""));
 
         KernelOutputParser.Action[] memory actions = new KernelOutputParser.Action[](1);
@@ -291,7 +290,9 @@ contract KernelVaultSnapshotPPSTest is Test {
         // Try to withdraw 50_000 shares → PPS says 50 tokens, but only 10 available
         vm.prank(userA);
         vm.expectRevert(
-            abi.encodeWithSelector(KernelVault.InsufficientAvailableAssets.selector, 50 ether, 10 ether)
+            abi.encodeWithSelector(
+                KernelVault.InsufficientAvailableAssets.selector, 50 ether, 10 ether
+            )
         );
         vault.withdraw(50 ether * OFFSET);
     }

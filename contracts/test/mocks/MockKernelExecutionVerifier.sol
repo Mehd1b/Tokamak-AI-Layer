@@ -99,11 +99,12 @@ contract MockKernelExecutionVerifier is IKernelExecutionVerifier {
 
     /// @notice Verify with caller-provided imageId (permissionless flow)
     /// @inheritdoc IKernelExecutionVerifier
-    function verifyAndParseWithImageId(
-        bytes32 _expectedImageId,
-        bytes calldata,
-        bytes calldata
-    ) external view override returns (ParsedJournal memory) {
+    function verifyAndParseWithImageId(bytes32 _expectedImageId, bytes calldata, bytes calldata)
+        external
+        view
+        override
+        returns (ParsedJournal memory)
+    {
         if (shouldRevert) {
             revert MockRevert(revertMessage);
         }

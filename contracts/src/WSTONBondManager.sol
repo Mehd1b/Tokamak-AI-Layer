@@ -83,17 +83,31 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
 
     // ============ Events ============
 
-    event BondLocked(address indexed operator, address indexed vault, uint64 indexed nonce, uint256 amount);
-    event BondReleased(address indexed operator, address indexed vault, uint64 indexed nonce, uint256 amount);
-    event BondSlashed(address indexed operator, address indexed vault, uint64 indexed nonce, uint256 amount, address slasher);
+    event BondLocked(
+        address indexed operator, address indexed vault, uint64 indexed nonce, uint256 amount
+    );
+    event BondReleased(
+        address indexed operator, address indexed vault, uint64 indexed nonce, uint256 amount
+    );
+    event BondSlashed(
+        address indexed operator,
+        address indexed vault,
+        uint64 indexed nonce,
+        uint256 amount,
+        address slasher
+    );
     event TreasuryUpdated(address indexed newTreasury);
     event MinBondFloorUpdated(uint256 newMinBondFloor);
     event VaultAuthorized(address indexed vault);
     event VaultRevoked(address indexed vault);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event TrustedRelayerUpdated(address indexed newRelayer);
-    event CrossChainBondLocked(address indexed operator, address indexed vault, uint64 indexed nonce, uint256 amount);
-    event BondReclaimed(address indexed operator, address indexed vault, uint64 indexed nonce, uint256 amount);
+    event CrossChainBondLocked(
+        address indexed operator, address indexed vault, uint64 indexed nonce, uint256 amount
+    );
+    event BondReclaimed(
+        address indexed operator, address indexed vault, uint64 indexed nonce, uint256 amount
+    );
     event TokensRescued(address indexed token, address indexed to, uint256 amount);
 
     // ============ Errors ============
@@ -150,12 +164,12 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     // ============ Core Functions ============
 
     /// @inheritdoc IBondManager
-    function lockBond(
-        address operator,
-        address vault,
-        uint64 nonce,
-        uint256 amount
-    ) external override nonReentrant onlyAuthorizedVault {
+    function lockBond(address operator, address vault, uint64 nonce, uint256 amount)
+        external
+        override
+        nonReentrant
+        onlyAuthorizedVault
+    {
         if (amount == 0) revert ZeroBondAmount();
 
         BondInfo storage bond = bonds[operator][vault][nonce];
@@ -177,11 +191,12 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     }
 
     /// @inheritdoc IBondManager
-    function releaseBond(
-        address operator,
-        address vault,
-        uint64 nonce
-    ) external override nonReentrant onlyAuthorizedVault {
+    function releaseBond(address operator, address vault, uint64 nonce)
+        external
+        override
+        nonReentrant
+        onlyAuthorizedVault
+    {
         BondInfo storage bond = bonds[operator][vault][nonce];
         if (bond.status != BondStatus.Locked) {
             revert InvalidBondStatus(operator, vault, nonce, bond.status);
@@ -199,12 +214,12 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     }
 
     /// @inheritdoc IBondManager
-    function slashBond(
-        address operator,
-        address vault,
-        uint64 nonce,
-        address slasher
-    ) external override nonReentrant onlyAuthorizedVault {
+    function slashBond(address operator, address vault, uint64 nonce, address slasher)
+        external
+        override
+        nonReentrant
+        onlyAuthorizedVault
+    {
         BondInfo storage bond = bonds[operator][vault][nonce];
         if (bond.status != BondStatus.Locked) {
             revert InvalidBondStatus(operator, vault, nonce, bond.status);
@@ -280,11 +295,11 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     /// @param operator The operator address
     /// @param vault The cross-chain vault address
     /// @param nonce The execution nonce
-    function releaseBondByRelayer(
-        address operator,
-        address vault,
-        uint64 nonce
-    ) external nonReentrant onlyRelayer {
+    function releaseBondByRelayer(address operator, address vault, uint64 nonce)
+        external
+        nonReentrant
+        onlyRelayer
+    {
         BondInfo storage bond = bonds[operator][vault][nonce];
         if (bond.status != BondStatus.Locked) {
             revert InvalidBondStatus(operator, vault, nonce, bond.status);
@@ -307,12 +322,11 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     /// @param vault The cross-chain vault address
     /// @param nonce The execution nonce
     /// @param slasher The address that triggered the slash on HyperEVM (address(0) for self-slash)
-    function slashBondByRelayer(
-        address operator,
-        address vault,
-        uint64 nonce,
-        address slasher
-    ) external nonReentrant onlyRelayer {
+    function slashBondByRelayer(address operator, address vault, uint64 nonce, address slasher)
+        external
+        nonReentrant
+        onlyRelayer
+    {
         BondInfo storage bond = bonds[operator][vault][nonce];
         if (bond.status != BondStatus.Locked) {
             revert InvalidBondStatus(operator, vault, nonce, bond.status);
@@ -327,6 +341,43 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         wston.safeTransfer(treasury, amount);
 
         emit BondSlashed(operator, vault, nonce, amount, slasher);
+    }
+
+    /// @notice Lock bonds for multiple executions in a single transaction
+    /// @dev Reduces L1 gas costs for operators running multiple concurrent executions
+    /// @param vaults Array of vault addresses
+    /// @param nonces Array of execution nonces
+    /// @param amounts Array of bond amounts
+    function lockBondBatch(
+        address[] calldata vaults,
+        uint64[] calldata nonces,
+        uint256[] calldata amounts
+    ) external nonReentrant {
+        require(
+            vaults.length == nonces.length && nonces.length == amounts.length, "length mismatch"
+        );
+        require(vaults.length > 0, "empty batch");
+        if (trustedRelayer == address(0)) revert RelayerNotSet();
+
+        uint256 totalAmount = 0;
+        for (uint256 i = 0; i < vaults.length; i++) {
+            if (amounts[i] == 0) revert ZeroBondAmount();
+            BondInfo storage bond = bonds[msg.sender][vaults[i]][nonces[i]];
+            if (bond.status != BondStatus.Empty) {
+                revert BondAlreadyExists(msg.sender, vaults[i], nonces[i]);
+            }
+            bond.amount = amounts[i];
+            bond.lockedAt = block.timestamp;
+            bond.status = BondStatus.Locked;
+            totalAmount += amounts[i];
+
+            emit CrossChainBondLocked(msg.sender, vaults[i], nonces[i], amounts[i]);
+            emit BondLocked(msg.sender, vaults[i], nonces[i], amounts[i]);
+        }
+
+        wston.safeTransferFrom(msg.sender, address(this), totalAmount);
+        totalBonded[msg.sender] += totalAmount;
+        totalLockedGlobal += totalAmount;
     }
 
     // ============ Bond Safety Valve ============
@@ -362,13 +413,39 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     // ============ View Functions ============
 
     /// @inheritdoc IBondManager
-    function getMinBond(address /* vault */) external view override returns (uint256) {
+    function getMinBond(address /* vault */ ) external view override returns (uint256) {
         return minBondFloor;
     }
 
     /// @inheritdoc IBondManager
     function getBondedAmount(address operator) external view override returns (uint256) {
         return totalBonded[operator];
+    }
+
+    /// @notice Get detailed bond info for a specific operator-vault-nonce combination
+    function getBondInfo(address operator, address vault, uint64 nonce)
+        external
+        view
+        override
+        returns (uint256 amount, uint256 lockedAt, uint8 status)
+    {
+        BondInfo storage bond = bonds[operator][vault][nonce];
+        return (bond.amount, bond.lockedAt, uint8(bond.status));
+    }
+
+    /// @notice Get operator's total active bond count for a vault across all nonces
+    function getOperatorBondCount(address operator, address vault, uint64 fromNonce, uint64 toNonce)
+        external
+        view
+        returns (uint256 activeCount, uint256 totalLocked)
+    {
+        for (uint64 i = fromNonce; i <= toNonce; i++) {
+            BondInfo storage bond = bonds[operator][vault][i];
+            if (bond.status == BondStatus.Locked) {
+                activeCount++;
+                totalLocked += bond.amount;
+            }
+        }
     }
 
     /// @inheritdoc IBondManager

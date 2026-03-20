@@ -18,6 +18,10 @@ import { formatBytes32, formatEther, timestampToDate, truncateAddress } from '@/
 import { useNetwork } from '@/lib/NetworkContext';
 import { NetworkBadge } from '@/components/NetworkLogo';
 import { CommentSection } from '@/components/CommentSection';
+import { PerformanceCard } from '@/components/PerformanceCard';
+import { DeprecationBanner } from '@/components/DeprecationBanner';
+import { StrategyStatusBanner } from '@/components/StrategyStatusBanner';
+import { BondStatusCard } from '@/components/BondStatusCard';
 import Link from 'next/link';
 
 export default function VaultDetailPage() {
@@ -25,7 +29,7 @@ export default function VaultDetailPage() {
   const vaultAddress = params.address as `0x${string}`;
   const { address: userAddress } = useAccount();
 
-  const { explorerUrl } = useNetwork();
+  const { explorerUrl, contracts } = useNetwork();
   const vault = useVaultInfo(vaultAddress);
   const protocolType = useVaultProtocolType(vaultAddress);
   const { data: userShares } = useVaultShares(vaultAddress, userAddress);
@@ -152,6 +156,26 @@ export default function VaultDetailPage() {
             )}
           </div>
 
+          {/* Deprecation Warning */}
+          {vault.agentId && (
+            <div className="mb-8">
+              <DeprecationBanner
+                agentId={String(vault.agentId) as `0x${string}`}
+                registryAddress={contracts.agentRegistry as `0x${string}`}
+              />
+            </div>
+          )}
+
+          {/* Strategy Status Warning */}
+          <StrategyStatusBanner
+            vaultAddress={vaultAddress}
+            assetDecimals={vault.assetDecimals}
+            assetSymbol={vault.assetSymbol}
+          />
+
+          {/* Performance Dashboard */}
+          <PerformanceCard vaultAddress={vaultAddress} />
+
           {/* Optimistic Status (only for optimistic vaults) */}
           {vault.isOptimistic && (
             <OptimisticStatusCard
@@ -161,6 +185,15 @@ export default function VaultDetailPage() {
               maxPending={vault.maxPending}
               pendingCount={vault.pendingCount}
               bondManagerAddress={vault.bondManagerAddress}
+            />
+          )}
+
+          {/* Bond & Slash Transparency (only for optimistic vaults) */}
+          {vault.isOptimistic && vault.bondManagerAddress && (
+            <BondStatusCard
+              bondManagerAddress={vault.bondManagerAddress}
+              minBond={vault.minBond}
+              challengeWindow={vault.challengeWindow}
             />
           )}
 
