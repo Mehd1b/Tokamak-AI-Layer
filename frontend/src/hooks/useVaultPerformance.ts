@@ -49,23 +49,39 @@ export function useVaultPerformance(
   const { contracts, selectedChainId } = useNetwork();
   const client = usePublicClient({ chainId: selectedChainId });
 
-  const { data, isLoading, error } = useQuery({
+  const emptyResult = {
+    totalReturn: null,
+    returnSince7d: null,
+    returnSince30d: null,
+    maxDrawdown: null,
+    executionCount: 0,
+    winRate: null,
+    sharpeRatio: null,
+  };
+
+  const { data, isLoading } = useQuery({
     queryKey: ['vaultPerformance', vaultAddress, selectedChainId, assetDecimals],
     queryFn: async () => {
-      if (!client || !vaultAddress) return null;
+      if (!client || !vaultAddress) return emptyResult;
 
-      const [currentAssets, currentShares] = await Promise.all([
-        client.readContract({
-          address: vaultAddress,
-          abi: KernelVaultABI,
-          functionName: 'totalAssets',
-        }) as Promise<bigint>,
-        client.readContract({
-          address: vaultAddress,
-          abi: KernelVaultABI,
-          functionName: 'totalShares',
-        }) as Promise<bigint>,
-      ]);
+      let currentAssets: bigint;
+      let currentShares: bigint;
+      try {
+        [currentAssets, currentShares] = await Promise.all([
+          client.readContract({
+            address: vaultAddress,
+            abi: KernelVaultABI,
+            functionName: 'totalAssets',
+          }) as Promise<bigint>,
+          client.readContract({
+            address: vaultAddress,
+            abi: KernelVaultABI,
+            functionName: 'totalShares',
+          }) as Promise<bigint>,
+        ]);
+      } catch {
+        return emptyResult;
+      }
 
       const now = Math.floor(Date.now() / 1000);
       const currentPps = currentShares > BigInt(0)
@@ -75,53 +91,57 @@ export function useVaultPerformance(
       let allEvents: HistoryEvent[] = [];
       let hasTimestamps = false;
 
-      if (isExplorerAvailable()) {
-        try {
-          const logs = await fetchVaultLogs(selectedChainId, vaultAddress);
-          const toHistoryEvent = (type: HistoryEvent['type']) => (l: DecodedVaultLog): HistoryEvent => ({
-            type, blockNumber: l.blockNumber, logIndex: l.logIndex, timeStamp: l.timeStamp, args: l.args,
+      try {
+        if (isExplorerAvailable()) {
+          try {
+            const logs = await fetchVaultLogs(selectedChainId, vaultAddress);
+            const toHistoryEvent = (type: HistoryEvent['type']) => (l: DecodedVaultLog): HistoryEvent => ({
+              type, blockNumber: l.blockNumber, logIndex: l.logIndex, timeStamp: l.timeStamp, args: l.args,
+            });
+            allEvents = [
+              ...logs.deposits.map(toHistoryEvent('deposit')),
+              ...logs.withdrawals.map(toHistoryEvent('withdraw')),
+              ...logs.executions.map(toHistoryEvent('execution')),
+            ];
+            hasTimestamps = true;
+          } catch {
+            // Fall through to RPC
+          }
+        }
+
+        if (allEvents.length === 0) {
+          const logClient = getLogsClient(client, selectedChainId);
+          const currentBlock = await logClient.getBlockNumber();
+
+          let fromBlock: bigint;
+          try {
+            fromBlock = await findVaultDeployBlock(
+              logClient, contracts.vaultFactory, vaultAddress, currentBlock, selectedChainId,
+            );
+          } catch {
+            fromBlock = BigInt(0);
+          }
+          if (fromBlock === BigInt(0)) {
+            fromBlock = recentFromBlock(currentBlock);
+          }
+
+          const [depositLogs, withdrawLogs, executionLogs] = await Promise.all([
+            paginatedGetLogs(logClient, { address: vaultAddress, event: depositEvent, fromBlock, toBlock: currentBlock }),
+            paginatedGetLogs(logClient, { address: vaultAddress, event: withdrawEvent, fromBlock, toBlock: currentBlock }),
+            paginatedGetLogs(logClient, { address: vaultAddress, event: executionAppliedEvent, fromBlock, toBlock: currentBlock }),
+          ]);
+
+          const toHistoryEvent = (type: HistoryEvent['type']) => (log: Log): HistoryEvent => ({
+            type, blockNumber: log.blockNumber ?? BigInt(0), logIndex: log.logIndex ?? 0, args: (log as any).args,
           });
           allEvents = [
-            ...logs.deposits.map(toHistoryEvent('deposit')),
-            ...logs.withdrawals.map(toHistoryEvent('withdraw')),
-            ...logs.executions.map(toHistoryEvent('execution')),
+            ...depositLogs.map(toHistoryEvent('deposit')),
+            ...withdrawLogs.map(toHistoryEvent('withdraw')),
+            ...executionLogs.map(toHistoryEvent('execution')),
           ];
-          hasTimestamps = true;
-        } catch {
-          // Fall through to RPC
         }
-      }
-
-      if (allEvents.length === 0) {
-        const logClient = getLogsClient(client, selectedChainId);
-        const currentBlock = await logClient.getBlockNumber();
-
-        let fromBlock: bigint;
-        try {
-          fromBlock = await findVaultDeployBlock(
-            logClient, contracts.vaultFactory, vaultAddress, currentBlock, selectedChainId,
-          );
-        } catch {
-          fromBlock = BigInt(0);
-        }
-        if (fromBlock === BigInt(0)) {
-          fromBlock = recentFromBlock(currentBlock);
-        }
-
-        const [depositLogs, withdrawLogs, executionLogs] = await Promise.all([
-          paginatedGetLogs(logClient, { address: vaultAddress, event: depositEvent, fromBlock, toBlock: currentBlock }),
-          paginatedGetLogs(logClient, { address: vaultAddress, event: withdrawEvent, fromBlock, toBlock: currentBlock }),
-          paginatedGetLogs(logClient, { address: vaultAddress, event: executionAppliedEvent, fromBlock, toBlock: currentBlock }),
-        ]);
-
-        const toHistoryEvent = (type: HistoryEvent['type']) => (log: Log): HistoryEvent => ({
-          type, blockNumber: log.blockNumber ?? BigInt(0), logIndex: log.logIndex ?? 0, args: (log as any).args,
-        });
-        allEvents = [
-          ...depositLogs.map(toHistoryEvent('deposit')),
-          ...withdrawLogs.map(toHistoryEvent('withdraw')),
-          ...executionLogs.map(toHistoryEvent('execution')),
-        ];
+      } catch {
+        return emptyResult;
       }
 
       allEvents.sort((a, b) => {
@@ -130,15 +150,7 @@ export function useVaultPerformance(
       });
 
       if (allEvents.length === 0) {
-        return {
-          totalReturn: null,
-          returnSince7d: null,
-          returnSince30d: null,
-          maxDrawdown: null,
-          executionCount: 0,
-          winRate: null,
-          sharpeRatio: null,
-        };
+        return emptyResult;
       }
 
       const timestampMap = new Map<string, number>();
@@ -328,6 +340,7 @@ export function useVaultPerformance(
     enabled: !!client && !!vaultAddress,
     staleTime: 60_000,
     refetchOnWindowFocus: false,
+    retry: false,
   });
 
   return {
@@ -339,6 +352,6 @@ export function useVaultPerformance(
     winRate: data?.winRate ?? null,
     sharpeRatio: data?.sharpeRatio ?? null,
     isLoading,
-    error: error as Error | null,
+    error: null,
   };
 }

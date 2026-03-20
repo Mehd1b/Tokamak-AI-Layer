@@ -37,7 +37,6 @@ export function PerformanceCard({ vaultAddress }: PerformanceCardProps) {
     winRate,
     sharpeRatio,
     isLoading,
-    error,
   } = useVaultPerformance(vaultAddress);
 
   const metrics: Array<{ label: string; value: string; colorClass: string }> = [
@@ -80,8 +79,6 @@ export function PerformanceCard({ vaultAddress }: PerformanceCardProps) {
             <SkeletonRow />
             <SkeletonRow />
           </>
-        ) : error ? (
-          <div className="py-3 text-red-400 text-sm">Failed to load performance data</div>
         ) : (
           metrics.map((metric, idx) => (
             <div
