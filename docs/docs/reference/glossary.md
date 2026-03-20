@@ -100,6 +100,10 @@ pub struct AgentOutput {
 }
 ```
 
+### Agent Deprecation
+
+The mechanism by which an agent author marks an agent as deprecated in the AgentRegistry. Deprecated agents continue operating in existing vaults but the frontend shows a warning banner. Authors can set a successor agent to guide depositors toward the newer version.
+
 ## B
 
 ### Basis Points (bps)
@@ -243,6 +247,10 @@ The output journal structure. 209 bytes, contains all commitments and execution 
 
 The on-chain contract that holds capital and executes verified agent actions.
 
+### OptimisticKernelVault
+
+An extension of KernelVault that supports two-phase optimistic execution: `executeOptimistic()` runs actions immediately with a WSTON bond, then `submitProof()` is called later to finalize. If the proof is not submitted within the challenge window, the bond is slashed.
+
 ## O
 
 ### opaque_agent_inputs
@@ -326,6 +334,10 @@ pub enum ViolationReason {
     InvalidActionPayload,
 }
 ```
+
+### WSTONBondManager
+
+The contract that manages WSTON bonds for optimistic execution. Operators lock WSTON as collateral before executing optimistically. Bonds are released on successful proof submission or slashed (10% finder, 80% depositors, 10% treasury) on challenge window expiry. See [Bond Manager](/onchain/bond-manager).
 
 ## Z
 

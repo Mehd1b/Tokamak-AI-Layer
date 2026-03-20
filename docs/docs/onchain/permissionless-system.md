@@ -117,15 +117,22 @@ interface IAgentRegistry {
         address author;
         bytes32 imageId;
         bytes32 agentCodeHash;
-        string metadataURI;
+        string _deprecated; // formerly metadataURI — retained for storage layout
         bool exists;
     }
 
     function computeAgentId(address author, bytes32 salt) external pure returns (bytes32);
-    function register(bytes32 salt, bytes32 imageId, bytes32 agentCodeHash, string calldata metadataURI) external returns (bytes32);
-    function update(bytes32 agentId, bytes32 newImageId, bytes32 newAgentCodeHash, string calldata newMetadataURI) external;
+    function register(bytes32 salt, bytes32 imageId, bytes32 agentCodeHash) external returns (bytes32);
+    function update(bytes32 agentId, bytes32 newImageId, bytes32 newAgentCodeHash) external;
     function get(bytes32 agentId) external view returns (AgentInfo memory);
     function agentExists(bytes32 agentId) external view returns (bool);
+
+    // Agent deprecation
+    function deprecate(bytes32 agentId) external;
+    function undeprecate(bytes32 agentId) external;
+    function setSuccessor(bytes32 agentId, bytes32 successorAgentId) external;
+    function isDeprecated(bytes32 agentId) external view returns (bool);
+    function getSuccessor(bytes32 agentId) external view returns (bytes32);
 }
 ```
 
@@ -239,6 +246,54 @@ address newVault = factory.deployVault(agentId, address(usdc), bytes32(uint256(1
 oldVault.withdraw(oldVault.shares(msg.sender));
 newVault.depositERC20Tokens(amount);
 ```
+
+## Agent Deprecation
+
+Authors can deprecate agents to signal that a newer version is available. This provides a clean upgrade path without breaking existing vaults.
+
+### Deprecation Functions
+
+```solidity
+// Mark an agent as deprecated (author only)
+registry.deprecate(agentId);
+
+// Set a successor agent for migration guidance
+registry.setSuccessor(agentId, newAgentId);
+
+// Remove deprecation if needed
+registry.undeprecate(agentId);
+
+// Query deprecation status
+bool deprecated = registry.isDeprecated(agentId);
+bytes32 successor = registry.getSuccessor(agentId);
+```
+
+### Deprecation Flow
+
+```mermaid
+sequenceDiagram
+    participant Author
+    participant Registry
+    participant Frontend
+
+    Author->>Registry: register(salt, imageId_v2, codeHash_v2)
+    Note over Author: New agent version deployed
+
+    Author->>Registry: deprecate(agentId_v1)
+    Author->>Registry: setSuccessor(agentId_v1, agentId_v2)
+
+    Note over Frontend: Shows deprecation banner on v1 vaults
+    Frontend->>Registry: isDeprecated(agentId_v1) → true
+    Frontend->>Registry: getSuccessor(agentId_v1) → agentId_v2
+```
+
+### Important Notes
+
+- Deprecation does **not** affect existing vault operation — vaults continue executing with their pinned imageId
+- Deprecation is purely informational, helping depositors and the frontend show migration guidance
+- Only the original agent author can deprecate/undeprecate
+- Setting a successor requires the successor agent to exist in the registry
+- Undeprecation clears the successor mapping
 
 ## Comparison: Before and After
 

@@ -49,7 +49,13 @@ library OracleVerifier {
         if (signature.length != 65) return false;
 
         // Check freshness (guard against future timestamps to prevent underflow)
-        if (maxOracleAge > 0 && (oracleTimestamp > block.timestamp || block.timestamp - oracleTimestamp > maxOracleAge)) return false;
+        if (
+            maxOracleAge > 0
+                && (
+                    oracleTimestamp > block.timestamp
+                        || block.timestamp - oracleTimestamp > maxOracleAge
+                )
+        ) return false;
 
         bytes32 r;
         bytes32 s;
@@ -63,13 +69,15 @@ library OracleVerifier {
         if (v != 27 && v != 28) return false;
 
         // EIP-2: reject upper-range s values to prevent signature malleability
-        if (uint256(s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) return false;
+        if (uint256(s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
+            return false;
+        }
 
         // Include timestamp, chainId, and vaultAddress in signed message to prevent replay
-        bytes32 domainFeedHash = keccak256(abi.encodePacked(feedHash, oracleTimestamp, chainId, vaultAddress));
-        bytes32 ethSignedHash = keccak256(
-            abi.encodePacked("\x19Ethereum Signed Message:\n32", domainFeedHash)
-        );
+        bytes32 domainFeedHash =
+            keccak256(abi.encodePacked(feedHash, oracleTimestamp, chainId, vaultAddress));
+        bytes32 ethSignedHash =
+            keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", domainFeedHash));
 
         address recovered = ecrecover(ethSignedHash, v, r, s);
         if (recovered == address(0)) return false;
@@ -122,12 +130,10 @@ library OracleVerifier {
             revert InvalidBondAttestation();
         }
 
-        bytes32 bondHash = keccak256(
-            abi.encodePacked("BOND_LOCK_V1", operator, vault, nonce, amount, chainId)
-        );
-        bytes32 ethSignedHash = keccak256(
-            abi.encodePacked("\x19Ethereum Signed Message:\n32", bondHash)
-        );
+        bytes32 bondHash =
+            keccak256(abi.encodePacked("BOND_LOCK_V1", operator, vault, nonce, amount, chainId));
+        bytes32 ethSignedHash =
+            keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", bondHash));
 
         address recovered = ecrecover(ethSignedHash, v, r, s);
         if (recovered == address(0) || recovered != expectedSigner) {
@@ -157,7 +163,13 @@ library OracleVerifier {
         }
 
         // Check freshness (guard against future timestamps to prevent underflow)
-        if (maxOracleAge > 0 && (oracleTimestamp > block.timestamp || block.timestamp - oracleTimestamp > maxOracleAge)) {
+        if (
+            maxOracleAge > 0
+                && (
+                    oracleTimestamp > block.timestamp
+                        || block.timestamp - oracleTimestamp > maxOracleAge
+                )
+        ) {
             revert OracleDataStale(oracleTimestamp, maxOracleAge, block.timestamp);
         }
 
@@ -180,10 +192,10 @@ library OracleVerifier {
         }
 
         // Include timestamp, chainId, and vaultAddress in signed message to prevent replay
-        bytes32 domainFeedHash = keccak256(abi.encodePacked(feedHash, oracleTimestamp, chainId, vaultAddress));
-        bytes32 ethSignedHash = keccak256(
-            abi.encodePacked("\x19Ethereum Signed Message:\n32", domainFeedHash)
-        );
+        bytes32 domainFeedHash =
+            keccak256(abi.encodePacked(feedHash, oracleTimestamp, chainId, vaultAddress));
+        bytes32 ethSignedHash =
+            keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", domainFeedHash));
 
         address recovered = ecrecover(ethSignedHash, v, r, s);
         if (recovered == address(0)) {

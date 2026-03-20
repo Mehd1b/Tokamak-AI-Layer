@@ -11,12 +11,10 @@ interface IVaultFactory {
     /// @param userSalt A unique salt chosen by the user
     /// @return vault The computed vault address
     /// @return salt The CREATE2 salt used for deployment
-    function computeVaultAddress(
-        address owner,
-        bytes32 agentId,
-        address asset,
-        bytes32 userSalt
-    ) external view returns (address vault, bytes32 salt);
+    function computeVaultAddress(address owner, bytes32 agentId, address asset, bytes32 userSalt)
+        external
+        view
+        returns (address vault, bytes32 salt);
 
     /// @notice Deploy a new vault with pinned imageId from registry
     /// @param agentId The agent ID from AgentRegistry
@@ -24,12 +22,9 @@ interface IVaultFactory {
     /// @param userSalt A unique salt for deterministic deployment
     /// @param expectedImageId The expected imageId (must match registry to prevent race conditions)
     /// @return vault The deployed vault address
-    function deployVault(
-        bytes32 agentId,
-        address asset,
-        bytes32 userSalt,
-        bytes32 expectedImageId
-    ) external returns (address vault);
+    function deployVault(bytes32 agentId, address asset, bytes32 userSalt, bytes32 expectedImageId)
+        external
+        returns (address vault);
 
     /// @notice Deploy a new OptimisticKernelVault for an agent
     /// @param agentId The agent ID to bind the vault to
@@ -118,10 +113,7 @@ interface IVaultFactory {
 
     /// @notice Emitted when an optimistic vault is deployed
     event OptimisticVaultDeployed(
-        address indexed vault,
-        bytes32 indexed agentId,
-        address indexed owner,
-        uint256 bondChainId
+        address indexed vault, bytes32 indexed agentId, address indexed owner, uint256 bondChainId
     );
 
     /// @notice Register an externally deployed vault with the factory

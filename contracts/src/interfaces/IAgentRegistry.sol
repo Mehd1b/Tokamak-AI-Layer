@@ -24,21 +24,15 @@ interface IAgentRegistry {
     /// @param imageId The RISC Zero image ID for this agent
     /// @param agentCodeHash The agent code hash
     /// @return agentId The registered agent's deterministic ID
-    function register(
-        bytes32 salt,
-        bytes32 imageId,
-        bytes32 agentCodeHash
-    ) external returns (bytes32 agentId);
+    function register(bytes32 salt, bytes32 imageId, bytes32 agentCodeHash)
+        external
+        returns (bytes32 agentId);
 
     /// @notice Update an existing agent's configuration (author only)
     /// @param agentId The agent ID to update
     /// @param newImageId The new RISC Zero image ID
     /// @param newAgentCodeHash The new agent code hash
-    function update(
-        bytes32 agentId,
-        bytes32 newImageId,
-        bytes32 newAgentCodeHash
-    ) external;
+    function update(bytes32 agentId, bytes32 newImageId, bytes32 newAgentCodeHash) external;
 
     /// @notice Unregister an agent (author only)
     /// @dev All vaults for this agent (queried from VaultFactory) must have zero total assets.
@@ -93,9 +87,7 @@ interface IAgentRegistry {
 
     /// @notice Emitted when an agent is updated
     event AgentUpdated(
-        bytes32 indexed agentId,
-        bytes32 indexed newImageId,
-        bytes32 newAgentCodeHash
+        bytes32 indexed agentId, bytes32 indexed newImageId, bytes32 newAgentCodeHash
     );
 
     /// @notice Emitted when an agent is unregistered

@@ -44,8 +44,7 @@ contract PermissionlessIntegrationTest is Test {
         // Deploy AgentRegistry via proxy
         AgentRegistry registryImpl = new AgentRegistry();
         ERC1967Proxy registryProxy = new ERC1967Proxy(
-            address(registryImpl),
-            abi.encodeCall(AgentRegistry.initialize, (address(this)))
+            address(registryImpl), abi.encodeCall(AgentRegistry.initialize, (address(this)))
         );
         registry = AgentRegistry(address(registryProxy));
 
@@ -56,7 +55,10 @@ contract PermissionlessIntegrationTest is Test {
         VaultFactory factoryImpl = new VaultFactory();
         ERC1967Proxy factoryProxy = new ERC1967Proxy(
             address(factoryImpl),
-            abi.encodeCall(VaultFactory.initialize, (address(registry), address(mockVerifier), address(this), address(codeStore)))
+            abi.encodeCall(
+                VaultFactory.initialize,
+                (address(registry), address(mockVerifier), address(this), address(codeStore))
+            )
         );
         factory = VaultFactory(address(factoryProxy));
 
@@ -117,8 +119,14 @@ contract PermissionlessIntegrationTest is Test {
         vm.prank(user);
         vault.depositERC20Tokens(100 ether);
 
-        assertEq(vault.shares(user), 100 ether * 1000, "User should have shares (with virtual offset)");
-        assertEq(vault.totalShares(), 100 ether * 1000, "Total shares should be updated (with virtual offset)");
+        assertEq(
+            vault.shares(user), 100 ether * 1000, "User should have shares (with virtual offset)"
+        );
+        assertEq(
+            vault.totalShares(),
+            100 ether * 1000,
+            "Total shares should be updated (with virtual offset)"
+        );
 
         // Step 4: Execute with valid proof
         uint256 transferAmount = 50 ether;
@@ -139,9 +147,7 @@ contract PermissionlessIntegrationTest is Test {
             token.balanceOf(recipient), recipientBefore + transferAmount, "Recipient should receive"
         );
         assertEq(
-            token.balanceOf(address(vault)),
-            vaultBefore - transferAmount,
-            "Vault should decrease"
+            token.balanceOf(address(vault)), vaultBefore - transferAmount, "Vault should decrease"
         );
         assertEq(vault.lastExecutionNonce(), 1, "Nonce should be updated");
     }
@@ -168,7 +174,9 @@ contract PermissionlessIntegrationTest is Test {
 
         // Verify vault's imageId is NOT affected
         assertEq(
-            vault.trustedImageId(), IMAGE_ID, "Vault imageId should NOT change after registry update"
+            vault.trustedImageId(),
+            IMAGE_ID,
+            "Vault imageId should NOT change after registry update"
         );
 
         // Vault can still execute with the ORIGINAL imageId
@@ -225,18 +233,12 @@ contract PermissionlessIntegrationTest is Test {
         KernelVault newVault = KernelVault(payable(newVaultAddr));
 
         // New vault should have the UPDATED imageId
-        assertEq(
-            newVault.trustedImageId(),
-            newImageId,
-            "New vault should have updated imageId"
-        );
+        assertEq(newVault.trustedImageId(), newImageId, "New vault should have updated imageId");
 
         // Old vault should still have the original imageId
         KernelVault oldVault = KernelVault(payable(vaultAddr));
         assertEq(
-            oldVault.trustedImageId(),
-            IMAGE_ID,
-            "Old vault should still have original imageId"
+            oldVault.trustedImageId(), IMAGE_ID, "Old vault should still have original imageId"
         );
     }
 
@@ -246,11 +248,7 @@ contract PermissionlessIntegrationTest is Test {
         bytes32 agent2ImageId = bytes32(uint256(0x9999));
         bytes32 agent2CodeHash = bytes32(uint256(0xDEAD));
         vm.prank(author);
-        bytes32 agent2Id = registry.register(
-            bytes32(uint256(0x2)),
-            agent2ImageId,
-            agent2CodeHash
-        );
+        bytes32 agent2Id = registry.register(bytes32(uint256(0x2)), agent2ImageId, agent2CodeHash);
 
         // Author deploys vault for second agent
         vm.prank(author);
@@ -276,9 +274,7 @@ contract PermissionlessIntegrationTest is Test {
 
         vm.prank(randomUser);
         bytes32 newAgentId = registry.register(
-            bytes32(uint256(0x123)),
-            bytes32(uint256(0xABCD)),
-            bytes32(uint256(0xEF01))
+            bytes32(uint256(0x123)), bytes32(uint256(0xABCD)), bytes32(uint256(0xEF01))
         );
 
         assertTrue(registry.agentExists(newAgentId), "Agent should be registered");
@@ -308,14 +304,14 @@ contract PermissionlessIntegrationTest is Test {
         // New author registers their agent
         vm.prank(newAuthor);
         bytes32 newAgentId = registry.register(
-            bytes32(uint256(0x456)),
-            bytes32(uint256(0x7890)),
-            bytes32(uint256(0xABCD))
+            bytes32(uint256(0x456)), bytes32(uint256(0x7890)), bytes32(uint256(0xABCD))
         );
 
         // New author can deploy vault for their agent
         vm.prank(newAuthor);
-        address newVaultAddr = factory.deployVault(newAgentId, address(token), bytes32(uint256(0x999)), bytes32(uint256(0x7890)));
+        address newVaultAddr = factory.deployVault(
+            newAgentId, address(token), bytes32(uint256(0x999)), bytes32(uint256(0x7890))
+        );
 
         assertTrue(factory.isDeployedVault(newVaultAddr), "Vault should be deployed");
 

@@ -43,13 +43,17 @@ contract KernelVaultSecurityFeaturesTest is Test {
         KernelExecutionVerifier verifierImpl = new KernelExecutionVerifier();
         ERC1967Proxy verifierProxy = new ERC1967Proxy(
             address(verifierImpl),
-            abi.encodeCall(KernelExecutionVerifier.initialize, (address(mockRiscZeroVerifier), address(this)))
+            abi.encodeCall(
+                KernelExecutionVerifier.initialize, (address(mockRiscZeroVerifier), address(this))
+            )
         );
         executionVerifier = KernelExecutionVerifier(address(verifierProxy));
 
         token = new MockERC20("Test Token", "TEST", 18);
 
-        vault = new KernelVault(address(token), address(executionVerifier), TEST_AGENT_ID, TEST_IMAGE_ID, address(this));
+        vault = new KernelVault(
+            address(token), address(executionVerifier), TEST_AGENT_ID, TEST_IMAGE_ID, address(this)
+        );
 
         token.mint(user, INITIAL_BALANCE);
         token.mint(user2, INITIAL_BALANCE);
@@ -73,15 +77,29 @@ contract KernelVaultSecurityFeaturesTest is Test {
         returns (bytes memory)
     {
         bytes memory journal = new bytes(209);
-        journal[0] = 0x01; journal[1] = 0x00; journal[2] = 0x00; journal[3] = 0x00;
-        journal[4] = 0x01; journal[5] = 0x00; journal[6] = 0x00; journal[7] = 0x00;
-        for (uint256 i = 0; i < 32; i++) journal[8 + i] = agentId[i];
+        journal[0] = 0x01;
+        journal[1] = 0x00;
+        journal[2] = 0x00;
+        journal[3] = 0x00;
+        journal[4] = 0x01;
+        journal[5] = 0x00;
+        journal[6] = 0x00;
+        journal[7] = 0x00;
+        for (uint256 i = 0; i < 32; i++) {
+            journal[8 + i] = agentId[i];
+        }
         bytes32 codeHash = TEST_CODE_HASH;
-        for (uint256 i = 0; i < 32; i++) journal[40 + i] = codeHash[i];
+        for (uint256 i = 0; i < 32; i++) {
+            journal[40 + i] = codeHash[i];
+        }
         bytes32 constraintHash = TEST_CONSTRAINT_HASH;
-        for (uint256 i = 0; i < 32; i++) journal[72 + i] = constraintHash[i];
+        for (uint256 i = 0; i < 32; i++) {
+            journal[72 + i] = constraintHash[i];
+        }
         bytes32 inputRoot = TEST_INPUT_ROOT;
-        for (uint256 i = 0; i < 32; i++) journal[104 + i] = inputRoot[i];
+        for (uint256 i = 0; i < 32; i++) {
+            journal[104 + i] = inputRoot[i];
+        }
         journal[136] = bytes1(uint8(nonce & 0xFF));
         journal[137] = bytes1(uint8((nonce >> 8) & 0xFF));
         journal[138] = bytes1(uint8((nonce >> 16) & 0xFF));
@@ -91,8 +109,12 @@ contract KernelVaultSecurityFeaturesTest is Test {
         journal[142] = bytes1(uint8((nonce >> 48) & 0xFF));
         journal[143] = bytes1(uint8((nonce >> 56) & 0xFF));
         bytes32 inputCommitment = TEST_INPUT_COMMITMENT;
-        for (uint256 i = 0; i < 32; i++) journal[144 + i] = inputCommitment[i];
-        for (uint256 i = 0; i < 32; i++) journal[176 + i] = actionCommitment[i];
+        for (uint256 i = 0; i < 32; i++) {
+            journal[144 + i] = inputCommitment[i];
+        }
+        for (uint256 i = 0; i < 32; i++) {
+            journal[176 + i] = actionCommitment[i];
+        }
         journal[208] = 0x01;
         return journal;
     }
@@ -340,7 +362,9 @@ contract KernelVaultSecurityFeaturesTest is Test {
         bytes32 commitment = sha256(agentOutput);
         bytes memory journal = _buildJournal(TEST_AGENT_ID, 1, commitment);
 
-        vm.expectRevert(abi.encodeWithSelector(KernelVault.InvalidCallTarget.selector, address(vault)));
+        vm.expectRevert(
+            abi.encodeWithSelector(KernelVault.InvalidCallTarget.selector, address(vault))
+        );
         vault.execute(journal, "", agentOutput);
     }
 
@@ -386,8 +410,7 @@ contract TransferOwnershipTest is Test {
         // Deploy AgentRegistry
         AgentRegistry regImpl = new AgentRegistry();
         ERC1967Proxy regProxy = new ERC1967Proxy(
-            address(regImpl),
-            abi.encodeCall(AgentRegistry.initialize, (address(this)))
+            address(regImpl), abi.encodeCall(AgentRegistry.initialize, (address(this)))
         );
         registry = AgentRegistry(address(regProxy));
 
@@ -395,7 +418,9 @@ contract TransferOwnershipTest is Test {
         KernelExecutionVerifier verImpl = new KernelExecutionVerifier();
         ERC1967Proxy verProxy = new ERC1967Proxy(
             address(verImpl),
-            abi.encodeCall(KernelExecutionVerifier.initialize, (address(mockRiscZeroVerifier), address(this)))
+            abi.encodeCall(
+                KernelExecutionVerifier.initialize, (address(mockRiscZeroVerifier), address(this))
+            )
         );
         verifier = KernelExecutionVerifier(address(verProxy));
 
@@ -404,7 +429,10 @@ contract TransferOwnershipTest is Test {
         // Use a dummy code store address for this test (we don't deploy vaults)
         ERC1967Proxy facProxy = new ERC1967Proxy(
             address(facImpl),
-            abi.encodeCall(VaultFactory.initialize, (address(registry), address(verifier), address(this), address(0x1)))
+            abi.encodeCall(
+                VaultFactory.initialize,
+                (address(registry), address(verifier), address(this), address(0x1))
+            )
         );
         factory = VaultFactory(address(facProxy));
     }

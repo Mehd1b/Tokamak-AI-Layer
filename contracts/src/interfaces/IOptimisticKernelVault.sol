@@ -76,10 +76,7 @@ interface IOptimisticKernelVault {
     /// @notice Get a pending execution by nonce
     /// @param nonce The execution nonce
     /// @return The PendingExecution struct
-    function getPendingExecution(uint64 nonce)
-        external
-        view
-        returns (PendingExecution memory);
+    function getPendingExecution(uint64 nonce) external view returns (PendingExecution memory);
 
     /// @notice Get the number of currently pending executions
     /// @return The count of pending executions
@@ -89,10 +86,7 @@ interface IOptimisticKernelVault {
 
     /// @notice Emitted when an optimistic execution is submitted
     event OptimisticExecutionSubmitted(
-        uint64 indexed executionNonce,
-        bytes32 journalHash,
-        uint256 bondAmount,
-        uint256 deadline
+        uint64 indexed executionNonce, bytes32 journalHash, uint256 bondAmount, uint256 deadline
     );
 
     /// @notice Emitted when a proof is submitted for a pending execution
@@ -102,9 +96,7 @@ interface IOptimisticKernelVault {
     /// @notice Emitted when a pending execution is slashed
     /// @dev Oracle watches this event and calls slashBondByRelayer on L1 BondManager
     event ExecutionSlashed(
-        uint64 indexed executionNonce,
-        address indexed slasher,
-        uint256 bondAmount
+        uint64 indexed executionNonce, address indexed slasher, uint256 bondAmount
     );
 
     /// @notice Emitted when optimistic configuration is updated

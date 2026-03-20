@@ -244,7 +244,13 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @param _agentId The agent ID this vault is bound to
     /// @param _trustedImageId The trusted RISC Zero image ID (pinned at deployment)
     /// @param _owner The vault owner (agent author) who can submit executions
-    constructor(address _asset, address _verifier, bytes32 _agentId, bytes32 _trustedImageId, address _owner) {
+    constructor(
+        address _asset,
+        address _verifier,
+        bytes32 _agentId,
+        bytes32 _trustedImageId,
+        address _owner
+    ) {
         if (_trustedImageId == bytes32(0)) revert InvalidTrustedImageId();
         require(_verifier != address(0), "zero verifier");
         require(_owner != address(0), "zero owner");
@@ -326,15 +332,20 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @dev MVP uses simple PPS math. First deposit is 1:1, subsequent deposits use
     ///      shares = msg.value * totalShares / totalAssets.
     ///      Only works when vault asset is address(0) (ETH vault).
-    function depositETH() external payable nonReentrant whenNotPaused returns (uint256 sharesMinted) {
+    function depositETH()
+        external
+        payable
+        nonReentrant
+        whenNotPaused
+        returns (uint256 sharesMinted)
+    {
         if (strategyActive) revert DepositsLockedDuringStrategy();
         if (address(asset) != address(0)) revert WrongDepositFunction();
         if (msg.value == 0) revert ZeroDeposit();
 
         // Calculate shares using virtual offset formula (ERC4626)
         // Use tracked balance (pre-deposit) for PPS calculation
-        uint256 effectiveAssets =
-            strategyActive ? snapshotTotalAssets : trackedETHBalance;
+        uint256 effectiveAssets = strategyActive ? snapshotTotalAssets : trackedETHBalance;
 
         // shares = assets * (totalShares + OFFSET) / (effectiveAssets + 1)
         sharesMinted = (msg.value * (totalShares + _DECIMALS_OFFSET)) / (effectiveAssets + 1);
@@ -352,7 +363,12 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @notice Withdraw tokens (or ETH if asset is address(0)) by burning shares based on current PPS
     /// @param shareAmount Number of shares to burn
     /// @return assetsOut Amount of tokens returned based on current exchange rate
-    function withdraw(uint256 shareAmount) external nonReentrant whenNotPaused returns (uint256 assetsOut) {
+    function withdraw(uint256 shareAmount)
+        external
+        nonReentrant
+        whenNotPaused
+        returns (uint256 assetsOut)
+    {
         return _processWithdraw(shareAmount, msg.sender);
     }
 
@@ -360,7 +376,12 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @param shareAmount Number of shares to burn
     /// @param to Recipient address for the withdrawn assets
     /// @return assetsOut Amount of tokens returned based on current exchange rate
-    function withdrawTo(uint256 shareAmount, address to) external nonReentrant whenNotPaused returns (uint256 assetsOut) {
+    function withdrawTo(uint256 shareAmount, address to)
+        external
+        nonReentrant
+        whenNotPaused
+        returns (uint256 assetsOut)
+    {
         require(to != address(0), "zero recipient");
         return _processWithdraw(shareAmount, to);
     }
@@ -409,8 +430,13 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
         if (oracleSigner != address(0) && oracleSignature.length > 0) {
             OracleVerifier.requireValidOracleSignature(
-                parsed.inputRoot, oracleSignature, oracleSigner,
-                oracleTimestamp, block.chainid, address(this), maxOracleAge
+                parsed.inputRoot,
+                oracleSignature,
+                oracleSigner,
+                oracleTimestamp,
+                block.chainid,
+                address(this),
+                maxOracleAge
             );
         }
 
@@ -468,7 +494,8 @@ contract KernelVault is ReentrancyGuard, Pausable {
         IKernelExecutionVerifier.ParsedJournal memory parsed =
             verifier.verifyAndParseWithImageId(trustedImageId, journal, seal);
 
-        uint64 providedNonce = _validateParsedJournal(parsed, agentOutputBytes, oracleSignature, oracleTimestamp);
+        uint64 providedNonce =
+            _validateParsedJournal(parsed, agentOutputBytes, oracleSignature, oracleTimestamp);
 
         _executeActions(agentOutputBytes, parsed.agentId, providedNonce, parsed.actionCommitment);
     }
@@ -476,7 +503,10 @@ contract KernelVault is ReentrancyGuard, Pausable {
     // ============ Internal Withdraw ============
 
     /// @notice Internal withdrawal logic shared by withdraw() and withdrawTo()
-    function _processWithdraw(uint256 shareAmount, address to) internal returns (uint256 assetsOut) {
+    function _processWithdraw(uint256 shareAmount, address to)
+        internal
+        returns (uint256 assetsOut)
+    {
         if (shareAmount == 0) revert ZeroWithdraw();
         if (shares[msg.sender] < shareAmount) {
             revert InsufficientShares(shareAmount, shares[msg.sender]);
@@ -686,7 +716,11 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @dev Allows depositors to exit if the vault is paused and the owner disappears
     /// @param shareAmount Number of shares to burn
     /// @return assetsOut Amount of tokens returned
-    function emergencyWithdraw(uint256 shareAmount) external nonReentrant returns (uint256 assetsOut) {
+    function emergencyWithdraw(uint256 shareAmount)
+        external
+        nonReentrant
+        returns (uint256 assetsOut)
+    {
         return _processEmergencyWithdraw(shareAmount, msg.sender);
     }
 
@@ -694,13 +728,20 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @param shareAmount Number of shares to burn
     /// @param to Recipient address for the withdrawn assets
     /// @return assetsOut Amount of tokens returned
-    function emergencyWithdrawTo(uint256 shareAmount, address to) external nonReentrant returns (uint256 assetsOut) {
+    function emergencyWithdrawTo(uint256 shareAmount, address to)
+        external
+        nonReentrant
+        returns (uint256 assetsOut)
+    {
         require(to != address(0), "zero recipient");
         return _processEmergencyWithdraw(shareAmount, to);
     }
 
     /// @notice Internal emergency withdrawal logic
-    function _processEmergencyWithdraw(uint256 shareAmount, address to) internal returns (uint256 assetsOut) {
+    function _processEmergencyWithdraw(uint256 shareAmount, address to)
+        internal
+        returns (uint256 assetsOut)
+    {
         require(paused(), "not paused");
         uint256 earliest = pausedAt + EMERGENCY_WITHDRAW_DELAY;
         if (block.timestamp < earliest) revert EmergencyWithdrawTooEarly(earliest, block.timestamp);

@@ -137,9 +137,13 @@ contract MockKernelVault {
         usdc.approve(adapter, amount);
     }
 
-    function callOpenPosition(address adapter, bool isBuy, uint256 marginAmount, uint256 orderSize, uint256 limitPrice)
-        external
-    {
+    function callOpenPosition(
+        address adapter,
+        bool isBuy,
+        uint256 marginAmount,
+        uint256 orderSize,
+        uint256 limitPrice
+    ) external {
         HyperliquidAdapter(adapter).openPosition(isBuy, marginAmount, orderSize, limitPrice);
     }
 
@@ -192,16 +196,10 @@ contract HyperliquidAdapterTest is Test {
 
         // Deploy mock precompile at the system address
         perpPrecompile = new MockPerpPositionPrecompile();
-        vm.etch(
-            0x0000000000000000000000000000000000000800,
-            address(perpPrecompile).code
-        );
+        vm.etch(0x0000000000000000000000000000000000000800, address(perpPrecompile).code);
 
         // Deploy mock CoreWriter at the system address
-        vm.etch(
-            0x3333333333333333333333333333333333333333,
-            address(coreWriter).code
-        );
+        vm.etch(0x3333333333333333333333333333333333333333, address(coreWriter).code);
 
         // Deploy mock vaults
         vaultA = new MockKernelVault(ownerA, address(usdc));
@@ -212,11 +210,7 @@ contract HyperliquidAdapterTest is Test {
         factory.setDeployedVault(address(vaultB), true);
 
         // Deploy canonical adapter
-        adapter = new HyperliquidAdapter(
-            address(usdc),
-            address(coreDeposit),
-            address(factory)
-        );
+        adapter = new HyperliquidAdapter(address(usdc), address(coreDeposit), address(factory));
 
         // Fund vaults with USDC
         usdc.mint(address(vaultA), 1_000_000e6);
@@ -305,7 +299,8 @@ contract HyperliquidAdapterTest is Test {
 
     function test_registerVault_subAccountImmutables() public {
         vm.prank(ownerA);
-        address subAccountAddr = adapter.registerVault(address(vaultA), PERP_ASSET_BTC, SZ_DECIMALS_BTC);
+        address subAccountAddr =
+            adapter.registerVault(address(vaultA), PERP_ASSET_BTC, SZ_DECIMALS_BTC);
 
         TradingSubAccount subAccount = TradingSubAccount(payable(subAccountAddr));
         assertEq(subAccount.adapter(), address(adapter));
@@ -368,7 +363,8 @@ contract HyperliquidAdapterTest is Test {
 
     function test_subAccount_revertsDirectAccess_executeOpen() public {
         vm.prank(ownerA);
-        address subAccountAddr = adapter.registerVault(address(vaultA), PERP_ASSET_BTC, SZ_DECIMALS_BTC);
+        address subAccountAddr =
+            adapter.registerVault(address(vaultA), PERP_ASSET_BTC, SZ_DECIMALS_BTC);
 
         vm.prank(nonOwner);
         vm.expectRevert(TradingSubAccount.OnlyAdapter.selector);
@@ -377,7 +373,8 @@ contract HyperliquidAdapterTest is Test {
 
     function test_subAccount_revertsDirectAccess_executeClose() public {
         vm.prank(ownerA);
-        address subAccountAddr = adapter.registerVault(address(vaultA), PERP_ASSET_BTC, SZ_DECIMALS_BTC);
+        address subAccountAddr =
+            adapter.registerVault(address(vaultA), PERP_ASSET_BTC, SZ_DECIMALS_BTC);
 
         vm.prank(nonOwner);
         vm.expectRevert(TradingSubAccount.OnlyAdapter.selector);
@@ -386,7 +383,8 @@ contract HyperliquidAdapterTest is Test {
 
     function test_subAccount_revertsDirectAccess_executeWithdraw() public {
         vm.prank(ownerA);
-        address subAccountAddr = adapter.registerVault(address(vaultA), PERP_ASSET_BTC, SZ_DECIMALS_BTC);
+        address subAccountAddr =
+            adapter.registerVault(address(vaultA), PERP_ASSET_BTC, SZ_DECIMALS_BTC);
 
         vm.prank(nonOwner);
         vm.expectRevert(TradingSubAccount.OnlyAdapter.selector);
@@ -455,8 +453,7 @@ contract HyperliquidAdapterTest is Test {
         vm.prank(address(vaultA));
         vm.expectRevert(
             abi.encodeWithSelector(
-                IHyperliquidAdapter.MarginOverflow.selector,
-                uint256(type(uint64).max) + 1
+                IHyperliquidAdapter.MarginOverflow.selector, uint256(type(uint64).max) + 1
             )
         );
         adapter.openPosition(true, uint256(type(uint64).max) + 1, 20_000, 50_000e8);
@@ -471,10 +468,7 @@ contract HyperliquidAdapterTest is Test {
 
         vm.prank(address(vaultA));
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IHyperliquidAdapter.OrderSizeOverflow.selector,
-                scaledOverflow
-            )
+            abi.encodeWithSelector(IHyperliquidAdapter.OrderSizeOverflow.selector, scaledOverflow)
         );
         adapter.openPosition(true, 10_000e6, overflowSize, 50_000e8);
     }
@@ -485,8 +479,7 @@ contract HyperliquidAdapterTest is Test {
         vm.prank(address(vaultA));
         vm.expectRevert(
             abi.encodeWithSelector(
-                IHyperliquidAdapter.PriceOverflow.selector,
-                uint256(type(uint64).max) + 1
+                IHyperliquidAdapter.PriceOverflow.selector, uint256(type(uint64).max) + 1
             )
         );
         adapter.openPosition(true, 10_000e6, 20_000, uint256(type(uint64).max) + 1);
@@ -498,9 +491,8 @@ contract HyperliquidAdapterTest is Test {
         _registerVaultA();
 
         // Set up a long position at the precompile address
-        MockPerpPositionPrecompile precompile = MockPerpPositionPrecompile(
-            0x0000000000000000000000000000000000000800
-        );
+        MockPerpPositionPrecompile precompile =
+            MockPerpPositionPrecompile(0x0000000000000000000000000000000000000800);
         vm.store(
             address(precompile),
             bytes32(uint256(0)),
@@ -514,14 +506,11 @@ contract HyperliquidAdapterTest is Test {
     function test_closePositionAtPrice_shortPosition() public {
         _registerVaultA();
 
-        MockPerpPositionPrecompile precompile = MockPerpPositionPrecompile(
-            0x0000000000000000000000000000000000000800
-        );
+        MockPerpPositionPrecompile precompile =
+            MockPerpPositionPrecompile(0x0000000000000000000000000000000000000800);
         int64 shortSzi = -500e8;
         vm.store(
-            address(precompile),
-            bytes32(uint256(0)),
-            bytes32(uint256(uint64(int64(shortSzi))))
+            address(precompile), bytes32(uint256(0)), bytes32(uint256(uint64(int64(shortSzi))))
         );
 
         // Close at mark * 1.05 = 52500 * 1e8 (5% above mark for buying)
@@ -548,9 +537,8 @@ contract HyperliquidAdapterTest is Test {
 
         // Set up a long position at the precompile address
         // The precompile is etched, so we use vm.store to set position
-        MockPerpPositionPrecompile precompile = MockPerpPositionPrecompile(
-            0x0000000000000000000000000000000000000800
-        );
+        MockPerpPositionPrecompile precompile =
+            MockPerpPositionPrecompile(0x0000000000000000000000000000000000000800);
         vm.store(
             address(precompile),
             bytes32(uint256(0)),
@@ -564,16 +552,13 @@ contract HyperliquidAdapterTest is Test {
         _registerVaultA();
 
         // Set up a short position (negative szi)
-        MockPerpPositionPrecompile precompile = MockPerpPositionPrecompile(
-            0x0000000000000000000000000000000000000800
-        );
+        MockPerpPositionPrecompile precompile =
+            MockPerpPositionPrecompile(0x0000000000000000000000000000000000000800);
         // Store negative szi: -500e8 as int64 in storage slot 0
         // int64(-500e8) = -50000000000 = 0xFFFFFFFF4190AB00 in two's complement
         int64 shortSzi = -500e8;
         vm.store(
-            address(precompile),
-            bytes32(uint256(0)),
-            bytes32(uint256(uint64(int64(shortSzi))))
+            address(precompile), bytes32(uint256(0)), bytes32(uint256(uint64(int64(shortSzi))))
         );
 
         vaultA.callClosePosition(address(adapter));
@@ -756,7 +741,9 @@ contract HyperliquidAdapterTest is Test {
         adapter.depositMarginFromVaultAdmin(address(vaultA), 50e6);
 
         // USDC should flow: vault -> subAccount -> coreDeposit
-        assertEq(usdc.balanceOf(address(vaultA)), 1_000_000e6 - 50e6, "Vault balance should decrease");
+        assertEq(
+            usdc.balanceOf(address(vaultA)), 1_000_000e6 - 50e6, "Vault balance should decrease"
+        );
         assertEq(usdc.balanceOf(address(coreDeposit)), 50e6, "CoreDeposit should have the USDC");
         assertEq(coreDeposit.depositCount(), 1);
     }

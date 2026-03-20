@@ -39,8 +39,7 @@ contract VaultFactoryTest is Test {
         // Deploy AgentRegistry via proxy
         AgentRegistry registryImpl = new AgentRegistry();
         ERC1967Proxy registryProxy = new ERC1967Proxy(
-            address(registryImpl),
-            abi.encodeCall(AgentRegistry.initialize, (address(this)))
+            address(registryImpl), abi.encodeCall(AgentRegistry.initialize, (address(this)))
         );
         registry = AgentRegistry(address(registryProxy));
 
@@ -48,7 +47,9 @@ contract VaultFactoryTest is Test {
         KernelExecutionVerifier verifierImpl = new KernelExecutionVerifier();
         ERC1967Proxy verifierProxy = new ERC1967Proxy(
             address(verifierImpl),
-            abi.encodeCall(KernelExecutionVerifier.initialize, (address(mockRiscZeroVerifier), address(this)))
+            abi.encodeCall(
+                KernelExecutionVerifier.initialize, (address(mockRiscZeroVerifier), address(this))
+            )
         );
         verifier = KernelExecutionVerifier(address(verifierProxy));
 
@@ -59,7 +60,10 @@ contract VaultFactoryTest is Test {
         VaultFactory factoryImpl = new VaultFactory();
         ERC1967Proxy factoryProxy = new ERC1967Proxy(
             address(factoryImpl),
-            abi.encodeCall(VaultFactory.initialize, (address(registry), address(verifier), address(this), address(codeStore)))
+            abi.encodeCall(
+                VaultFactory.initialize,
+                (address(registry), address(verifier), address(this), address(codeStore))
+            )
         );
         factory = VaultFactory(address(factoryProxy));
 
@@ -92,7 +96,8 @@ contract VaultFactoryTest is Test {
 
     function test_computeVaultAddress_differentOwners() public view {
         (address vault1,) = factory.computeVaultAddress(author, agentId, address(token), USER_SALT);
-        (address vault2,) = factory.computeVaultAddress(nonAuthor, agentId, address(token), USER_SALT);
+        (address vault2,) =
+            factory.computeVaultAddress(nonAuthor, agentId, address(token), USER_SALT);
 
         assertTrue(vault1 != vault2, "Different owners should produce different addresses");
     }
@@ -246,9 +251,7 @@ contract VaultFactoryTest is Test {
         // Verify the vault has the correct imageId pinned
         KernelVault deployedVault = KernelVault(payable(vault));
         assertEq(
-            deployedVault.trustedImageId(),
-            IMAGE_ID,
-            "Deployed vault should have correct imageId"
+            deployedVault.trustedImageId(), IMAGE_ID, "Deployed vault should have correct imageId"
         );
 
         // Update the registry (simulate author updating agent)
@@ -268,7 +271,8 @@ contract VaultFactoryTest is Test {
         // Author deploys multiple vaults with different salts
         vm.startPrank(author);
         address vault1 = factory.deployVault(agentId, address(token), USER_SALT, IMAGE_ID);
-        address vault2 = factory.deployVault(agentId, address(token), bytes32(uint256(0x9999)), IMAGE_ID);
+        address vault2 =
+            factory.deployVault(agentId, address(token), bytes32(uint256(0x9999)), IMAGE_ID);
         vm.stopPrank();
 
         assertTrue(vault1 != vault2, "Different salts should produce different vaults");
@@ -326,7 +330,8 @@ contract VaultFactoryTest is Test {
     function test_vaultAt_returnsCorrectAddress() public {
         vm.startPrank(author);
         address vault1 = factory.deployVault(agentId, address(token), USER_SALT, IMAGE_ID);
-        address vault2 = factory.deployVault(agentId, address(token), bytes32(uint256(0x9999)), IMAGE_ID);
+        address vault2 =
+            factory.deployVault(agentId, address(token), bytes32(uint256(0x9999)), IMAGE_ID);
         vm.stopPrank();
 
         assertEq(factory.vaultAt(0), vault1, "First vault address should match");
@@ -348,7 +353,8 @@ contract VaultFactoryTest is Test {
     function test_getAllVaults_returnsAllVaults() public {
         vm.startPrank(author);
         address vault1 = factory.deployVault(agentId, address(token), USER_SALT, IMAGE_ID);
-        address vault2 = factory.deployVault(agentId, address(token), bytes32(uint256(0x9999)), IMAGE_ID);
+        address vault2 =
+            factory.deployVault(agentId, address(token), bytes32(uint256(0x9999)), IMAGE_ID);
         vm.stopPrank();
 
         address[] memory vaults = factory.getAllVaults();
@@ -387,7 +393,8 @@ contract VaultFactoryTest is Test {
     function test_getAgentVaults_afterMultipleDeployments() public {
         vm.startPrank(author);
         address vault1 = factory.deployVault(agentId, address(token), USER_SALT, IMAGE_ID);
-        address vault2 = factory.deployVault(agentId, address(token), bytes32(uint256(0x9999)), IMAGE_ID);
+        address vault2 =
+            factory.deployVault(agentId, address(token), bytes32(uint256(0x9999)), IMAGE_ID);
         address vault3 = factory.deployVault(agentId, address(0), USER_SALT, IMAGE_ID);
         vm.stopPrank();
 

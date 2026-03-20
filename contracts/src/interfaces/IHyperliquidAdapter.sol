@@ -113,7 +113,8 @@ interface IHyperliquidAdapter {
     /// @param marginAmount USDC margin to deposit (raw 6-decimal units, cast to uint64)
     /// @param orderSize Position size in base asset units (szDecimals-scaled, cast to uint64)
     /// @param limitPrice Limit price in 1e8 scaled units (will be cast to uint64)
-    function openPosition(bool isBuy, uint256 marginAmount, uint256 orderSize, uint256 limitPrice) external;
+    function openPosition(bool isBuy, uint256 marginAmount, uint256 orderSize, uint256 limitPrice)
+        external;
 
     /// @notice Close the full position using an agent-supplied limit price.
     /// @dev Uses a price within HyperCore's oracle band instead of extreme prices.
@@ -183,5 +184,4 @@ interface IHyperliquidAdapter {
     /// @param vault The vault address
     /// @return The VaultConfig struct
     function getVaultConfig(address vault) external view returns (VaultConfig memory);
-
 }

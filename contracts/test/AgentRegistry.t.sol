@@ -50,12 +50,10 @@ contract AgentRegistryTest is Test {
     bytes32 public constant CODE_HASH_1 = bytes32(uint256(0xC0DE1));
     bytes32 public constant CODE_HASH_2 = bytes32(uint256(0xC0DE2));
 
-
     function setUp() public {
         AgentRegistry impl = new AgentRegistry();
         ERC1967Proxy proxy = new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(AgentRegistry.initialize, (address(this)))
+            address(impl), abi.encodeCall(AgentRegistry.initialize, (address(this)))
         );
         registry = AgentRegistry(address(proxy));
 
@@ -116,9 +114,7 @@ contract AgentRegistryTest is Test {
         bytes32 expectedAgentId = registry.computeAgentId(author1, SALT_1);
 
         vm.expectEmit(true, true, true, true);
-        emit IAgentRegistry.AgentRegistered(
-            expectedAgentId, author1, IMAGE_ID_1, CODE_HASH_1
-        );
+        emit IAgentRegistry.AgentRegistered(expectedAgentId, author1, IMAGE_ID_1, CODE_HASH_1);
 
         vm.prank(author1);
         registry.register(SALT_1, IMAGE_ID_1, CODE_HASH_1);
@@ -475,7 +471,9 @@ contract AgentRegistryTest is Test {
 
         vm.prank(author1);
         vm.expectRevert(
-            abi.encodeWithSelector(IAgentRegistry.VaultHasDeposits.selector, address(mockVault), 1000)
+            abi.encodeWithSelector(
+                IAgentRegistry.VaultHasDeposits.selector, address(mockVault), 1000
+            )
         );
         registry.unregister(agentId);
     }
@@ -569,8 +567,7 @@ contract AgentRegistryTest is Test {
         // Deploy a fresh registry without factory set
         AgentRegistry impl = new AgentRegistry();
         ERC1967Proxy proxy = new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(AgentRegistry.initialize, (address(this)))
+            address(impl), abi.encodeCall(AgentRegistry.initialize, (address(this)))
         );
         AgentRegistry freshRegistry = AgentRegistry(address(proxy));
 
@@ -684,9 +681,7 @@ contract AgentRegistryTest is Test {
         bytes32 successorId = registry.register(SALT_1, IMAGE_ID_2, CODE_HASH_2);
 
         vm.prank(author1);
-        vm.expectRevert(
-            abi.encodeWithSelector(IAgentRegistry.AgentNotDeprecated.selector, agentId)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IAgentRegistry.AgentNotDeprecated.selector, agentId));
         registry.setSuccessor(agentId, successorId);
     }
 
@@ -698,9 +693,7 @@ contract AgentRegistryTest is Test {
         registry.deprecate(agentId);
 
         vm.prank(author1);
-        vm.expectRevert(
-            abi.encodeWithSelector(IAgentRegistry.CannotSucceedSelf.selector, agentId)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IAgentRegistry.CannotSucceedSelf.selector, agentId));
         registry.setSuccessor(agentId, agentId);
     }
 

@@ -120,7 +120,7 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
     // ============ UUPS ============
 
     /// @notice Authorize upgrade (only owner)
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address) internal override onlyOwner { }
 
     // ============ External Functions ============
 
@@ -130,11 +130,10 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
     }
 
     /// @inheritdoc IAgentRegistry
-    function register(
-        bytes32 salt,
-        bytes32 imageId,
-        bytes32 agentCodeHash
-    ) external returns (bytes32 agentId) {
+    function register(bytes32 salt, bytes32 imageId, bytes32 agentCodeHash)
+        external
+        returns (bytes32 agentId)
+    {
         // Validate inputs
         if (imageId == bytes32(0)) revert InvalidImageId();
         if (agentCodeHash == bytes32(0)) revert InvalidAgentCodeHash();
@@ -166,11 +165,7 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
     }
 
     /// @inheritdoc IAgentRegistry
-    function update(
-        bytes32 agentId,
-        bytes32 newImageId,
-        bytes32 newAgentCodeHash
-    ) external {
+    function update(bytes32 agentId, bytes32 newImageId, bytes32 newAgentCodeHash) external {
         // Check agent exists
         AgentInfo storage agent = _agents[agentId];
         if (!agent.exists) {

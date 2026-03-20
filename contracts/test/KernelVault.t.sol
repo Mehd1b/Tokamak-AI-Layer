@@ -42,7 +42,9 @@ contract KernelVaultTest is Test {
         KernelExecutionVerifier verifierImpl = new KernelExecutionVerifier();
         ERC1967Proxy verifierProxy = new ERC1967Proxy(
             address(verifierImpl),
-            abi.encodeCall(KernelExecutionVerifier.initialize, (address(mockRiscZeroVerifier), address(this)))
+            abi.encodeCall(
+                KernelExecutionVerifier.initialize, (address(mockRiscZeroVerifier), address(this))
+            )
         );
         executionVerifier = KernelExecutionVerifier(address(verifierProxy));
 
@@ -50,7 +52,9 @@ contract KernelVaultTest is Test {
         token = new MockERC20("Test Token", "TEST", 18);
 
         // Deploy KernelVault with trustedImageId
-        vault = new KernelVault(address(token), address(executionVerifier), TEST_AGENT_ID, TEST_IMAGE_ID, address(this));
+        vault = new KernelVault(
+            address(token), address(executionVerifier), TEST_AGENT_ID, TEST_IMAGE_ID, address(this)
+        );
 
         // Mint tokens to user
         token.mint(user, INITIAL_BALANCE);
@@ -245,7 +249,9 @@ contract KernelVaultTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                KernelVault.InsufficientShares.selector, DEPOSIT_AMOUNT * OFFSET + 1, DEPOSIT_AMOUNT * OFFSET
+                KernelVault.InsufficientShares.selector,
+                DEPOSIT_AMOUNT * OFFSET + 1,
+                DEPOSIT_AMOUNT * OFFSET
             )
         );
         vault.withdraw(DEPOSIT_AMOUNT * OFFSET + 1);
@@ -502,7 +508,9 @@ contract KernelVaultTest is Test {
 
     function test_constructor_zeroImageId_reverts() public {
         vm.expectRevert(KernelVault.InvalidTrustedImageId.selector);
-        new KernelVault(address(token), address(executionVerifier), TEST_AGENT_ID, bytes32(0), address(this));
+        new KernelVault(
+            address(token), address(executionVerifier), TEST_AGENT_ID, bytes32(0), address(this)
+        );
     }
 
     function test_execute_usesVerifyAndParseWithImageId() public {

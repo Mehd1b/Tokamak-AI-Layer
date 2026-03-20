@@ -32,8 +32,7 @@ contract TradingSubAccount {
     address public constant CORE_WRITER = 0x3333333333333333333333333333333333333333;
 
     /// @notice Precompile for reading perp positions from HyperCore
-    address public constant PERP_POSITION_PRECOMPILE =
-        0x0000000000000000000000000000000000000800;
+    address public constant PERP_POSITION_PRECOMPILE = 0x0000000000000000000000000000000000000800;
 
     /// @notice CoreWriter encoding version
     uint8 private constant ENCODING_VERSION = 0x01;
@@ -163,7 +162,7 @@ contract TradingSubAccount {
     // ============ HYPE Funding ============
 
     /// @notice Accept native HYPE transfers (required for HyperCore CoreWriter gas)
-    receive() external payable {}
+    receive() external payable { }
 
     /// @notice Bridge all native HYPE held by this contract to HyperCore spot balance
     /// @dev Sends native HYPE to the HYPE system address (0x2222...2222), which credits
@@ -173,7 +172,7 @@ contract TradingSubAccount {
     function bridgeHypeToCore() external onlyAdapter {
         uint256 balance = address(this).balance;
         if (balance == 0) revert NoHypeBalance();
-        (bool success,) = HYPE_SYSTEM_ADDRESS.call{value: balance}("");
+        (bool success,) = HYPE_SYSTEM_ADDRESS.call{ value: balance }("");
         if (!success) revert HypeBridgeFailed();
         emit HypeBridgedToCore(balance);
     }
@@ -206,7 +205,10 @@ contract TradingSubAccount {
     /// @param marginAmount USDC margin to deposit (raw 6-decimal units)
     /// @param orderSize Position size in base asset units (szDecimals-scaled)
     /// @param px Limit price in 1e8 scaled units (agent-computed, must be within HyperCore price band)
-    function executeOpen(bool isBuy, uint64 marginAmount, uint64 orderSize, uint64 px) external onlyAdapter {
+    function executeOpen(bool isBuy, uint64 marginAmount, uint64 orderSize, uint64 px)
+        external
+        onlyAdapter
+    {
         // 1-2. Deposit margin to HyperCore (skip if margin=0, used in two-proof mode
         // where deposit was done in a prior proof via depositMargin)
         if (marginAmount > 0) {
@@ -237,9 +239,8 @@ contract TradingSubAccount {
     /// @param px Agent-computed limit price in 1e8 scaled units (must be within oracle band)
     function closePositionAtPrice(uint64 px) external onlyAdapter {
         // 1. Read current position via precompile
-        (bool success, bytes memory result) = PERP_POSITION_PRECOMPILE.staticcall(
-            abi.encode(address(this), uint16(perpAsset))
-        );
+        (bool success, bytes memory result) =
+            PERP_POSITION_PRECOMPILE.staticcall(abi.encode(address(this), uint16(perpAsset)));
 
         if (!success) revert NoPositionToClose();
 
@@ -267,8 +268,7 @@ contract TradingSubAccount {
         uint64 sz = szRaw * uint64(10 ** (8 - szDecimals));
 
         // 4. Place reduce-only IOC order at agent-supplied price via CoreWriter
-        bytes memory encodedAction =
-            abi.encode(perpAsset, isBuy, px, sz, true, TIF_IOC, uint128(0));
+        bytes memory encodedAction = abi.encode(perpAsset, isBuy, px, sz, true, TIF_IOC, uint128(0));
 
         bytes memory data = _packCoreWriterAction(ACTION_LIMIT_ORDER, encodedAction);
         ICoreWriter(CORE_WRITER).sendRawAction(data);
@@ -282,9 +282,8 @@ contract TradingSubAccount {
     ///      causing silent rejection. Prefer closePositionAtPrice() with agent-computed price.
     function executeClose() external onlyAdapter {
         // 1. Read current position via precompile
-        (bool success, bytes memory result) = PERP_POSITION_PRECOMPILE.staticcall(
-            abi.encode(address(this), uint16(perpAsset))
-        );
+        (bool success, bytes memory result) =
+            PERP_POSITION_PRECOMPILE.staticcall(abi.encode(address(this), uint16(perpAsset)));
 
         if (!success) revert NoPositionToClose();
 
@@ -314,8 +313,7 @@ contract TradingSubAccount {
         uint64 sz = szRaw * uint64(10 ** (8 - szDecimals));
 
         // 4. Place reduce-only IOC order via CoreWriter
-        bytes memory encodedAction =
-            abi.encode(perpAsset, isBuy, px, sz, true, TIF_IOC, uint128(0));
+        bytes memory encodedAction = abi.encode(perpAsset, isBuy, px, sz, true, TIF_IOC, uint128(0));
 
         bytes memory data = _packCoreWriterAction(ACTION_LIMIT_ORDER, encodedAction);
         ICoreWriter(CORE_WRITER).sendRawAction(data);

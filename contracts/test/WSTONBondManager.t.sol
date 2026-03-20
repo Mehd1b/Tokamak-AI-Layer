@@ -245,8 +245,7 @@ contract WSTONBondManagerTest is Test {
         assertEq(mockWston.balanceOf(treasury), treasuryBalanceBefore + 1 ether);
 
         // Verify storage updated
-        (,, WSTONBondManager.BondStatus status) =
-            bondManager.bonds(operator, mockVault, NONCE_1);
+        (,, WSTONBondManager.BondStatus status) = bondManager.bonds(operator, mockVault, NONCE_1);
         assertEq(uint8(status), uint8(WSTONBondManager.BondStatus.Slashed));
         assertEq(bondManager.totalBonded(operator), 0);
     }
@@ -530,8 +529,7 @@ contract WSTONBondManagerTest is Test {
         assertEq(bondManager.totalLockedGlobal(), 0);
         assertEq(bondManager.totalBonded(operator), 0);
 
-        (, , WSTONBondManager.BondStatus status) =
-            bondManager.bonds(operator, mockVault, NONCE_1);
+        (,, WSTONBondManager.BondStatus status) = bondManager.bonds(operator, mockVault, NONCE_1);
         assertEq(uint8(status), uint8(WSTONBondManager.BondStatus.Released));
     }
 

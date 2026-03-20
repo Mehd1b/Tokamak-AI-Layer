@@ -17,7 +17,13 @@ contract OracleVerifierWrapper {
         uint64 maxOracleAge
     ) external view {
         OracleVerifier.requireValidOracleSignature(
-            feedHash, signature, expectedSigner, oracleTimestamp, chainId, vaultAddress, maxOracleAge
+            feedHash,
+            signature,
+            expectedSigner,
+            oracleTimestamp,
+            chainId,
+            vaultAddress,
+            maxOracleAge
         );
     }
 
@@ -31,7 +37,13 @@ contract OracleVerifierWrapper {
         uint64 maxOracleAge
     ) external view returns (bool) {
         return OracleVerifier.verifyOracleSignature(
-            feedHash, signature, expectedSigner, oracleTimestamp, chainId, vaultAddress, maxOracleAge
+            feedHash,
+            signature,
+            expectedSigner,
+            oracleTimestamp,
+            chainId,
+            vaultAddress,
+            maxOracleAge
         );
     }
 }
@@ -65,16 +77,20 @@ contract OracleVerifierTest is Test {
         uint256 chainId,
         address vaultAddress
     ) internal pure returns (bytes memory) {
-        bytes32 domainFeedHash = keccak256(abi.encodePacked(feedHash, oracleTimestamp, chainId, vaultAddress));
-        bytes32 ethSignedHash = keccak256(
-            abi.encodePacked("\x19Ethereum Signed Message:\n32", domainFeedHash)
-        );
+        bytes32 domainFeedHash =
+            keccak256(abi.encodePacked(feedHash, oracleTimestamp, chainId, vaultAddress));
+        bytes32 ethSignedHash =
+            keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", domainFeedHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, ethSignedHash);
         return abi.encodePacked(r, s, v);
     }
 
     /// @notice Convenience: sign with default domain values
-    function _signFeedHashDefault(bytes32 feedHash, uint256 pk) internal pure returns (bytes memory) {
+    function _signFeedHashDefault(bytes32 feedHash, uint256 pk)
+        internal
+        pure
+        returns (bytes memory)
+    {
         return _signFeedHash(feedHash, pk, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT);
     }
 
@@ -85,7 +101,9 @@ contract OracleVerifierTest is Test {
         bytes memory sig = _signFeedHashDefault(feedHash, ORACLE_PK);
 
         assertTrue(
-            wrapper.verify(feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0),
+            wrapper.verify(
+                feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0
+            ),
             "Valid signature should verify"
         );
     }
@@ -96,7 +114,9 @@ contract OracleVerifierTest is Test {
 
         address wrongSigner = address(0xDEAD);
         assertFalse(
-            wrapper.verify(feedHash, sig, wrongSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0),
+            wrapper.verify(
+                feedHash, sig, wrongSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0
+            ),
             "Wrong signer should fail"
         );
     }
@@ -107,7 +127,15 @@ contract OracleVerifierTest is Test {
 
         bytes32 differentHash = sha256("different data");
         assertFalse(
-            wrapper.verify(differentHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0),
+            wrapper.verify(
+                differentHash,
+                sig,
+                oracleSigner,
+                DEFAULT_TIMESTAMP,
+                DEFAULT_CHAIN_ID,
+                DEFAULT_VAULT,
+                0
+            ),
             "Wrong feed hash should fail"
         );
     }
@@ -117,7 +145,15 @@ contract OracleVerifierTest is Test {
         bytes memory shortSig = new bytes(64);
 
         assertFalse(
-            wrapper.verify(feedHash, shortSig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0),
+            wrapper.verify(
+                feedHash,
+                shortSig,
+                oracleSigner,
+                DEFAULT_TIMESTAMP,
+                DEFAULT_CHAIN_ID,
+                DEFAULT_VAULT,
+                0
+            ),
             "Short signature should fail"
         );
     }
@@ -127,7 +163,15 @@ contract OracleVerifierTest is Test {
         bytes memory longSig = new bytes(66);
 
         assertFalse(
-            wrapper.verify(feedHash, longSig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0),
+            wrapper.verify(
+                feedHash,
+                longSig,
+                oracleSigner,
+                DEFAULT_TIMESTAMP,
+                DEFAULT_CHAIN_ID,
+                DEFAULT_VAULT,
+                0
+            ),
             "Long signature should fail"
         );
     }
@@ -138,7 +182,9 @@ contract OracleVerifierTest is Test {
         sig[64] = 0x00; // invalid v
 
         assertFalse(
-            wrapper.verify(feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0),
+            wrapper.verify(
+                feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0
+            ),
             "Invalid recovery ID should fail"
         );
     }
@@ -148,7 +194,15 @@ contract OracleVerifierTest is Test {
         bytes memory emptySig = new bytes(0);
 
         assertFalse(
-            wrapper.verify(feedHash, emptySig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0),
+            wrapper.verify(
+                feedHash,
+                emptySig,
+                oracleSigner,
+                DEFAULT_TIMESTAMP,
+                DEFAULT_CHAIN_ID,
+                DEFAULT_VAULT,
+                0
+            ),
             "Empty signature should fail"
         );
     }
@@ -161,11 +215,15 @@ contract OracleVerifierTest is Test {
         bytes memory sig = _signFeedHashDefault(feedHash, otherPk);
 
         assertTrue(
-            wrapper.verify(feedHash, sig, otherSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0),
+            wrapper.verify(
+                feedHash, sig, otherSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0
+            ),
             "Should verify with matching signer"
         );
         assertFalse(
-            wrapper.verify(feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0),
+            wrapper.verify(
+                feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0
+            ),
             "Should fail with non-matching signer"
         );
     }
@@ -189,7 +247,9 @@ contract OracleVerifierTest is Test {
 
         // Verify with different vault address
         assertFalse(
-            wrapper.verify(feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, address(0xBEEF), 0),
+            wrapper.verify(
+                feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, address(0xBEEF), 0
+            ),
             "Wrong vault address should fail"
         );
     }
@@ -200,7 +260,15 @@ contract OracleVerifierTest is Test {
 
         // Verify with different timestamp
         assertFalse(
-            wrapper.verify(feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP + 1, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0),
+            wrapper.verify(
+                feedHash,
+                sig,
+                oracleSigner,
+                DEFAULT_TIMESTAMP + 1,
+                DEFAULT_CHAIN_ID,
+                DEFAULT_VAULT,
+                0
+            ),
             "Wrong timestamp should fail"
         );
     }
@@ -213,7 +281,9 @@ contract OracleVerifierTest is Test {
 
         // block.timestamp=1100, oracleTimestamp=1000, maxAge=200 → age=100 ≤ 200 → OK
         assertTrue(
-            wrapper.verify(feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 200),
+            wrapper.verify(
+                feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 200
+            ),
             "Within max age should succeed"
         );
     }
@@ -224,7 +294,9 @@ contract OracleVerifierTest is Test {
 
         // block.timestamp=1100, oracleTimestamp=1000, maxAge=50 → age=100 > 50 → stale
         assertFalse(
-            wrapper.verify(feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 50),
+            wrapper.verify(
+                feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 50
+            ),
             "Expired oracle data should fail"
         );
     }
@@ -233,11 +305,14 @@ contract OracleVerifierTest is Test {
         bytes32 feedHash = sha256("test feed data");
         // Sign with very old timestamp
         uint64 oldTimestamp = 1;
-        bytes memory sig = _signFeedHash(feedHash, ORACLE_PK, oldTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT);
+        bytes memory sig =
+            _signFeedHash(feedHash, ORACLE_PK, oldTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT);
 
         // maxOracleAge=0 means no age check
         assertTrue(
-            wrapper.verify(feedHash, sig, oracleSigner, oldTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0),
+            wrapper.verify(
+                feedHash, sig, oracleSigner, oldTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0
+            ),
             "Zero maxAge should skip staleness check"
         );
     }
@@ -249,17 +324,19 @@ contract OracleVerifierTest is Test {
         bytes memory sig = _signFeedHashDefault(feedHash, ORACLE_PK);
 
         // Should not revert
-        wrapper.requireValid(feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0);
+        wrapper.requireValid(
+            feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0
+        );
     }
 
     function test_requireValid_revertsOnBadLength() public {
         bytes32 feedHash = sha256("test feed data");
         bytes memory shortSig = new bytes(10);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(OracleVerifier.InvalidSignatureLength.selector, 10)
+        vm.expectRevert(abi.encodeWithSelector(OracleVerifier.InvalidSignatureLength.selector, 10));
+        wrapper.requireValid(
+            feedHash, shortSig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0
         );
-        wrapper.requireValid(feedHash, shortSig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0);
     }
 
     function test_requireValid_revertsOnBadRecoveryId() public {
@@ -267,10 +344,10 @@ contract OracleVerifierTest is Test {
         bytes memory sig = _signFeedHashDefault(feedHash, ORACLE_PK);
         sig[64] = 0x00; // invalid v
 
-        vm.expectRevert(
-            abi.encodeWithSelector(OracleVerifier.InvalidRecoveryId.selector, 0)
+        vm.expectRevert(abi.encodeWithSelector(OracleVerifier.InvalidRecoveryId.selector, 0));
+        wrapper.requireValid(
+            feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0
         );
-        wrapper.requireValid(feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0);
     }
 
     function test_requireValid_revertsOnSignerMismatch() public {
@@ -279,9 +356,13 @@ contract OracleVerifierTest is Test {
 
         address wrongSigner = address(0xDEAD);
         vm.expectRevert(
-            abi.encodeWithSelector(OracleVerifier.SignerMismatch.selector, oracleSigner, wrongSigner)
+            abi.encodeWithSelector(
+                OracleVerifier.SignerMismatch.selector, oracleSigner, wrongSigner
+            )
         );
-        wrapper.requireValid(feedHash, sig, wrongSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0);
+        wrapper.requireValid(
+            feedHash, sig, wrongSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0
+        );
     }
 
     function test_requireValid_revertsOnStaleData() public {
@@ -290,9 +371,13 @@ contract OracleVerifierTest is Test {
 
         // block.timestamp=1100, oracleTimestamp=1000, maxAge=50 → stale
         vm.expectRevert(
-            abi.encodeWithSelector(OracleVerifier.OracleDataStale.selector, DEFAULT_TIMESTAMP, 50, 1100)
+            abi.encodeWithSelector(
+                OracleVerifier.OracleDataStale.selector, DEFAULT_TIMESTAMP, 50, 1100
+            )
         );
-        wrapper.requireValid(feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 50);
+        wrapper.requireValid(
+            feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 50
+        );
     }
 
     // ============ Edge Cases ============
@@ -302,7 +387,9 @@ contract OracleVerifierTest is Test {
         bytes memory sig = _signFeedHashDefault(feedHash, ORACLE_PK);
 
         assertTrue(
-            wrapper.verify(feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0),
+            wrapper.verify(
+                feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0
+            ),
             "Zero feed hash should verify"
         );
     }
@@ -313,11 +400,14 @@ contract OracleVerifierTest is Test {
         bytes32 feedHash = sha256("test feed data");
         // Sign with a future timestamp (2000 > block.timestamp 1100)
         uint64 futureTimestamp = 2000;
-        bytes memory sig = _signFeedHash(feedHash, ORACLE_PK, futureTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT);
+        bytes memory sig =
+            _signFeedHash(feedHash, ORACLE_PK, futureTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT);
 
         // With maxOracleAge > 0, future timestamp should return false (not underflow)
         assertFalse(
-            wrapper.verify(feedHash, sig, oracleSigner, futureTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 200),
+            wrapper.verify(
+                feedHash, sig, oracleSigner, futureTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 200
+            ),
             "Future timestamp should fail verification (not underflow)"
         );
     }
@@ -325,23 +415,31 @@ contract OracleVerifierTest is Test {
     function test_futureTimestamp_requireValid_reverts() public {
         bytes32 feedHash = sha256("test feed data");
         uint64 futureTimestamp = 2000;
-        bytes memory sig = _signFeedHash(feedHash, ORACLE_PK, futureTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT);
+        bytes memory sig =
+            _signFeedHash(feedHash, ORACLE_PK, futureTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT);
 
         // Should revert with OracleDataStale, not underflow panic
         vm.expectRevert(
-            abi.encodeWithSelector(OracleVerifier.OracleDataStale.selector, futureTimestamp, 200, 1100)
+            abi.encodeWithSelector(
+                OracleVerifier.OracleDataStale.selector, futureTimestamp, 200, 1100
+            )
         );
-        wrapper.requireValid(feedHash, sig, oracleSigner, futureTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 200);
+        wrapper.requireValid(
+            feedHash, sig, oracleSigner, futureTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 200
+        );
     }
 
     function test_futureTimestamp_zeroMaxAge_succeeds() public view {
         bytes32 feedHash = sha256("test feed data");
         uint64 futureTimestamp = 2000;
-        bytes memory sig = _signFeedHash(feedHash, ORACLE_PK, futureTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT);
+        bytes memory sig =
+            _signFeedHash(feedHash, ORACLE_PK, futureTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT);
 
         // maxOracleAge=0 means no age check, so future timestamp should pass
         assertTrue(
-            wrapper.verify(feedHash, sig, oracleSigner, futureTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0),
+            wrapper.verify(
+                feedHash, sig, oracleSigner, futureTimestamp, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0
+            ),
             "Zero maxAge should skip staleness check even with future timestamp"
         );
     }
@@ -351,7 +449,9 @@ contract OracleVerifierTest is Test {
         bytes memory sig = _signFeedHashDefault(feedHash, ORACLE_PK);
 
         assertTrue(
-            wrapper.verify(feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0),
+            wrapper.verify(
+                feedHash, sig, oracleSigner, DEFAULT_TIMESTAMP, DEFAULT_CHAIN_ID, DEFAULT_VAULT, 0
+            ),
             "All-bits feed hash should verify"
         );
     }

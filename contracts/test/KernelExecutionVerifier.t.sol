@@ -26,7 +26,9 @@ contract KernelExecutionVerifierTest is Test {
         KernelExecutionVerifier impl = new KernelExecutionVerifier();
         ERC1967Proxy proxy = new ERC1967Proxy(
             address(impl),
-            abi.encodeCall(KernelExecutionVerifier.initialize, (address(mockVerifier), address(this)))
+            abi.encodeCall(
+                KernelExecutionVerifier.initialize, (address(mockVerifier), address(this))
+            )
         );
         verifierContract = KernelExecutionVerifier(address(proxy));
     }
@@ -270,7 +272,9 @@ contract KernelExecutionVerifierTest is Test {
         KernelExecutionVerifier revertImpl = new KernelExecutionVerifier();
         ERC1967Proxy revertProxy = new ERC1967Proxy(
             address(revertImpl),
-            abi.encodeCall(KernelExecutionVerifier.initialize, (address(revertingVerifier), address(this)))
+            abi.encodeCall(
+                KernelExecutionVerifier.initialize, (address(revertingVerifier), address(this))
+            )
         );
         KernelExecutionVerifier contractWithRevertingVerifier =
             KernelExecutionVerifier(address(revertProxy));
