@@ -13,9 +13,9 @@ export const ETHEREUM_MAINNET_ADDRESSES: DeploymentAddresses = {
 } as const;
 
 export const HYPEREVM_MAINNET_ADDRESSES: DeploymentAddresses = {
-  agentRegistry: '0xAf58D2191772bcFFB3260F5140E995ec79e4d88B',
-  vaultFactory: '0xc7Fc0dD5f1B03E3De0C313eE0D3b06Cb2Dc017BB',
-  kernelExecutionVerifier: '0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30',
+  agentRegistry: '0x8fd180069269b5800AD60998c567731894b707b4',
+  vaultFactory: '0xCB76E29808733a32946e9fB70A3Fb7b2e5a1a89a',
+  kernelExecutionVerifier: '0x98800a0d9a5755Be1f8613DdA265797F3fE2C56b',
   riscZeroVerifierRouter: '0x9f8d4D1f7AAf06aab1640abd565A731399862Bc8',
 } as const;
 
