@@ -111,6 +111,41 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @dev Only meaningful when asset == address(0). Updated in depositETH, withdraw, execute, receive.
     uint256 public trackedETHBalance;
 
+    // ============ Performance Tracking ============
+
+    /// @notice PPS scaled by 1e18 at first deposit (set once)
+    uint256 public initialPps;
+
+    /// @notice Timestamp when initialPps was recorded
+    uint256 public initialPpsTimestamp;
+
+    /// @notice All-time peak PPS (scaled by 1e18)
+    uint256 public peakPps;
+
+    /// @notice Maximum drawdown from peak in basis points (e.g., 500 = 5%)
+    uint256 public maxDrawdownBps;
+
+    /// @notice Number of executions where PPS did not decrease
+    uint256 public executionWins;
+
+    /// @notice Total number of completed executions
+    uint256 public totalExecutionCount;
+
+    /// @notice PPS before the most recent execution (scaled by 1e18)
+    uint256 public preExecutionPps;
+
+    /// @notice Circular buffer of PPS checkpoints for time-windowed returns
+    uint256 public constant MAX_PPS_CHECKPOINTS = 30;
+
+    /// @notice PPS values in the circular buffer (scaled by 1e18)
+    uint256[30] public ppsCheckpointValues;
+
+    /// @notice Timestamps in the circular buffer
+    uint256[30] public ppsCheckpointTimestamps;
+
+    /// @notice Next write index in the circular buffer
+    uint256 public ppsCheckpointIndex;
+
     // ============ Events ============
 
     /// @notice Emitted when tokens are deposited
@@ -324,6 +359,14 @@ contract KernelVault is ReentrancyGuard, Pausable {
         totalShares += sharesMinted;
         totalDeposited += actualReceived;
 
+        // Initialize performance tracking on first deposit
+        if (initialPps == 0) {
+            uint256 pps = currentPps();
+            initialPps = pps;
+            initialPpsTimestamp = block.timestamp;
+            peakPps = pps;
+        }
+
         emit Deposit(msg.sender, actualReceived, sharesMinted);
     }
 
@@ -356,6 +399,14 @@ contract KernelVault is ReentrancyGuard, Pausable {
         totalShares += sharesMinted;
         totalDeposited += msg.value;
         trackedETHBalance += msg.value;
+
+        // Initialize performance tracking on first deposit
+        if (initialPps == 0) {
+            uint256 pps = currentPps();
+            initialPps = pps;
+            initialPpsTimestamp = block.timestamp;
+            peakPps = pps;
+        }
 
         emit Deposit(msg.sender, msg.value, sharesMinted);
     }
@@ -471,6 +522,10 @@ contract KernelVault is ReentrancyGuard, Pausable {
     ) internal {
         lastExecutionNonce = providedNonce;
 
+        // Snapshot PPS before execution for performance tracking
+        uint256 ppsBefore = currentPps();
+        preExecutionPps = ppsBefore;
+
         KernelOutputParser.Action[] memory actions =
             KernelOutputParser.parseActions(agentOutputBytes);
 
@@ -478,7 +533,40 @@ contract KernelVault is ReentrancyGuard, Pausable {
             _executeAction(i, actions[i]);
         }
 
+        // Update performance metrics after execution
+        _updatePerformanceMetrics(ppsBefore);
+
         emit ExecutionApplied(parsedAgentId, providedNonce, actionCommitment, actions.length);
+    }
+
+    /// @notice Update on-chain performance tracking after an execution
+    function _updatePerformanceMetrics(uint256 ppsBefore) internal {
+        uint256 ppsAfter = currentPps();
+        totalExecutionCount++;
+
+        // Win tracking: PPS did not decrease
+        if (ppsAfter >= ppsBefore) {
+            executionWins++;
+        }
+
+        // Peak PPS tracking
+        if (ppsAfter > peakPps) {
+            peakPps = ppsAfter;
+        }
+
+        // Max drawdown tracking (from peak)
+        if (peakPps > 0 && ppsAfter < peakPps) {
+            uint256 drawdownBps = ((peakPps - ppsAfter) * 10000) / peakPps;
+            if (drawdownBps > maxDrawdownBps) {
+                maxDrawdownBps = drawdownBps;
+            }
+        }
+
+        // Write PPS checkpoint to circular buffer
+        uint256 idx = ppsCheckpointIndex % MAX_PPS_CHECKPOINTS;
+        ppsCheckpointValues[idx] = ppsAfter;
+        ppsCheckpointTimestamps[idx] = block.timestamp;
+        ppsCheckpointIndex++;
     }
 
     /// @notice Internal execution logic shared by execute() and executeWithOracle()
@@ -823,6 +911,49 @@ contract KernelVault is ReentrancyGuard, Pausable {
     function totalValueLocked() public view returns (uint256) {
         if (totalWithdrawn > totalDeposited) return 0;
         return totalDeposited - totalWithdrawn;
+    }
+
+    /// @notice Returns current PPS scaled by 1e18
+    function currentPps() public view returns (uint256) {
+        uint256 ts = totalShares;
+        if (ts == 0) return 1e18;
+        return (effectiveTotalAssets() * 1e18) / ts;
+    }
+
+    /// @notice Returns performance metrics in a single call
+    function getPerformanceMetrics()
+        external
+        view
+        returns (
+            uint256 _initialPps,
+            uint256 _initialPpsTimestamp,
+            uint256 _currentPps,
+            uint256 _peakPps,
+            uint256 _maxDrawdownBps,
+            uint256 _executionWins,
+            uint256 _totalExecutionCount,
+            uint256 _checkpointIndex
+        )
+    {
+        return (
+            initialPps,
+            initialPpsTimestamp,
+            currentPps(),
+            peakPps,
+            maxDrawdownBps,
+            executionWins,
+            totalExecutionCount,
+            ppsCheckpointIndex
+        );
+    }
+
+    /// @notice Returns a batch of PPS checkpoints for time-windowed return computation
+    function getPpsCheckpoints()
+        external
+        view
+        returns (uint256[30] memory values, uint256[30] memory timestamps, uint256 index)
+    {
+        return (ppsCheckpointValues, ppsCheckpointTimestamps, ppsCheckpointIndex);
     }
 
     /// @notice Convert assets to shares using current exchange rate (virtual offset)
