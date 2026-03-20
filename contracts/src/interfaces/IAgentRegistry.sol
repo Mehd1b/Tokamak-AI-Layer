@@ -68,6 +68,21 @@ interface IAgentRegistry {
     /// @return All agent IDs as an array
     function getAllAgentIds() external view returns (bytes32[] memory);
 
+    /// @notice Deprecate an agent (author only)
+    function deprecate(bytes32 agentId) external;
+
+    /// @notice Remove deprecation from an agent (author only)
+    function undeprecate(bytes32 agentId) external;
+
+    /// @notice Set a successor agent for a deprecated agent (author only)
+    function setSuccessor(bytes32 agentId, bytes32 successorAgentId) external;
+
+    /// @notice Check if an agent is deprecated
+    function isDeprecated(bytes32 agentId) external view returns (bool);
+
+    /// @notice Get the successor agent ID (bytes32(0) if none)
+    function getSuccessor(bytes32 agentId) external view returns (bytes32);
+
     /// @notice Emitted when an agent is registered
     event AgentRegistered(
         bytes32 indexed agentId,
@@ -85,6 +100,15 @@ interface IAgentRegistry {
 
     /// @notice Emitted when an agent is unregistered
     event AgentUnregistered(bytes32 indexed agentId, address indexed author);
+
+    /// @notice Emitted when an agent is deprecated
+    event AgentDeprecated(bytes32 indexed agentId, address indexed author);
+
+    /// @notice Emitted when an agent deprecation is removed
+    event AgentUndeprecated(bytes32 indexed agentId, address indexed author);
+
+    /// @notice Emitted when a successor agent is set
+    event AgentSuccessorSet(bytes32 indexed agentId, bytes32 indexed successorAgentId);
 
     /// @notice Agent with this ID already exists
     error AgentAlreadyExists(bytes32 agentId);
@@ -109,4 +133,16 @@ interface IAgentRegistry {
 
     /// @notice Vault was not deployed by the factory
     error VaultNotDeployed(address vault);
+
+    /// @notice Agent is already deprecated
+    error AgentAlreadyDeprecated(bytes32 agentId);
+
+    /// @notice Agent is not deprecated
+    error AgentNotDeprecated(bytes32 agentId);
+
+    /// @notice Successor agent does not exist
+    error SuccessorDoesNotExist(bytes32 successorAgentId);
+
+    /// @notice Agent cannot succeed itself
+    error CannotSucceedSelf(bytes32 agentId);
 }

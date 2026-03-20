@@ -582,6 +582,144 @@ contract AgentRegistryTest is Test {
         freshRegistry.unregister(agentId);
     }
 
+    // ============ deprecate Tests ============
+
+    function test_deprecate_success() public {
+        vm.prank(author1);
+        bytes32 agentId = registry.register(SALT_1, IMAGE_ID_1, CODE_HASH_1);
+
+        assertFalse(registry.isDeprecated(agentId), "Agent should not be deprecated initially");
+
+        vm.expectEmit(true, true, false, true);
+        emit IAgentRegistry.AgentDeprecated(agentId, author1);
+
+        vm.prank(author1);
+        registry.deprecate(agentId);
+
+        assertTrue(registry.isDeprecated(agentId), "Agent should be deprecated");
+    }
+
+    function test_deprecate_not_author_reverts() public {
+        vm.prank(author1);
+        bytes32 agentId = registry.register(SALT_1, IMAGE_ID_1, CODE_HASH_1);
+
+        vm.prank(author2);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAgentRegistry.NotAgentAuthor.selector, agentId, author2, author1
+            )
+        );
+        registry.deprecate(agentId);
+    }
+
+    function test_deprecate_already_deprecated_reverts() public {
+        vm.prank(author1);
+        bytes32 agentId = registry.register(SALT_1, IMAGE_ID_1, CODE_HASH_1);
+
+        vm.prank(author1);
+        registry.deprecate(agentId);
+
+        vm.prank(author1);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAgentRegistry.AgentAlreadyDeprecated.selector, agentId)
+        );
+        registry.deprecate(agentId);
+    }
+
+    // ============ undeprecate Tests ============
+
+    function test_undeprecate_success() public {
+        vm.prank(author1);
+        bytes32 agentId = registry.register(SALT_1, IMAGE_ID_1, CODE_HASH_1);
+
+        // Register a successor agent
+        vm.prank(author2);
+        bytes32 successorId = registry.register(SALT_1, IMAGE_ID_2, CODE_HASH_2);
+
+        // Deprecate and set successor
+        vm.startPrank(author1);
+        registry.deprecate(agentId);
+        registry.setSuccessor(agentId, successorId);
+        vm.stopPrank();
+
+        assertTrue(registry.isDeprecated(agentId), "Agent should be deprecated");
+        assertEq(registry.getSuccessor(agentId), successorId, "Successor should be set");
+
+        vm.expectEmit(true, true, false, true);
+        emit IAgentRegistry.AgentUndeprecated(agentId, author1);
+
+        vm.prank(author1);
+        registry.undeprecate(agentId);
+
+        assertFalse(registry.isDeprecated(agentId), "Agent should no longer be deprecated");
+        assertEq(registry.getSuccessor(agentId), bytes32(0), "Successor should be cleared");
+    }
+
+    // ============ setSuccessor Tests ============
+
+    function test_setSuccessor_success() public {
+        vm.prank(author1);
+        bytes32 agentId = registry.register(SALT_1, IMAGE_ID_1, CODE_HASH_1);
+
+        vm.prank(author2);
+        bytes32 successorId = registry.register(SALT_1, IMAGE_ID_2, CODE_HASH_2);
+
+        vm.prank(author1);
+        registry.deprecate(agentId);
+
+        vm.expectEmit(true, true, false, true);
+        emit IAgentRegistry.AgentSuccessorSet(agentId, successorId);
+
+        vm.prank(author1);
+        registry.setSuccessor(agentId, successorId);
+
+        assertEq(registry.getSuccessor(agentId), successorId, "Successor should be set");
+    }
+
+    function test_setSuccessor_not_deprecated_reverts() public {
+        vm.prank(author1);
+        bytes32 agentId = registry.register(SALT_1, IMAGE_ID_1, CODE_HASH_1);
+
+        vm.prank(author2);
+        bytes32 successorId = registry.register(SALT_1, IMAGE_ID_2, CODE_HASH_2);
+
+        vm.prank(author1);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAgentRegistry.AgentNotDeprecated.selector, agentId)
+        );
+        registry.setSuccessor(agentId, successorId);
+    }
+
+    function test_setSuccessor_self_reverts() public {
+        vm.prank(author1);
+        bytes32 agentId = registry.register(SALT_1, IMAGE_ID_1, CODE_HASH_1);
+
+        vm.prank(author1);
+        registry.deprecate(agentId);
+
+        vm.prank(author1);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAgentRegistry.CannotSucceedSelf.selector, agentId)
+        );
+        registry.setSuccessor(agentId, agentId);
+    }
+
+    function test_setSuccessor_nonexistent_reverts() public {
+        vm.prank(author1);
+        bytes32 agentId = registry.register(SALT_1, IMAGE_ID_1, CODE_HASH_1);
+
+        vm.prank(author1);
+        registry.deprecate(agentId);
+
+        bytes32 fakeSuccessorId = bytes32(uint256(0xDEAD));
+
+        vm.prank(author1);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAgentRegistry.SuccessorDoesNotExist.selector, fakeSuccessorId)
+        );
+        registry.setSuccessor(agentId, fakeSuccessorId);
+    }
+
     // ============ UUPS Tests ============
 
     function test_owner_isSetCorrectly() public view {

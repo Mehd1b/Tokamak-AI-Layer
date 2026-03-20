@@ -53,4 +53,19 @@ interface IBondManager {
     /// @notice Get the ERC20 token used for bonds
     /// @return The bond token address
     function bondToken() external view returns (address);
+
+    /// @notice Lock bonds for multiple executions in a single transaction
+    /// @param vaults Array of vault addresses
+    /// @param nonces Array of execution nonces
+    /// @param amounts Array of bond amounts
+    function lockBondBatch(address[] calldata vaults, uint64[] calldata nonces, uint256[] calldata amounts) external;
+
+    /// @notice Get detailed bond info for a specific operator-vault-nonce combination
+    /// @param operator The operator address
+    /// @param vault The vault address
+    /// @param nonce The execution nonce
+    /// @return amount The bond amount
+    /// @return lockedAt The timestamp when the bond was locked
+    /// @return status The bond status (0=Empty, 1=Locked, 2=Released, 3=Slashed)
+    function getBondInfo(address operator, address vault, uint64 nonce) external view returns (uint256 amount, uint256 lockedAt, uint8 status);
 }

@@ -38,8 +38,14 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
     /// @notice Maximum number of vaults checked during unregister (prevents OOG)
     uint256 public constant MAX_VAULTS_PER_UNREGISTER = 50;
 
+    /// @notice Mapping from agentId to deprecation status
+    mapping(bytes32 => bool) internal _deprecated;
+
+    /// @notice Mapping from agentId to successor agentId
+    mapping(bytes32 => bytes32) internal _successors;
+
     /// @notice Storage gap for future upgrades
-    uint256[46] private __gap;
+    uint256[44] private __gap;
 
     // ============ Errors ============
 
@@ -247,6 +253,55 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
     /// @inheritdoc IAgentRegistry
     function getAllAgentIds() external view returns (bytes32[] memory) {
         return _agentIds;
+    }
+
+    /// @inheritdoc IAgentRegistry
+    function deprecate(bytes32 agentId) external {
+        AgentInfo storage agent = _agents[agentId];
+        if (!agent.exists) revert AgentNotFound(agentId);
+        if (msg.sender != agent.author) revert NotAgentAuthor(agentId, msg.sender, agent.author);
+        if (_deprecated[agentId]) revert AgentAlreadyDeprecated(agentId);
+
+        _deprecated[agentId] = true;
+
+        emit AgentDeprecated(agentId, msg.sender);
+    }
+
+    /// @inheritdoc IAgentRegistry
+    function undeprecate(bytes32 agentId) external {
+        AgentInfo storage agent = _agents[agentId];
+        if (!agent.exists) revert AgentNotFound(agentId);
+        if (msg.sender != agent.author) revert NotAgentAuthor(agentId, msg.sender, agent.author);
+        if (!_deprecated[agentId]) revert AgentNotDeprecated(agentId);
+
+        _deprecated[agentId] = false;
+        delete _successors[agentId];
+
+        emit AgentUndeprecated(agentId, msg.sender);
+    }
+
+    /// @inheritdoc IAgentRegistry
+    function setSuccessor(bytes32 agentId, bytes32 successorAgentId) external {
+        AgentInfo storage agent = _agents[agentId];
+        if (!agent.exists) revert AgentNotFound(agentId);
+        if (msg.sender != agent.author) revert NotAgentAuthor(agentId, msg.sender, agent.author);
+        if (!_deprecated[agentId]) revert AgentNotDeprecated(agentId);
+        if (!_agents[successorAgentId].exists) revert SuccessorDoesNotExist(successorAgentId);
+        if (agentId == successorAgentId) revert CannotSucceedSelf(agentId);
+
+        _successors[agentId] = successorAgentId;
+
+        emit AgentSuccessorSet(agentId, successorAgentId);
+    }
+
+    /// @inheritdoc IAgentRegistry
+    function isDeprecated(bytes32 agentId) external view returns (bool) {
+        return _deprecated[agentId];
+    }
+
+    /// @inheritdoc IAgentRegistry
+    function getSuccessor(bytes32 agentId) external view returns (bytes32) {
+        return _successors[agentId];
     }
 
     // ============ Internal Functions ============
