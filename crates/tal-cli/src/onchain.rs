@@ -24,6 +24,8 @@ pub struct ChainConfig {
     pub agent_registry: Address,
     pub vault_factory: Address,
     pub usdc: Address,
+    /// CoreDepositWallet address for Hyperliquid margin deposits
+    pub core_deposit_wallet: Address,
     /// Pre-deployed library addresses for linking
     pub libraries: HashMap<&'static str, Address>,
 }
@@ -35,17 +37,18 @@ pub fn get_chain_config(chain_id: u64) -> Result<ChainConfig> {
             chain_id: 999,
             name: "HyperEVM Mainnet",
             rpc_url: "", // Must be provided via env
-            agent_registry: "0xAf58D2191772bcFFB3260F5140E995ec79e4d88B".parse().unwrap(),
-            vault_factory: "0xc7Fc0dD5f1B03E3De0C313eE0D3b06Cb2Dc017BB".parse().unwrap(),
+            agent_registry: "0x8fd180069269b5800AD60998c567731894b707b4".parse().unwrap(),
+            vault_factory: "0xCB76E29808733a32946e9fB70A3Fb7b2e5a1a89a".parse().unwrap(),
             usdc: "0xb88339CB7199b77E23DB6E890353E22632Ba630f".parse().unwrap(),
+            core_deposit_wallet: "0x0b80659a4076e9e93c7dbe0f10675a16a3e5c206".parse().unwrap(),
             libraries: HashMap::from([
                 (
                     "src/libraries/OracleVerifier.sol:OracleVerifier",
-                    "0x49D2F7419f15eD00700dE325FE9F945C26353c18".parse().unwrap(),
+                    "0x2dA75E3d1a2ACF78da42122335dCB3E9B7BE0FEb".parse().unwrap(),
                 ),
                 (
                     "src/KernelOutputParser.sol:KernelOutputParser",
-                    "0x23d9B155ed33a248085ae15Ed76b305D97F0D8fd".parse().unwrap(),
+                    "0x4707a929799c87588b7da2e66F85Da538148D853".parse().unwrap(),
                 ),
             ]),
         }),
@@ -56,6 +59,7 @@ pub fn get_chain_config(chain_id: u64) -> Result<ChainConfig> {
             agent_registry: "0x09447147C6E75a60A449f38532F06E19F5F632F3".parse().unwrap(),
             vault_factory: "0x4c36bCA87f21E16f5af8A6d7Df2D86a5aD13049F".parse().unwrap(),
             usdc: "0x2B3370eE501B4a559b57D449569354196457D8Ab".parse().unwrap(),
+            core_deposit_wallet: "0x0b80659a4076e9e93c7dbe0f10675a16a3e5c206".parse().unwrap(),
             libraries: HashMap::new(),
         }),
         _ => bail!("Unsupported chain ID: {}. Supported: 999 (HyperEVM), 998 (HyperEVM Testnet)", chain_id),

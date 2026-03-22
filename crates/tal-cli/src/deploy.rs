@@ -8,8 +8,8 @@
 //! 5. Summary
 
 use crate::onchain::{
-    self, build_provider, get_chain_config, parse_bytes32, read_manifest, resolve_chain_id,
-    resolve_env, resolve_private_key, send_tx, ChainConfig,
+    self, build_provider, get_chain_config, parse_bytes32, read_and_link_artifact, read_manifest,
+    resolve_chain_id, resolve_env, resolve_private_key, send_tx, ChainConfig,
 };
 use alloy::primitives::{Address, FixedBytes, U256};
 use alloy::providers::Provider;
@@ -619,18 +619,69 @@ async fn step_deploy_adapter(
         println!("  Using existing adapter: {}", addr);
         addr
     } else {
-        // Deploy new adapter
+        // Deploy adapter from forge build artifact with library linking
         println!("  Deploying HyperliquidAdapter...");
-        println!("  {} Adapter deployment requires forge with library linking.", "ℹ".yellow());
-        println!("    FOUNDRY_PROFILE=small forge create \\");
-        println!("      --private-key $PK --legacy --gas-limit 3000000 --broadcast \\");
-        println!("      --rpc-url {} \\", chain.rpc_url);
-        println!("      src/adapters/HyperliquidAdapter.sol:HyperliquidAdapter \\");
-        println!("      --constructor-args {} <CORE_DEPOSIT_WALLET> {}", chain.usdc, chain.vault_factory);
-        println!();
-        println!("    Then set ADAPTER_ADDRESS in .env and re-run:");
-        println!("    tal deploy --hyperliquid --step adapter");
-        bail!("Adapter must be deployed via forge (requires library linking). See instructions above.");
+
+        if chain.libraries.is_empty() {
+            bail!(
+                "No pre-deployed libraries configured for chain {}. \
+                 Deploy OracleVerifier and KernelOutputParser first, then add them to the chain config.",
+                chain.chain_id
+            );
+        }
+
+        // Resolve contracts directory — try common locations
+        let contracts_dir = ["contracts", "../contracts", "../../contracts"]
+            .iter()
+            .find(|d| std::path::Path::new(d).join("out").exists())
+            .with_context(|| {
+                "Cannot find contracts/out/ directory. Run `forge build` in contracts/ first."
+            })?;
+
+        let artifact_path = format!(
+            "{}/out/HyperliquidAdapter.sol/HyperliquidAdapter.json",
+            contracts_dir
+        );
+
+        // Read artifact and link libraries
+        let linked_bytecode = read_and_link_artifact(&artifact_path, &chain.libraries)
+            .context("Failed to link HyperliquidAdapter bytecode. Run `forge build` in contracts/ first.")?;
+
+        // Encode constructor args: (address _usdc, address _coreDepositWallet, address _vaultFactory)
+        let core_deposit = if chain.core_deposit_wallet != Address::ZERO {
+            chain.core_deposit_wallet
+        } else {
+            let addr_str = resolve_env("CORE_DEPOSIT_WALLET")
+                .with_context(|| "CORE_DEPOSIT_WALLET not set and not in chain config")?;
+            addr_str.parse().context("Invalid CORE_DEPOSIT_WALLET")?
+        };
+
+        let constructor_args = alloy::sol_types::SolValue::abi_encode(&(
+            chain.usdc,
+            core_deposit,
+            chain.vault_factory,
+        ));
+
+        let mut deploy_data = linked_bytecode;
+        deploy_data.extend_from_slice(&constructor_args);
+
+        let result = send_tx(provider, None, deploy_data, U256::ZERO, Some(3_000_000))
+            .await
+            .context("HyperliquidAdapter deployment failed")?;
+
+        let addr = result.contract_address
+            .context("No contract address in deployment receipt")?;
+
+        println!(
+            "  {} HyperliquidAdapter deployed: {} (tx: {:?}, gas: {})",
+            "✓".green(),
+            addr,
+            result.tx_hash,
+            result.gas_used
+        );
+        println!("  {} Add to .env: ADAPTER_ADDRESS={}", "ℹ".yellow(), addr);
+
+        addr
     };
 
     // Check if vault is already registered on the adapter

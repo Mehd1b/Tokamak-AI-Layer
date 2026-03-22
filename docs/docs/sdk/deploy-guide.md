@@ -78,19 +78,18 @@ This catches the immutable `trustedImageId` footgun programmatically — no more
 
 ### Step 4: Adapter Setup (perp-trader only)
 
-Detected automatically from project structure (presence of `host/` directory). Prints manual deployment guidance for the HyperliquidAdapter:
+Activated with the `--hyperliquid` flag. Deploys the HyperliquidAdapter and registers the vault:
 
-```bash
-FOUNDRY_PROFILE=small forge create \
-  --private-key $PK --legacy --gas-limit 3000000 --broadcast \
-  --libraries "src/libraries/OracleVerifier.sol:OracleVerifier:0x49D2..." \
-  --libraries "src/KernelOutputParser.sol:KernelOutputParser:0x23d9..." \
-  src/HyperliquidAdapter.sol:HyperliquidAdapter \
-  --constructor-args $VAULT $USDC
-```
+1. **Deploy HyperliquidAdapter** — Reads the forge build artifact from `contracts/out/`, links OracleVerifier and KernelOutputParser libraries automatically, and deploys with constructor args (USDC, CoreDepositWallet, VaultFactory). If `ADAPTER_ADDRESS` is already set in `.env`, the existing adapter is reused.
+
+2. **Register vault on adapter** — Calls `registerVault(vault, perpAsset, szDecimals)` which deploys a TradingSubAccount via CREATE2 for the vault. Configure the perp asset via `PERP_ASSET` env var (0=BTC, 1=ETH, 3=SOL) and `SZ_DECIMALS` (BTC=5, ETH=4, SOL=2).
+
+3. **Fund HYPE gas** — Sends HYPE to the sub-account for CoreWriter gas (default 0.01 HYPE, override with `HYPE_FUND_AMOUNT`).
+
+4. **Register API wallet** — If `API_WALLET_ADDRESS` is set, registers it on the sub-account for REST API seed trades.
 
 :::note
-Adapter deployment requires library linking and `FOUNDRY_PROFILE=small` (via_ir=true) to fit within the 3M gas limit. This step is not yet automated in `tal deploy`.
+Adapter deployment requires `forge build` to have been run first (reads bytecode from `contracts/out/`). Library addresses are resolved from the chain config automatically.
 :::
 
 ### Step 5: Summary
