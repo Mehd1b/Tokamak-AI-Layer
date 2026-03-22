@@ -88,14 +88,6 @@ export function Footer() {
             {/* Links row */}
             <div className={`flex flex-wrap items-center justify-center gap-8 text-sm transition-all duration-700 delay-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
               <Link
-                href="/agents"
-                className="text-gray-500 hover:text-[#A855F7] transition-colors duration-300 relative group"
-                style={{ fontFamily: 'var(--font-mono), monospace' }}
-              >
-                Agents
-                <span className="absolute bottom-0 left-0 w-0 h-[1px] bg-[#A855F7] group-hover:w-full transition-all duration-300" />
-              </Link>
-              <Link
                 href="/vaults"
                 className="text-gray-500 hover:text-[#A855F7] transition-colors duration-300 relative group"
                 style={{ fontFamily: 'var(--font-mono), monospace' }}

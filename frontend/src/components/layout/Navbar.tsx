@@ -29,7 +29,6 @@ const SOCIAL_ICONS = {
 
 // Protocol dropdown links
 const PROTOCOL_LINKS: DropdownLink[] = [
-  { title: 'Agents', description: 'Browse registered kernel agents', href: '/agents', internal: true },
   { title: 'Vaults', description: 'Explore and deploy vaults', href: '/vaults', internal: true },
   { title: 'Staking', description: 'WSTON staking and bridge', href: '/staking', internal: true },
 ];
