@@ -30,7 +30,7 @@ export function VaultExplainer() {
           className="text-2xl font-bold text-white"
           style={{ fontFamily: 'var(--font-mono), monospace' }}
         >
-          Welcome to Tokamak Vaults
+          Welcome to Tokagent Vaults
         </h2>
         <div className="space-y-4 text-sm text-white/70" style={{ fontFamily: 'var(--font-mono), monospace' }}>
           <div>
