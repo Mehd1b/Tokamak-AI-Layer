@@ -312,6 +312,34 @@ sequenceDiagram
 - Setting a successor requires the successor agent to exist in the registry
 - Undeprecation clears the successor mapping
 
+## Agent Metadata
+
+Agents can store metadata on-chain via a URI pointing to JSON:
+
+```solidity
+function setMetadataURI(bytes32 agentId, string calldata uri) external;
+function getMetadataURI(bytes32 agentId) external view returns (string memory);
+```
+
+Only the agent author can set metadata. The URI can point to IPFS, HTTPS, or Arweave.
+
+**Metadata JSON schema:**
+
+```json
+{
+  "name": "ETH-BTC Momentum",
+  "description": "Mean-reversion strategy on ETH/BTC ratio using 4h TWAP",
+  "tags": ["perpetuals", "hyperliquid", "momentum"],
+  "sourceRepo": "https://github.com/alice/eth-btc-momentum",
+  "version": "1.2.0"
+}
+```
+
+Setting metadata enables:
+- **Frontend discovery** — vault cards show agent names instead of hex IDs
+- **Forking** — `tal fork <agent-id>` clones the source repo and scaffolds a new project
+- **Ecosystem indexing** — third-party dashboards and aggregators can discover agents
+
 ## Comparison: Before and After
 
 | Aspect | Before (Owner-controlled) | After (Permissionless) |

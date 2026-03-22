@@ -205,6 +205,73 @@ See [CallBuilder & ERC20 Helpers](/sdk/call-builder) for full documentation.
 | `MAX_ACTION_PAYLOAD_BYTES` | 16,384 | Maximum payload per action |
 | `MAX_AGENT_INPUT_BYTES` | 64,000 | Maximum opaque input size |
 
+## React Hooks (`@tokamak/execution-kernel-sdk/react`)
+
+The SDK provides React hooks for building vault frontends. Install with:
+
+```bash
+npm install @tokamak/execution-kernel-sdk viem wagmi @tanstack/react-query
+```
+
+Wrap your app in `TokamakProvider`:
+
+```tsx
+import { TokamakProvider } from '@tokamak/execution-kernel-sdk/react';
+
+function App() {
+  return (
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        <TokamakProvider>
+          <YourApp />
+        </TokamakProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
+  );
+}
+```
+
+**Available hooks:**
+
+| Hook | Purpose |
+|------|---------|
+| `useVault(address)` | Read vault info (TVL, shares, asset, agentId) |
+| `useVaultList()` | List all deployed vaults |
+| `useUserShares(address)` | User's shares and asset value in a vault |
+| `useAgent(agentId)` | Read agent info (author, imageId, codeHash) |
+| `useAgentList()` | List all registered agents |
+| `useDeposit(vault, asset)` | Stateful approve→deposit flow with step tracking |
+| `useWithdraw(vault)` | Stateful withdraw flow |
+| `useIsLegacyChain()` | Auto-detect HyperEVM legacy gas requirement |
+| `useChainMismatch(chainId)` | Check if wallet is on the wrong chain |
+
+**Typed errors:**
+
+```tsx
+import { TokamakError, ErrorCode } from '@tokamak/execution-kernel-sdk';
+
+try {
+  await deposit(amount);
+} catch (err) {
+  const error = TokamakError.from(err);
+  switch (error.code) {
+    case ErrorCode.USER_REJECTED: // user cancelled
+    case ErrorCode.INSUFFICIENT_BALANCE: // not enough funds
+    case ErrorCode.STRATEGY_ACTIVE: // vault locked
+  }
+}
+```
+
+## Simulator (`tal sim`)
+
+For rapid iteration during development, you can run your agent logic natively using `tal sim` without building the full zkVM ELF binary or generating proofs. This uses the same constraint enforcement as the real kernel but executes natively, reducing iteration time from ~10 minutes to ~5 seconds.
+
+```bash
+tal sim fixtures/sample.json
+```
+
+See [Getting Started](/getting-started) for details on integrating `tal sim` into your development workflow.
+
 ## Next Steps
 
 - [Writing an Agent](/sdk/writing-an-agent) - Build your first agent

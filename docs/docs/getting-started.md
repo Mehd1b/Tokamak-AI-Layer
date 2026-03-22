@@ -196,6 +196,18 @@ tal test --local --determinism-check
 The zkVM generates proofs of execution. If your agent is non-deterministic (e.g., uses randomness or system time), the proof would be for a different execution than what actually ran. The kernel SDK enforces this: `#![no_std]`, no I/O, no randomness, no unsafe code.
 :::
 
+## Rapid Iteration with `tal sim`
+
+Before building the full zkVM ELF binary, use `tal sim` to test your agent logic instantly:
+
+```bash
+tal sim fixtures/sample.json
+```
+
+This runs your `agent_main()` natively with constraint enforcement — no proof generation required. Iteration time: ~5 seconds vs. ~10 minutes for a full ELF build.
+
+Edit your agent logic → run `tal sim` → see results immediately. Only build the ELF (`tal build --elf`) when you're ready to deploy.
+
 ## Build the Proof (8 min)
 
 This step compiles your agent into a zkVM guest binary and generates the `IMAGE_ID` — a unique fingerprint of your compiled agent that gets registered on-chain.

@@ -105,6 +105,44 @@ members = [
 
 ---
 
+## `tal fork`
+
+Fork an existing on-chain agent to create your own version. Fetches agent metadata from the registry, clones the source repository (if available), and scaffolds a new project with a fresh salt.
+
+```bash
+tal fork <agent-id>                          # Fork with auto-detected name
+tal fork <agent-id> --name my-strategy       # Fork with custom name
+tal fork <agent-id> --output ./my-agents/    # Fork to specific directory
+```
+
+**How it works:**
+
+1. Queries `AgentRegistry.get(agentId)` to verify the agent exists
+2. Queries `AgentRegistry.getMetadataURI(agentId)` for metadata
+3. If metadata contains a `sourceRepo` URL, clones it via `git clone --depth 1`
+4. If no source repo is available, falls back to `tal init --template minimal`
+5. Generates a new deterministic salt and updates the project name
+6. Prints next steps (`tal sim`, `tal build`, `tal deploy`)
+
+**Agent metadata JSON schema** (stored at the URI):
+
+```json
+{
+  "name": "ETH-BTC Momentum",
+  "description": "Mean-reversion strategy on ETH/BTC ratio",
+  "tags": ["perpetuals", "hyperliquid", "momentum"],
+  "sourceRepo": "https://github.com/alice/eth-btc-momentum",
+  "version": "1.2.0"
+}
+```
+
+Agent authors can set their metadata URI on-chain:
+```bash
+cast send <registry> "setMetadataURI(bytes32,string)" <agentId> "https://..." --private-key $PK
+```
+
+---
+
 ## `tal doctor`
 
 Pre-flight configuration validator. Checks toolchain, build state, and configuration.
@@ -247,6 +285,72 @@ When `--elf` is specified, `tal build`:
 1. Cleans stale riscv-guest target (`rm -rf target/riscv-guest/{agent}-risc0-methods`)
 2. Builds via `cargo build -p {agent}-risc0-methods --release`
 3. Warns about using the `.bin` file (not raw ELF) for bundling
+
+---
+
+## `tal sim`
+
+Run agent logic and constraint enforcement natively against a JSON fixture — no zkVM compilation required. Reduces iteration time from ~10 minutes to ~5 seconds.
+
+```bash
+tal sim <fixture.json>          # Run simulation with fixture
+tal sim --list                  # List available fixtures
+tal sim                         # Run with default fixtures/sample.json
+```
+
+**How it works:**
+
+1. Detects the agent directory (walks up from CWD looking for `agent/src/lib.rs`)
+2. Checks for a `src/bin/sim.rs` binary target — auto-generates it if missing
+3. Runs `cargo run --bin sim --features simulator -- <fixture>`
+4. Prints actions table and constraint pass/fail results
+5. Exit code 0 = all constraints pass, 1 = any fail (CI-friendly)
+
+**Fixture format (JSON):**
+
+```json
+{
+  "agent_id": "0x0000...0001",
+  "vault_address": "0x1111...1111",
+  "equity": 10000000,
+  "execution_nonce": 1,
+  "opaque_inputs": "0xdeadbeef...",
+  "constraints": {
+    "max_drawdown_bps": 500,
+    "cooldown_seconds": 60
+  }
+}
+```
+
+- `opaque_inputs`: hex string with agent-specific input data
+- `opaque_inputs_file`: alternative — path to a binary file
+- `constraints`: optional overrides (defaults are permissive)
+
+**Example output:**
+
+```
+--- Simulation Result -------------------------------------------
+
+  Agent:   0x00000000...0001
+  Nonce:   1
+  Equity:  10.000000 USDC
+
+  Actions (2):
+  #   Type           Target         Details
+  --- -------------- -------------- ------------------------------
+  1   CALL           0x2222..2222   selector=0x00000000 calldata=0B
+  2   CALL           0x2222..2222   selector=0x51cff8d9 calldata=32B
+
+  Constraints:
+    [+] Max actions     2 / 64
+    [+] Drawdown        (disabled)
+    [+] Cooldown        OK (no cooldown)
+    [+] Leverage        (reserved)
+
+  Result: PASS
+```
+
+New agents scaffolded with `tal init` include a `fixtures/sample.json` and `src/bin/sim.rs` automatically.
 
 ---
 

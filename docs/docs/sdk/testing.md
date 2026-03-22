@@ -28,6 +28,26 @@ flowchart TD
 | E2E Proof Tests | Minutes | Full zkVM proof generation |
 | On-Chain E2E | Minutes | Complete flow with blockchain |
 
+## Native Simulation (`tal sim`)
+
+The fastest way to test agent logic is the native simulator. It runs `agent_main()` plus constraint enforcement without zkVM compilation:
+
+```bash
+tal sim fixtures/sample.json
+```
+
+**When to use:**
+- Iterating on agent logic (edit → sim → see results in 5 seconds)
+- Testing constraint boundaries (drawdown, cooldown, max actions)
+- CI pipelines (exit code 1 on constraint failure)
+
+**When to use full proving instead:**
+- Final verification before deployment
+- Testing proof generation and on-chain verification
+- Validating IMAGE_ID and AGENT_CODE_HASH binding
+
+Fixtures are JSON files with agent context and opaque inputs. New projects scaffolded with `tal init` include example fixtures in `agent/fixtures/`.
+
 ## TestHarness
 
 The `TestHarness` provides a fluent API for testing agents with minimal boilerplate:
