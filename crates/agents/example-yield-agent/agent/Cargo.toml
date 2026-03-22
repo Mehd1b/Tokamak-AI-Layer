@@ -8,6 +8,15 @@ license = "Apache-2.0"
 [lib]
 crate-type = ["rlib"]
 
+[[bin]]
+name = "sim"
+path = "src/bin/sim.rs"
+required-features = ["simulator"]
+
+[features]
+default = []
+simulator = ["kernel-sdk/simulator"]
+
 [dependencies]
 kernel-sdk = { path = "../../../sdk/kernel-sdk" }
 kernel-guest = { path = "../../../runtime/kernel-guest" }

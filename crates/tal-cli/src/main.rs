@@ -13,6 +13,7 @@ mod doctor;
 mod init;
 mod monitor;
 mod onchain;
+mod sim;
 mod test_cmd;
 
 use clap::{Parser, Subcommand};
@@ -140,6 +141,16 @@ enum Commands {
         min_bond: Option<String>,
     },
 
+    /// Simulate agent execution against a fixture (no zkVM required)
+    Sim {
+        /// Path to fixture JSON file
+        fixture: Option<String>,
+
+        /// List available fixtures
+        #[arg(long)]
+        list: bool,
+    },
+
     /// Live agent execution dashboard
     Monitor {
         /// Vault contract address to monitor
@@ -221,6 +232,8 @@ fn main() -> anyhow::Result<()> {
             optimistic,
             min_bond.as_deref(),
         ),
+
+        Commands::Sim { fixture, list } => sim::run(fixture.as_deref(), list, cli.verbose),
 
         Commands::Monitor {
             vault,

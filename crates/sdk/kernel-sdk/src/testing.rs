@@ -303,6 +303,9 @@ impl TestHarness {
     }
 
     /// Execute a kernel function with custom constraints and return a `KernelTestResult`.
+    ///
+    /// Requires the `testing` or `simulator` feature (which bring in the `constraints` crate).
+    #[cfg(any(feature = "testing", feature = "simulator"))]
     pub fn execute_kernel_with_constraints(
         self,
         kernel_fn: fn(&[u8], &constraints::ConstraintSetV1) -> Result<Vec<u8>, KernelError>,
@@ -677,8 +680,8 @@ mod tests {
 
     #[test]
     fn test_hex_bytes_empty() {
-        assert_eq!(hex_bytes(""), alloc::vec![]);
-        assert_eq!(hex_bytes("0x"), alloc::vec![]);
+        assert_eq!(hex_bytes(""), alloc::vec![0u8; 0]);
+        assert_eq!(hex_bytes("0x"), alloc::vec![0u8; 0]);
     }
 
     #[test]

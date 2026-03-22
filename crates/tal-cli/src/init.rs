@@ -395,7 +395,8 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
 
 fn create_dirs(root: &Path) -> Result<()> {
     let dirs = [
-        root.join("agent/src"),
+        root.join("agent/src/bin"),
+        root.join("agent/fixtures"),
         root.join("risc0-methods/src"),
         root.join("risc0-methods/zkvm-guest/src"),
         root.join("dist"),
@@ -419,7 +420,7 @@ fn write_file(path: &Path, content: &str) -> Result<()> {
 // ===========================================================================
 
 fn generate_agent_files(root: &Path, name: &str, template: Template, standalone: bool) -> Result<()> {
-    let _name_snake = name.replace('-', "_");
+    let name_snake = name.replace('-', "_");
 
     let (kernel_sdk_dep, kernel_guest_dep, constraints_dep) = if standalone {
         (
@@ -447,6 +448,11 @@ edition = "2021"
 [lib]
 crate-type = ["rlib"]
 
+[[bin]]
+name = "sim"
+path = "src/bin/sim.rs"
+required-features = ["simulator"]
+
 [dependencies]
 {kernel_sdk_dep}
 {kernel_guest_dep}
@@ -454,6 +460,10 @@ crate-type = ["rlib"]
 
 [build-dependencies]
 sha2 = {{ version = "0.10", default-features = false }}
+
+[features]
+default = []
+simulator = ["kernel-sdk/simulator"]
 "#
         ),
     )?;
@@ -471,6 +481,40 @@ sha2 = {{ version = "0.10", default-features = false }}
         Template::PerpTrader => gen_agent_lib_perp_trader(),
     };
     write_file(&root.join("agent/src/lib.rs"), &lib_rs)?;
+
+    // src/bin/sim.rs — simulator binary
+    let sim_content = format!(
+        "fn main() {{\n    kernel_sdk::simulator::run_and_print({}::agent_main, std::env::args());\n}}\n",
+        name_snake
+    );
+    write_file(&root.join("agent/src/bin/sim.rs"), &sim_content)?;
+
+    // fixtures/sample.json — example fixture for the simulator
+    let fixture_json = match template {
+        Template::Minimal => r#"{
+  "agent_id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+  "equity": 1000000,
+  "execution_nonce": 1,
+  "opaque_inputs": "0x"
+}
+"#.to_string(),
+        Template::Yield => r#"{
+  "agent_id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+  "vault_address": "0x1111111111111111111111111111111111111111",
+  "equity": 10000000,
+  "execution_nonce": 1,
+  "opaque_inputs": "0x11111111111111111111111111111111111111112222222222222222222222222222222222222222a086010000000000"
+}
+"#.to_string(),
+        Template::PerpTrader => r#"{
+  "agent_id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+  "equity": 1000000,
+  "execution_nonce": 1,
+  "opaque_inputs": "0x"
+}
+"#.to_string(),
+    };
+    write_file(&root.join("agent/fixtures/sample.json"), &fixture_json)?;
 
     Ok(())
 }

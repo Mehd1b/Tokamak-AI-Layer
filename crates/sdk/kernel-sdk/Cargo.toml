@@ -15,6 +15,8 @@ crate-type = ["rlib"]
 [dependencies]
 kernel-core = { path = "../../protocol/kernel-core", default-features = false }
 constraints = { path = "../../protocol/constraints", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
 
 [dev-dependencies]
 # No dev dependencies - keep SDK minimal
@@ -30,6 +32,9 @@ std = ["kernel-core/std"]
 
 # Enable testing-only action types (ACTION_TYPE_ECHO) and testing module
 testing = ["kernel-core/testing", "dep:constraints"]
+
+# Enable simulator mode: std + serde + constraints for host-side agent simulation
+simulator = ["std", "dep:constraints", "dep:serde", "dep:serde_json"]
 
 [lints.clippy]
 std_instead_of_alloc = "deny"

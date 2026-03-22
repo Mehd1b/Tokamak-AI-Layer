@@ -102,6 +102,9 @@ pub mod types;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 
+#[cfg(feature = "simulator")]
+pub mod simulator;
+
 // ============================================================================
 // Prelude - Common Imports
 // ============================================================================
