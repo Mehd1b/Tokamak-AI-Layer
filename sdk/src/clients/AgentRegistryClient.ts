@@ -102,6 +102,15 @@ export class AgentRegistryClient {
     };
   }
 
+  async getAllAgentIds(): Promise<`0x${string}`[]> {
+    const result = await this.publicClient.readContract({
+      address: this.address,
+      abi: AgentRegistryABI,
+      functionName: 'getAllAgentIds',
+    });
+    return result as `0x${string}`[];
+  }
+
   async agentExists(agentId: `0x${string}`): Promise<boolean> {
     return await this.publicClient.readContract({
       address: this.address,

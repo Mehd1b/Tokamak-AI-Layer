@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useAccount } from 'wagmi';
+import { useAccount, useBalance, useReadContract } from 'wagmi';
 import { useVaultInfo, useVaultShares } from '@/hooks/useKernelVault';
 import { useVaultHistory } from '@/hooks/useVaultHistory';
 import { useVaultExecutions } from '@/hooks/useVaultExecutions';
@@ -17,6 +18,9 @@ import { protocolLabel, protocolColor, PROTOCOL_TYPE } from '@/lib/protocolTypes
 import { formatBytes32, formatEther, timestampToDate, truncateAddress } from '@/lib/utils';
 import { useNetwork } from '@/lib/NetworkContext';
 import { NetworkBadge } from '@/components/NetworkLogo';
+import { NetworkBanner } from '@/components/NetworkBanner';
+import { DepositStepper } from '@/components/DepositStepper';
+import { PostDepositConfirmation } from '@/components/PostDepositConfirmation';
 import { CommentSection } from '@/components/CommentSection';
 import { PerformanceCard } from '@/components/PerformanceCard';
 import { DeprecationBanner } from '@/components/DeprecationBanner';
@@ -24,17 +28,46 @@ import { StrategyStatusBanner } from '@/components/StrategyStatusBanner';
 import { BondStatusCard } from '@/components/BondStatusCard';
 import Link from 'next/link';
 
+const ERC20_BALANCE_ABI = [
+  { type: 'function', name: 'balanceOf', inputs: [{ name: 'account', type: 'address' }], outputs: [{ type: 'uint256' }], stateMutability: 'view' },
+] as const;
+
 export default function VaultDetailPage() {
   const params = useParams();
   const vaultAddress = params.address as `0x${string}`;
   const { address: userAddress } = useAccount();
 
-  const { explorerUrl, contracts } = useNetwork();
+  const { explorerUrl, contracts, selectedChainId } = useNetwork();
   const vault = useVaultInfo(vaultAddress);
   const protocolType = useVaultProtocolType(vaultAddress);
   const { data: userShares } = useVaultShares(vaultAddress, userAddress);
   const { tvl, pps, isLoading: historyLoading } = useVaultHistory(vaultAddress, vault.assetDecimals);
   const { executions, isLoading: executionsLoading } = useVaultExecutions(vaultAddress);
+
+  // State for PostDepositConfirmation
+  const [depositConfirmation, setDepositConfirmation] = useState<{
+    show: boolean;
+    sharesMinted: bigint;
+  }>({ show: false, sharesMinted: 0n });
+
+  // Fetch user balance for DepositStepper
+  const assetAddr = vault.asset as `0x${string}` | undefined;
+  const { data: nativeBalance } = useBalance({
+    address: userAddress,
+    chainId: selectedChainId,
+    query: { enabled: vault.isEthVault && !!userAddress },
+  });
+  const { data: rawTokenBalance } = useReadContract({
+    address: assetAddr,
+    abi: ERC20_BALANCE_ABI,
+    functionName: 'balanceOf',
+    args: userAddress ? [userAddress] : undefined,
+    chainId: selectedChainId,
+    query: { enabled: !vault.isEthVault && !!assetAddr && !!userAddress },
+  });
+  const userBalanceBigInt: bigint = vault.isEthVault
+    ? (nativeBalance?.value ?? 0n)
+    : (typeof rawTokenBalance === 'bigint' ? rawTokenBalance : 0n);
 
   if (vault.isLoading) {
     return (
@@ -58,6 +91,9 @@ export default function VaultDetailPage() {
         <span className="separator">/</span>
         <span className="text-gray-400">{truncateAddress(vaultAddress, 6)}</span>
       </nav>
+
+      {/* Network mismatch banner */}
+      <NetworkBanner expectedChainId={selectedChainId} chainName={selectedChainId === 999 ? 'HyperEVM' : undefined} />
 
       {/* Two-column layout: main content left, discussion right */}
       <div className="flex flex-col xl:flex-row gap-8">
@@ -239,13 +275,33 @@ export default function VaultDetailPage() {
               <h2 className="text-lg font-light text-white mb-4" style={{ fontFamily: 'var(--font-serif), serif' }}>
                 Deposit
               </h2>
-              <VaultDepositForm
-                vaultAddress={vaultAddress}
-                isEthVault={vault.isEthVault}
-                assetDecimals={vault.assetDecimals}
-                assetSymbol={vault.assetSymbol}
-                assetAddress={vault.asset as `0x${string}` | undefined}
-              />
+              {depositConfirmation.show ? (
+                <PostDepositConfirmation
+                  sharesMinted={depositConfirmation.sharesMinted}
+                  assetSymbol={vault.assetSymbol}
+                  assetDecimals={vault.assetDecimals}
+                  txHash={'0x0' as `0x${string}`}
+                  explorerUrl={undefined}
+                  onDismiss={() => setDepositConfirmation({ show: false, sharesMinted: 0n })}
+                />
+              ) : assetAddr && !vault.isEthVault ? (
+                <DepositStepper
+                  vaultAddress={vaultAddress}
+                  asset={assetAddr}
+                  assetSymbol={vault.assetSymbol}
+                  assetDecimals={vault.assetDecimals}
+                  userBalance={userBalanceBigInt}
+                  onSuccess={(sharesMinted) => setDepositConfirmation({ show: true, sharesMinted })}
+                />
+              ) : (
+                <VaultDepositForm
+                  vaultAddress={vaultAddress}
+                  isEthVault={vault.isEthVault}
+                  assetDecimals={vault.assetDecimals}
+                  assetSymbol={vault.assetSymbol}
+                  assetAddress={vault.asset as `0x${string}` | undefined}
+                />
+              )}
             </div>
             <div className="card">
               <h2 className="text-lg font-light text-white mb-4" style={{ fontFamily: 'var(--font-serif), serif' }}>

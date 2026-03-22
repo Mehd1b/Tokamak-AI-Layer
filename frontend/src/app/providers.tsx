@@ -9,6 +9,7 @@ import { metaMaskWallet } from '@rainbow-me/rainbowkit/wallets';
 import '@rainbow-me/rainbowkit/styles.css';
 import { useState, type ReactNode } from 'react';
 import { NetworkProvider } from '@/lib/NetworkContext';
+import { TokamakProvider } from '@ek-sdk/react';
 
 const connectors = connectorsForWallets(
   [
@@ -56,7 +57,9 @@ export function Providers({ children }: { children: ReactNode }) {
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
-          <NetworkProvider>{children}</NetworkProvider>
+          <TokamakProvider>
+            <NetworkProvider>{children}</NetworkProvider>
+          </TokamakProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

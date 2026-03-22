@@ -17,30 +17,29 @@ var __copyProps = (to, from, except, desc) => {
 };
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// src/index.ts
-var src_exports = {};
-__export(src_exports, {
-  AgentRegistryABI: () => AgentRegistryABI,
-  AgentRegistryClient: () => AgentRegistryClient,
-  DEFAULT_CHAIN_ID: () => DEFAULT_CHAIN_ID,
-  DEPLOYMENTS: () => DEPLOYMENTS,
-  DepositError: () => DepositError,
-  ErrorCode: () => ErrorCode,
-  ExecutionKernelClient: () => ExecutionKernelClient,
-  ExecutionStatus: () => ExecutionStatus,
-  KernelActionType: () => KernelActionType,
-  KernelExecutionVerifierABI: () => KernelExecutionVerifierABI,
-  KernelVaultABI: () => KernelVaultABI,
-  KernelVaultClient: () => KernelVaultClient,
-  OPTIMISM_SEPOLIA_ADDRESSES: () => SEPOLIA_ADDRESSES,
-  SEPOLIA_ADDRESSES: () => SEPOLIA_ADDRESSES,
-  TokamakError: () => TokamakError,
-  VaultFactoryABI: () => VaultFactoryABI,
-  VaultFactoryClient: () => VaultFactoryClient,
-  VerifierClient: () => VerifierClient,
-  WithdrawError: () => WithdrawError
+// src/react/index.ts
+var react_exports = {};
+__export(react_exports, {
+  TokamakProvider: () => TokamakProvider,
+  useAgent: () => useAgent,
+  useAgentList: () => useAgentList,
+  useChainMismatch: () => useChainMismatch,
+  useDeposit: () => useDeposit,
+  useIsChainSupported: () => useIsChainSupported,
+  useIsLegacyChain: () => useIsLegacyChain,
+  useRequiredTokamakClient: () => useRequiredTokamakClient,
+  useTokamakClient: () => useTokamakClient,
+  useUserShares: () => useUserShares,
+  useVault: () => useVault,
+  useVaultList: () => useVaultList,
+  useVaultsForAgent: () => useVaultsForAgent,
+  useWithdraw: () => useWithdraw
 });
-module.exports = __toCommonJS(src_exports);
+module.exports = __toCommonJS(react_exports);
+
+// src/react/provider.tsx
+var import_react = require("react");
+var import_wagmi = require("wagmi");
 
 // src/ExecutionKernelClient.ts
 var import_viem4 = require("viem");
@@ -1197,20 +1196,6 @@ var DEPLOYMENTS = {
   11155111: SEPOLIA_ADDRESSES,
   998: HYPEREVM_TESTNET_ADDRESSES
 };
-var DEFAULT_CHAIN_ID = 1;
-
-// src/types.ts
-var KernelActionType = /* @__PURE__ */ ((KernelActionType2) => {
-  KernelActionType2[KernelActionType2["CALL"] = 2] = "CALL";
-  KernelActionType2[KernelActionType2["TRANSFER_ERC20"] = 3] = "TRANSFER_ERC20";
-  KernelActionType2[KernelActionType2["NO_OP"] = 4] = "NO_OP";
-  return KernelActionType2;
-})(KernelActionType || {});
-var ExecutionStatus = /* @__PURE__ */ ((ExecutionStatus2) => {
-  ExecutionStatus2[ExecutionStatus2["Success"] = 1] = "Success";
-  ExecutionStatus2[ExecutionStatus2["Failure"] = 2] = "Failure";
-  return ExecutionStatus2;
-})(ExecutionStatus || {});
 
 // src/ExecutionKernelClient.ts
 var ExecutionKernelClient = class {
@@ -1285,20 +1270,179 @@ var ExecutionKernelClient = class {
   }
 };
 
+// src/react/provider.tsx
+var import_jsx_runtime = require("react/jsx-runtime");
+var TokamakContext = (0, import_react.createContext)(null);
+function TokamakProviderInner({ children, addresses }) {
+  const publicClient = (0, import_wagmi.usePublicClient)();
+  const { data: walletClient } = (0, import_wagmi.useWalletClient)();
+  const chainId = (0, import_wagmi.useChainId)();
+  const client = (0, import_react.useMemo)(() => {
+    if (!publicClient) return null;
+    const addrs = addresses ?? DEPLOYMENTS[chainId];
+    if (!addrs) return null;
+    return new ExecutionKernelClient({
+      publicClient,
+      walletClient: walletClient ?? void 0,
+      ...addrs
+    });
+  }, [publicClient, walletClient, chainId, addresses]);
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TokamakContext.Provider, { value: client, children });
+}
+function TokamakProvider({ children, addresses }) {
+  const [mounted, setMounted] = (0, import_react.useState)(false);
+  (0, import_react.useEffect)(() => setMounted(true), []);
+  if (!mounted) {
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TokamakContext.Provider, { value: null, children });
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TokamakProviderInner, { addresses, children });
+}
+function useTokamakClient() {
+  return (0, import_react.useContext)(TokamakContext);
+}
+function useRequiredTokamakClient() {
+  const client = (0, import_react.useContext)(TokamakContext);
+  if (!client) {
+    throw new Error(
+      "useTokamakClient: no client available. Wrap your app in <TokamakProvider> and ensure the wallet is connected to a supported chain."
+    );
+  }
+  return client;
+}
+
+// src/react/useAgent.ts
+var import_react_query = require("@tanstack/react-query");
+function useAgent(agentId) {
+  const client = useTokamakClient();
+  return (0, import_react_query.useQuery)({
+    queryKey: ["tokamak", "agent", agentId],
+    queryFn: async () => {
+      if (!client || !agentId) return null;
+      return client.getAgent(agentId);
+    },
+    enabled: !!client && !!agentId,
+    staleTime: 6e4
+  });
+}
+function useAgentList() {
+  const client = useTokamakClient();
+  return (0, import_react_query.useQuery)({
+    queryKey: ["tokamak", "agents"],
+    queryFn: async () => {
+      if (!client) return [];
+      const ids = await client.agents.getAllAgentIds();
+      const agents = await Promise.all(ids.map((id) => client.getAgent(id)));
+      return agents.filter((a) => a !== null && a.exists);
+    },
+    enabled: !!client,
+    staleTime: 6e4
+  });
+}
+
+// src/react/useVault.ts
+var import_react_query2 = require("@tanstack/react-query");
+var import_wagmi2 = require("wagmi");
+function useVault(vaultAddress) {
+  const client = useTokamakClient();
+  const { address: userAddress } = (0, import_wagmi2.useAccount)();
+  return (0, import_react_query2.useQuery)({
+    queryKey: ["tokamak", "vault", vaultAddress, userAddress],
+    queryFn: async () => {
+      if (!client || !vaultAddress) return null;
+      const vaultClient = client.createVaultClient(vaultAddress);
+      return vaultClient.getInfo(userAddress);
+    },
+    enabled: !!client && !!vaultAddress,
+    staleTime: 3e4
+  });
+}
+
+// src/react/useVaultList.ts
+var import_react_query3 = require("@tanstack/react-query");
+function useVaultList() {
+  const client = useTokamakClient();
+  return (0, import_react_query3.useQuery)({
+    queryKey: ["tokamak", "vaults"],
+    queryFn: async () => {
+      if (!client) return [];
+      const addresses = await client.vaultFactory.getAllVaults();
+      const vaults = await Promise.all(
+        addresses.map(async (addr) => {
+          try {
+            const vc = client.createVaultClient(addr);
+            const info = await vc.getInfo();
+            return {
+              address: addr,
+              agentId: info.agentId,
+              asset: info.asset,
+              totalAssets: info.totalAssets,
+              totalShares: info.totalShares,
+              totalValueLocked: info.totalValueLocked
+            };
+          } catch {
+            return null;
+          }
+        })
+      );
+      return vaults.filter((v) => v !== null);
+    },
+    enabled: !!client,
+    staleTime: 3e4
+  });
+}
+function useVaultsForAgent(agentId) {
+  const { data: allVaults, ...rest } = useVaultList();
+  const filtered = allVaults?.filter((v) => v.agentId === agentId) ?? [];
+  return { data: filtered, ...rest };
+}
+
+// src/react/useUserShares.ts
+var import_react_query4 = require("@tanstack/react-query");
+var import_wagmi3 = require("wagmi");
+function useUserShares(vaultAddress) {
+  const client = useTokamakClient();
+  const { address } = (0, import_wagmi3.useAccount)();
+  return (0, import_react_query4.useQuery)({
+    queryKey: ["tokamak", "userShares", vaultAddress, address],
+    queryFn: async () => {
+      if (!client || !vaultAddress || !address) return null;
+      const vc = client.createVaultClient(vaultAddress);
+      const shares = await vc.shares(address);
+      const assetsValue = shares > 0n ? await vc.convertToAssets(shares) : 0n;
+      return { shares, assetsValue };
+    },
+    enabled: !!client && !!vaultAddress && !!address,
+    staleTime: 15e3
+  });
+}
+
+// src/react/useDeposit.ts
+var import_react2 = require("react");
+var import_wagmi5 = require("wagmi");
+var import_viem5 = require("viem");
+var import_react_query5 = require("@tanstack/react-query");
+
+// src/react/useChainValidation.ts
+var import_wagmi4 = require("wagmi");
+var LEGACY_GAS_CHAINS = /* @__PURE__ */ new Set([999, 998]);
+function useIsLegacyChain() {
+  const chainId = (0, import_wagmi4.useChainId)();
+  return LEGACY_GAS_CHAINS.has(chainId);
+}
+function useIsChainSupported() {
+  const chainId = (0, import_wagmi4.useChainId)();
+  return chainId in DEPLOYMENTS;
+}
+function useChainMismatch(expectedChainId) {
+  const chainId = (0, import_wagmi4.useChainId)();
+  if (!expectedChainId) return false;
+  return chainId !== expectedChainId;
+}
+function getLegacyGasOverrides(chainId) {
+  return LEGACY_GAS_CHAINS.has(chainId) ? { type: "legacy" } : {};
+}
+
 // src/errors.ts
-var ErrorCode = /* @__PURE__ */ ((ErrorCode2) => {
-  ErrorCode2["NETWORK_MISMATCH"] = "NETWORK_MISMATCH";
-  ErrorCode2["INSUFFICIENT_BALANCE"] = "INSUFFICIENT_BALANCE";
-  ErrorCode2["USER_REJECTED"] = "USER_REJECTED";
-  ErrorCode2["APPROVAL_FAILED"] = "APPROVAL_FAILED";
-  ErrorCode2["DEPOSIT_FAILED"] = "DEPOSIT_FAILED";
-  ErrorCode2["WITHDRAW_FAILED"] = "WITHDRAW_FAILED";
-  ErrorCode2["AGENT_NOT_FOUND"] = "AGENT_NOT_FOUND";
-  ErrorCode2["VAULT_NOT_FOUND"] = "VAULT_NOT_FOUND";
-  ErrorCode2["STRATEGY_ACTIVE"] = "STRATEGY_ACTIVE";
-  ErrorCode2["TRANSACTION_REVERTED"] = "TRANSACTION_REVERTED";
-  return ErrorCode2;
-})(ErrorCode || {});
 var TokamakError = class _TokamakError extends Error {
   code;
   cause;
@@ -1343,26 +1487,142 @@ var WithdrawError = class _WithdrawError extends TokamakError {
     return new _WithdrawError(base.code, base.message, base.cause);
   }
 };
+
+// src/react/useDeposit.ts
+var ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+function useDeposit(vaultAddress, asset) {
+  const client = useTokamakClient();
+  const { address } = (0, import_wagmi5.useAccount)();
+  const chainId = (0, import_wagmi5.useChainId)();
+  const publicClient = (0, import_wagmi5.usePublicClient)();
+  const { data: walletClient } = (0, import_wagmi5.useWalletClient)();
+  const queryClient = (0, import_react_query5.useQueryClient)();
+  const [step, setStep] = (0, import_react2.useState)("idle");
+  const [error, setError] = (0, import_react2.useState)(null);
+  const [txHash, setTxHash] = (0, import_react2.useState)(null);
+  const [sharesMinted, setSharesMinted] = (0, import_react2.useState)(null);
+  const isETH = !asset || asset === ZERO_ADDRESS;
+  const { data: allowance = 0n } = (0, import_react_query5.useQuery)({
+    queryKey: ["tokamak", "allowance", asset, vaultAddress, address],
+    queryFn: async () => {
+      if (!publicClient || !address || !vaultAddress || !asset || isETH) return 0n;
+      return publicClient.readContract({
+        address: asset,
+        abi: import_viem5.erc20Abi,
+        functionName: "allowance",
+        args: [address, vaultAddress]
+      });
+    },
+    enabled: !!publicClient && !!address && !!vaultAddress && !isETH,
+    staleTime: 1e4
+  });
+  const needsApproval = (0, import_react2.useCallback)(
+    (amount) => !isETH && allowance < amount,
+    [isETH, allowance]
+  );
+  const deposit = (0, import_react2.useCallback)(async (amount) => {
+    if (!client || !vaultAddress || !walletClient || !publicClient || !address) {
+      setError(new DepositError("TRANSACTION_REVERTED" /* TRANSACTION_REVERTED */, "Wallet not connected"));
+      setStep("error");
+      return;
+    }
+    try {
+      setError(null);
+      setTxHash(null);
+      setSharesMinted(null);
+      const vaultClient = client.createVaultClient(vaultAddress);
+      if (!isETH && allowance < amount) {
+        setStep("approving");
+        const approveTx = await walletClient.writeContract({
+          address: asset,
+          abi: import_viem5.erc20Abi,
+          functionName: "approve",
+          args: [vaultAddress, amount],
+          ...getLegacyGasOverrides(chainId)
+        });
+        await publicClient.waitForTransactionReceipt({ hash: approveTx });
+        await queryClient.invalidateQueries({
+          queryKey: ["tokamak", "allowance", asset, vaultAddress, address]
+        });
+      }
+      setStep("depositing");
+      const result = isETH ? await vaultClient.depositETH(amount) : await vaultClient.depositERC20(amount);
+      setTxHash(result.txHash);
+      setSharesMinted(result.sharesMinted);
+      setStep("success");
+      await queryClient.invalidateQueries({ queryKey: ["tokamak", "vault", vaultAddress] });
+      await queryClient.invalidateQueries({ queryKey: ["tokamak", "userShares", vaultAddress] });
+    } catch (err) {
+      const depositErr = DepositError.from(err);
+      setError(depositErr);
+      setStep("error");
+    }
+  }, [client, vaultAddress, walletClient, publicClient, address, isETH, allowance, asset, chainId, queryClient]);
+  const reset = (0, import_react2.useCallback)(() => {
+    setStep("idle");
+    setError(null);
+    setTxHash(null);
+    setSharesMinted(null);
+  }, []);
+  return { step, error, txHash, sharesMinted, deposit, reset, needsApproval, isETH, allowance };
+}
+
+// src/react/useWithdraw.ts
+var import_react3 = require("react");
+var import_react_query6 = require("@tanstack/react-query");
+function useWithdraw(vaultAddress) {
+  const client = useTokamakClient();
+  const queryClient = (0, import_react_query6.useQueryClient)();
+  const [step, setStep] = (0, import_react3.useState)("idle");
+  const [error, setError] = (0, import_react3.useState)(null);
+  const [txHash, setTxHash] = (0, import_react3.useState)(null);
+  const [assetsOut, setAssetsOut] = (0, import_react3.useState)(null);
+  const withdraw = (0, import_react3.useCallback)(async (shares) => {
+    if (!client || !vaultAddress) {
+      setError(new WithdrawError("TRANSACTION_REVERTED" /* TRANSACTION_REVERTED */, "Wallet not connected"));
+      setStep("error");
+      return;
+    }
+    try {
+      setError(null);
+      setTxHash(null);
+      setAssetsOut(null);
+      setStep("withdrawing");
+      const vaultClient = client.createVaultClient(vaultAddress);
+      const result = await vaultClient.withdraw(shares);
+      setTxHash(result.txHash);
+      setAssetsOut(result.assetsOut);
+      setStep("success");
+      await queryClient.invalidateQueries({ queryKey: ["tokamak", "vault", vaultAddress] });
+      await queryClient.invalidateQueries({ queryKey: ["tokamak", "userShares", vaultAddress] });
+    } catch (err) {
+      setError(WithdrawError.from(err));
+      setStep("error");
+    }
+  }, [client, vaultAddress, queryClient]);
+  const reset = (0, import_react3.useCallback)(() => {
+    setStep("idle");
+    setError(null);
+    setTxHash(null);
+    setAssetsOut(null);
+  }, []);
+  return { step, error, txHash, assetsOut, withdraw, reset };
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  AgentRegistryABI,
-  AgentRegistryClient,
-  DEFAULT_CHAIN_ID,
-  DEPLOYMENTS,
-  DepositError,
-  ErrorCode,
-  ExecutionKernelClient,
-  ExecutionStatus,
-  KernelActionType,
-  KernelExecutionVerifierABI,
-  KernelVaultABI,
-  KernelVaultClient,
-  OPTIMISM_SEPOLIA_ADDRESSES,
-  SEPOLIA_ADDRESSES,
-  TokamakError,
-  VaultFactoryABI,
-  VaultFactoryClient,
-  VerifierClient,
-  WithdrawError
+  TokamakProvider,
+  useAgent,
+  useAgentList,
+  useChainMismatch,
+  useDeposit,
+  useIsChainSupported,
+  useIsLegacyChain,
+  useRequiredTokamakClient,
+  useTokamakClient,
+  useUserShares,
+  useVault,
+  useVaultList,
+  useVaultsForAgent,
+  useWithdraw
 });
-//# sourceMappingURL=index.js.map
+//# sourceMappingURL=react.js.map

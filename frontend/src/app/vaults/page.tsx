@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { useIsDeployedVault, useDeployedVaultsList } from '@/hooks/useVaultFactory';
 import { useCommentCounts } from '@/hooks/useCommentCounts';
 import { VaultCard, VaultRow } from '@/components/VaultCard';
+import { VaultExplainer } from '@/components/VaultExplainer';
 import Link from 'next/link';
 
 type SortKey = 'tvl' | 'balance' | 'newest' | 'oldest' | 'shares' | 'comments';
@@ -60,6 +61,8 @@ export default function VaultsPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-6 lg:px-12 py-12">
+      <VaultExplainer />
+
       {/* Header — editorial layout */}
       <div className="mb-10">
         <div className="flex items-center gap-3 mb-5">

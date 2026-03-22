@@ -7,9 +7,14 @@
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.mjs",
+      "require": "./dist/react.js"
     }
   },
   "scripts": {
@@ -24,19 +29,48 @@
     "viem": "^2.21.0"
   },
   "devDependencies": {
+    "@tanstack/react-query": "^5.95.0",
     "@types/node": "^22.0.0",
+    "@types/react": "^19.2.14",
+    "@wagmi/core": "^3.4.0",
+    "react": "^19.2.4",
     "tsup": "^8.3.0",
     "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.0",
+    "wagmi": "^3.5.0"
   },
   "peerDependencies": {
-    "viem": ">=2.0.0"
+    "@tanstack/react-query": "^5.0.0",
+    "react": "^18.0.0 || ^19.0.0",
+    "viem": "^2.21.0",
+    "wagmi": "^2.0.0"
   },
-  "files": ["dist"],
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "wagmi": {
+      "optional": true
+    },
+    "@tanstack/react-query": {
+      "optional": true
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/tokamak-network/Tokamak-AI-Layer"
   },
-  "keywords": ["tokamak", "execution-kernel", "risc-zero", "zk", "agent", "vault", "sdk"]
+  "keywords": [
+    "tokamak",
+    "execution-kernel",
+    "risc-zero",
+    "zk",
+    "agent",
+    "vault",
+    "sdk"
+  ]
 }

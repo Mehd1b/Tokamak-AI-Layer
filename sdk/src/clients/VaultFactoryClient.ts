@@ -85,6 +85,25 @@ export class VaultFactoryClient {
     return { vaultAddress, txHash };
   }
 
+  async getAllVaults(): Promise<`0x${string}`[]> {
+    const result = await this.publicClient.readContract({
+      address: this.address,
+      abi: VaultFactoryABI,
+      functionName: 'getAllVaults',
+    });
+    return result as `0x${string}`[];
+  }
+
+  async getAgentVaults(agentId: `0x${string}`): Promise<`0x${string}`[]> {
+    const result = await this.publicClient.readContract({
+      address: this.address,
+      abi: VaultFactoryABI,
+      functionName: 'getAgentVaults',
+      args: [agentId],
+    });
+    return result as `0x${string}`[];
+  }
+
   async isDeployedVault(vault: `0x${string}`): Promise<boolean> {
     return await this.publicClient.readContract({
       address: this.address,

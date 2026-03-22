@@ -1,54 +1,3 @@
-"use strict";
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-
-// src/index.ts
-var src_exports = {};
-__export(src_exports, {
-  AgentRegistryABI: () => AgentRegistryABI,
-  AgentRegistryClient: () => AgentRegistryClient,
-  DEFAULT_CHAIN_ID: () => DEFAULT_CHAIN_ID,
-  DEPLOYMENTS: () => DEPLOYMENTS,
-  DepositError: () => DepositError,
-  ErrorCode: () => ErrorCode,
-  ExecutionKernelClient: () => ExecutionKernelClient,
-  ExecutionStatus: () => ExecutionStatus,
-  KernelActionType: () => KernelActionType,
-  KernelExecutionVerifierABI: () => KernelExecutionVerifierABI,
-  KernelVaultABI: () => KernelVaultABI,
-  KernelVaultClient: () => KernelVaultClient,
-  OPTIMISM_SEPOLIA_ADDRESSES: () => SEPOLIA_ADDRESSES,
-  SEPOLIA_ADDRESSES: () => SEPOLIA_ADDRESSES,
-  TokamakError: () => TokamakError,
-  VaultFactoryABI: () => VaultFactoryABI,
-  VaultFactoryClient: () => VaultFactoryClient,
-  VerifierClient: () => VerifierClient,
-  WithdrawError: () => WithdrawError
-});
-module.exports = __toCommonJS(src_exports);
-
-// src/ExecutionKernelClient.ts
-var import_viem4 = require("viem");
-var import_chains = require("viem/chains");
-
-// src/clients/AgentRegistryClient.ts
-var import_viem = require("viem");
-
 // src/abi/AgentRegistry.ts
 var AgentRegistryABI = [
   {
@@ -263,6 +212,7 @@ var AgentRegistryABI = [
 ];
 
 // src/clients/AgentRegistryClient.ts
+import { decodeEventLog } from "viem";
 var AgentRegistryClient = class {
   publicClient;
   walletClient;
@@ -295,7 +245,7 @@ var AgentRegistryClient = class {
     let agentId;
     for (const log of receipt.logs) {
       try {
-        const event = (0, import_viem.decodeEventLog)({
+        const event = decodeEventLog({
           abi: AgentRegistryABI,
           data: log.data,
           topics: log.topics
@@ -362,9 +312,6 @@ var AgentRegistryClient = class {
     }
   }
 };
-
-// src/clients/VaultFactoryClient.ts
-var import_viem2 = require("viem");
 
 // src/abi/VaultFactory.ts
 var VaultFactoryABI = [
@@ -548,6 +495,7 @@ var VaultFactoryABI = [
 ];
 
 // src/clients/VaultFactoryClient.ts
+import { decodeEventLog as decodeEventLog2 } from "viem";
 var VaultFactoryClient = class {
   publicClient;
   walletClient;
@@ -594,7 +542,7 @@ var VaultFactoryClient = class {
     let vaultAddress;
     for (const log of receipt.logs) {
       try {
-        const event = (0, import_viem2.decodeEventLog)({
+        const event = decodeEventLog2({
           abi: VaultFactoryABI,
           data: log.data,
           topics: log.topics
@@ -643,9 +591,6 @@ var VaultFactoryClient = class {
     }
   }
 };
-
-// src/clients/KernelVaultClient.ts
-var import_viem3 = require("viem");
 
 // src/abi/KernelVault.ts
 var KernelVaultABI = [
@@ -810,6 +755,7 @@ var KernelVaultABI = [
 ];
 
 // src/clients/KernelVaultClient.ts
+import { decodeEventLog as decodeEventLog3 } from "viem";
 var KernelVaultClient = class {
   publicClient;
   walletClient;
@@ -1003,7 +949,7 @@ var KernelVaultClient = class {
   parseDepositEvent(logs) {
     for (const log of logs) {
       try {
-        const event = (0, import_viem3.decodeEventLog)({
+        const event = decodeEventLog3({
           abi: KernelVaultABI,
           data: log.data,
           topics: log.topics
@@ -1020,7 +966,7 @@ var KernelVaultClient = class {
   parseWithdrawEvent(logs) {
     for (const log of logs) {
       try {
-        const event = (0, import_viem3.decodeEventLog)({
+        const event = decodeEventLog3({
           abi: KernelVaultABI,
           data: log.data,
           topics: log.topics
@@ -1213,6 +1159,8 @@ var ExecutionStatus = /* @__PURE__ */ ((ExecutionStatus2) => {
 })(ExecutionStatus || {});
 
 // src/ExecutionKernelClient.ts
+import { createPublicClient, http } from "viem";
+import { optimismSepolia } from "viem/chains";
 var ExecutionKernelClient = class {
   agents;
   vaultFactory;
@@ -1222,9 +1170,9 @@ var ExecutionKernelClient = class {
   config;
   constructor(config) {
     this.config = config;
-    this.publicClient = config.publicClient ?? (0, import_viem4.createPublicClient)({
-      chain: import_chains.optimismSepolia,
-      transport: (0, import_viem4.http)(config.rpcUrl)
+    this.publicClient = config.publicClient ?? createPublicClient({
+      chain: optimismSepolia,
+      transport: http(config.rpcUrl)
     });
     this.walletClient = config.walletClient;
     const addresses = {
@@ -1343,26 +1291,25 @@ var WithdrawError = class _WithdrawError extends TokamakError {
     return new _WithdrawError(base.code, base.message, base.cause);
   }
 };
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
+
+export {
   AgentRegistryABI,
   AgentRegistryClient,
-  DEFAULT_CHAIN_ID,
-  DEPLOYMENTS,
-  DepositError,
-  ErrorCode,
-  ExecutionKernelClient,
-  ExecutionStatus,
-  KernelActionType,
-  KernelExecutionVerifierABI,
-  KernelVaultABI,
-  KernelVaultClient,
-  OPTIMISM_SEPOLIA_ADDRESSES,
-  SEPOLIA_ADDRESSES,
-  TokamakError,
   VaultFactoryABI,
   VaultFactoryClient,
+  KernelVaultABI,
+  KernelVaultClient,
+  KernelExecutionVerifierABI,
   VerifierClient,
+  SEPOLIA_ADDRESSES,
+  DEPLOYMENTS,
+  DEFAULT_CHAIN_ID,
+  KernelActionType,
+  ExecutionStatus,
+  ExecutionKernelClient,
+  ErrorCode,
+  TokamakError,
+  DepositError,
   WithdrawError
-});
-//# sourceMappingURL=index.js.map
+};
+//# sourceMappingURL=chunk-LWHRFYJG.mjs.map

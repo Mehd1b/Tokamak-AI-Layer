@@ -36,3 +36,5 @@ export {
 
 export type { DeploymentAddresses } from './addresses';
 export { SEPOLIA_ADDRESSES } from './addresses';
+
+export { TokamakError, DepositError, WithdrawError, ErrorCode } from './errors';
