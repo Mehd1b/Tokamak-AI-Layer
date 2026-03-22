@@ -30,11 +30,28 @@ This design removes the need for a trusted operator to register agents, enabling
 
 | Contract | Address |
 |----------|---------|
-| AgentRegistry | `0xAf58D2191772bcFFB3260F5140E995ec79e4d88B` |
-| VaultFactory | `0xc7Fc0dD5f1B03E3De0C313eE0D3b06Cb2Dc017BB` |
-| KernelExecutionVerifier | `0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30` |
+| AgentRegistry | [`0x8fd180069269b5800AD60998c567731894b707b4`](https://hyperliquid.cloud.blockscout.com/address/0x8fd180069269b5800AD60998c567731894b707b4) |
+| VaultFactory | [`0xCB76E29808733a32946e9fB70A3Fb7b2e5a1a89a`](https://hyperliquid.cloud.blockscout.com/address/0xCB76E29808733a32946e9fB70A3Fb7b2e5a1a89a) |
+| KernelExecutionVerifier | [`0x98800a0d9a5755Be1f8613DdA265797F3fE2C56b`](https://hyperliquid.cloud.blockscout.com/address/0x98800a0d9a5755Be1f8613DdA265797F3fE2C56b) |
 | RISC Zero Verifier Router | `0x9f8d4D1f7AAf06aab1640abd565A731399862Bc8` |
-| HyperliquidAdapter | `0x30C1ab0F82CDE134A9eb91CC8AEBAD503aa736dA` |
+
+### Arbitrum One (Chain ID: 42161)
+
+| Contract | Address |
+|----------|---------|
+| AgentRegistry | [`0x0052258E517835081c94c0B685409f2EfC4D502b`](https://arbiscan.io/address/0x0052258E517835081c94c0B685409f2EfC4D502b) |
+| VaultFactory | [`0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30`](https://arbiscan.io/address/0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30) |
+| KernelExecutionVerifier | [`0x09447147C6E75a60A449f38532F06E19F5F632F3`](https://arbiscan.io/address/0x09447147C6E75a60A449f38532F06E19F5F632F3) |
+| RISC Zero Verifier Router | [`0x0b144e07a0826182b6b59788c34b32bfa86fb711`](https://arbiscan.io/address/0x0b144e07a0826182b6b59788c34b32bfa86fb711) |
+
+### Optimism (Chain ID: 10)
+
+| Contract | Address |
+|----------|---------|
+| AgentRegistry | [`0x0052258E517835081c94c0B685409f2EfC4D502b`](https://optimistic.etherscan.io/address/0x0052258E517835081c94c0B685409f2EfC4D502b) |
+| VaultFactory | [`0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30`](https://optimistic.etherscan.io/address/0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30) |
+| KernelExecutionVerifier | [`0x09447147C6E75a60A449f38532F06E19F5F632F3`](https://optimistic.etherscan.io/address/0x09447147C6E75a60A449f38532F06E19F5F632F3) |
+| RISC Zero Verifier Router | [`0x0b144e07a0826182b6b59788c34b32bfa86fb711`](https://optimistic.etherscan.io/address/0x0b144e07a0826182b6b59788c34b32bfa86fb711) |
 
 ### Ethereum Sepolia (Testnet)
 
