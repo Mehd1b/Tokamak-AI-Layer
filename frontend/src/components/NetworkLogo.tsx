@@ -14,6 +14,23 @@ export const EthereumLogo = ({ className }: { className?: string }) => (
   </svg>
 );
 
+// Arbitrum logo
+export const ArbitrumLogo = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 100 100" className={className} fill="none">
+    <circle cx="50" cy="50" r="48" fill="#213147" />
+    <path d="M50 20L25 60h50L50 20z" fill="#28A0F0" />
+    <path d="M36 55l14-25 14 25H36z" fill="#fff" />
+  </svg>
+);
+
+// Optimism logo
+export const OptimismLogo = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 100 100" className={className} fill="none">
+    <circle cx="50" cy="50" r="48" fill="#FF0420" />
+    <text x="50" y="62" textAnchor="middle" fill="#fff" fontSize="40" fontWeight="bold" fontFamily="sans-serif">OP</text>
+  </svg>
+);
+
 // Hyperliquid logo (stylized green mark)
 export const HyperliquidLogo = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 100 100" className={className} fill="none">
@@ -28,6 +45,8 @@ export const HyperliquidLogo = ({ className }: { className?: string }) => (
 const NETWORKS = [
   { chainId: 1, name: 'Ethereum', Logo: EthereumLogo },
   { chainId: 999, name: 'HyperEVM', Logo: HyperliquidLogo },
+  { chainId: 42161, name: 'Arbitrum', Logo: ArbitrumLogo },
+  { chainId: 10, name: 'Optimism', Logo: OptimismLogo },
   { chainId: 11155111, name: 'Sepolia', Logo: EthereumLogo },
   { chainId: 998, name: 'HyperEVM Testnet', Logo: HyperliquidLogo },
 ];

@@ -33,9 +33,25 @@ export const HYPEREVM_TESTNET_ADDRESSES: DeploymentAddresses = {
   riscZeroVerifierRouter: '0x0000000000000000000000000000000000000000',
 } as const;
 
+export const ARBITRUM_ADDRESSES: DeploymentAddresses = {
+  agentRegistry: '0x0052258E517835081c94c0B685409f2EfC4D502b',
+  vaultFactory: '0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30',
+  kernelExecutionVerifier: '0x09447147C6E75a60A449f38532F06E19F5F632F3',
+  riscZeroVerifierRouter: '0x0b144e07a0826182b6b59788c34b32bfa86fb711',
+} as const;
+
+export const OPTIMISM_ADDRESSES: DeploymentAddresses = {
+  agentRegistry: '0x0052258E517835081c94c0B685409f2EfC4D502b',
+  vaultFactory: '0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30',
+  kernelExecutionVerifier: '0x09447147C6E75a60A449f38532F06E19F5F632F3',
+  riscZeroVerifierRouter: '0x0b144e07a0826182b6b59788c34b32bfa86fb711',
+} as const;
+
 export const DEPLOYMENTS: Record<number, DeploymentAddresses> = {
   1: ETHEREUM_MAINNET_ADDRESSES,
   999: HYPEREVM_MAINNET_ADDRESSES,
+  42161: ARBITRUM_ADDRESSES,
+  10: OPTIMISM_ADDRESSES,
   11155111: SEPOLIA_ADDRESSES,
   998: HYPEREVM_TESTNET_ADDRESSES,
 } as const;
