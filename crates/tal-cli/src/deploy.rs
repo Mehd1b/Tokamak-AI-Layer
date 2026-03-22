@@ -99,7 +99,7 @@ pub fn run(
 async fn run_async(
     testnet: bool,
     step: Option<&str>,
-    _config_path: &str,
+    config_path: &str,
     verbose: bool,
     hyperliquid: bool,
     optimistic: bool,
@@ -268,8 +268,21 @@ async fn run_async(
 
         if !already_enabled {
             // Set oracle signer (required before enabling optimistic)
-            if let Some(oracle_signer_str) = resolve_env("ORACLE_SIGNER") {
-                let oracle_signer: Address = oracle_signer_str.parse().context("Invalid ORACLE_SIGNER")?;
+            // Resolve oracle signer: prefer explicit ORACLE_SIGNER address,
+            // otherwise derive from ORACLE_KEY private key.
+            let oracle_signer: Option<Address> = if let Some(addr_str) = resolve_env("ORACLE_SIGNER") {
+                Some(addr_str.parse().context("Invalid ORACLE_SIGNER")?)
+            } else if let Some(oracle_key) = resolve_env("ORACLE_KEY") {
+                let pk_clean = oracle_key.strip_prefix("0x").unwrap_or(&oracle_key);
+                let signer: alloy::signers::local::PrivateKeySigner = pk_clean.parse()
+                    .context("Invalid ORACLE_KEY — cannot derive oracle signer address")?;
+                println!("  Derived oracle signer from ORACLE_KEY: {}", signer.address());
+                Some(signer.address())
+            } else {
+                None
+            };
+
+            if let Some(oracle_signer) = oracle_signer {
                 let current_signer = okv.oracleSigner().call().await.map(|r| r._0).unwrap_or(Address::ZERO);
 
                 if current_signer == Address::ZERO {
@@ -323,10 +336,8 @@ async fn run_async(
                 let result = send_tx(&provider, Some(vault_addr), tx_data, U256::ZERO, None).await?;
                 println!("  {} Optimistic execution enabled (tx: {:?})", "✓".green(), result.tx_hash);
             } else {
-                println!("  {} ORACLE_SIGNER not set — optimistic execution not enabled", "⚠".yellow());
-                println!("    Set ORACLE_SIGNER in .env, then run:");
-                println!("    cast send {} 'setOracleSigner(address)' <signer> --private-key $PK --legacy --rpc-url $RPC", vault_addr);
-                println!("    cast send {} 'setOptimisticEnabled(bool)' true --private-key $PK --legacy --rpc-url $RPC", vault_addr);
+                println!("  {} Neither ORACLE_SIGNER nor ORACLE_KEY set — optimistic execution not enabled", "⚠".yellow());
+                println!("    Set ORACLE_KEY (private key) or ORACLE_SIGNER (address) in .env, then re-run deploy.");
             }
         } else {
             println!("  {} Optimistic execution already enabled", "✓".green());
@@ -367,6 +378,24 @@ async fn run_async(
         println!("  Sub-Acct:   {}", sub);
     }
     println!("  {}", "─".repeat(55));
+
+    // Persist deployment outputs to .env
+    let agent_id_hex = format!("0x{}", hex::encode(agent_id));
+    let vault_addr_str = format!("{}", vault_addr);
+
+    let env_path = config_path;
+    if std::path::Path::new(env_path).exists() {
+        update_env_file(env_path, "AGENT_ID", &agent_id_hex)?;
+        update_env_file(env_path, "VAULT_ADDRESS", &vault_addr_str)?;
+        if let Some(sub) = sub_account {
+            update_env_file(env_path, "SUB_ACCOUNT", &format!("{}", sub))?;
+        }
+        println!();
+        println!("  {} Updated {} with AGENT_ID, VAULT_ADDRESS{}", "✓".green(),
+            env_path,
+            if sub_account.is_some() { ", SUB_ACCOUNT" } else { "" });
+    }
+
     println!();
     println!("  {} Deployment complete!", "✓".green().bold());
     println!();
@@ -793,25 +822,32 @@ async fn step_fund_and_configure(
         tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
     }
 
-    // Register API wallet (if provided)
-    if let Some(api_wallet_str) = resolve_env("API_WALLET_ADDRESS") {
-        let api_wallet: Address = api_wallet_str.parse().context("Invalid API_WALLET_ADDRESS")?;
-        let wallet_name = resolve_env("API_WALLET_NAME").unwrap_or_else(|| "tal-bot".to_string());
+    // Register deployer as API wallet (for REST API seed trades)
+    let api_wallet = resolve_env("API_WALLET_ADDRESS")
+        .map(|s| s.parse::<Address>())
+        .transpose()
+        .context("Invalid API_WALLET_ADDRESS")?
+        .unwrap_or(deployer);
 
-        println!("  Registering API wallet {} as '{}'...", api_wallet, wallet_name);
+    let wallet_name = resolve_env("API_WALLET_NAME").unwrap_or_else(|| "tal-bot".to_string());
 
-        let tx_data = IHyperliquidAdapter::addApiWalletAdminCall {
-            vault: vault_addr,
-            wallet: api_wallet,
-            name: wallet_name.clone(),
+    println!("  Registering API wallet {} as '{}'...", api_wallet, wallet_name);
+
+    let tx_data = IHyperliquidAdapter::addApiWalletAdminCall {
+        vault: vault_addr,
+        wallet: api_wallet,
+        name: wallet_name.clone(),
+    }
+    .abi_encode();
+
+    match send_tx(provider, Some(adapter_addr), tx_data, U256::ZERO, Some(500_000)).await {
+        Ok(result) => {
+            println!("  {} API wallet registered (tx: {:?}, gas: {})", "✓".green(), result.tx_hash, result.gas_used);
         }
-        .abi_encode();
-
-        let result = send_tx(provider, Some(adapter_addr), tx_data, U256::ZERO, Some(500_000)).await?;
-        println!("  {} API wallet registered (tx: {:?}, gas: {})", "✓".green(), result.tx_hash, result.gas_used);
-    } else {
-        println!("  {} API_WALLET_ADDRESS not set — skipping API wallet registration", "ℹ".blue());
-        println!("    Set API_WALLET_ADDRESS in .env to register later");
+        Err(e) => {
+            // May already be registered — not fatal
+            println!("  {} API wallet registration skipped (may already exist): {}", "ℹ".blue(), e);
+        }
     }
 
     println!();
@@ -842,4 +878,29 @@ fn format_usdc(amount: U256) -> String {
     let raw: u128 = amount.try_into().unwrap_or(0);
     let dollars = raw as f64 / 1_000_000.0;
     format!("{:.2}", dollars)
+}
+
+/// Update a KEY=VALUE line in a .env file. If the key exists, replace its value.
+/// If not, append it at the end.
+fn update_env_file(path: &str, key: &str, value: &str) -> Result<()> {
+    let content = std::fs::read_to_string(path).unwrap_or_default();
+    let mut found = false;
+    let mut lines: Vec<String> = content
+        .lines()
+        .map(|line| {
+            if line.starts_with(&format!("{}=", key)) {
+                found = true;
+                format!("{}={}", key, value)
+            } else {
+                line.to_string()
+            }
+        })
+        .collect();
+
+    if !found {
+        lines.push(format!("{}={}", key, value));
+    }
+
+    std::fs::write(path, lines.join("\n") + "\n")?;
+    Ok(())
 }
