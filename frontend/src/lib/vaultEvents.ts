@@ -14,7 +14,7 @@ const PARALLEL_BATCH_SIZE = 10;
  */
 const NATIVE_RPC_URLS: Record<number, string> = {
   [hyperEvmMainnet.id]: process.env.NEXT_PUBLIC_HYPER_MAINNET_RPC_URL || '',
-  [hyperEvmTestnet.id]: 'https://rpc.hyperliquid-testnet.xyz/evm',
+  [hyperEvmTestnet.id]: process.env.NEXT_PUBLIC_HYPER_TESTNET_RPC_URL || '',
 };
 
 const CHAIN_BY_ID: Record<number, any> = {
