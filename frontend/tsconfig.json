@@ -17,6 +17,11 @@
     "paths": {
       "@/*": ["./src/*"],
       "@ek-sdk/*": ["../sdk/src/*"],
+      "viem": ["./node_modules/viem"],
+      "viem/*": ["./node_modules/viem/*"],
+      "wagmi": ["./node_modules/wagmi"],
+      "wagmi/*": ["./node_modules/wagmi/*"],
+      "@tanstack/react-query": ["./node_modules/@tanstack/react-query"],
       "react": ["./node_modules/@types/react"],
       "react/jsx-runtime": ["./node_modules/@types/react/jsx-runtime"]
     }
