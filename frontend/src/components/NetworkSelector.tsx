@@ -90,11 +90,11 @@ export function NetworkSelector() {
               }`}
               style={{ fontFamily: 'var(--font-mono), monospace' }}
             >
-              <network.Logo className="w-4 h-4" />
-              {network.name}
+              <network.Logo className="w-4 h-4 shrink-0" />
+              <span className="flex-1 text-left">{network.name}</span>
               <NetworkBadge isMainnet={true} />
               {network.chainId === selectedChainId && (
-                <svg className="w-3.5 h-3.5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               )}
@@ -123,11 +123,11 @@ export function NetworkSelector() {
               }`}
               style={{ fontFamily: 'var(--font-mono), monospace' }}
             >
-              <network.Logo className="w-4 h-4" />
-              {network.name}
+              <network.Logo className="w-4 h-4 shrink-0" />
+              <span className="flex-1 text-left">{network.name}</span>
               <NetworkBadge isMainnet={false} />
               {network.chainId === selectedChainId && (
-                <svg className="w-3.5 h-3.5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               )}
