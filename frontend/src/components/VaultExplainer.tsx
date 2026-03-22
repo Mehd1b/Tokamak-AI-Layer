@@ -28,11 +28,11 @@ export function VaultExplainer() {
       <div className="card max-w-lg mx-4 p-8 space-y-6">
         <h2
           className="text-2xl font-bold text-white"
-          style={{ fontFamily: 'var(--font-serif), serif' }}
+          style={{ fontFamily: 'var(--font-mono), monospace' }}
         >
           Welcome to Tokamak Vaults
         </h2>
-        <div className="space-y-4 text-sm text-white/70" style={{ fontFamily: 'var(--font-serif), serif' }}>
+        <div className="space-y-4 text-sm text-white/70" style={{ fontFamily: 'var(--font-mono), monospace' }}>
           <div>
             <h3 className="font-semibold text-white/90 mb-1">What are Vaults?</h3>
             <p>Vaults are smart contracts that hold your funds and execute strategies automatically using verifiable AI agents.</p>
@@ -64,7 +64,7 @@ export function VaultExplainer() {
         <button
           onClick={dismiss}
           className="btn-primary w-full py-3 text-base"
-          style={{ fontFamily: 'var(--font-serif), serif' }}
+          style={{ fontFamily: 'var(--font-mono), monospace' }}
         >
           Got it — show me the vaults
         </button>
