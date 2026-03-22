@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAccount } from 'wagmi';
 import { formatUnits, parseUnits } from 'viem';
 import { useDeposit, type DepositStep } from '@ek-sdk/react';
@@ -32,8 +32,20 @@ export function DepositStepper({
   onSuccess,
 }: DepositStepperProps) {
   const { isConnected } = useAccount();
-  const { step, error, deposit, reset, needsApproval, isETH } = useDeposit(vaultAddress, asset);
+  const { step, error, sharesMinted, deposit, reset, needsApproval, isETH } = useDeposit(vaultAddress, asset);
   const [amount, setAmount] = useState('');
+  const onSuccessCalled = useRef(false);
+
+  // Trigger onSuccess only when step transitions to 'success'
+  useEffect(() => {
+    if (step === 'success' && !onSuccessCalled.current) {
+      onSuccessCalled.current = true;
+      onSuccess?.(sharesMinted ?? parsedAmount);
+    }
+    if (step !== 'success') {
+      onSuccessCalled.current = false;
+    }
+  }, [step]);
 
   const parsedAmount = (() => {
     try {
@@ -45,8 +57,12 @@ export function DepositStepper({
 
   const handleDeposit = async () => {
     if (parsedAmount <= 0n) return;
-    await deposit(parsedAmount);
-    onSuccess?.(parsedAmount);
+    try {
+      await deposit(parsedAmount);
+    } catch {
+      // Error already handled by useDeposit (sets step to 'error')
+      return;
+    }
   };
 
   const handleMax = () => {

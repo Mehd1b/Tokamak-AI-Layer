@@ -65,9 +65,10 @@ export function useDeposit(
 
   const deposit = useCallback(async (amount: bigint) => {
     if (!client || !vaultAddress || !walletClient || !publicClient || !address) {
-      setError(new DepositError(ErrorCode.TRANSACTION_REVERTED, 'Wallet not connected'));
+      const err = new DepositError(ErrorCode.TRANSACTION_REVERTED, 'Wallet not connected');
+      setError(err);
       setStep('error');
-      return;
+      throw err;
     }
 
     try {
@@ -111,6 +112,7 @@ export function useDeposit(
       const depositErr = DepositError.from(err);
       setError(depositErr);
       setStep('error');
+      throw depositErr;
     }
   }, [client, vaultAddress, walletClient, publicClient, address, isETH, allowance, asset, chainId, queryClient]);
 
