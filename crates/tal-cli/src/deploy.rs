@@ -188,12 +188,21 @@ async fn run_async(
     if let Some(s) = step {
         match s {
             "register" => {
-                step_register(&provider, &chain, deployer_addr, agent_salt, image_id, agent_code_hash, verbose, total_steps).await?;
+                let agent_id = step_register(&provider, &chain, deployer_addr, agent_salt, image_id, agent_code_hash, verbose, total_steps).await?;
+                if std::path::Path::new(config_path).exists() {
+                    update_env_file(config_path, "AGENT_ID", &format!("0x{}", hex::encode(agent_id)))?;
+                    println!("  {} Updated {} with AGENT_ID", "✓".green(), config_path);
+                }
                 return Ok(());
             }
             "vault" => {
                 let agent_id = compute_agent_id(&provider, &chain, deployer_addr, agent_salt).await?;
-                step_deploy_vault(&provider, &chain, deployer_addr, agent_id, image_id, vault_salt, verbose, optimistic, total_steps).await?;
+                let vault_addr = step_deploy_vault(&provider, &chain, deployer_addr, agent_id, image_id, vault_salt, verbose, optimistic, total_steps).await?;
+                if std::path::Path::new(config_path).exists() {
+                    update_env_file(config_path, "AGENT_ID", &format!("0x{}", hex::encode(agent_id)))?;
+                    update_env_file(config_path, "VAULT_ADDRESS", &format!("{}", vault_addr))?;
+                    println!("  {} Updated {} with AGENT_ID, VAULT_ADDRESS", "✓".green(), config_path);
+                }
                 return Ok(());
             }
             "adapter" => {
@@ -204,7 +213,13 @@ async fn run_async(
                     .with_context(|| "VAULT_ADDRESS not set")?
                     .parse()
                     .context("Invalid VAULT_ADDRESS")?;
-                step_deploy_adapter(&provider, &chain, deployer_addr, vault_addr, verbose, total_steps).await?;
+                let (_adapter, sub_account) = step_deploy_adapter(&provider, &chain, deployer_addr, vault_addr, verbose, total_steps).await?;
+                if std::path::Path::new(config_path).exists() {
+                    if let Some(sub) = sub_account {
+                        update_env_file(config_path, "SUB_ACCOUNT", &format!("{}", sub))?;
+                        println!("  {} Updated {} with SUB_ACCOUNT", "✓".green(), config_path);
+                    }
+                }
                 return Ok(());
             }
             "fund" => {
