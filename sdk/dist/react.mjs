@@ -3,7 +3,7 @@ import {
   DepositError,
   ExecutionKernelClient,
   WithdrawError
-} from "./chunk-LWHRFYJG.mjs";
+} from "./chunk-74VOWPMV.mjs";
 
 // src/react/provider.tsx
 import { createContext, useContext, useEffect, useMemo, useState } from "react";

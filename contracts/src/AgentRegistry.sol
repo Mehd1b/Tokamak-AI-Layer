@@ -44,8 +44,11 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
     /// @notice Mapping from agentId to successor agentId
     mapping(bytes32 => bytes32) internal _successors;
 
+    /// @notice Mapping of agent ID to metadata URI (IPFS/HTTPS pointer to JSON)
+    mapping(bytes32 => string) internal _agentMetadataURI;
+
     /// @notice Storage gap for future upgrades
-    uint256[44] private __gap;
+    uint256[43] private __gap;
 
     // ============ Errors ============
 
@@ -297,6 +300,26 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
     /// @inheritdoc IAgentRegistry
     function getSuccessor(bytes32 agentId) external view returns (bytes32) {
         return _successors[agentId];
+    }
+
+    // ============ Metadata Functions ============
+
+    /// @notice Set metadata URI for an agent (name, description, tags, source repo)
+    /// @param agentId The agent to set metadata for
+    /// @param uri URI pointing to JSON metadata (IPFS, HTTPS, Arweave, etc.)
+    function setMetadataURI(bytes32 agentId, string calldata uri) external {
+        AgentInfo storage agent = _agents[agentId];
+        require(agent.exists, "AgentDoesNotExist");
+        require(agent.author == msg.sender, "NotAgentAuthor");
+        _agentMetadataURI[agentId] = uri;
+        emit AgentMetadataUpdated(agentId, uri);
+    }
+
+    /// @notice Get the metadata URI for an agent
+    /// @param agentId The agent to query
+    /// @return The metadata URI string (empty if not set)
+    function getMetadataURI(bytes32 agentId) external view returns (string memory) {
+        return _agentMetadataURI[agentId];
     }
 
     // ============ Internal Functions ============

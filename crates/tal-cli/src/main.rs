@@ -10,6 +10,7 @@
 
 mod deploy;
 mod doctor;
+mod fork;
 mod init;
 mod monitor;
 mod onchain;
@@ -141,6 +142,20 @@ enum Commands {
         min_bond: Option<String>,
     },
 
+    /// Fork an existing agent to create your own version
+    Fork {
+        /// Agent ID to fork (hex, 0x-prefixed)
+        agent_id: String,
+
+        /// Name for the forked agent (defaults to original name + "-fork")
+        #[arg(short, long)]
+        name: Option<String>,
+
+        /// Output directory
+        #[arg(short, long)]
+        output: Option<String>,
+    },
+
     /// Simulate agent execution against a fixture (no zkVM required)
     Sim {
         /// Path to fixture JSON file
@@ -231,6 +246,18 @@ fn main() -> anyhow::Result<()> {
             hyperliquid,
             optimistic,
             min_bond.as_deref(),
+        ),
+
+        Commands::Fork {
+            agent_id,
+            name,
+            output,
+        } => fork::run(
+            &agent_id,
+            name.as_deref(),
+            output.as_deref(),
+            &cli.config,
+            cli.verbose,
         ),
 
         Commands::Sim { fixture, list } => sim::run(fixture.as_deref(), list, cli.verbose),

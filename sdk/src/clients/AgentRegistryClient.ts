@@ -120,6 +120,28 @@ export class AgentRegistryClient {
     });
   }
 
+  async getMetadataURI(agentId: `0x${string}`): Promise<string> {
+    return this.publicClient.readContract({
+      address: this.address,
+      abi: AgentRegistryABI,
+      functionName: 'getMetadataURI',
+      args: [agentId],
+    }) as Promise<string>;
+  }
+
+  async setMetadataURI(agentId: `0x${string}`, uri: string): Promise<`0x${string}`> {
+    this.requireWallet();
+    const hash = await this.walletClient!.writeContract({
+      chain: this.walletClient!.chain ?? null,
+      account: this.walletClient!.account!,
+      address: this.address,
+      abi: AgentRegistryABI,
+      functionName: 'setMetadataURI',
+      args: [agentId, uri],
+    });
+    return hash;
+  }
+
   private requireWallet(): void {
     if (!this.walletClient) {
       throw new Error('WalletClient required for write operations');

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { truncateAddress, truncateBytes32, formatEther } from '@/lib/utils';
 import { NetworkBadge } from '@/components/NetworkLogo';
 import { protocolLabel, protocolColor, PROTOCOL_TYPE, type ProtocolType } from '@/lib/protocolTypes';
+import { useAgentMetadata } from '@/hooks/useAgentMetadata';
 
 interface VaultCardProps {
   address: string;
@@ -55,6 +56,14 @@ function protocolAccent(type: number): { border: string; glow: string; text: str
         dot: 'bg-[#A855F7]',
       };
   }
+}
+
+function AgentName({ agentId }: { agentId: string }) {
+  const { data: metadata } = useAgentMetadata(agentId as `0x${string}`);
+  if (metadata?.name) {
+    return <span title={agentId}>{metadata.name}</span>;
+  }
+  return <span>{truncateBytes32(agentId, 4)}</span>;
 }
 
 export function VaultCard({
@@ -156,7 +165,7 @@ export function VaultCard({
             {truncateAddress(address, 6)}
           </span>
           <span className="text-gray-600">
-            Agent {truncateBytes32(agentId, 4)}
+            Agent <AgentName agentId={agentId} />
           </span>
         </div>
 

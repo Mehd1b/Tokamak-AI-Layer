@@ -208,4 +208,29 @@ export const AgentRegistryABI = [
       { name: 'newFactory', type: 'address', indexed: true },
     ],
   },
+  {
+    type: 'function',
+    name: 'setMetadataURI',
+    inputs: [
+      { name: 'agentId', type: 'bytes32' },
+      { name: 'uri', type: 'string' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'getMetadataURI',
+    inputs: [{ name: 'agentId', type: 'bytes32' }],
+    outputs: [{ name: '', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    name: 'AgentMetadataUpdated',
+    inputs: [
+      { name: 'agentId', type: 'bytes32', indexed: true },
+      { name: 'metadataURI', type: 'string', indexed: false },
+    ],
+  },
 ] as const;

@@ -110,6 +110,8 @@ declare class AgentRegistryClient {
     get(agentId: `0x${string}`): Promise<KernelAgentInfo>;
     getAllAgentIds(): Promise<`0x${string}`[]>;
     agentExists(agentId: `0x${string}`): Promise<boolean>;
+    getMetadataURI(agentId: `0x${string}`): Promise<string>;
+    setMetadataURI(agentId: `0x${string}`, uri: string): Promise<`0x${string}`>;
     private requireWallet;
 }
 

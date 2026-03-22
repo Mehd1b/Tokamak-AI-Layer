@@ -1,4 +1,4 @@
-export { A as AgentRegistryClient, D as DEFAULT_CHAIN_ID, a as DEPLOYMENTS, b as DeployVaultParams, c as DeploymentAddresses, d as DepositError, E as ErrorCode, e as ExecuteParams, f as ExecutionKernelClient, g as ExecutionKernelConfig, h as ExecutionStatus, K as KernelAction, i as KernelActionType, j as KernelAgentInfo, k as KernelInput, l as KernelJournal, m as KernelVaultClient, n as KernelVaultInfo, S as OPTIMISM_SEPOLIA_ADDRESSES, P as ParsedJournal, S as SEPOLIA_ADDRESSES, T as TokamakError, V as VaultFactoryClient, o as VerifierClient, W as WithdrawError } from './errors-DyMZk1T_.js';
+export { A as AgentRegistryClient, D as DEFAULT_CHAIN_ID, a as DEPLOYMENTS, b as DeployVaultParams, c as DeploymentAddresses, d as DepositError, E as ErrorCode, e as ExecuteParams, f as ExecutionKernelClient, g as ExecutionKernelConfig, h as ExecutionStatus, K as KernelAction, i as KernelActionType, j as KernelAgentInfo, k as KernelInput, l as KernelJournal, m as KernelVaultClient, n as KernelVaultInfo, S as OPTIMISM_SEPOLIA_ADDRESSES, P as ParsedJournal, S as SEPOLIA_ADDRESSES, T as TokamakError, V as VaultFactoryClient, o as VerifierClient, W as WithdrawError } from './errors-Bo9oKMn7.js';
 import 'viem';
 
 declare const AgentRegistryABI: readonly [{
@@ -299,6 +299,42 @@ declare const AgentRegistryABI: readonly [{
         readonly name: "newFactory";
         readonly type: "address";
         readonly indexed: true;
+    }];
+}, {
+    readonly type: "function";
+    readonly name: "setMetadataURI";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "bytes32";
+    }, {
+        readonly name: "uri";
+        readonly type: "string";
+    }];
+    readonly outputs: readonly [];
+    readonly stateMutability: "nonpayable";
+}, {
+    readonly type: "function";
+    readonly name: "getMetadataURI";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "bytes32";
+    }];
+    readonly outputs: readonly [{
+        readonly name: "";
+        readonly type: "string";
+    }];
+    readonly stateMutability: "view";
+}, {
+    readonly type: "event";
+    readonly name: "AgentMetadataUpdated";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "bytes32";
+        readonly indexed: true;
+    }, {
+        readonly name: "metadataURI";
+        readonly type: "string";
+        readonly indexed: false;
     }];
 }];
 

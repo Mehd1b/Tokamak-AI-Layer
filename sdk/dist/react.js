@@ -258,6 +258,31 @@ var AgentRegistryABI = [
       { name: "previousFactory", type: "address", indexed: true },
       { name: "newFactory", type: "address", indexed: true }
     ]
+  },
+  {
+    type: "function",
+    name: "setMetadataURI",
+    inputs: [
+      { name: "agentId", type: "bytes32" },
+      { name: "uri", type: "string" }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "getMetadataURI",
+    inputs: [{ name: "agentId", type: "bytes32" }],
+    outputs: [{ name: "", type: "string" }],
+    stateMutability: "view"
+  },
+  {
+    type: "event",
+    name: "AgentMetadataUpdated",
+    inputs: [
+      { name: "agentId", type: "bytes32", indexed: true },
+      { name: "metadataURI", type: "string", indexed: false }
+    ]
   }
 ];
 
@@ -354,6 +379,26 @@ var AgentRegistryClient = class {
       functionName: "agentExists",
       args: [agentId]
     });
+  }
+  async getMetadataURI(agentId) {
+    return this.publicClient.readContract({
+      address: this.address,
+      abi: AgentRegistryABI,
+      functionName: "getMetadataURI",
+      args: [agentId]
+    });
+  }
+  async setMetadataURI(agentId, uri) {
+    this.requireWallet();
+    const hash = await this.walletClient.writeContract({
+      chain: this.walletClient.chain ?? null,
+      account: this.walletClient.account,
+      address: this.address,
+      abi: AgentRegistryABI,
+      functionName: "setMetadataURI",
+      args: [agentId, uri]
+    });
+    return hash;
   }
   requireWallet() {
     if (!this.walletClient) {

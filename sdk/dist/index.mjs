@@ -17,7 +17,7 @@ import {
   VaultFactoryClient,
   VerifierClient,
   WithdrawError
-} from "./chunk-LWHRFYJG.mjs";
+} from "./chunk-74VOWPMV.mjs";
 export {
   AgentRegistryABI,
   AgentRegistryClient,

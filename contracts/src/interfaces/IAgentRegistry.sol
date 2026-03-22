@@ -77,6 +77,12 @@ interface IAgentRegistry {
     /// @notice Get the successor agent ID (bytes32(0) if none)
     function getSuccessor(bytes32 agentId) external view returns (bytes32);
 
+    /// @notice Set metadata URI for an agent (author only)
+    function setMetadataURI(bytes32 agentId, string calldata uri) external;
+
+    /// @notice Get the metadata URI for an agent
+    function getMetadataURI(bytes32 agentId) external view returns (string memory);
+
     /// @notice Emitted when an agent is registered
     event AgentRegistered(
         bytes32 indexed agentId,
@@ -101,6 +107,9 @@ interface IAgentRegistry {
 
     /// @notice Emitted when a successor agent is set
     event AgentSuccessorSet(bytes32 indexed agentId, bytes32 indexed successorAgentId);
+
+    /// @notice Emitted when agent metadata URI is updated
+    event AgentMetadataUpdated(bytes32 indexed agentId, string metadataURI);
 
     /// @notice Agent with this ID already exists
     error AgentAlreadyExists(bytes32 agentId);
