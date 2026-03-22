@@ -4,6 +4,7 @@ import './globals.css';
 import { Providers } from './providers';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
+import { Analytics } from '@vercel/analytics/react';
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
@@ -48,6 +49,7 @@ export default function RootLayout({
           <main className="relative z-10 flex-1 pt-20">{children}</main>
           <Footer />
         </Providers>
+        <Analytics />
       </body>
     </html>
   );
