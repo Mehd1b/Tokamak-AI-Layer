@@ -27,13 +27,36 @@ const HyperliquidAdapterABI = [
   },
 ] as const;
 
-// Known HyperliquidAdapter addresses per chain (multiple versions)
-const ADAPTER_ADDRESSES: Record<number, `0x${string}`[]> = {
-  999: [
-    '0x47660230D9B8e343bdecD2e35008Bd06E47bb3e0', // v16 (two-proof)
-    '0x641aDfDD98007Ea18507Aab6579C9b652c600007', // v15 (szDecimals fix)
-  ],
-};
+// Known HyperliquidAdapter addresses per chain (multiple versions).
+// Additional adapters can be added via NEXT_PUBLIC_HYPERLIQUID_ADAPTERS (comma-separated).
+function getAdapterAddresses(chainId: number): `0x${string}`[] {
+  const known: Record<number, `0x${string}`[]> = {
+    999: [
+      '0x47660230D9B8e343bdecD2e35008Bd06E47bb3e0', // v16 (two-proof)
+      '0x641aDfDD98007Ea18507Aab6579C9b652c600007', // v15 (szDecimals fix)
+    ],
+    998: [
+      '0xA9392fb511b5314d4faB0e7aAe43107b2cb32755', // testnet adapter
+    ],
+  };
+
+  const base = known[chainId] ?? [];
+
+  // Merge any additional adapters from env (comma-separated hex addresses)
+  const extra = (typeof window !== 'undefined'
+    ? process.env.NEXT_PUBLIC_HYPERLIQUID_ADAPTERS
+    : process.env.NEXT_PUBLIC_HYPERLIQUID_ADAPTERS) ?? '';
+  if (extra) {
+    const parsed = extra
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.startsWith('0x') && s.length === 42) as `0x${string}`[];
+    // Prepend extras so newest adapters are checked first
+    return [...parsed, ...base];
+  }
+
+  return base;
+}
 
 export interface HyperliquidPosition {
   coin: string;
@@ -85,7 +108,7 @@ const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 export function useSubAccount(vaultAddress: `0x${string}` | undefined) {
   const { selectedChainId } = useNetwork();
   const client = usePublicClient({ chainId: selectedChainId });
-  const adapters = ADAPTER_ADDRESSES[selectedChainId] ?? [];
+  const adapters = getAdapterAddresses(selectedChainId);
 
   return useQuery<`0x${string}` | null>({
     queryKey: ['hyperliquidSubAccount', vaultAddress, selectedChainId],
