@@ -1,4 +1,25 @@
 /**
+ * Strip API keys and sensitive tokens from URLs in error messages.
+ * Matches patterns like /v2/KEY, /v3/KEY, ?apikey=KEY, &api_key=KEY, etc.
+ */
+export function sanitizeErrorMessage(msg: string): string {
+  return msg
+    // Strip path-based API keys: /v2/abc123... or /v3/abc123...
+    .replace(/\/v\d+\/[A-Za-z0-9_-]{10,}/g, '/v*/***')
+    // Strip query param keys: ?apikey=... or &api_key=... or &key=...
+    .replace(/([?&])(api[_-]?key|key|token|secret|auth)=[^&\s]*/gi, '$1$2=***')
+    // Strip full URLs to just host + path hint
+    .replace(/https?:\/\/[^\s"')]+/g, (url) => {
+      try {
+        const u = new URL(url);
+        return `${u.protocol}//${u.hostname}/...`;
+      } catch {
+        return '[URL redacted]';
+      }
+    });
+}
+
+/**
  * Human-readable error messages for KernelVault custom errors.
  * Keys are Solidity error names as they appear in revert reason strings.
  */
@@ -57,7 +78,12 @@ export function parseVaultError(error: Error | null | undefined): string | null 
     return 'Transaction nonce conflict. Please try again.';
   }
 
-  // Fallback: truncate the raw message
-  const clean = msg.replace(/^.*reason:\s*/i, '').split('\n')[0];
+  // Rate limiting
+  if (msg.includes('429') || msg.includes('rate limit') || msg.includes('Too Many Requests')) {
+    return 'RPC rate limit reached. Please try again in a few seconds.';
+  }
+
+  // Fallback: sanitize and truncate the raw message
+  const clean = sanitizeErrorMessage(msg.replace(/^.*reason:\s*/i, '').split('\n')[0]);
   return clean.length > 120 ? clean.slice(0, 120) + '...' : clean;
 }

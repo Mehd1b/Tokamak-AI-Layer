@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAccount } from 'wagmi';
 import { formatUnits, parseUnits } from 'viem';
 import { useDeposit, type DepositStep } from '@ek-sdk/react';
+import { sanitizeErrorMessage } from '@/lib/vaultErrors';
 
 interface DepositStepperProps {
   vaultAddress: `0x${string}`;
@@ -133,7 +134,7 @@ export function DepositStepper({
       {/* Error */}
       {error && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-sm text-red-400">
-          {error.message}
+          {sanitizeErrorMessage(error.message)}
         </div>
       )}
 

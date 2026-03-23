@@ -177,7 +177,7 @@ export default function VaultsPage() {
 
           {vaultsError && (
             <div className="rounded-2xl border border-red-500/20 bg-red-500/5 text-center py-12 mb-8">
-              <p className="text-red-400 font-mono text-sm">Failed to fetch vaults: {vaultsError.message.slice(0, 120)}</p>
+              <p className="text-red-400 font-mono text-sm">Failed to fetch vaults. Please try refreshing the page.</p>
             </div>
           )}
 
