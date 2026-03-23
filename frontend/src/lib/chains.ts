@@ -13,7 +13,7 @@ export const thanosSepolia = defineChain({
   id: 111551119090,
   name: 'Thanos Sepolia',
   nativeCurrency: { name: 'TON', symbol: 'TON', decimals: 18 },
-  rpcUrls: { default: { http: [process.env.NEXT_PUBLIC_THANOS_SEPOLIA_RPC_URL || 'https://rpc.thanos-sepolia.tokamak.network'] } },
+  rpcUrls: { default: { http: ['/api/rpc/111551119090'] } },
   blockExplorers: { default: { name: 'Thanos Explorer', url: 'https://explorer.thanos-sepolia.tokamak.network' } },
   testnet: true,
 });
@@ -22,7 +22,7 @@ export const hyperEvmMainnet = defineChain({
   id: 999,
   name: 'HyperEVM',
   nativeCurrency: { name: 'HYPE', symbol: 'HYPE', decimals: 18 },
-  rpcUrls: { default: { http: [process.env.NEXT_PUBLIC_HYPER_MAINNET_RPC_URL || ''] } },
+  rpcUrls: { default: { http: ['/api/rpc/999'] } },
   blockExplorers: { default: { name: 'HyperEVM Explorer', url: 'https://hyperevmscan.io' } },
   contracts: {
     multicall3: {
@@ -37,7 +37,7 @@ export const hyperEvmTestnet = defineChain({
   id: 998,
   name: 'HyperEVM Testnet',
   nativeCurrency: { name: 'HYPE', symbol: 'HYPE', decimals: 18 },
-  rpcUrls: { default: { http: [process.env.NEXT_PUBLIC_HYPER_TESTNET_RPC_URL || 'https://rpc.hyperliquid-testnet.xyz/evm'] } },
+  rpcUrls: { default: { http: ['/api/rpc/998'] } },
   blockExplorers: { default: { name: 'HyperEVM Explorer', url: 'https://testnet.purrsec.com' } },
   contracts: {
     multicall3: {
