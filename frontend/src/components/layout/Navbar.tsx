@@ -259,7 +259,7 @@ export function Navbar() {
     <>
       <nav className={clsx(
         "fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 sm:px-8 border-b border-white/5",
-        pathname === '/' ? 'bg-transparent' : 'bg-black'
+        pathname === '/' ? 'bg-transparent' : 'bg-[#0a0a0f]'
       )}>
         {/* Logo - Interlocking Diamonds */}
         <Link href="/" className="group flex items-center gap-3">
