@@ -39,12 +39,14 @@ export function registerBondAttestation(
     const amountBig = BigInt(amount);
     const chainIdBig = BigInt(chainId);
 
-    // Check vault is registered (across all chains)
-    const vaultChainId = Number(chainIdBig) === 1 ? 1 : 999;
-    // The vault lives on HyperEVM typically, but we check all registered chains
-    let isRegistered = await registry.isRegisteredVault(vault, 999);
-    if (!isRegistered) {
-      isRegistered = await registry.isRegisteredVault(vault, 1);
+    // Check vault is registered across all supported chains
+    const chainsToCheck = [999, 998, 1]; // HyperEVM mainnet, testnet, Ethereum
+    let isRegistered = false;
+    for (const cid of chainsToCheck) {
+      if (await registry.isRegisteredVault(vault, cid)) {
+        isRegistered = true;
+        break;
+      }
     }
 
     if (!isRegistered) {

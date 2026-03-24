@@ -19,11 +19,13 @@ export const config = {
   // RPC
   ethRpcUrl: requireEnv('ETH_RPC_URL'),
   hyperRpcUrl: requireEnv('HYPER_RPC_URL'),
+  hyperTestnetRpcUrl: process.env.HYPER_TESTNET_RPC_URL || '',
 
   // Contracts
   wstonBondManager: requireEnv('WSTON_BOND_MANAGER') as `0x${string}`,
   vaultFactoryHyper: requireEnv('VAULT_FACTORY_HYPER') as `0x${string}`,
   vaultFactoryEth: requireEnv('VAULT_FACTORY_ETH') as `0x${string}`,
+  vaultFactoryHyperTestnet: (process.env.VAULT_FACTORY_HYPER_TESTNET || '') as `0x${string}`,
 
   // Config
   confirmationDepth: parseInt(process.env.CONFIRMATION_DEPTH || '10'),
@@ -34,6 +36,7 @@ export const config = {
   // Scan start blocks (avoid scanning from genesis)
   scanStartBlockHyper: BigInt(process.env.SCAN_START_BLOCK_HYPER || '0'),
   scanStartBlockEth: BigInt(process.env.SCAN_START_BLOCK_ETH || '0'),
+  scanStartBlockHyperTestnet: BigInt(process.env.SCAN_START_BLOCK_HYPER_TESTNET || '0'),
 } as const;
 
 // ============ ABIs ============

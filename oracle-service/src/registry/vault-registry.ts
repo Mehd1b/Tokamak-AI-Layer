@@ -16,14 +16,19 @@ import pino from 'pino';
 
 const logger = pino({ name: 'vault-registry' });
 
-// HyperEVM chain definition
+// Chain definitions
 const hyperEVM: Chain = {
   id: 999,
   name: 'HyperEVM',
   nativeCurrency: { name: 'HYPE', symbol: 'HYPE', decimals: 18 },
-  rpcUrls: {
-    default: { http: [config.hyperRpcUrl] },
-  },
+  rpcUrls: { default: { http: [config.hyperRpcUrl] } },
+};
+
+const hyperEVMTestnet: Chain = {
+  id: 998,
+  name: 'HyperEVM Testnet',
+  nativeCurrency: { name: 'HYPE', symbol: 'HYPE', decimals: 18 },
+  rpcUrls: { default: { http: [config.hyperTestnetRpcUrl || 'https://rpc.hyperliquid-testnet.xyz/evm'] } },
 };
 
 export type NewVaultCallback = (vault: vaultStore.VaultRecord) => void;
@@ -31,9 +36,11 @@ export type NewVaultCallback = (vault: vaultStore.VaultRecord) => void;
 export class VaultRegistry {
   private ethClient: PublicClient;
   private hyperClient: PublicClient;
+  private hyperTestnetClient: PublicClient | null = null;
   private onNewVault: NewVaultCallback | null = null;
   private unwatchHyper: (() => void) | null = null;
   private unwatchEth: (() => void) | null = null;
+  private unwatchHyperTestnet: (() => void) | null = null;
 
   constructor() {
     this.ethClient = createPublicClient({
@@ -44,6 +51,13 @@ export class VaultRegistry {
       chain: hyperEVM,
       transport: http(config.hyperRpcUrl),
     });
+    // Only create testnet client if configured
+    if (config.hyperTestnetRpcUrl && config.vaultFactoryHyperTestnet) {
+      this.hyperTestnetClient = createPublicClient({
+        chain: hyperEVMTestnet,
+        transport: http(config.hyperTestnetRpcUrl),
+      });
+    }
   }
 
   /** Register callback for new vault discovery (used by relayer) */
@@ -55,11 +69,17 @@ export class VaultRegistry {
   async start(): Promise<void> {
     logger.info('Starting vault registry...');
 
-    // Scan historical events on both chains (non-blocking to avoid delaying server start)
+    // Scan historical events on all configured chains
     const scanPromises = [
       this.scanHistorical(this.hyperClient, 999, config.vaultFactoryHyper, config.scanStartBlockHyper),
       this.scanHistorical(this.ethClient, 1, config.vaultFactoryEth, config.scanStartBlockEth),
     ];
+
+    if (this.hyperTestnetClient && config.vaultFactoryHyperTestnet) {
+      scanPromises.push(
+        this.scanHistorical(this.hyperTestnetClient, 998, config.vaultFactoryHyperTestnet, config.scanStartBlockHyperTestnet)
+      );
+    }
 
     // Don't block startup — scan in background
     Promise.all(scanPromises).then(() => {
@@ -71,6 +91,9 @@ export class VaultRegistry {
     // Subscribe to new events immediately
     this.subscribeNew(this.hyperClient, 999, config.vaultFactoryHyper);
     this.subscribeNew(this.ethClient, 1, config.vaultFactoryEth);
+    if (this.hyperTestnetClient && config.vaultFactoryHyperTestnet) {
+      this.subscribeNew(this.hyperTestnetClient, 998, config.vaultFactoryHyperTestnet);
+    }
 
     const count = await vaultStore.getVaultCount();
     logger.info({ registeredVaults: count }, 'Vault registry started');
@@ -152,6 +175,8 @@ export class VaultRegistry {
 
     if (chainId === 999) {
       this.unwatchHyper = () => clearInterval(interval);
+    } else if (chainId === 998) {
+      this.unwatchHyperTestnet = () => clearInterval(interval);
     } else {
       this.unwatchEth = () => clearInterval(interval);
     }
@@ -196,6 +221,7 @@ export class VaultRegistry {
   stop(): void {
     this.unwatchHyper?.();
     this.unwatchEth?.();
+    this.unwatchHyperTestnet?.();
     logger.info('Vault registry stopped');
   }
 }
