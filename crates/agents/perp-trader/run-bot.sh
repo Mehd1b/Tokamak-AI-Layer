@@ -37,9 +37,10 @@ if [[ -n "$ENV_FILE" && -f "$ENV_FILE" ]]; then
 fi
 
 # ── Configuration (override via env) ─────────────────────────────────────────
-# Optimistic KernelVault (OKV) on HyperEVM mainnet
-VAULT="${VAULT:-0x90bdcc34907e7a387e394f10179cf3328e5b0d82}"
-RPC="${RPC:-${RPC_URL_HYPER_MAINNET:-https://rpc.hyperliquid.xyz/evm}}"
+# Read from .env variable names that tal deploy writes (VAULT_ADDRESS, RPC_URL, ADAPTER_ADDRESS)
+# Fall back to legacy names (VAULT, RPC, ADAPTER) then hardcoded mainnet defaults
+VAULT="${VAULT:-${VAULT_ADDRESS:-0x90bdcc34907e7a387e394f10179cf3328e5b0d82}}"
+RPC="${RPC:-${RPC_URL:-https://rpc.hyperliquid.xyz/evm}}"
 PK="${PK:-env:PRIVATE_KEY}"
 ORACLE="${ORACLE:-env:ORACLE_KEY}"
 # Bundle path resolution (checked in order):
@@ -59,11 +60,16 @@ if [[ -z "${BUNDLE:-}" ]]; then
     exit 1
   fi
 fi
-HL_URL="${HL_URL:-https://api.hyperliquid.xyz}"
+# Auto-detect Hyperliquid API URL based on chain ID
+if [[ "${CHAIN_ID:-999}" == "998" ]]; then
+  HL_URL="${HL_URL:-https://api.hyperliquid-testnet.xyz}"
+else
+  HL_URL="${HL_URL:-https://api.hyperliquid.xyz}"
+fi
 
-# Adapter v17 (two-proof, for OKV)
-ADAPTER="${ADAPTER:-0x79607Dd1B4C312C270da427113920016Be24119A}"
-USDC="${USDC:-0xb88339CB7199b77E23DB6E890353E22632Ba630f}"
+# Adapter and USDC (read from .env names tal deploy writes)
+ADAPTER="${ADAPTER:-${ADAPTER_ADDRESS:-0x79607Dd1B4C312C270da427113920016Be24119A}}"
+USDC="${USDC:-${USDC_ADDRESS:-0xb88339CB7199b77E23DB6E890353E22632Ba630f}}"
 ASSET="${ASSET:-BTC}"
 
 # Strategy
