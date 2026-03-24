@@ -1,8 +1,9 @@
 import type { FastifyInstance } from 'fastify';
-import { type Address, isAddress } from 'viem';
+import { type Address, isAddress, createPublicClient, http, parseAbi } from 'viem';
 import { BondSigner } from '../signing/bond-signer.js';
 import { L1Verifier } from '../verification/l1-verifier.js';
 import { VaultRegistry } from '../registry/vault-registry.js';
+import { config } from '../config.js';
 import pino from 'pino';
 
 const logger = pino({ name: 'bond-attestation' });
@@ -39,8 +40,8 @@ export function registerBondAttestation(
     const amountBig = BigInt(amount);
     const chainIdBig = BigInt(chainId);
 
-    // Check vault is registered across all supported chains
-    const chainsToCheck = [999, 998, 1]; // HyperEVM mainnet, testnet, Ethereum
+    // Check vault is registered: first DB (event-scanned), then on-chain fallback
+    const chainsToCheck = [999, 998, 1];
     let isRegistered = false;
     for (const cid of chainsToCheck) {
       if (await registry.isRegisteredVault(vault, cid)) {
@@ -49,11 +50,42 @@ export function registerBondAttestation(
       }
     }
 
+    // On-chain fallback: query isDeployedVault() directly on each factory
     if (!isRegistered) {
-      logger.warn({ vault }, 'Bond attestation rejected: vault not registered');
+      const isDeployedAbi = parseAbi(['function isDeployedVault(address) view returns (bool)']);
+      const factoryChecks: { rpc: string; factory: string }[] = [
+        { rpc: config.hyperRpcUrl, factory: config.vaultFactoryHyper },
+      ];
+      if (config.hyperTestnetRpcUrl && config.vaultFactoryHyperTestnet) {
+        factoryChecks.push({ rpc: config.hyperTestnetRpcUrl, factory: config.vaultFactoryHyperTestnet });
+      }
+      factoryChecks.push({ rpc: config.ethRpcUrl, factory: config.vaultFactoryEth });
+
+      for (const { rpc, factory } of factoryChecks) {
+        try {
+          const client = createPublicClient({ transport: http(rpc) });
+          const deployed = await client.readContract({
+            address: factory as Address,
+            abi: isDeployedAbi,
+            functionName: 'isDeployedVault',
+            args: [vault as Address],
+          });
+          if (deployed) {
+            isRegistered = true;
+            logger.info({ vault, factory }, 'Vault verified on-chain (not in DB yet)');
+            break;
+          }
+        } catch (err) {
+          logger.debug({ err, factory }, 'On-chain vault check failed, trying next');
+        }
+      }
+    }
+
+    if (!isRegistered) {
+      logger.warn({ vault }, 'Bond attestation rejected: vault not registered on any factory');
       return reply.status(403).send({
         error: 'Vault not registered',
-        detail: 'The vault address is not a registered OptimisticKernelVault deployed by VaultFactory',
+        detail: 'The vault address is not deployed by any known VaultFactory',
       });
     }
 
