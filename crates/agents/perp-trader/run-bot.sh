@@ -42,11 +42,22 @@ VAULT="${VAULT:-0x90bdcc34907e7a387e394f10179cf3328e5b0d82}"
 RPC="${RPC:-${RPC_URL_HYPER_MAINNET:-https://rpc.hyperliquid.xyz/evm}}"
 PK="${PK:-env:PRIVATE_KEY}"
 ORACLE="${ORACLE:-env:ORACLE_KEY}"
-# Bundle path: standalone has bundle/ at root, monorepo has crates/agents/perp-trader/bundle
-if [[ -d "$EK_ROOT/bundle" ]]; then
-  BUNDLE="${BUNDLE:-${EK_ROOT}/bundle}"
-else
-  BUNDLE="${BUNDLE:-${EK_ROOT}/crates/agents/perp-trader/bundle}"
+# Bundle path resolution (checked in order):
+#   1. bundle/ at project root (has agent-pack.json + guest.elf)
+#   2. dist/ at project root (tal build --elf populates this)
+#   3. Monorepo path: crates/agents/perp-trader/bundle
+if [[ -z "${BUNDLE:-}" ]]; then
+  if [[ -f "$EK_ROOT/bundle/guest.elf" ]]; then
+    BUNDLE="$EK_ROOT/bundle"
+  elif [[ -f "$EK_ROOT/dist/guest.elf" ]]; then
+    BUNDLE="$EK_ROOT/dist"
+  elif [[ -f "$EK_ROOT/crates/agents/perp-trader/bundle/guest.elf" ]]; then
+    BUNDLE="$EK_ROOT/crates/agents/perp-trader/bundle"
+  else
+    echo "ERROR: No bundle with guest.elf found."
+    echo "  Run 'tal build --elf' first, or copy guest.elf into bundle/ or dist/."
+    exit 1
+  fi
 fi
 HL_URL="${HL_URL:-https://api.hyperliquid.xyz}"
 
