@@ -283,18 +283,19 @@ async fn run_async(
 
         if !already_enabled {
             // Set oracle signer (required before enabling optimistic)
-            // Resolve oracle signer: prefer explicit ORACLE_SIGNER address,
-            // otherwise derive from ORACLE_KEY private key.
+            // Resolution order:
+            //   1. ORACLE_SIGNER env var (explicit address)
+            //   2. Production bond oracle (0x2394...3AB) — the signer used by the
+            //      hosted oracle service for bond attestations
+            //   3. Derived from ORACLE_KEY (only for custom/self-hosted oracle setups)
+            const PRODUCTION_BOND_ORACLE: &str = "0x2394F355E086Aa3Fcec2ff28EeDdDbf09d3f03AB";
+
             let oracle_signer: Option<Address> = if let Some(addr_str) = resolve_env("ORACLE_SIGNER") {
                 Some(addr_str.parse().context("Invalid ORACLE_SIGNER")?)
-            } else if let Some(oracle_key) = resolve_env("ORACLE_KEY") {
-                let pk_clean = oracle_key.strip_prefix("0x").unwrap_or(&oracle_key);
-                let signer: alloy::signers::local::PrivateKeySigner = pk_clean.parse()
-                    .context("Invalid ORACLE_KEY — cannot derive oracle signer address")?;
-                println!("  Derived oracle signer from ORACLE_KEY: {}", signer.address());
-                Some(signer.address())
             } else {
-                None
+                // Default to the production bond oracle signer
+                println!("  Using production bond oracle signer: {}", PRODUCTION_BOND_ORACLE);
+                Some(PRODUCTION_BOND_ORACLE.parse().unwrap())
             };
 
             if let Some(oracle_signer) = oracle_signer {
