@@ -416,22 +416,26 @@ fn update_manifest_from_build(
         anyhow::bail!("Cannot find agent/src/lib.rs or agent/Cargo.toml");
     };
 
-    // Find the ELF path from methods.rs
-    let elf_sha256 = if let Some(path_line) = content.lines().find(|l| l.contains("_PATH: &str")) {
+    // Find the ELF path from methods.rs, copy it to dist/, and compute SHA256
+    let mut elf_sha256 = "unknown".to_string();
+    if let Some(path_line) = content.lines().find(|l| l.contains("_PATH: &str")) {
         if let Some(start) = path_line.find('"') {
             if let Some(end) = path_line[start+1..].find('"') {
-                let elf_path = &path_line[start+1..start+1+end];
-                if std::path::Path::new(elf_path).exists() {
+                let elf_source = &path_line[start+1..start+1+end];
+                if std::path::Path::new(elf_source).exists() {
                     use sha2::{Digest, Sha256};
-                    let elf_bytes = std::fs::read(elf_path)?;
+                    let elf_bytes = std::fs::read(elf_source)?;
                     let hash: [u8; 32] = Sha256::digest(&elf_bytes).into();
-                    format!("0x{}", hex::encode(hash))
-                } else {
-                    "unknown".to_string()
+                    elf_sha256 = format!("0x{}", hex::encode(hash));
+
+                    // Copy ELF to dist/guest.elf so the bundle is self-contained
+                    let dest = std::path::Path::new("dist/guest.elf");
+                    std::fs::copy(elf_source, dest)?;
+                    println!("  {} Copied ELF to dist/guest.elf ({}B)", "✓".green(), elf_bytes.len());
                 }
-            } else { "unknown".to_string() }
-        } else { "unknown".to_string() }
-    } else { "unknown".to_string() };
+            }
+        }
+    }
 
     // Update the manifest
     let manifest_content = std::fs::read_to_string(manifest_path)?;
@@ -441,6 +445,7 @@ fn update_manifest_from_build(
     manifest["agent_code_hash"] = serde_json::Value::String(agent_code_hash.clone());
     if let Some(artifacts) = manifest.get_mut("artifacts") {
         artifacts["elf_sha256"] = serde_json::Value::String(elf_sha256);
+        artifacts["elf_path"] = serde_json::Value::String("guest.elf".to_string());
     }
 
     std::fs::write(manifest_path, serde_json::to_string_pretty(&manifest)?)?;
