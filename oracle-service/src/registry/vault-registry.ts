@@ -109,7 +109,8 @@ export class VaultRegistry {
 
     try {
       const head = await client.getBlockNumber();
-      const CHUNK = 9_999n; // Alchemy limits eth_getLogs to 10,000 blocks
+      // HyperEVM RPCs limit getLogs to 1000 blocks; Alchemy to 10,000
+      const CHUNK = (chainId === 999 || chainId === 998) ? 999n : 9_999n;
       let totalFound = 0;
 
       for (let from = startBlock; from <= head; from += CHUNK + 1n) {
