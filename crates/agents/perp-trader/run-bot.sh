@@ -14,10 +14,25 @@ set -euo pipefail
 
 # ── Load .env ────────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-EK_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-ENV_FILE="${EK_ROOT}/contracts/.env"
 
-if [[ -f "$ENV_FILE" ]]; then
+# Detect project root: standalone project has Cargo.toml in SCRIPT_DIR,
+# monorepo layout has it three levels up (crates/agents/perp-trader/).
+if [[ -f "$SCRIPT_DIR/Cargo.toml" ]]; then
+  EK_ROOT="$SCRIPT_DIR"
+else
+  EK_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+fi
+
+# Load .env from project root (standalone) or contracts/.env (monorepo)
+if [[ -f "$EK_ROOT/.env" ]]; then
+  ENV_FILE="$EK_ROOT/.env"
+elif [[ -f "$EK_ROOT/contracts/.env" ]]; then
+  ENV_FILE="${EK_ROOT}/contracts/.env"
+else
+  ENV_FILE=""
+fi
+
+if [[ -n "$ENV_FILE" && -f "$ENV_FILE" ]]; then
   export $(grep -v '^#' "$ENV_FILE" | grep -v '^$' | xargs)
 fi
 
@@ -27,7 +42,12 @@ VAULT="${VAULT:-0x90bdcc34907e7a387e394f10179cf3328e5b0d82}"
 RPC="${RPC:-${RPC_URL_HYPER_MAINNET:-https://rpc.hyperliquid.xyz/evm}}"
 PK="${PK:-env:PRIVATE_KEY}"
 ORACLE="${ORACLE:-env:ORACLE_KEY}"
-BUNDLE="${BUNDLE:-${EK_ROOT}/crates/agents/perp-trader/bundle}"
+# Bundle path: standalone has bundle/ at root, monorepo has crates/agents/perp-trader/bundle
+if [[ -d "$EK_ROOT/bundle" ]]; then
+  BUNDLE="${BUNDLE:-${EK_ROOT}/bundle}"
+else
+  BUNDLE="${BUNDLE:-${EK_ROOT}/crates/agents/perp-trader/bundle}"
+fi
 HL_URL="${HL_URL:-https://api.hyperliquid.xyz}"
 
 # Adapter v17 (two-proof, for OKV)
@@ -47,7 +67,12 @@ MONITOR_INTERVAL="${MONITOR_INTERVAL:-15}"  # 15s between retries/polls
 # Sub-account and seed trades
 SZ_DECIMALS="${SZ_DECIMALS:-5}"
 API_WALLET="${API_WALLET:-env:API_WALLET_KEY}"
-SEED_SCRIPT="${SEED_SCRIPT:-${EK_ROOT}/crates/agents/perp-trader/scripts/hl_seed_trade.py}"
+# Seed script: standalone has scripts/ at root, monorepo has crates/agents/perp-trader/scripts/
+if [[ -d "$EK_ROOT/scripts" ]]; then
+  SEED_SCRIPT="${SEED_SCRIPT:-${EK_ROOT}/scripts/hl_seed_trade.py}"
+else
+  SEED_SCRIPT="${SEED_SCRIPT:-${EK_ROOT}/crates/agents/perp-trader/scripts/hl_seed_trade.py}"
+fi
 SEED_LEVERAGE="${SEED_LEVERAGE:-5}"
 
 # HYPE auto-funding
