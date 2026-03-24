@@ -443,6 +443,16 @@ fn update_manifest_from_build(
 
     manifest["image_id"] = serde_json::Value::String(image_id_hex.clone());
     manifest["agent_code_hash"] = serde_json::Value::String(agent_code_hash.clone());
+    // Backfill agent_id from .env if the manifest has a placeholder
+    if let Some(id) = manifest.get("agent_id").and_then(|v| v.as_str()) {
+        if id == "0x0" || id.is_empty() {
+            if let Ok(env_id) = std::env::var("AGENT_ID") {
+                if env_id.len() == 66 {
+                    manifest["agent_id"] = serde_json::Value::String(env_id);
+                }
+            }
+        }
+    }
     // Ensure required fields exist (backfill for older skeletons)
     if manifest.get("risc0_version").is_none() {
         manifest["risc0_version"] = serde_json::Value::String("3.0.4".to_string());
