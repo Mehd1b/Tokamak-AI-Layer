@@ -347,7 +347,7 @@ fn update_manifest_from_build(
         // Create dist/ and a skeleton manifest
         std::fs::create_dir_all("dist")?;
         let skeleton = format!(
-            r#"{{"format_version":"1","agent_name":"{}","agent_version":"0.1.0","agent_id":"0x0","protocol_version":1,"kernel_version":1,"risc0_version":"3.0.4","rust_toolchain":"1.75.0","agent_code_hash":"","image_id":"","artifacts":{{"elf_path":"guest.elf","elf_sha256":""}},"build":{{"cargo_lock_sha256":"0x0000000000000000000000000000000000000000000000000000000000000000","build_command":"cargo build --release","reproducible":false}}}}"#,
+            r#"{{"format_version":"1","agent_name":"{}","agent_version":"0.1.0","agent_id":"0x0","protocol_version":1,"kernel_version":1,"risc0_version":"3.0.4","rust_toolchain":"1.75.0","agent_code_hash":"","image_id":"","artifacts":{{"elf_path":"guest.elf","elf_sha256":""}},"build":{{"cargo_lock_sha256":"0x0000000000000000000000000000000000000000000000000000000000000000","build_command":"cargo build --release","reproducible":false}},"inputs":"TODO: Describe your agent input format","actions_profile":"TODO: Describe the actions your agent produces"}}"#,
             agent_name
         );
         std::fs::write(manifest_path, &skeleton)?;
@@ -456,6 +456,12 @@ fn update_manifest_from_build(
             "build_command": "cargo build --release",
             "reproducible": false
         });
+    }
+    if manifest.get("inputs").is_none() {
+        manifest["inputs"] = serde_json::Value::String("TODO: Describe your agent input format".to_string());
+    }
+    if manifest.get("actions_profile").is_none() {
+        manifest["actions_profile"] = serde_json::Value::String("TODO: Describe the actions your agent produces".to_string());
     }
     if let Some(artifacts) = manifest.get_mut("artifacts") {
         artifacts["elf_sha256"] = serde_json::Value::String(elf_sha256);
