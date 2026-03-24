@@ -347,7 +347,7 @@ fn update_manifest_from_build(
         // Create dist/ and a skeleton manifest
         std::fs::create_dir_all("dist")?;
         let skeleton = format!(
-            r#"{{"format_version":"1","agent_name":"{}","agent_version":"0.1.0","agent_id":"0x0","protocol_version":1,"kernel_version":1,"agent_code_hash":"","image_id":"","artifacts":{{"elf_path":"","elf_sha256":""}}}}"#,
+            r#"{{"format_version":"1","agent_name":"{}","agent_version":"0.1.0","agent_id":"0x0","protocol_version":1,"kernel_version":1,"risc0_version":"3.0.4","rust_toolchain":"1.75.0","agent_code_hash":"","image_id":"","artifacts":{{"elf_path":"guest.elf","elf_sha256":""}},"build":{{"cargo_lock_sha256":"0x0000000000000000000000000000000000000000000000000000000000000000","build_command":"cargo build --release","reproducible":false}}}}"#,
             agent_name
         );
         std::fs::write(manifest_path, &skeleton)?;
@@ -443,6 +443,20 @@ fn update_manifest_from_build(
 
     manifest["image_id"] = serde_json::Value::String(image_id_hex.clone());
     manifest["agent_code_hash"] = serde_json::Value::String(agent_code_hash.clone());
+    // Ensure required fields exist (backfill for older skeletons)
+    if manifest.get("risc0_version").is_none() {
+        manifest["risc0_version"] = serde_json::Value::String("3.0.4".to_string());
+    }
+    if manifest.get("rust_toolchain").is_none() {
+        manifest["rust_toolchain"] = serde_json::Value::String("1.75.0".to_string());
+    }
+    if manifest.get("build").is_none() {
+        manifest["build"] = serde_json::json!({
+            "cargo_lock_sha256": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "build_command": "cargo build --release",
+            "reproducible": false
+        });
+    }
     if let Some(artifacts) = manifest.get_mut("artifacts") {
         artifacts["elf_sha256"] = serde_json::Value::String(elf_sha256);
         artifacts["elf_path"] = serde_json::Value::String("guest.elf".to_string());
