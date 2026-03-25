@@ -462,8 +462,7 @@ export default function HomePage() {
               className={`text-4xl md:text-5xl lg:text-6xl font-light mb-6 transition-all duration-1000 ${isFeatureVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
               style={{ fontFamily: 'var(--font-serif), serif' }}
             >
-              <span className="text-white">The </span>
-              <span className="italic text-[#A855F7]">Execution Kernel</span>
+              <span className="italic text-[#A855F7]">Tokagent</span>
             </h2>
 
             <p className={`text-lg text-gray-400 max-w-2xl mx-auto mb-8 leading-relaxed transition-all duration-1000 delay-200 ${isFeatureVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
