@@ -271,35 +271,11 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Mobile Hero Visualization */}
+          {/* Mobile Hero Visualization — removed EK logo */}
           <div
-            className={`flex lg:hidden justify-center mt-8 transition-all duration-1000 ${isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
-            style={{ transitionDelay: '400ms' }}
+            className="hidden"
           >
             <div className="relative">
-              <div
-                className="absolute inset-0 -m-8 rounded-full pointer-events-none"
-                style={{
-                  background: 'radial-gradient(circle, rgba(168, 85, 247, 0.15) 0%, transparent 70%)',
-                }}
-              />
-              <div
-                className="w-24 h-24 rounded-2xl border border-[#A855F7]/30 bg-[#0a0a0f]/80 flex items-center justify-center backdrop-blur-sm"
-                style={{ boxShadow: '0 0 40px rgba(168, 85, 247, 0.2)' }}
-              >
-                <span
-                  className="text-[#A855F7] text-3xl font-light"
-                  style={{ fontFamily: 'var(--font-mono), monospace', filter: 'drop-shadow(0 0 8px rgba(168, 85, 247, 0.5))' }}
-                >
-                  EK
-                </span>
-              </div>
-              <span
-                className="block text-center mt-3 text-[10px] uppercase tracking-[0.2em] text-[#A855F7]/60"
-                style={{ fontFamily: 'var(--font-mono), monospace' }}
-              >
-                zkVM Verified
-              </span>
             </div>
           </div>
 

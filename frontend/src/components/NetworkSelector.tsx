@@ -69,7 +69,7 @@ export function NetworkSelector() {
 
       {isOpen && (
         <div
-          className="absolute top-full mt-2 right-0 w-56 p-2 rounded-xl border border-[#A855F7]/30 backdrop-blur-md bg-[#0a0a0f]/90 z-50"
+          className="absolute top-full mt-2 right-0 w-56 p-2 rounded-xl border border-[#A855F7]/30 backdrop-blur-md bg-[#0a0a0f]/90 z-50 max-h-[60vh] overflow-y-auto"
         >
           {/* Mainnets section */}
           <div className="px-3 pt-1 pb-1.5">
