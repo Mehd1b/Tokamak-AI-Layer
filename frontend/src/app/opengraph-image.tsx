@@ -88,7 +88,7 @@ export default function OGImage() {
             textTransform: 'uppercase' as const,
           }}
         >
-          Execution Kernel
+          Verifiable Agent Execution
         </div>
 
         <div

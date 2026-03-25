@@ -43,6 +43,7 @@ export const metadata: Metadata = {
   icons: {
     icon: '/icon.svg',
   },
+  themeColor: '#0a0a0f',
   alternates: {
     canonical: SITE_URL,
   },

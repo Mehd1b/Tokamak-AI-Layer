@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 import ExecutionWorkflowDiagram from '../../components/ExecutionWorkflowDiagram';
 import ProofGenerationPipeline from '../../components/ProofGenerationPipeline';
 import OperatingEnvelopeDiagram from '../../components/OperatingEnvelopeDiagram';
@@ -91,10 +92,13 @@ export default function WhitepaperPage() {
             <div className="my-12 text-center">
               <h4 className="text-xl font-semibold text-white mb-6">Protocol Workflow Overview</h4>
               <div className="bg-gray-900/40 rounded-2xl p-8 border border-gray-700/30">
-                <img
+                <Image
                   src="/workflow/workflow.png"
-                  alt="Protocol Workflow Overview"
+                  alt="Protocol Workflow Overview — diagram showing the interaction between agent developers, executors, vaults, and on-chain verification"
+                  width={1200}
+                  height={675}
                   className="w-full max-w-4xl mx-auto rounded-lg shadow-2xl"
+                  priority
                 />
               </div>
             </div>
