@@ -9,7 +9,7 @@ import AuroraBackground from '@/components/AuroraBackground';
 
 function VerifiableIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 64 64" className={className} fill="none">
+    <svg viewBox="0 0 64 64" className={className} fill="none" aria-hidden="true">
       {/* Geometric shield */}
       <path
         d="M32 6 L54 18 V42 L32 54 L10 42 V18 Z"
@@ -36,7 +36,7 @@ function VerifiableIcon({ className }: { className?: string }) {
 
 function VaultIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 64 64" className={className} fill="none">
+    <svg viewBox="0 0 64 64" className={className} fill="none" aria-hidden="true">
       {/* Vault body */}
       <rect x="14" y="18" width="36" height="28" rx="3" stroke="#A855F7" strokeWidth="1.2" strokeOpacity="0.4" fill="rgba(168, 85, 247, 0.03)" />
       {/* Lock rings */}
@@ -55,7 +55,7 @@ function VaultIcon({ className }: { className?: string }) {
 
 function AgentIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 64 64" className={className} fill="none">
+    <svg viewBox="0 0 64 64" className={className} fill="none" aria-hidden="true">
       {/* Neural network nodes */}
       <circle cx="32" cy="16" r="3.5" stroke="#A855F7" strokeWidth="1" strokeOpacity="0.5" fill="rgba(168, 85, 247, 0.1)" />
       <circle cx="18" cy="32" r="3.5" stroke="#A855F7" strokeWidth="1" strokeOpacity="0.5" fill="rgba(168, 85, 247, 0.08)" />
@@ -79,7 +79,7 @@ function AgentIcon({ className }: { className?: string }) {
 
 function SettlementIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 64 64" className={className} fill="none">
+    <svg viewBox="0 0 64 64" className={className} fill="none" aria-hidden="true">
       {/* Chain blocks */}
       <rect x="8" y="24" width="14" height="14" rx="2" stroke="#A855F7" strokeWidth="1" strokeOpacity="0.4" fill="rgba(168, 85, 247, 0.04)" />
       <rect x="25" y="24" width="14" height="14" rx="2" stroke="#A855F7" strokeWidth="1.5" strokeOpacity="0.6" fill="rgba(168, 85, 247, 0.06)" />
@@ -261,6 +261,7 @@ export default function HomePage() {
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
+                    aria-hidden="true"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                   </svg>
@@ -316,7 +317,7 @@ export default function HomePage() {
                 }}
               />
 
-              <svg viewBox="0 0 600 600" className="w-full h-full">
+              <svg viewBox="0 0 600 600" className="w-full h-full" aria-hidden="true">
                 <defs>
                   <radialGradient id="center-glow" cx="50%" cy="50%" r="50%">
                     <stop offset="0%" stopColor="#A855F7" stopOpacity="0.4" />
@@ -730,6 +731,7 @@ export default function HomePage() {
                 className="absolute inset-0 w-full h-full pointer-events-none overflow-visible z-0"
                 viewBox="0 0 400 320"
                 preserveAspectRatio="xMidYMid slice"
+                aria-hidden="true"
               >
                 <defs>
                   <linearGradient id="beam-grad" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -759,7 +761,7 @@ export default function HomePage() {
                 <div className="absolute w-32 h-32 rounded-full border border-white/5 border-dashed animate-[spin_20s_linear_infinite_reverse]" />
                 {/* Center Hub */}
                 <div className="z-10 flex bg-[#0a0a0f] w-20 h-20 border-white/10 border rounded-3xl relative items-center justify-center overflow-hidden shadow-2xl group-hover:border-[#A855F7]/40 transition-colors duration-500">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-white relative z-20 group-hover:text-[#A855F7] transition-colors duration-500">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-white relative z-20 group-hover:text-[#A855F7] transition-colors duration-500" aria-hidden="true">
                     <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/>
                     <path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/>
                     <path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>
@@ -789,7 +791,7 @@ export default function HomePage() {
             <div className="w-full h-72 rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl overflow-hidden relative flex flex-col items-center justify-center p-6">
               {/* ZK Proof hexagon visualization */}
               <div className="relative mb-6">
-                <svg viewBox="0 0 100 100" className="w-24 h-24">
+                <svg viewBox="0 0 100 100" className="w-24 h-24" aria-hidden="true">
                   <defs>
                     <linearGradient id="proof-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
                       <stop offset="0%" stopColor="#A855F7" stopOpacity="0.8" />

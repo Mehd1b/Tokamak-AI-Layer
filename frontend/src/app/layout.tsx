@@ -16,23 +16,35 @@ const playfair = Playfair_Display({
   variable: '--font-serif',
 });
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://tokamak.ai';
+
 export const metadata: Metadata = {
-  title: 'Execution Kernel',
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: 'Tokamak AI Layer — Verifiable Agent Execution on Ethereum',
+    template: '%s | Tokamak AI Layer',
+  },
   description:
-    'Verifiable agent execution with RISC Zero zkVM on Ethereum',
+    'Verifiable ML agent execution with RISC Zero zkVM on Ethereum. Deploy autonomous DeFi strategy vaults with zero-knowledge proofs.',
   openGraph: {
-    title: 'Execution Kernel',
-    description: 'Verifiable agent execution with RISC Zero zkVM on Ethereum',
-    siteName: 'Execution Kernel',
+    title: 'Tokamak AI Layer — Verifiable Agent Execution on Ethereum',
+    description:
+      'Verifiable ML agent execution with RISC Zero zkVM on Ethereum. Deploy autonomous DeFi strategy vaults with zero-knowledge proofs.',
+    siteName: 'Tokamak AI Layer',
     type: 'website',
+    url: SITE_URL,
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Execution Kernel',
-    description: 'Verifiable agent execution with RISC Zero zkVM on Ethereum',
+    title: 'Tokamak AI Layer — Verifiable Agent Execution on Ethereum',
+    description:
+      'Verifiable ML agent execution with RISC Zero zkVM on Ethereum. Deploy autonomous DeFi strategy vaults with zero-knowledge proofs.',
   },
   icons: {
     icon: '/icon.svg',
+  },
+  alternates: {
+    canonical: SITE_URL,
   },
 };
 
@@ -43,6 +55,43 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} ${playfair.variable} dark`}>
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@graph': [
+                {
+                  '@type': 'Organization',
+                  name: 'Tokamak AI Layer',
+                  url: SITE_URL,
+                  logo: `${SITE_URL}/icon.svg`,
+                  description:
+                    'Verifiable ML agent execution with RISC Zero zkVM on Ethereum.',
+                  sameAs: [
+                    'https://github.com/tokamak-network',
+                  ],
+                },
+                {
+                  '@type': 'WebApplication',
+                  name: 'Tokamak AI Layer',
+                  url: SITE_URL,
+                  applicationCategory: 'DeFi',
+                  operatingSystem: 'Web',
+                  description:
+                    'Deploy autonomous DeFi strategy vaults with verifiable zero-knowledge execution on Ethereum.',
+                  offers: {
+                    '@type': 'Offer',
+                    price: '0',
+                    priceCurrency: 'USD',
+                  },
+                },
+              ],
+            }),
+          }}
+        />
+      </head>
       <body className="flex min-h-screen flex-col bg-[#0a0a0f]">
         <Providers>
           <Navbar />
