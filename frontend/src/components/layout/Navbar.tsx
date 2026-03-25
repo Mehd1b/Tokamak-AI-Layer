@@ -268,7 +268,7 @@ export function Navbar() {
             className="text-lg font-medium tracking-wider text-white group-hover:text-[#A855F7] transition-colors duration-300"
             style={{ fontFamily: 'var(--font-mono), monospace' }}
           >
-            Tokamak AI Layer
+            Tokagent
           </span>
         </Link>
 

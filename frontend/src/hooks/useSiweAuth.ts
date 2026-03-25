@@ -34,7 +34,7 @@ export function useSiweAuth() {
       const message = new SiweMessage({
         domain: window.location.host,
         address,
-        statement: 'Sign in to comment on Tokamak AI Layer vaults.',
+        statement: 'Sign in to comment on Tokagent vaults.',
         uri: window.location.origin,
         version: '1',
         chainId: chain.id,

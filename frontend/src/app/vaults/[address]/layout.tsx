@@ -12,9 +12,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title: `Vault ${short}`,
-    description: `View details, performance, and execution history for AI strategy vault ${address} on the Tokamak AI Layer protocol.`,
+    description: `View details, performance, and execution history for AI strategy vault ${address} on the Tokagent protocol.`,
     openGraph: {
-      title: `Vault ${short} | Tokamak AI Layer`,
+      title: `Vault ${short} | Tokagent`,
       description: `AI strategy vault ${short} — performance, deposits, and execution history with verifiable zero-knowledge proofs.`,
     },
     alternates: {

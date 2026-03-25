@@ -131,7 +131,7 @@ export function Footer() {
             {/* Copyright */}
             <div className={`flex flex-col sm:flex-row items-center gap-2 text-gray-600 text-xs transition-all duration-700 delay-400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
               <span style={{ fontFamily: 'var(--font-mono), monospace' }}>
-                &copy; {new Date().getFullYear()} Tokamak AI Layer
+                &copy; {new Date().getFullYear()} Tokagent
               </span>
               <span className="hidden sm:inline text-gray-700">|</span>
               <span style={{ fontFamily: 'var(--font-mono), monospace' }}>

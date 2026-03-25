@@ -2,7 +2,7 @@ import { ImageResponse } from 'next/og';
 
 export const runtime = 'edge';
 
-export const alt = 'Tokamak AI Layer — Verifiable Agent Execution on Ethereum';
+export const alt = 'Tokagent — Verifiable Agent Execution on Ethereum';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -75,7 +75,7 @@ export default function OGImage() {
             lineHeight: 1.1,
           }}
         >
-          Tokamak AI Layer
+          Tokagent
         </div>
 
         <div

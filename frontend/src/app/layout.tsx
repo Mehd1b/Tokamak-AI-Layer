@@ -21,22 +21,22 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://tokamak.ai';
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'Tokamak AI Layer — Verifiable Agent Execution on Ethereum',
-    template: '%s | Tokamak AI Layer',
+    default: 'Tokagent — Verifiable Agent Execution on Ethereum',
+    template: '%s | Tokagent',
   },
   description:
     'Verifiable ML agent execution with RISC Zero zkVM on Ethereum. Deploy autonomous DeFi strategy vaults with zero-knowledge proofs.',
   openGraph: {
-    title: 'Tokamak AI Layer — Verifiable Agent Execution on Ethereum',
+    title: 'Tokagent — Verifiable Agent Execution on Ethereum',
     description:
       'Verifiable ML agent execution with RISC Zero zkVM on Ethereum. Deploy autonomous DeFi strategy vaults with zero-knowledge proofs.',
-    siteName: 'Tokamak AI Layer',
+    siteName: 'Tokagent',
     type: 'website',
     url: SITE_URL,
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Tokamak AI Layer — Verifiable Agent Execution on Ethereum',
+    title: 'Tokagent — Verifiable Agent Execution on Ethereum',
     description:
       'Verifiable ML agent execution with RISC Zero zkVM on Ethereum. Deploy autonomous DeFi strategy vaults with zero-knowledge proofs.',
   },
@@ -65,7 +65,7 @@ export default function RootLayout({
               '@graph': [
                 {
                   '@type': 'Organization',
-                  name: 'Tokamak AI Layer',
+                  name: 'Tokagent',
                   url: SITE_URL,
                   logo: `${SITE_URL}/icon.svg`,
                   description:
@@ -76,7 +76,7 @@ export default function RootLayout({
                 },
                 {
                   '@type': 'WebApplication',
-                  name: 'Tokamak AI Layer',
+                  name: 'Tokagent',
                   url: SITE_URL,
                   applicationCategory: 'DeFi',
                   operatingSystem: 'Web',

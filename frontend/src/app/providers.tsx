@@ -19,7 +19,7 @@ const connectors = connectorsForWallets(
     },
   ],
   {
-    appName: 'Tokamak AI Layer',
+    appName: 'Tokagent',
     projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_ID || 'placeholder',
   },
 );

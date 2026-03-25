@@ -3,9 +3,9 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Whitepaper — Verifiable ML Agent Marketplace for DeFi',
   description:
-    'Technical whitepaper for the Tokamak AI Layer protocol. Covers verifiable ML agent execution, RISC Zero zkVM integration, vault architecture, and DeFi strategy verification.',
+    'Technical whitepaper for the Tokagent protocol. Covers verifiable ML agent execution, RISC Zero zkVM integration, vault architecture, and DeFi strategy verification.',
   openGraph: {
-    title: 'Whitepaper | Tokamak AI Layer',
+    title: 'Whitepaper | Tokagent',
     description:
       'Technical whitepaper covering verifiable ML agent execution with RISC Zero zkVM on Ethereum.',
   },
@@ -21,11 +21,11 @@ const jsonLd = {
   '@type': 'TechArticle',
   headline: 'Verifiable ML Agent Marketplace for DeFi',
   description:
-    'Technical whitepaper for the Tokamak AI Layer protocol covering verifiable ML agent execution with RISC Zero zkVM on Ethereum.',
+    'Technical whitepaper for the Tokagent protocol covering verifiable ML agent execution with RISC Zero zkVM on Ethereum.',
   url: `${SITE_URL}/whitepaper`,
   publisher: {
     '@type': 'Organization',
-    name: 'Tokamak AI Layer',
+    name: 'Tokagent',
     url: SITE_URL,
   },
   mainEntityOfPage: `${SITE_URL}/whitepaper`,

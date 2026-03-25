@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   description:
     'Browse and deposit into autonomous AI-powered DeFi strategy vaults. Verifiable execution with RISC Zero zero-knowledge proofs on Ethereum.',
   openGraph: {
-    title: 'AI Strategy Vaults | Tokamak AI Layer',
+    title: 'AI Strategy Vaults | Tokagent',
     description:
       'Browse and deposit into autonomous AI-powered DeFi strategy vaults with verifiable zero-knowledge execution.',
   },
