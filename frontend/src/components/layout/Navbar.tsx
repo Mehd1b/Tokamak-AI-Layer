@@ -440,11 +440,10 @@ export function Navbar() {
 
         {/* Mobile Menu Button */}
         <div className="flex items-center gap-3 md:hidden">
-          <NetworkSelector />
           <ConnectButton />
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="relative group p-3 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm hover:border-[#A855F7]/50 transition-all duration-300"
+            className="relative group p-3 rounded-xl border border-gray-700/50 bg-gray-900/60 backdrop-blur-sm hover:border-[#A855F7]/50 transition-all duration-300"
             aria-label="Toggle menu"
           >
             <div className="w-6 h-6 flex flex-col justify-center items-center">
@@ -458,13 +457,14 @@ export function Navbar() {
 
       {/* Full-Screen Mobile Menu */}
       {isMenuOpen && (
-        <div className="fixed top-0 left-0 w-full h-full bg-[#0a0a0f] z-50 md:hidden">
+        <div className="fixed top-0 left-0 w-full h-full bg-black z-50 md:hidden">
           <div className="flex flex-col h-full">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+            {/* Header with logo + close */}
+            <div className="flex items-center justify-between px-8 py-6 border-b border-gray-700/30">
               <Link href="/" className="flex items-center gap-3" onClick={() => setIsMenuOpen(false)}>
                 <DiamondLogo />
                 <span className="text-lg font-medium tracking-wider text-white" style={{ fontFamily: 'var(--font-mono), monospace' }}>
-                  EK
+                  Tokagent
                 </span>
               </Link>
               <button
@@ -477,6 +477,8 @@ export function Navbar() {
                 </svg>
               </button>
             </div>
+
+            {/* Main navigation — vertically centered */}
             <div className="flex-1 flex flex-col justify-center px-6" style={{ fontFamily: 'var(--font-mono), monospace' }}>
               <div className="space-y-8 text-center">
 
@@ -526,49 +528,6 @@ export function Navbar() {
                   </div>
                 </div>
 
-                {/* Mobile SOCIALS Accordion */}
-                <div className="text-center">
-                  <button
-                    onClick={() => setIsMobileSocialsOpen(prev => !prev)}
-                    className="inline-flex items-center gap-2 text-md font-light text-white hover:text-[#A855F7] transition-all duration-300 tracking-wider"
-                    aria-expanded={isMobileSocialsOpen}
-                  >
-                    SOCIALS
-                    <svg
-                      className={`w-4 h-4 transition-transform duration-200 ${isMobileSocialsOpen ? 'rotate-180' : ''}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                  <div
-                    className={`overflow-hidden transition-all duration-300 ${
-                      isMobileSocialsOpen ? 'max-h-96 opacity-100 mt-4' : 'max-h-0 opacity-0'
-                    }`}
-                  >
-                    <div className="space-y-3 text-sm">
-                      {SOCIALS_LINKS.map((link) => (
-                        <a
-                          key={link.href}
-                          href={link.href}
-                          className="block text-gray-300 hover:text-[#A855F7] transition-colors"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={() => {
-                            setIsMenuOpen(false);
-                            setIsMobileSocialsOpen(false);
-                          }}
-                        >
-                          {link.title}
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
                 <Link
                   href="/whitepaper"
                   className={clsx(
@@ -588,6 +547,30 @@ export function Navbar() {
                 >
                   DOCS
                 </a>
+
+                {/* Network selector inside mobile menu */}
+                <div className="flex justify-center pt-4">
+                  <NetworkSelector />
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom social links */}
+            <div className="p-6 border-t border-gray-700/30">
+              <div className="flex space-x-6 justify-center">
+                {SOCIALS_LINKS.map((link) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    className="text-gray-400 hover:text-[#A855F7] transition-colors duration-300"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={link.title}
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    {link.icon}
+                  </a>
+                ))}
               </div>
             </div>
           </div>
