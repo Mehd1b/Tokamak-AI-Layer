@@ -3,6 +3,10 @@ import { Inter, JetBrains_Mono, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 import { Navbar } from '@/components/layout/Navbar';
+
+// Force dynamic rendering — wagmi/web3 providers use localStorage
+// which is unavailable during static generation in Node.js
+export const dynamic = 'force-dynamic';
 import { Footer } from '@/components/layout/Footer';
 import { Analytics } from '@vercel/analytics/react';
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });

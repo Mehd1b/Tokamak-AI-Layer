@@ -347,10 +347,10 @@ tal metadata show <agent-id>
 
 Setting metadata enables:
 - **Frontend discovery** — vault cards show agent names instead of hex IDs
-- **Marketplace** — agents with metadata appear in the public marketplace at [`/marketplace`](/marketplace)
-- **Leaderboard** — agent performance rankings at [`/leaderboard`](/leaderboard)
-- **Deploy UI** — one-click vault deployment at [`/deploy`](/deploy)
-- **Referrals** — earn referral rewards by sharing agent links at [`/referrals`](/referrals)
+- **Marketplace** — agents with metadata appear in the public marketplace at [`/marketplace`](https://tokagent.network/marketplace)
+- **Leaderboard** — agent performance rankings at [`/leaderboard`](https://tokagent.network/leaderboard)
+- **Deploy UI** — one-click vault deployment at [`/deploy`](https://tokagent.network/deploy)
+- **Referrals** — earn referral rewards by sharing agent links at [`/referrals`](https://tokagent.network/referrals)
 - **Forking** — `tal fork <agent-id>` clones the source repo and scaffolds a new project
 - **Ecosystem indexing** — third-party dashboards and aggregators can discover agents
 
