@@ -665,26 +665,29 @@ export default function HomePage() {
           style={{ animation: 'marquee-scroll-rtl 40s linear infinite' }}
         >
           {[
-            { src: '/partner-chainlink.svg', alt: 'Chainlink' },
-            { src: '/partner-sky.svg', alt: 'SKY' },
-            { src: '/partner-dsrv.svg', alt: 'DSRV' },
-            { src: '/partner-efg.svg', alt: 'EFG' },
-            { src: '/partner-kdac.svg', alt: 'KDAC' },
-            { src: '/partner-ozys.svg', alt: 'Ozys' },
-            { src: '/partner-chainlink.svg', alt: 'Chainlink' },
-            { src: '/partner-sky.svg', alt: 'SKY' },
-            { src: '/partner-dsrv.svg', alt: 'DSRV' },
-            { src: '/partner-efg.svg', alt: 'EFG' },
-            { src: '/partner-kdac.svg', alt: 'KDAC' },
-            { src: '/partner-ozys.svg', alt: 'Ozys' },
+            { src: '/partner-chainlink.svg', alt: 'Chainlink', url: 'https://chain.link' },
+            { src: '/partner-sky.svg', alt: 'SKY', url: 'https://sky.money' },
+            { src: '/partner-dsrv.svg', alt: 'DSRV', url: 'https://www.dsrvlabs.com' },
+            { src: '/partner-efg.svg', alt: 'EFG', url: 'https://www.everestventures.co' },
+            { src: '/partner-kdac.svg', alt: 'KDAC', url: 'https://kdac.io' },
+            { src: '/partner-ozys.svg', alt: 'Ozys', url: 'https://ozys.io' },
+            { src: '/partner-chainlink.svg', alt: 'Chainlink', url: 'https://chain.link' },
+            { src: '/partner-sky.svg', alt: 'SKY', url: 'https://sky.money' },
+            { src: '/partner-dsrv.svg', alt: 'DSRV', url: 'https://www.dsrvlabs.com' },
+            { src: '/partner-efg.svg', alt: 'EFG', url: 'https://www.everestventures.co' },
+            { src: '/partner-kdac.svg', alt: 'KDAC', url: 'https://kdac.io' },
+            { src: '/partner-ozys.svg', alt: 'Ozys', url: 'https://ozys.io' },
           ].map((partner, i) => (
-            <div
+            <a
               key={i}
+              href={partner.url}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center justify-center mx-8 shrink-0 opacity-40 hover:opacity-80 transition-opacity duration-300"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={partner.src} alt={partner.alt} className="h-8 w-auto" />
-            </div>
+            </a>
           ))}
         </div>
       </section>
