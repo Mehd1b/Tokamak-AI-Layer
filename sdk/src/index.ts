@@ -12,6 +12,7 @@ export { AgentRegistryABI } from './abi/AgentRegistry';
 export { VaultFactoryABI } from './abi/VaultFactory';
 export { KernelVaultABI } from './abi/KernelVault';
 export { KernelExecutionVerifierABI } from './abi/KernelExecutionVerifier';
+export { ReferralManagerABI } from './abi/ReferralManager';
 
 // Utilities
 export { fetchAgentMetadata, resolveMetadataURI } from './utils/metadata';

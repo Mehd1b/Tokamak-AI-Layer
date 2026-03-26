@@ -111,6 +111,40 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @dev Only meaningful when asset == address(0). Updated in depositETH, withdraw, execute, receive.
     uint256 public trackedETHBalance;
 
+    // ============ Fee State ============
+
+    /// @notice Annual management fee in basis points (e.g., 200 = 2%). Max 500 (5%).
+    uint256 public managementFeeBps;
+
+    /// @notice Performance fee on profits in basis points (e.g., 2000 = 20%). Max 5000 (50%).
+    uint256 public performanceFeeBps;
+
+    /// @notice Address that receives the agent author's share of fees
+    address public feeRecipient;
+
+    /// @notice Protocol treasury address (receives protocol's share of fees)
+    address public protocolTreasury;
+
+    /// @notice Protocol's share of collected fees in basis points (e.g., 1000 = 10%)
+    uint256 public protocolFeeSplitBps;
+
+    /// @notice Timestamp when management fee was last collected
+    uint256 public lastFeeTimestamp;
+
+    /// @notice PPS high water mark for performance fee (scaled by 1e18)
+    uint256 public highWaterMark;
+
+    // ============ Fee Constants ============
+
+    /// @notice Maximum management fee: 500 bps = 5% annual
+    uint256 public constant MAX_MANAGEMENT_FEE_BPS = 500;
+
+    /// @notice Maximum performance fee: 5000 bps = 50% of profits
+    uint256 public constant MAX_PERFORMANCE_FEE_BPS = 5000;
+
+    /// @notice Maximum protocol fee split: 5000 bps = 50% of fees
+    uint256 public constant MAX_PROTOCOL_FEE_SPLIT_BPS = 5000;
+
     // ============ Performance Tracking ============
 
     /// @notice PPS scaled by 1e18 at first deposit (set once)
@@ -187,6 +221,21 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
     /// @notice Emitted when oracle signer configuration is updated
     event OracleSignerUpdated(address indexed signer, uint64 maxAge);
+
+    /// @notice Emitted when management fee shares are collected
+    event ManagementFeeCollected(uint256 shares, address recipient);
+
+    /// @notice Emitted when performance fee shares are collected
+    event PerformanceFeeCollected(uint256 shares, address recipient, uint256 pps);
+
+    /// @notice Emitted when fee parameters are updated
+    event FeesUpdated(uint256 managementFeeBps, uint256 performanceFeeBps);
+
+    /// @notice Emitted when fee recipient is updated
+    event FeeRecipientUpdated(address indexed recipient);
+
+    /// @notice Emitted when protocol treasury is updated
+    event ProtocolTreasuryUpdated(address indexed treasury, uint256 splitBps);
 
     // ============ Errors ============
 
@@ -271,6 +320,21 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @notice Emergency withdrawal called too early
     error EmergencyWithdrawTooEarly(uint256 earliest, uint256 current);
 
+    /// @notice Management fee exceeds maximum
+    error ManagementFeeTooHigh(uint256 feeBps, uint256 maxBps);
+
+    /// @notice Performance fee exceeds maximum
+    error PerformanceFeeTooHigh(uint256 feeBps, uint256 maxBps);
+
+    /// @notice Protocol fee split exceeds maximum
+    error ProtocolFeeSplitTooHigh(uint256 splitBps, uint256 maxBps);
+
+    /// @notice Fee recipient is zero address
+    error ZeroFeeRecipient();
+
+    /// @notice No fees to collect
+    error NoFeesToCollect();
+
     // ============ Constructor ============
 
     /// @notice Initialize the vault
@@ -324,6 +388,72 @@ contract KernelVault is ReentrancyGuard, Pausable {
         emit OracleSignerUpdated(_signer, _maxAge);
     }
 
+    // ============ Fee Configuration ============
+
+    /// @notice Set management and performance fee rates (owner only)
+    /// @param mgmtBps Annual management fee in basis points (max 500 = 5%)
+    /// @param perfBps Performance fee on profits in basis points (max 5000 = 50%)
+    function setFees(uint256 mgmtBps, uint256 perfBps) external {
+        if (msg.sender != owner) revert NotOwner();
+        if (mgmtBps > MAX_MANAGEMENT_FEE_BPS) revert ManagementFeeTooHigh(mgmtBps, MAX_MANAGEMENT_FEE_BPS);
+        if (perfBps > MAX_PERFORMANCE_FEE_BPS) revert PerformanceFeeTooHigh(perfBps, MAX_PERFORMANCE_FEE_BPS);
+
+        // Collect any outstanding fees before changing rates
+        if (managementFeeBps > 0 && totalShares > 0 && lastFeeTimestamp > 0) {
+            _collectManagementFee();
+        }
+        if (performanceFeeBps > 0 && totalShares > 0 && highWaterMark > 0) {
+            _collectPerformanceFee();
+        }
+
+        managementFeeBps = mgmtBps;
+        performanceFeeBps = perfBps;
+
+        // Initialize fee timestamp if setting fees for the first time
+        if (lastFeeTimestamp == 0 && mgmtBps > 0) {
+            lastFeeTimestamp = block.timestamp;
+        }
+
+        // Initialize high water mark if setting performance fee for the first time
+        if (highWaterMark == 0 && perfBps > 0 && totalShares > 0) {
+            highWaterMark = currentPps();
+        }
+
+        emit FeesUpdated(mgmtBps, perfBps);
+    }
+
+    /// @notice Set the fee recipient address (owner only)
+    /// @param recipient Address that receives the agent author's share of fees
+    function setFeeRecipient(address recipient) external {
+        if (msg.sender != owner) revert NotOwner();
+        if (recipient == address(0)) revert ZeroFeeRecipient();
+        feeRecipient = recipient;
+        emit FeeRecipientUpdated(recipient);
+    }
+
+    /// @notice Set the protocol treasury and fee split (callable by factory owner or vault owner for initial setup)
+    /// @param treasury Protocol treasury address
+    /// @param splitBps Protocol's share of fees in basis points (max 5000 = 50%)
+    function setProtocolTreasury(address treasury, uint256 splitBps) external {
+        if (msg.sender != owner) revert NotOwner();
+        if (splitBps > MAX_PROTOCOL_FEE_SPLIT_BPS) revert ProtocolFeeSplitTooHigh(splitBps, MAX_PROTOCOL_FEE_SPLIT_BPS);
+        protocolTreasury = treasury;
+        protocolFeeSplitBps = splitBps;
+        emit ProtocolTreasuryUpdated(treasury, splitBps);
+    }
+
+    /// @notice Collect accrued management fee by minting shares to fee recipient
+    /// @dev Management fee is time-based: feeShares = totalShares * mgmtFeeBps * elapsed / (365 days * 10000)
+    function collectManagementFee() external nonReentrant returns (uint256 feeShares) {
+        return _collectManagementFee();
+    }
+
+    /// @notice Collect accrued performance fee by minting shares based on PPS above high water mark
+    /// @dev Performance fee is profit-based: only charged on PPS increase above highWaterMark
+    function collectPerformanceFee() external nonReentrant returns (uint256 feeShares) {
+        return _collectPerformanceFee();
+    }
+
     // ============ Deposit/Withdraw ============
 
     /// @notice Deposit ERC20 tokens and receive shares based on current PPS
@@ -365,6 +495,13 @@ contract KernelVault is ReentrancyGuard, Pausable {
             initialPps = pps;
             initialPpsTimestamp = block.timestamp;
             peakPps = pps;
+            // Initialize fee tracking
+            if (managementFeeBps > 0 && lastFeeTimestamp == 0) {
+                lastFeeTimestamp = block.timestamp;
+            }
+            if (performanceFeeBps > 0 && highWaterMark == 0) {
+                highWaterMark = pps;
+            }
         }
 
         emit Deposit(msg.sender, actualReceived, sharesMinted);
@@ -406,6 +543,13 @@ contract KernelVault is ReentrancyGuard, Pausable {
             initialPps = pps;
             initialPpsTimestamp = block.timestamp;
             peakPps = pps;
+            // Initialize fee tracking
+            if (managementFeeBps > 0 && lastFeeTimestamp == 0) {
+                lastFeeTimestamp = block.timestamp;
+            }
+            if (performanceFeeBps > 0 && highWaterMark == 0) {
+                highWaterMark = pps;
+            }
         }
 
         emit Deposit(msg.sender, msg.value, sharesMinted);
@@ -535,6 +679,9 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
         // Update performance metrics after execution
         _updatePerformanceMetrics(ppsBefore);
+
+        // Collect any accrued fees after execution
+        _collectFeesAfterExecution();
 
         emit ExecutionApplied(parsedAgentId, providedNonce, actionCommitment, actions.length);
     }
@@ -956,6 +1103,31 @@ contract KernelVault is ReentrancyGuard, Pausable {
         return (ppsCheckpointValues, ppsCheckpointTimestamps, ppsCheckpointIndex);
     }
 
+    /// @notice Returns fee configuration in a single call
+    function getFeeInfo()
+        external
+        view
+        returns (
+            uint256 _managementFeeBps,
+            uint256 _performanceFeeBps,
+            address _feeRecipient,
+            address _protocolTreasury,
+            uint256 _protocolFeeSplitBps,
+            uint256 _lastFeeTimestamp,
+            uint256 _highWaterMark
+        )
+    {
+        return (
+            managementFeeBps,
+            performanceFeeBps,
+            feeRecipient,
+            protocolTreasury,
+            protocolFeeSplitBps,
+            lastFeeTimestamp,
+            highWaterMark
+        );
+    }
+
     /// @notice Convert assets to shares using current exchange rate (virtual offset)
     /// @param assets Amount of assets to convert
     /// @return Amount of shares that would be minted
@@ -968,6 +1140,99 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @return Amount of assets that would be returned
     function convertToAssets(uint256 _shares) public view returns (uint256) {
         return (_shares * (effectiveTotalAssets() + 1)) / (totalShares + _DECIMALS_OFFSET);
+    }
+
+    // ============ Internal Fee Functions ============
+
+    /// @notice Internal management fee collection
+    /// @dev feeShares = totalShares * mgmtFeeBps * timeElapsed / (365 days * 10000)
+    function _collectManagementFee() internal returns (uint256 feeShares) {
+        if (managementFeeBps == 0 || totalShares == 0 || lastFeeTimestamp == 0) return 0;
+
+        uint256 timeElapsed = block.timestamp - lastFeeTimestamp;
+        if (timeElapsed == 0) return 0;
+
+        // feeShares = totalShares * mgmtFeeBps * timeElapsed / (365 days * 10000)
+        feeShares = (totalShares * managementFeeBps * timeElapsed) / (365 days * 10000);
+
+        if (feeShares == 0) return 0;
+
+        lastFeeTimestamp = block.timestamp;
+
+        _distributeFeeShares(feeShares);
+
+        emit ManagementFeeCollected(feeShares, feeRecipient);
+    }
+
+    /// @notice Internal performance fee collection
+    /// @dev Only collects if current PPS > highWaterMark
+    ///      feeShares = totalShares * profitBps * perfFeeBps / (10000 * 10000)
+    function _collectPerformanceFee() internal returns (uint256 feeShares) {
+        if (performanceFeeBps == 0 || totalShares == 0) return 0;
+
+        uint256 pps = currentPps();
+
+        if (highWaterMark == 0) {
+            // Initialize HWM on first collection
+            highWaterMark = pps;
+            return 0;
+        }
+
+        if (pps <= highWaterMark) return 0;
+
+        // profitBps = (pps - hwm) * 10000 / hwm
+        uint256 profitBps = ((pps - highWaterMark) * 10000) / highWaterMark;
+
+        // feeShares = totalShares * profitBps * perfFeeBps / (10000 * 10000)
+        feeShares = (totalShares * profitBps * performanceFeeBps) / (10000 * 10000);
+
+        if (feeShares == 0) return 0;
+
+        // Update high water mark BEFORE minting (which dilutes PPS)
+        highWaterMark = pps;
+
+        _distributeFeeShares(feeShares);
+
+        emit PerformanceFeeCollected(feeShares, feeRecipient, pps);
+    }
+
+    /// @notice Distribute fee shares between fee recipient and protocol treasury
+    /// @param feeShares Total fee shares to distribute
+    function _distributeFeeShares(uint256 feeShares) internal {
+        if (feeShares == 0) return;
+
+        uint256 protocolShares = 0;
+        uint256 recipientShares = feeShares;
+
+        // Split between protocol treasury and fee recipient
+        if (protocolTreasury != address(0) && protocolFeeSplitBps > 0) {
+            protocolShares = (feeShares * protocolFeeSplitBps) / 10000;
+            recipientShares = feeShares - protocolShares;
+        }
+
+        // Mint shares to fee recipient (defaults to owner if not set)
+        address recipient = feeRecipient != address(0) ? feeRecipient : owner;
+        if (recipientShares > 0) {
+            shares[recipient] += recipientShares;
+            totalShares += recipientShares;
+        }
+
+        // Mint shares to protocol treasury
+        if (protocolShares > 0 && protocolTreasury != address(0)) {
+            shares[protocolTreasury] += protocolShares;
+            totalShares += protocolShares;
+        }
+    }
+
+    /// @notice Collect fees after execution if any are due
+    /// @dev Called internally after _updatePerformanceMetrics in execution flow
+    function _collectFeesAfterExecution() internal {
+        if (managementFeeBps > 0 && lastFeeTimestamp > 0) {
+            _collectManagementFee();
+        }
+        if (performanceFeeBps > 0) {
+            _collectPerformanceFee();
+        }
     }
 
     /// @notice Allow receiving ETH for CALL actions with value

@@ -8,6 +8,7 @@ import { KernelVaultABI as _KernelVaultABI } from '@ek-sdk/abi/KernelVault';
 import { KernelExecutionVerifierABI as _KernelExecutionVerifierABI } from '@ek-sdk/abi/KernelExecutionVerifier';
 import { OptimisticKernelVaultABI as _OptimisticKernelVaultABI } from '@ek-sdk/abi/OptimisticKernelVault';
 import { WSTONBondManagerABI as _WSTONBondManagerABI } from '@ek-sdk/abi/WSTONBondManager';
+import { ReferralManagerABI as _ReferralManagerABI } from '@ek-sdk/abi/ReferralManager';
 
 export const AgentRegistryABI = _AgentRegistryABI;
 export const VaultFactoryABI = _VaultFactoryABI;
@@ -15,3 +16,4 @@ export const KernelVaultABI = _KernelVaultABI;
 export const KernelExecutionVerifierABI = _KernelExecutionVerifierABI;
 export const OptimisticKernelVaultABI = _OptimisticKernelVaultABI;
 export const WSTONBondManagerABI = _WSTONBondManagerABI;
+export const ReferralManagerABI = _ReferralManagerABI;

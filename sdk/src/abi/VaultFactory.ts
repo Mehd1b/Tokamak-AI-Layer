@@ -176,4 +176,43 @@ export const VaultFactoryABI = [
       { name: 'newOwner', type: 'address', indexed: true },
     ],
   },
+  // ============ Protocol Treasury ============
+  {
+    type: 'function',
+    name: 'protocolTreasury',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'defaultProtocolFeeSplitBps',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'setProtocolTreasury',
+    inputs: [{ name: 'treasury', type: 'address' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'setDefaultProtocolFeeSplitBps',
+    inputs: [{ name: 'splitBps', type: 'uint256' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'event',
+    name: 'ProtocolTreasuryUpdated',
+    inputs: [{ name: 'treasury', type: 'address', indexed: true }],
+  },
+  {
+    type: 'event',
+    name: 'DefaultProtocolFeeSplitUpdated',
+    inputs: [{ name: 'splitBps', type: 'uint256', indexed: false }],
+  },
 ] as const;

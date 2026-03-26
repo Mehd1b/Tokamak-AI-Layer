@@ -3,6 +3,7 @@ export interface DeploymentAddresses {
   vaultFactory: `0x${string}`;
   kernelExecutionVerifier: `0x${string}`;
   riscZeroVerifierRouter: `0x${string}`;
+  referralManager?: `0x${string}`;
 }
 
 export const ETHEREUM_MAINNET_ADDRESSES: DeploymentAddresses = {

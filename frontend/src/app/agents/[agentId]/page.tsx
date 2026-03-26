@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAgentMetadata } from '@/hooks/useAgentMetadata';
 import { useDeployedVaultsList, type VaultInfo } from '@/hooks/useVaultFactory';
 import { useVaultPerformance } from '@/hooks/useVaultPerformance';
+import { useAgentAuthor } from '@/hooks/useAgentAuthor';
 import { formatEther, truncateBytes32, truncateAddress } from '@/lib/utils';
 import { protocolLabel, protocolColor, PROTOCOL_TYPE, type ProtocolType } from '@/lib/protocolTypes';
 import { NetworkBadge } from '@/components/NetworkLogo';
@@ -184,6 +185,200 @@ function AggregateStats({ vaults }: { vaults: VaultInfo[] }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Fork Section component                                             */
+/* ------------------------------------------------------------------ */
+
+function ForkSection({ agentId, agentName }: { agentId: string; agentName: string }) {
+  const [copied, setCopied] = useState(false);
+  const command = `tal fork ${agentId}`;
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback
+    }
+  }, [command]);
+
+  return (
+    <div className="rounded-2xl border border-[#A855F7]/20 bg-[#A855F7]/5 p-8 mb-10">
+      <div className="flex flex-col md:flex-row md:items-start gap-6">
+        <div className="flex-1">
+          <h3 className="text-lg font-light text-white mb-2" style={{ fontFamily: 'var(--font-serif), serif' }}>
+            <span className="italic text-[#A855F7]">Fork</span> this agent
+          </h3>
+          <p className="text-gray-400 text-sm font-mono leading-relaxed mb-4">
+            Fork this agent to create your own version. Modify the strategy and deploy your own vault.
+          </p>
+
+          {/* Command */}
+          <div className="mb-4">
+            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-mono mb-2">
+              Run in your terminal
+            </p>
+            <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/30 p-4">
+              <code className="flex-1 text-sm font-mono text-[#C084FC] break-all">
+                {command}
+              </code>
+              <button
+                onClick={handleCopy}
+                className="shrink-0 p-2 rounded-lg border border-white/10 hover:border-[#A855F7]/30 bg-white/[0.02] hover:bg-[#A855F7]/5 transition-all"
+                title="Copy command"
+              >
+                {copied ? (
+                  <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                )}
+              </button>
+            </div>
+          </div>
+
+          <a
+            href="https://docs.tokagent.network"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-xs font-mono text-[#C084FC] hover:text-[#A855F7] transition-colors"
+          >
+            Read the full guide
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
+        </div>
+
+        {/* Steps */}
+        <div className="md:w-64 space-y-3">
+          <div className="flex items-start gap-3">
+            <span className="shrink-0 w-5 h-5 rounded-full bg-[#A855F7]/10 border border-[#A855F7]/20 flex items-center justify-center text-[10px] font-mono text-[#C084FC]">1</span>
+            <p className="text-xs font-mono text-gray-400">Install the Tokagent CLI</p>
+          </div>
+          <div className="flex items-start gap-3">
+            <span className="shrink-0 w-5 h-5 rounded-full bg-[#A855F7]/10 border border-[#A855F7]/20 flex items-center justify-center text-[10px] font-mono text-[#C084FC]">2</span>
+            <p className="text-xs font-mono text-gray-400">Fork the agent&apos;s strategy code</p>
+          </div>
+          <div className="flex items-start gap-3">
+            <span className="shrink-0 w-5 h-5 rounded-full bg-[#A855F7]/10 border border-[#A855F7]/20 flex items-center justify-center text-[10px] font-mono text-[#C084FC]">3</span>
+            <p className="text-xs font-mono text-gray-400">Customize, register, and deploy</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Author Section component                                           */
+/* ------------------------------------------------------------------ */
+
+function AuthorSection({
+  authorAddress,
+  authorDisplayName,
+  allVaults,
+  currentAgentId,
+}: {
+  authorAddress: string;
+  authorDisplayName?: string;
+  allVaults: VaultInfo[];
+  currentAgentId: string;
+}) {
+  // Find all unique agent IDs that share the same author address
+  // We get this from the useAgentAuthor hook results passed in from the parent
+  // For now, we show the author info card; the parent queries author's other agents
+
+  return (
+    <div className="mb-10">
+      <h2 className="text-xs font-mono text-gray-500 uppercase tracking-wider mb-5">
+        Author
+      </h2>
+      <div className="rounded-xl border border-white/5 bg-[#12121a]/80 p-5">
+        <div className="flex items-center gap-3 mb-3">
+          {/* Author avatar placeholder */}
+          <div className="w-10 h-10 rounded-full bg-[#A855F7]/10 border border-[#A855F7]/20 flex items-center justify-center">
+            <svg className="w-5 h-5 text-[#A855F7]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+            </svg>
+          </div>
+          <div>
+            {authorDisplayName && (
+              <p className="text-sm font-mono text-white">{authorDisplayName}</p>
+            )}
+            <p className="text-[11px] font-mono text-gray-500 break-all">
+              {truncateAddress(authorAddress, 6)}
+            </p>
+          </div>
+        </div>
+        <p className="text-[10px] font-mono text-gray-600 uppercase tracking-wider">
+          On-chain Author Address
+        </p>
+        <p className="text-[11px] font-mono text-gray-500 break-all mt-1">
+          {authorAddress}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function AuthorOtherAgents({
+  authorAgentIds,
+  currentAgentId,
+  allVaults,
+}: {
+  authorAgentIds: string[];
+  currentAgentId: string;
+  allVaults: VaultInfo[];
+}) {
+  // Filter out the current agent
+  const otherAgentIds = authorAgentIds.filter(
+    (id) => id.toLowerCase() !== currentAgentId.toLowerCase()
+  );
+
+  if (otherAgentIds.length === 0) return null;
+
+  return (
+    <div className="mb-10">
+      <h2 className="text-xs font-mono text-gray-500 uppercase tracking-wider mb-5">
+        Other agents by this author
+      </h2>
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {otherAgentIds.map((otherId, i) => {
+          const vaultCount = allVaults.filter(
+            (v) => v.agentId.toLowerCase() === otherId.toLowerCase()
+          ).length;
+
+          return (
+            <Link key={otherId} href={`/agents/${encodeURIComponent(otherId)}`}>
+              <div
+                className="rounded-xl border border-white/5 bg-[#12121a]/80 p-4 group hover:border-[#A855F7]/20 transition-all duration-300 cursor-pointer vault-card-enter"
+                style={{ animationDelay: `${i * 60}ms` }}
+              >
+                <p className="text-sm font-mono text-gray-200 group-hover:text-white transition-colors truncate mb-1">
+                  {truncateBytes32(otherId, 6)}
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-gray-500">
+                    {vaultCount} vault{vaultCount !== 1 ? 's' : ''}
+                  </span>
+                  <svg className="w-4 h-4 text-gray-600 group-hover:text-gray-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Page component                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -196,6 +391,7 @@ export default function AgentDetailPage() {
 
   const { data: metadata, isLoading: isLoadingMeta } = useAgentMetadata(decodedAgentId as `0x${string}`);
   const { data: allVaults, isLoading: isLoadingVaults } = useDeployedVaultsList();
+  const { authorAddress, authorAgentIds, isLoading: isLoadingAuthor } = useAgentAuthor(decodedAgentId as `0x${string}`);
 
   const agentVaults = useMemo(() => {
     if (!allVaults) return [];
@@ -312,8 +508,33 @@ export default function AgentDetailPage() {
             </div>
           </div>
 
+          {/* Fork section */}
+          <ForkSection
+            agentId={decodedAgentId}
+            agentName={metadata?.name || truncateBytes32(decodedAgentId, 6)}
+          />
+
           {/* Aggregate stats */}
           {agentVaults.length > 0 && <AggregateStats vaults={agentVaults} />}
+
+          {/* Author section */}
+          {authorAddress && (
+            <AuthorSection
+              authorAddress={authorAddress}
+              authorDisplayName={metadata?.author}
+              allVaults={allVaults ?? []}
+              currentAgentId={decodedAgentId}
+            />
+          )}
+
+          {/* Other agents by this author */}
+          {authorAgentIds.length > 0 && allVaults && (
+            <AuthorOtherAgents
+              authorAgentIds={authorAgentIds}
+              currentAgentId={decodedAgentId}
+              allVaults={allVaults}
+            />
+          )}
 
           {/* Vaults section */}
           <div className="mb-10">

@@ -41,8 +41,14 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     /// @notice Protocol type for each vault (0=Generic, 1=Hyperliquid, 2=Polymarket)
     mapping(address => uint8) public _vaultProtocolType;
 
+    /// @notice Protocol treasury address for fee collection
+    address public protocolTreasury;
+
+    /// @notice Default protocol fee split in basis points (e.g., 1000 = 10%)
+    uint256 public defaultProtocolFeeSplitBps;
+
     /// @notice Storage gap for future upgrades
-    uint256[42] private __gap;
+    uint256[40] private __gap;
 
     // ============ Errors ============
 
@@ -53,6 +59,12 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
 
     /// @notice Emitted when ownership is transferred
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+    /// @notice Emitted when protocol treasury is updated
+    event ProtocolTreasuryUpdated(address indexed treasury);
+
+    /// @notice Emitted when default protocol fee split is updated
+    event DefaultProtocolFeeSplitUpdated(uint256 splitBps);
 
     // ============ Modifiers ============
 
@@ -131,6 +143,21 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         require(newStore != address(0), "zero optimisticVaultCodeStore");
         require(newStore.code.length > 0, "no code at store");
         _optimisticVaultCreationCodeStore = newStore;
+    }
+
+    /// @notice Set the protocol treasury address (owner only)
+    /// @param treasury The new protocol treasury address
+    function setProtocolTreasury(address treasury) external onlyOwner {
+        protocolTreasury = treasury;
+        emit ProtocolTreasuryUpdated(treasury);
+    }
+
+    /// @notice Set the default protocol fee split for new vaults (owner only)
+    /// @param splitBps Default fee split in basis points (max 5000 = 50%)
+    function setDefaultProtocolFeeSplitBps(uint256 splitBps) external onlyOwner {
+        require(splitBps <= 5000, "split too high");
+        defaultProtocolFeeSplitBps = splitBps;
+        emit DefaultProtocolFeeSplitUpdated(splitBps);
     }
 
     // ============ External Functions ============

@@ -33,6 +33,8 @@ const SOCIAL_ICONS = {
 const PROTOCOL_LINKS: DropdownLink[] = [
   { title: 'Vaults', description: 'Explore and deploy vaults', href: '/vaults', internal: true },
   { title: 'Deploy Vault', description: 'Launch a new AI-managed vault', href: '/deploy', internal: true },
+  { title: 'Marketplace', description: 'Browse and fork agent templates', href: '/marketplace', internal: true },
+  { title: 'Referrals', description: 'Invite friends and earn points', href: '/referrals', internal: true },
   { title: 'Staking', description: 'WSTON staking and bridge', href: '/staking', internal: true },
 ];
 
