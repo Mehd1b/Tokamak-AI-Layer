@@ -257,7 +257,7 @@ export default function HomePage() {
       {/* ═══════════════ 2. TOP PERFORMING VAULTS ═══════════════ */}
       <section
         ref={topVaultsRef}
-        className="relative z-10 py-24 overflow-hidden border-t border-white/5"
+        className="relative z-10 py-24 overflow-hidden border-t border-white/5 bg-[#0a0a0f]/50 backdrop-blur-xl"
       >
         <div
           className="absolute top-0 left-0 right-0 h-px"
@@ -343,7 +343,7 @@ export default function HomePage() {
       {/* ═══════════════ 4. HOW IT WORKS ═══════════════ */}
       <section
         ref={howItWorksRef}
-        className="relative z-10 py-24 overflow-hidden border-t border-white/5"
+        className="relative z-10 py-24 overflow-hidden border-t border-white/5 bg-[#0a0a0f]/50 backdrop-blur-xl"
       >
         <div
           className="absolute top-0 left-0 right-0 h-px"
