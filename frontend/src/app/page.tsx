@@ -207,7 +207,7 @@ export default function HomePage() {
           {/* Subheadline */}
           <p
             className={`text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-            style={{ transitionDelay: '600ms' }}
+            style={{ transitionDelay: '600ms', fontFamily: 'var(--font-mono), monospace' }}
           >
             Deposit into autonomous vaults. Every trade is mathematically proven correct.
           </p>
@@ -645,11 +645,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Partnered with — auto-scrolling marquee */}
+      {/* Partnered with — auto-scrolling marquee (right to left → items move left to right visually) */}
       <style>{`
-        @keyframes marquee-scroll {
-          from { transform: translateX(0); }
-          to { transform: translateX(-50%); }
+        @keyframes marquee-scroll-rtl {
+          from { transform: translateX(-50%); }
+          to { transform: translateX(0); }
         }
       `}</style>
       <section className="relative z-10 py-16 border-t border-white/5 overflow-hidden">
@@ -661,21 +661,30 @@ export default function HomePage() {
         <div className="absolute right-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-l from-[#0a0a0f] to-transparent pointer-events-none" />
         {/* Scrolling track */}
         <div
-          className="flex whitespace-nowrap"
-          style={{ animation: 'marquee-scroll 30s linear infinite' }}
+          className="flex whitespace-nowrap items-center"
+          style={{ animation: 'marquee-scroll-rtl 40s linear infinite' }}
         >
           {[
-            'Chainlink', 'Polygon', 'Bounce', 'BifROST', 'DSRV', 'Ozys', 'Staked', 'Despread', 'Decipher',
-            'Ciphers', 'SKY', 'METER', 'KDAC', "D'CENT", 'Panony', 'EFG', 'Paycoin',
-            'Chainlink', 'Polygon', 'Bounce', 'BifROST', 'DSRV', 'Ozys', 'Staked', 'Despread', 'Decipher',
-            'Ciphers', 'SKY', 'METER', 'KDAC', "D'CENT", 'Panony', 'EFG', 'Paycoin',
-          ].map((name, i) => (
-            <span
+            { src: '/name=chainlink, Hover=on.9b47119d.svg', alt: 'Chainlink' },
+            { src: '/name=SKY, Hover=off.1c4cd3b7.svg', alt: 'SKY' },
+            { src: '/name=DSRV, Hover=on.0e9131d5.svg', alt: 'DSRV' },
+            { src: '/name=efg, Hover=on.efe29c96.svg', alt: 'EFG' },
+            { src: '/name=kdac, Hover=on.73ee35ce.svg', alt: 'KDAC' },
+            { src: '/name=ozys, Hover=on.d4a3b17e.svg', alt: 'Ozys' },
+            { src: '/name=chainlink, Hover=on.9b47119d.svg', alt: 'Chainlink' },
+            { src: '/name=SKY, Hover=off.1c4cd3b7.svg', alt: 'SKY' },
+            { src: '/name=DSRV, Hover=on.0e9131d5.svg', alt: 'DSRV' },
+            { src: '/name=efg, Hover=on.efe29c96.svg', alt: 'EFG' },
+            { src: '/name=kdac, Hover=on.73ee35ce.svg', alt: 'KDAC' },
+            { src: '/name=ozys, Hover=on.d4a3b17e.svg', alt: 'Ozys' },
+          ].map((partner, i) => (
+            <div
               key={i}
-              className="inline-flex items-center mx-3 px-4 py-2 rounded-full border border-white/5 bg-white/[0.02] text-xs font-mono text-white/30 tracking-wider shrink-0"
+              className="inline-flex items-center justify-center mx-8 shrink-0 opacity-40 hover:opacity-80 transition-opacity duration-300"
             >
-              {name}
-            </span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={partner.src} alt={partner.alt} className="h-8 w-auto" />
+            </div>
           ))}
         </div>
       </section>
