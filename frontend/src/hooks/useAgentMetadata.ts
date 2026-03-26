@@ -26,11 +26,11 @@ function resolveUri(uri: string): string {
 }
 
 export function useAgentMetadata(agentId: `0x${string}` | undefined) {
-  const publicClient = usePublicClient();
-  const { contracts } = useNetwork();
+  const { contracts, selectedChainId } = useNetwork();
+  const publicClient = usePublicClient({ chainId: selectedChainId });
 
   return useQuery<AgentMetadata | null>({
-    queryKey: ['agentMetadata', agentId],
+    queryKey: ['agentMetadata', agentId, selectedChainId],
     queryFn: async () => {
       if (!publicClient || !agentId || !contracts?.agentRegistry) return null;
 
