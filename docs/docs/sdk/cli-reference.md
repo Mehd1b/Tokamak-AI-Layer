@@ -143,6 +143,83 @@ cast send <registry> "setMetadataURI(bytes32,string)" <agentId> "https://..." --
 
 ---
 
+## `tal metadata set`
+
+Set on-chain metadata for a registered agent. Metadata makes your agent discoverable in the marketplace, leaderboard, and deploy UI.
+
+```
+tal metadata set <AGENT_ID> [OPTIONS]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--name <NAME>` | — | Human-readable agent name |
+| `--description <DESC>` | — | Short description of the agent strategy |
+| `--tags <TAGS>` | — | Comma-separated tags (e.g. `perpetuals,hyperliquid,momentum`) |
+| `--source-repo <URL>` | — | Source repository URL (enables `tal fork`) |
+| `--version <VER>` | — | Semantic version string |
+| `--uri <URI>` | — | Raw metadata URI (IPFS, HTTPS, or Arweave). Overrides individual fields |
+| `--chain <ID>` | `999` | Chain ID |
+
+### Examples
+
+```bash
+# Set metadata with individual fields
+tal metadata set 0x12c3edf... \
+  --name "ETH-BTC Momentum" \
+  --description "Mean-reversion strategy on ETH/BTC ratio using 4h TWAP" \
+  --tags perpetuals,hyperliquid,momentum \
+  --source-repo https://github.com/alice/eth-btc-momentum \
+  --version 1.2.0
+
+# Set metadata with a raw URI
+tal metadata set 0x12c3edf... --uri "ipfs://QmMetadata..."
+
+# Set metadata on Arbitrum
+tal metadata set 0x12c3edf... --name "My Agent" --chain 42161
+```
+
+---
+
+## `tal metadata show`
+
+Display on-chain metadata for any registered agent.
+
+```
+tal metadata show <AGENT_ID> [OPTIONS]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--chain <ID>` | `999` | Chain ID |
+| `--json` | false | Output raw JSON metadata |
+
+### Examples
+
+```bash
+# View agent metadata
+tal metadata show 0x12c3edf...
+
+# JSON output for scripting
+tal metadata show 0x12c3edf... --json
+
+# Query on a specific chain
+tal metadata show 0x12c3edf... --chain 42161
+```
+
+### Example Output
+
+```
+Agent Metadata: 0x12c3edf...
+  Name:         ETH-BTC Momentum
+  Description:  Mean-reversion strategy on ETH/BTC ratio using 4h TWAP
+  Tags:         perpetuals, hyperliquid, momentum
+  Source Repo:  https://github.com/alice/eth-btc-momentum
+  Version:      1.2.0
+```
+
+---
+
 ## `tal doctor`
 
 Pre-flight configuration validator. Checks toolchain, build state, and configuration.

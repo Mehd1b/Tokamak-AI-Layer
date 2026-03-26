@@ -109,22 +109,37 @@ These constants are defined in [`kernel-core/src/lib.rs`](https://github.com/tok
 
 | Contract | Address |
 |----------|---------|
-| AgentRegistry | [`0xFa0AAEe4482C7901653855F591B832E7E8a20727`](https://etherscan.io/address/0xFa0AAEe4482C7901653855F591B832E7E8a20727) |
-| VaultFactory | [`0x9cF9828Fd6253Df7C9497fd06Fa531E0CCc1d822`](https://etherscan.io/address/0x9cF9828Fd6253Df7C9497fd06Fa531E0CCc1d822) |
-| KernelExecutionVerifier | [`0xAf58D2191772bcFFB3260F5140E995ec79e4d88B`](https://etherscan.io/address/0xAf58D2191772bcFFB3260F5140E995ec79e4d88B) |
+| AgentRegistry | [`0x2BF56f889Ab5E535C3194bB2B356f10D6fa2FBEc`](https://etherscan.io/address/0x2BF56f889Ab5E535C3194bB2B356f10D6fa2FBEc) |
+| VaultFactory | [`0x47E6EfFf516E8b899092ebEEF92fddCE579e9d39`](https://etherscan.io/address/0x47E6EfFf516E8b899092ebEEF92fddCE579e9d39) |
+| KernelExecutionVerifier | [`0x5c0F88e27FADAb50EA82572950a616b4Cf4fd8B3`](https://etherscan.io/address/0x5c0F88e27FADAb50EA82572950a616b4Cf4fd8B3) |
 | RISC Zero Verifier Router | [`0x8EaB2D97Dfce405A1692a21b3ff3A172d593D319`](https://etherscan.io/address/0x8EaB2D97Dfce405A1692a21b3ff3A172d593D319) |
 
 ### HyperEVM Mainnet (Chain ID: 999)
 
 | Contract | Address |
 |----------|---------|
-| AgentRegistry | `0xAf58D2191772bcFFB3260F5140E995ec79e4d88B` |
-| VaultFactory | `0xc7Fc0dD5f1B03E3De0C313eE0D3b06Cb2Dc017BB` |
-| KernelExecutionVerifier | `0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30` |
+| AgentRegistry | `0x47E6EfFf516E8b899092ebEEF92fddCE579e9d39` |
+| VaultFactory | `0xd27A7470a34903b7e215EA8d07d9cd2d21238F83` |
+| KernelExecutionVerifier | `0xD1478689f829c4B4F882eB8Ef7914C7874ddC707` |
 | RISC Zero Verifier Router | `0x9f8d4D1f7AAf06aab1640abd565A731399862Bc8` |
-| HyperliquidAdapter | `0x47660230D9B8e343bdecD2e35008Bd06E47bb3e0` |
 
 See [Hyperliquid Integration](/onchain/hyperliquid-integration) for details on the HyperEVM adapter contracts.
+
+### Arbitrum One (Chain ID: 42161)
+
+| Contract | Address |
+|----------|---------|
+| AgentRegistry | [`0xa6b363872aC1AA91Bc6a270958A06230c10aa473`](https://arbiscan.io/address/0xa6b363872aC1AA91Bc6a270958A06230c10aa473) |
+| VaultFactory | [`0x7b0E7eDf494acF2E90fBc9Fc97b8C412606B0611`](https://arbiscan.io/address/0x7b0E7eDf494acF2E90fBc9Fc97b8C412606B0611) |
+| KernelExecutionVerifier | [`0x936782d6bB65C75dFeC03228d1a5cb5d38C59318`](https://arbiscan.io/address/0x936782d6bB65C75dFeC03228d1a5cb5d38C59318) |
+
+### Optimism (Chain ID: 10)
+
+| Contract | Address |
+|----------|---------|
+| AgentRegistry | [`0xa6b363872aC1AA91Bc6a270958A06230c10aa473`](https://optimistic.etherscan.io/address/0xa6b363872aC1AA91Bc6a270958A06230c10aa473) |
+| VaultFactory | [`0x7b0E7eDf494acF2E90fBc9Fc97b8C412606B0611`](https://optimistic.etherscan.io/address/0x7b0E7eDf494acF2E90fBc9Fc97b8C412606B0611) |
+| KernelExecutionVerifier | [`0x936782d6bB65C75dFeC03228d1a5cb5d38C59318`](https://optimistic.etherscan.io/address/0x936782d6bB65C75dFeC03228d1a5cb5d38C59318) |
 
 ### HyperEVM Testnet (Chain ID: 998)
 

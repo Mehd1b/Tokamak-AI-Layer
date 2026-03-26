@@ -150,7 +150,10 @@ To get testnet tokens:
 
 | Chain | ID | AgentRegistry | VaultFactory |
 |-------|-----|---------------|--------------|
-| HyperEVM Mainnet | 999 | `0xAf58D219...` | `0xc7Fc0dD5...` |
+| HyperEVM Mainnet | 999 | `0x47E6EfFf...` | `0xd27A7470...` |
+| Ethereum Mainnet | 1 | `0x2BF56f88...` | `0x47E6EfFf...` |
+| Arbitrum One | 42161 | `0xa6b36387...` | `0x7b0E7eDf...` |
+| Optimism | 10 | `0xa6b36387...` | `0x7b0E7eDf...` |
 | HyperEVM Testnet | 998 | `0x09447147...` | `0x4c36bCA8...` |
 
 Addresses are sourced from `crates/tal-cli/src/onchain.rs` and match the on-chain deployments in `sdk/src/addresses.ts`.

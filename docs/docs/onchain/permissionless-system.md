@@ -21,36 +21,36 @@ This design removes the need for a trusted operator to register agents, enabling
 
 | Contract | Address |
 |----------|---------|
-| AgentRegistry | [`0xFa0AAEe4482C7901653855F591B832E7E8a20727`](https://etherscan.io/address/0xFa0AAEe4482C7901653855F591B832E7E8a20727) |
-| VaultFactory | [`0x9cF9828Fd6253Df7C9497fd06Fa531E0CCc1d822`](https://etherscan.io/address/0x9cF9828Fd6253Df7C9497fd06Fa531E0CCc1d822) |
-| KernelExecutionVerifier | [`0xAf58D2191772bcFFB3260F5140E995ec79e4d88B`](https://etherscan.io/address/0xAf58D2191772bcFFB3260F5140E995ec79e4d88B) |
+| AgentRegistry | [`0x2BF56f889Ab5E535C3194bB2B356f10D6fa2FBEc`](https://etherscan.io/address/0x2BF56f889Ab5E535C3194bB2B356f10D6fa2FBEc) |
+| VaultFactory | [`0x47E6EfFf516E8b899092ebEEF92fddCE579e9d39`](https://etherscan.io/address/0x47E6EfFf516E8b899092ebEEF92fddCE579e9d39) |
+| KernelExecutionVerifier | [`0x5c0F88e27FADAb50EA82572950a616b4Cf4fd8B3`](https://etherscan.io/address/0x5c0F88e27FADAb50EA82572950a616b4Cf4fd8B3) |
 | RISC Zero Verifier Router | [`0x8EaB2D97Dfce405A1692a21b3ff3A172d593D319`](https://etherscan.io/address/0x8EaB2D97Dfce405A1692a21b3ff3A172d593D319) |
 
 ### HyperEVM Mainnet (Chain ID: 999)
 
 | Contract | Address |
 |----------|---------|
-| AgentRegistry | [`0x8fd180069269b5800AD60998c567731894b707b4`](https://hyperliquid.cloud.blockscout.com/address/0x8fd180069269b5800AD60998c567731894b707b4) |
-| VaultFactory | [`0xCB76E29808733a32946e9fB70A3Fb7b2e5a1a89a`](https://hyperliquid.cloud.blockscout.com/address/0xCB76E29808733a32946e9fB70A3Fb7b2e5a1a89a) |
-| KernelExecutionVerifier | [`0x98800a0d9a5755Be1f8613DdA265797F3fE2C56b`](https://hyperliquid.cloud.blockscout.com/address/0x98800a0d9a5755Be1f8613DdA265797F3fE2C56b) |
+| AgentRegistry | [`0x47E6EfFf516E8b899092ebEEF92fddCE579e9d39`](https://hyperliquid.cloud.blockscout.com/address/0x47E6EfFf516E8b899092ebEEF92fddCE579e9d39) |
+| VaultFactory | [`0xd27A7470a34903b7e215EA8d07d9cd2d21238F83`](https://hyperliquid.cloud.blockscout.com/address/0xd27A7470a34903b7e215EA8d07d9cd2d21238F83) |
+| KernelExecutionVerifier | [`0xD1478689f829c4B4F882eB8Ef7914C7874ddC707`](https://hyperliquid.cloud.blockscout.com/address/0xD1478689f829c4B4F882eB8Ef7914C7874ddC707) |
 | RISC Zero Verifier Router | `0x9f8d4D1f7AAf06aab1640abd565A731399862Bc8` |
 
 ### Arbitrum One (Chain ID: 42161)
 
 | Contract | Address |
 |----------|---------|
-| AgentRegistry | [`0x0052258E517835081c94c0B685409f2EfC4D502b`](https://arbiscan.io/address/0x0052258E517835081c94c0B685409f2EfC4D502b) |
-| VaultFactory | [`0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30`](https://arbiscan.io/address/0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30) |
-| KernelExecutionVerifier | [`0x09447147C6E75a60A449f38532F06E19F5F632F3`](https://arbiscan.io/address/0x09447147C6E75a60A449f38532F06E19F5F632F3) |
+| AgentRegistry | [`0xa6b363872aC1AA91Bc6a270958A06230c10aa473`](https://arbiscan.io/address/0xa6b363872aC1AA91Bc6a270958A06230c10aa473) |
+| VaultFactory | [`0x7b0E7eDf494acF2E90fBc9Fc97b8C412606B0611`](https://arbiscan.io/address/0x7b0E7eDf494acF2E90fBc9Fc97b8C412606B0611) |
+| KernelExecutionVerifier | [`0x936782d6bB65C75dFeC03228d1a5cb5d38C59318`](https://arbiscan.io/address/0x936782d6bB65C75dFeC03228d1a5cb5d38C59318) |
 | RISC Zero Verifier Router | [`0x0b144e07a0826182b6b59788c34b32bfa86fb711`](https://arbiscan.io/address/0x0b144e07a0826182b6b59788c34b32bfa86fb711) |
 
 ### Optimism (Chain ID: 10)
 
 | Contract | Address |
 |----------|---------|
-| AgentRegistry | [`0x0052258E517835081c94c0B685409f2EfC4D502b`](https://optimistic.etherscan.io/address/0x0052258E517835081c94c0B685409f2EfC4D502b) |
-| VaultFactory | [`0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30`](https://optimistic.etherscan.io/address/0xDc9d9A78676C600E7Ca55a8D0c63da9462Acfe30) |
-| KernelExecutionVerifier | [`0x09447147C6E75a60A449f38532F06E19F5F632F3`](https://optimistic.etherscan.io/address/0x09447147C6E75a60A449f38532F06E19F5F632F3) |
+| AgentRegistry | [`0xa6b363872aC1AA91Bc6a270958A06230c10aa473`](https://optimistic.etherscan.io/address/0xa6b363872aC1AA91Bc6a270958A06230c10aa473) |
+| VaultFactory | [`0x7b0E7eDf494acF2E90fBc9Fc97b8C412606B0611`](https://optimistic.etherscan.io/address/0x7b0E7eDf494acF2E90fBc9Fc97b8C412606B0611) |
+| KernelExecutionVerifier | [`0x936782d6bB65C75dFeC03228d1a5cb5d38C59318`](https://optimistic.etherscan.io/address/0x936782d6bB65C75dFeC03228d1a5cb5d38C59318) |
 | RISC Zero Verifier Router | [`0x0b144e07a0826182b6b59788c34b32bfa86fb711`](https://optimistic.etherscan.io/address/0x0b144e07a0826182b6b59788c34b32bfa86fb711) |
 
 ### Ethereum Sepolia (Testnet)
@@ -335,8 +335,22 @@ Only the agent author can set metadata. The URI can point to IPFS, HTTPS, or Arw
 }
 ```
 
+You can also manage metadata directly from the CLI:
+
+```bash
+# Set metadata for your agent
+tal metadata set <agent-id> --name "ETH-BTC Momentum" --description "Mean-reversion strategy" --tags perpetuals,hyperliquid
+
+# View metadata for any agent
+tal metadata show <agent-id>
+```
+
 Setting metadata enables:
 - **Frontend discovery** — vault cards show agent names instead of hex IDs
+- **Marketplace** — agents with metadata appear in the public marketplace at [`/marketplace`](/marketplace)
+- **Leaderboard** — agent performance rankings at [`/leaderboard`](/leaderboard)
+- **Deploy UI** — one-click vault deployment at [`/deploy`](/deploy)
+- **Referrals** — earn referral rewards by sharing agent links at [`/referrals`](/referrals)
 - **Forking** — `tal fork <agent-id>` clones the source repo and scaffolds a new project
 - **Ecosystem indexing** — third-party dashboards and aggregators can discover agents
 
