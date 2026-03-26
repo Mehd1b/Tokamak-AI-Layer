@@ -1,6 +1,6 @@
 [package]
 name = "tal-cli"
-version = "0.7.1"
+version = "0.7.2"
 edition = "2021"
 description = "Unified CLI for the Tokamak AI Layer — scaffold, validate, test, and deploy verifiable agents on RISC Zero zkVM"
 license = "MIT OR Apache-2.0"
@@ -30,5 +30,12 @@ tempfile = "3"
 alloy = { version = "0.8", features = ["providers", "transports", "contract", "signer-local", "rpc-types", "sol-types"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# Vendored OpenSSL for cross-compilation (transitive dep from alloy)
+openssl = { version = "0.10", features = ["vendored"], optional = true }
+
+[features]
+default = []
+vendored-openssl = ["openssl"]
 
 [dev-dependencies]

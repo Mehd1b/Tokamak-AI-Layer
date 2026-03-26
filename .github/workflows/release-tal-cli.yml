@@ -27,6 +27,7 @@ jobs:
             os: ubuntu-latest
             archive: tar.gz
             cross: true
+            features: vendored-openssl
           - target: x86_64-apple-darwin
             os: macos-latest
             archive: tar.gz
@@ -54,10 +55,15 @@ jobs:
 
       - name: Build binary
         run: |
+          FEATURES="${{ matrix.features }}"
+          FEATURE_FLAG=""
+          if [ -n "$FEATURES" ]; then
+            FEATURE_FLAG="--features $FEATURES"
+          fi
           if [ "${{ matrix.cross }}" = "true" ]; then
-            cross build --release --target ${{ matrix.target }} -p tal-cli
+            cross build --release --target ${{ matrix.target }} -p tal-cli $FEATURE_FLAG
           else
-            cargo build --release --target ${{ matrix.target }} -p tal-cli
+            cargo build --release --target ${{ matrix.target }} -p tal-cli $FEATURE_FLAG
           fi
         shell: bash
 
