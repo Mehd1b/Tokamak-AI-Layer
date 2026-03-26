@@ -6,3 +6,7 @@ export { useUserShares, type UserSharesInfo } from './useUserShares';
 export { useDeposit, type DepositStep, type UseDepositReturn } from './useDeposit';
 export { useWithdraw, type WithdrawStep, type UseWithdrawReturn } from './useWithdraw';
 export { useIsLegacyChain, useIsChainSupported, useChainMismatch } from './useChainValidation';
+export { useVaultReturns } from './useVaultReturns';
+export { useVaultPPSHistory } from './useVaultPPSHistory';
+export { useExecutionHistory } from './useExecutionHistory';
+export { useUserPortfolio } from './useUserPortfolio';

@@ -29,6 +29,11 @@ export type {
   ExecuteParams,
   ExecutionKernelConfig,
   AgentMetadata,
+  ExecutionRecord,
+  UserVaultPosition,
+  UserPortfolio,
+  VaultReturns,
+  PpsHistoryData,
 } from './types';
 
 export {

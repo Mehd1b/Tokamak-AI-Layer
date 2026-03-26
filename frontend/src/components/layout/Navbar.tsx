@@ -32,6 +32,7 @@ const SOCIAL_ICONS = {
 // Protocol dropdown links
 const PROTOCOL_LINKS: DropdownLink[] = [
   { title: 'Vaults', description: 'Explore and deploy vaults', href: '/vaults', internal: true },
+  { title: 'Deploy Vault', description: 'Launch a new AI-managed vault', href: '/deploy', internal: true },
   { title: 'Staking', description: 'WSTON staking and bridge', href: '/staking', internal: true },
 ];
 
@@ -419,6 +420,17 @@ export function Navbar() {
             </div>
           </div>
 
+          <Link
+            href="/leaderboard"
+            className={clsx(
+              'px-4 py-2 rounded-lg border border-dashed transition-all tracking-wider text-sm',
+              pathname === '/leaderboard' || pathname?.startsWith('/agents/')
+                ? 'border-[#A855F7]/60 text-[#A855F7]'
+                : 'border-white/30 text-white hover:border-white/60 hover:text-gray-300',
+            )}
+          >
+            LEADERBOARD
+          </Link>
           {walletConnected && (
             <Link
               href="/portfolio"
@@ -552,6 +564,18 @@ export function Navbar() {
                   </div>
                 </div>
 
+                <Link
+                  href="/leaderboard"
+                  className={clsx(
+                    'block text-md font-light transition-all duration-300 tracking-wider',
+                    pathname === '/leaderboard' || pathname?.startsWith('/agents/')
+                      ? 'text-[#A855F7]'
+                      : 'text-white hover:text-[#A855F7]',
+                  )}
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  LEADERBOARD
+                </Link>
                 {walletConnected && (
                   <Link
                     href="/portfolio"

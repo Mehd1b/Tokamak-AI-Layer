@@ -1,7 +1,7 @@
 import type { PublicClient, WalletClient } from 'viem';
 import { decodeEventLog } from 'viem';
 import { KernelVaultABI } from '../abi/KernelVault';
-import type { ExecuteParams, KernelVaultInfo, PerformanceMetrics } from '../types';
+import type { ExecuteParams, ExecutionRecord, KernelVaultInfo, PerformanceMetrics } from '../types';
 
 export class KernelVaultClient {
   private readonly publicClient: PublicClient;
@@ -351,6 +351,64 @@ export class KernelVaultClient {
       allTimeReturnPct,
       ppsHistory,
     };
+  }
+
+  // ============ Execution History ============
+
+  /**
+   * Query ExecutionApplied event logs from the vault contract.
+   * Returns execution records sorted newest-first.
+   * Optional `fromBlock` parameter allows pagination (defaults to earliest).
+   */
+  async getExecutionHistory(options?: {
+    fromBlock?: bigint;
+    toBlock?: bigint;
+  }): Promise<ExecutionRecord[]> {
+    const agentIdVal = await this.agentId();
+
+    const logs = await this.publicClient.getLogs({
+      address: this.vaultAddress,
+      event: {
+        type: 'event',
+        name: 'ExecutionApplied',
+        inputs: [
+          { name: 'agentId', type: 'bytes32', indexed: true },
+          { name: 'executionNonce', type: 'uint64', indexed: true },
+          { name: 'actionCommitment', type: 'bytes32', indexed: false },
+          { name: 'actionCount', type: 'uint256', indexed: false },
+        ],
+      },
+      args: {
+        agentId: agentIdVal,
+      },
+      fromBlock: options?.fromBlock ?? 'earliest',
+      toBlock: options?.toBlock ?? 'latest',
+    });
+
+    // Fetch block timestamps in parallel for all logs
+    const uniqueBlockNumbers = [...new Set(logs.map((l) => l.blockNumber))];
+    const blockMap = new Map<bigint, number>();
+    const blocks = await Promise.all(
+      uniqueBlockNumbers.map((bn) =>
+        this.publicClient.getBlock({ blockNumber: bn }),
+      ),
+    );
+    for (const block of blocks) {
+      blockMap.set(block.number, Number(block.timestamp));
+    }
+
+    const records: ExecutionRecord[] = logs.map((log) => ({
+      nonce: log.args.executionNonce!,
+      actionCommitment: log.args.actionCommitment! as `0x${string}`,
+      actionCount: Number(log.args.actionCount!),
+      timestamp: blockMap.get(log.blockNumber) ?? 0,
+      txHash: log.transactionHash as `0x${string}`,
+      blockNumber: log.blockNumber,
+    }));
+
+    // Sort newest-first
+    records.sort((a, b) => b.timestamp - a.timestamp);
+    return records;
   }
 
   private parseDepositEvent(logs: readonly { data: `0x${string}`; topics: readonly `0x${string}`[] }[]): bigint {

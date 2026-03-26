@@ -97,6 +97,51 @@ export interface ExecuteParams {
   agentOutputBytes: `0x${string}`;
 }
 
+// ============ Execution History ============
+
+export interface ExecutionRecord {
+  nonce: bigint;
+  actionCommitment: `0x${string}`;
+  actionCount: number;
+  timestamp: number;
+  txHash: `0x${string}`;
+  blockNumber: bigint;
+}
+
+// ============ Portfolio Types ============
+
+export interface UserVaultPosition {
+  vaultAddress: `0x${string}`;
+  agentId: `0x${string}`;
+  asset: `0x${string}`;
+  shares: bigint;
+  assetsValue: bigint;
+  pnl: bigint;
+  totalDeposited: bigint;
+}
+
+export interface UserPortfolio {
+  vaults: UserVaultPosition[];
+  totalValue: bigint;
+  totalPnL: bigint;
+}
+
+// ============ Vault Returns ============
+
+export interface VaultReturns {
+  return7d: number | null;
+  return30d: number | null;
+  allTime: number;
+  maxDrawdown: number;
+}
+
+// ============ PPS History ============
+
+export interface PpsHistoryData {
+  timestamps: number[];
+  values: bigint[];
+}
+
 // ============ Agent Metadata ============
 
 export interface AgentMetadata {
