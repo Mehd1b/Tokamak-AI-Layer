@@ -652,13 +652,13 @@ export default function HomePage() {
           to { transform: translateX(0); }
         }
       `}</style>
-      <section className="relative z-10 py-16 border-t border-white/5 overflow-hidden">
-        <p className="text-center text-[10px] font-mono uppercase tracking-[0.3em] text-gray-600 mb-8">
+      <section className="relative z-10 py-16 bg-[#0a0a0f]/50 backdrop-blur-xl border-t border-white/5 overflow-hidden">
+        <p className="text-center text-[10px] font-mono uppercase tracking-[0.3em] text-gray-500 mb-8">
           Partnered with
         </p>
-        {/* Gradient masks */}
-        <div className="absolute left-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-r from-[#0a0a0f] to-transparent pointer-events-none" />
-        <div className="absolute right-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-l from-[#0a0a0f] to-transparent pointer-events-none" />
+        {/* Gradient masks — transparent to match aurora bleed-through */}
+        <div className="absolute left-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-r from-[#0a0a0f]/80 to-transparent pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-l from-[#0a0a0f]/80 to-transparent pointer-events-none" />
         {/* Scrolling track */}
         <div
           className="flex whitespace-nowrap items-center"
@@ -683,7 +683,7 @@ export default function HomePage() {
               href={partner.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center mx-8 shrink-0 opacity-40 hover:opacity-80 transition-opacity duration-300"
+              className="inline-flex items-center justify-center mx-8 shrink-0 opacity-70 hover:opacity-100 transition-opacity duration-300 brightness-125"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={partner.src} alt={partner.alt} className="h-8 w-auto" />
