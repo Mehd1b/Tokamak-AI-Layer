@@ -665,18 +665,18 @@ export default function HomePage() {
           style={{ animation: 'marquee-scroll-rtl 40s linear infinite' }}
         >
           {[
-            { src: '/name=chainlink, Hover=on.9b47119d.svg', alt: 'Chainlink' },
-            { src: '/name=SKY, Hover=off.1c4cd3b7.svg', alt: 'SKY' },
-            { src: '/name=DSRV, Hover=on.0e9131d5.svg', alt: 'DSRV' },
-            { src: '/name=efg, Hover=on.efe29c96.svg', alt: 'EFG' },
-            { src: '/name=kdac, Hover=on.73ee35ce.svg', alt: 'KDAC' },
-            { src: '/name=ozys, Hover=on.d4a3b17e.svg', alt: 'Ozys' },
-            { src: '/name=chainlink, Hover=on.9b47119d.svg', alt: 'Chainlink' },
-            { src: '/name=SKY, Hover=off.1c4cd3b7.svg', alt: 'SKY' },
-            { src: '/name=DSRV, Hover=on.0e9131d5.svg', alt: 'DSRV' },
-            { src: '/name=efg, Hover=on.efe29c96.svg', alt: 'EFG' },
-            { src: '/name=kdac, Hover=on.73ee35ce.svg', alt: 'KDAC' },
-            { src: '/name=ozys, Hover=on.d4a3b17e.svg', alt: 'Ozys' },
+            { src: '/partner-chainlink.svg', alt: 'Chainlink' },
+            { src: '/partner-sky.svg', alt: 'SKY' },
+            { src: '/partner-dsrv.svg', alt: 'DSRV' },
+            { src: '/partner-efg.svg', alt: 'EFG' },
+            { src: '/partner-kdac.svg', alt: 'KDAC' },
+            { src: '/partner-ozys.svg', alt: 'Ozys' },
+            { src: '/partner-chainlink.svg', alt: 'Chainlink' },
+            { src: '/partner-sky.svg', alt: 'SKY' },
+            { src: '/partner-dsrv.svg', alt: 'DSRV' },
+            { src: '/partner-efg.svg', alt: 'EFG' },
+            { src: '/partner-kdac.svg', alt: 'KDAC' },
+            { src: '/partner-ozys.svg', alt: 'Ozys' },
           ].map((partner, i) => (
             <div
               key={i}
