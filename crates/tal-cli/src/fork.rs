@@ -14,10 +14,18 @@ use std::process::Command;
 // ===========================================================================
 
 sol! {
+    struct AgentInfo {
+        address author;
+        bytes32 imageId;
+        bytes32 agentCodeHash;
+        string _deprecated;
+        bool exists;
+    }
+
     #[sol(rpc)]
     interface IAgentRegistry {
         function getMetadataURI(bytes32 agentId) external view returns (string);
-        function get(bytes32 agentId) external view returns (address author, bytes32 imageId, bytes32 agentCodeHash, string deprecated, bool exists);
+        function get(bytes32 agentId) external view returns (AgentInfo info);
     }
 }
 
@@ -104,7 +112,7 @@ async fn run_async(
         .await
         .with_context(|| "Failed to query AgentRegistry.get()")?;
 
-    if !agent_info.exists {
+    if !agent_info.info.exists {
         anyhow::bail!(
             "Agent 0x{} not found on {} (registry: {})",
             hex::encode(agent_id),
@@ -113,9 +121,9 @@ async fn run_async(
         );
     }
 
-    println!("  Author: {}", agent_info.author);
-    println!("  Image ID: 0x{}...", &hex::encode(agent_info.imageId)[..16]);
-    println!("  Code Hash: 0x{}...", &hex::encode(agent_info.agentCodeHash)[..16]);
+    println!("  Author: {}", agent_info.info.author);
+    println!("  Image ID: 0x{}...", &hex::encode(agent_info.info.imageId)[..16]);
+    println!("  Code Hash: 0x{}...", &hex::encode(agent_info.info.agentCodeHash)[..16]);
     println!("  {} Agent found on-chain", "✓".green());
     println!();
 
@@ -263,8 +271,8 @@ async fn run_async(
     if verbose {
         println!();
         println!("  Full salt: {}", fork_salt);
-        println!("  Original author: {}", agent_info.author);
-        println!("  Original image ID: 0x{}", hex::encode(agent_info.imageId));
+        println!("  Original author: {}", agent_info.info.author);
+        println!("  Original image ID: 0x{}", hex::encode(agent_info.info.imageId));
     }
 
     Ok(())
