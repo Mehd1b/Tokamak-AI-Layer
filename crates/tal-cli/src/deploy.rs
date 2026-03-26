@@ -421,6 +421,8 @@ async fn run_async(
         println!("    • Run bot: ./run-bot.sh");
     }
     println!("    • Monitor: tal monitor --vault {}", vault_addr);
+    println!();
+    println!("  {} Tip: Run `tal metadata set` to add a name and description to your agent", "ℹ".blue());
 
     Ok(())
 }

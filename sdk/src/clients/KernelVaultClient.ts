@@ -1,7 +1,7 @@
 import type { PublicClient, WalletClient } from 'viem';
 import { decodeEventLog } from 'viem';
 import { KernelVaultABI } from '../abi/KernelVault';
-import type { ExecuteParams, KernelVaultInfo } from '../types';
+import type { ExecuteParams, KernelVaultInfo, PerformanceMetrics } from '../types';
 
 export class KernelVaultClient {
   private readonly publicClient: PublicClient;
@@ -217,6 +217,139 @@ export class KernelVaultClient {
       totalValueLocked: totalValueLockedVal,
       userShares,
       userAssets,
+    };
+  }
+
+  // ============ Performance Methods ============
+
+  /**
+   * Read PPS checkpoint arrays and return as ordered history.
+   * The on-chain storage is a circular buffer of up to 30 entries.
+   * Returned array is sorted oldest-first and excludes empty slots.
+   */
+  async getPpsHistory(): Promise<{ timestamp: number; value: bigint }[]> {
+    const maxCheckpoints = 30; // MAX_PPS_CHECKPOINTS constant on contract
+
+    // Read all checkpoint slots in parallel
+    const indexPromises: Promise<bigint>[] = [];
+    for (let i = 0; i < maxCheckpoints; i++) {
+      indexPromises.push(
+        this.publicClient.readContract({
+          address: this.vaultAddress,
+          abi: KernelVaultABI,
+          functionName: 'ppsCheckpointValues',
+          args: [BigInt(i)],
+        }),
+      );
+      indexPromises.push(
+        this.publicClient.readContract({
+          address: this.vaultAddress,
+          abi: KernelVaultABI,
+          functionName: 'ppsCheckpointTimestamps',
+          args: [BigInt(i)],
+        }),
+      );
+    }
+
+    const results = await Promise.all(indexPromises);
+
+    // Pair up values and timestamps, filter out empty (zero-timestamp) slots
+    const checkpoints: { timestamp: number; value: bigint }[] = [];
+    for (let i = 0; i < maxCheckpoints; i++) {
+      const value = results[i * 2];
+      const timestamp = results[i * 2 + 1];
+      if (timestamp > 0n) {
+        checkpoints.push({ timestamp: Number(timestamp), value });
+      }
+    }
+
+    // Sort oldest-first by timestamp
+    checkpoints.sort((a, b) => a.timestamp - b.timestamp);
+    return checkpoints;
+  }
+
+  /**
+   * Read on-chain performance data and compute derived metrics.
+   * Uses parallel reads for all scalar fields plus the PPS history.
+   */
+  async getPerformanceMetrics(): Promise<PerformanceMetrics> {
+    const [
+      initialPpsVal,
+      peakPpsVal,
+      maxDrawdownBpsVal,
+      executionWinsVal,
+      totalExecutionCountVal,
+      totalAssetsVal,
+      totalSharesVal,
+      ppsHistory,
+    ] = await Promise.all([
+      this.publicClient.readContract({
+        address: this.vaultAddress,
+        abi: KernelVaultABI,
+        functionName: 'initialPps',
+      }) as Promise<bigint>,
+      this.publicClient.readContract({
+        address: this.vaultAddress,
+        abi: KernelVaultABI,
+        functionName: 'peakPps',
+      }) as Promise<bigint>,
+      this.publicClient.readContract({
+        address: this.vaultAddress,
+        abi: KernelVaultABI,
+        functionName: 'maxDrawdownBps',
+      }) as Promise<bigint>,
+      this.publicClient.readContract({
+        address: this.vaultAddress,
+        abi: KernelVaultABI,
+        functionName: 'executionWins',
+      }) as Promise<bigint>,
+      this.publicClient.readContract({
+        address: this.vaultAddress,
+        abi: KernelVaultABI,
+        functionName: 'totalExecutionCount',
+      }) as Promise<bigint>,
+      this.totalAssets(),
+      this.totalShares(),
+      this.getPpsHistory(),
+    ]);
+
+    // Compute current PPS: totalAssets / totalShares (scaled by 1e18 like the contract)
+    // When no shares exist, PPS is 1e18 (1:1)
+    const PPS_SCALE = 10n ** 18n;
+    const DECIMALS_OFFSET = 1000n; // matches contract _DECIMALS_OFFSET
+    let currentPps: bigint;
+    if (totalSharesVal === 0n) {
+      currentPps = PPS_SCALE;
+    } else {
+      // Mirror the contract's convertToAssets math: assets * (totalShares + offset) / (totalAssets + offset)
+      // PPS = totalAssets * 1e18 / totalShares (simplified, offset negligible at scale)
+      currentPps = (totalAssetsVal * PPS_SCALE) / (totalSharesVal + DECIMALS_OFFSET);
+    }
+
+    const executionCount = Number(totalExecutionCountVal);
+    const executionWins = Number(executionWinsVal);
+
+    // Derived: win rate (0 if no executions)
+    const winRate = executionCount > 0
+      ? (executionWins / executionCount) * 100
+      : 0;
+
+    // Derived: all-time return percentage
+    const initialPps = initialPpsVal > 0n ? initialPpsVal : PPS_SCALE;
+    const allTimeReturnPct = initialPps > 0n
+      ? Number(((currentPps - initialPps) * 10000n) / initialPps) / 100
+      : 0;
+
+    return {
+      currentPps,
+      initialPps,
+      peakPps: peakPpsVal,
+      maxDrawdownBps: Number(maxDrawdownBpsVal),
+      executionCount,
+      executionWins,
+      winRate,
+      allTimeReturnPct,
+      ppsHistory,
     };
   }
 

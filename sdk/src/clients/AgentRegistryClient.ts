@@ -1,7 +1,8 @@
 import type { PublicClient, WalletClient } from 'viem';
 import { decodeEventLog } from 'viem';
 import { AgentRegistryABI } from '../abi/AgentRegistry';
-import type { KernelAgentInfo } from '../types';
+import type { AgentMetadata, KernelAgentInfo } from '../types';
+import { fetchAgentMetadata } from '../utils/metadata';
 
 export class AgentRegistryClient {
   private readonly publicClient: PublicClient;
@@ -140,6 +141,12 @@ export class AgentRegistryClient {
       args: [agentId, uri],
     });
     return hash;
+  }
+
+  async getAgentMetadata(agentId: `0x${string}`): Promise<AgentMetadata | null> {
+    const uri = await this.getMetadataURI(agentId);
+    if (!uri) return null;
+    return fetchAgentMetadata(uri);
   }
 
   private requireWallet(): void {

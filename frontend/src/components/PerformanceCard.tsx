@@ -12,17 +12,31 @@ function formatPct(value: number | null): string {
 }
 
 function pctColor(value: number | null): string {
-  if (value === null) return 'text-gray-300';
+  if (value === null) return 'text-gray-400';
   if (value > 0) return 'text-green-400';
   if (value < 0) return 'text-red-400';
   return 'text-gray-300';
 }
 
-function SkeletonRow() {
+function pctBg(value: number | null): string {
+  if (value === null) return 'bg-white/[0.03]';
+  if (value > 0) return 'bg-green-500/[0.06]';
+  if (value < 0) return 'bg-red-500/[0.06]';
+  return 'bg-white/[0.03]';
+}
+
+function pctBorder(value: number | null): string {
+  if (value === null) return 'border-white/5';
+  if (value > 0) return 'border-green-500/10';
+  if (value < 0) return 'border-red-500/10';
+  return 'border-white/5';
+}
+
+function SkeletonCell() {
   return (
-    <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
-      <div className="h-4 w-24 rounded bg-white/5 animate-pulse" />
-      <div className="h-4 w-16 rounded bg-white/5 animate-pulse mt-1 sm:mt-0" />
+    <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
+      <div className="h-3 w-16 rounded bg-white/5 animate-pulse mb-2" />
+      <div className="h-6 w-20 rounded bg-white/5 animate-pulse" />
     </div>
   );
 }
@@ -30,6 +44,7 @@ function SkeletonRow() {
 export function PerformanceCard({ vaultAddress }: PerformanceCardProps) {
   const {
     totalReturn,
+    apy,
     returnSince7d,
     returnSince30d,
     maxDrawdown,
@@ -39,18 +54,9 @@ export function PerformanceCard({ vaultAddress }: PerformanceCardProps) {
     isLoading,
   } = useVaultPerformance(vaultAddress);
 
-  const metrics: Array<{ label: string; value: string; colorClass: string }> = [
-    { label: 'Total Return', value: formatPct(totalReturn), colorClass: pctColor(totalReturn) },
-    { label: '7d Return', value: formatPct(returnSince7d), colorClass: pctColor(returnSince7d) },
-    { label: '30d Return', value: formatPct(returnSince30d), colorClass: pctColor(returnSince30d) },
-    { label: 'Max Drawdown', value: formatPct(maxDrawdown), colorClass: pctColor(maxDrawdown) },
-    { label: 'Win Rate', value: winRate !== null ? `${winRate.toFixed(2)}%` : '-', colorClass: 'text-gray-300' },
-    { label: 'Executions', value: String(executionCount), colorClass: 'text-gray-300' },
-    { label: 'Sharpe Ratio', value: sharpeRatio !== null ? sharpeRatio.toFixed(2) : '-', colorClass: 'text-gray-300' },
-  ];
-
   return (
     <div className="card mb-8">
+      {/* Header */}
       <div className="flex items-center gap-3 mb-5">
         <div
           className="w-10 h-10 rounded-xl flex items-center justify-center"
@@ -68,31 +74,71 @@ export function PerformanceCard({ vaultAddress }: PerformanceCardProps) {
         </h2>
       </div>
 
-      <div className="space-y-4" style={{ fontFamily: 'var(--font-mono), monospace' }}>
-        {isLoading ? (
-          <>
-            <SkeletonRow />
-            <SkeletonRow />
-            <SkeletonRow />
-            <SkeletonRow />
-            <SkeletonRow />
-            <SkeletonRow />
-            <SkeletonRow />
-          </>
-        ) : (
-          metrics.map((metric, idx) => (
-            <div
-              key={metric.label}
-              className={`flex flex-col sm:flex-row sm:justify-between py-3 ${
-                idx < metrics.length - 1 ? 'border-b border-white/5' : ''
-              }`}
-            >
-              <span className="text-gray-500 text-sm">{metric.label}</span>
-              <span className={`text-sm ${metric.colorClass}`}>{metric.value}</span>
+      {isLoading ? (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <SkeletonCell />
+          <SkeletonCell />
+          <SkeletonCell />
+          <SkeletonCell />
+        </div>
+      ) : (
+        <>
+          {/* Primary metrics — summary grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            {/* APY */}
+            <div className={`rounded-xl border ${pctBorder(apy)} ${pctBg(apy)} p-4`}>
+              <p className="text-[10px] uppercase tracking-widest text-gray-500 font-mono mb-1">APY</p>
+              <p className={`text-lg font-mono font-medium ${pctColor(apy)}`}>
+                {formatPct(apy)}
+              </p>
             </div>
-          ))
-        )}
-      </div>
+
+            {/* Max Drawdown */}
+            <div className={`rounded-xl border ${pctBorder(maxDrawdown)} ${pctBg(maxDrawdown)} p-4`}>
+              <p className="text-[10px] uppercase tracking-widest text-gray-500 font-mono mb-1">Max Drawdown</p>
+              <p className={`text-lg font-mono font-medium ${pctColor(maxDrawdown)}`}>
+                {formatPct(maxDrawdown)}
+              </p>
+            </div>
+
+            {/* Win Rate */}
+            <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4">
+              <p className="text-[10px] uppercase tracking-widest text-gray-500 font-mono mb-1">Win Rate</p>
+              <p className={`text-lg font-mono font-medium ${winRate !== null ? (winRate >= 50 ? 'text-green-400' : 'text-amber-400') : 'text-gray-400'}`}>
+                {winRate !== null ? `${winRate.toFixed(1)}%` : '-'}
+              </p>
+            </div>
+
+            {/* Executions */}
+            <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4">
+              <p className="text-[10px] uppercase tracking-widest text-gray-500 font-mono mb-1">Executions</p>
+              <p className="text-lg font-mono font-medium text-gray-300">
+                {executionCount}
+              </p>
+            </div>
+          </div>
+
+          {/* Secondary metrics — detail rows */}
+          <div className="space-y-0" style={{ fontFamily: 'var(--font-mono), monospace' }}>
+            <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
+              <span className="text-gray-500 text-sm">Total Return</span>
+              <span className={`text-sm ${pctColor(totalReturn)}`}>{formatPct(totalReturn)}</span>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
+              <span className="text-gray-500 text-sm">7d Return</span>
+              <span className={`text-sm ${pctColor(returnSince7d)}`}>{formatPct(returnSince7d)}</span>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
+              <span className="text-gray-500 text-sm">30d Return</span>
+              <span className={`text-sm ${pctColor(returnSince30d)}`}>{formatPct(returnSince30d)}</span>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:justify-between py-3">
+              <span className="text-gray-500 text-sm">Sharpe Ratio</span>
+              <span className="text-sm text-gray-300">{sharpeRatio !== null ? sharpeRatio.toFixed(2) : '-'}</span>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -8,9 +8,21 @@ import { AgentRegistryABI } from '@/lib/contracts';
 export interface AgentMetadata {
   name?: string;
   description?: string;
+  strategy?: string;
+  author?: string;
+  authorUrl?: string;
   tags?: string[];
   sourceRepo?: string;
   version?: string;
+}
+
+/** Convert `ipfs://` URIs to an HTTP gateway URL. Passthrough for http(s) URLs. */
+function resolveUri(uri: string): string {
+  if (uri.startsWith('ipfs://')) {
+    const cid = uri.slice('ipfs://'.length);
+    return `https://gateway.pinata.cloud/ipfs/${cid}`;
+  }
+  return uri;
 }
 
 export function useAgentMetadata(agentId: `0x${string}` | undefined) {
@@ -32,7 +44,8 @@ export function useAgentMetadata(agentId: `0x${string}` | undefined) {
 
         if (!uri || uri === '') return null;
 
-        const response = await fetch(uri);
+        const fetchUrl = resolveUri(uri as string);
+        const response = await fetch(fetchUrl);
         if (!response.ok) return null;
 
         return (await response.json()) as AgentMetadata;
@@ -41,6 +54,6 @@ export function useAgentMetadata(agentId: `0x${string}` | undefined) {
       }
     },
     enabled: !!publicClient && !!agentId && !!contracts?.agentRegistry,
-    staleTime: 300_000, // 5 min — metadata changes rarely
+    staleTime: 5 * 60 * 1000, // 5 min — metadata changes rarely
   });
 }

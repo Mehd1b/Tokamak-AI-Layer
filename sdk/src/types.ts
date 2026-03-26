@@ -72,6 +72,18 @@ export interface KernelVaultInfo {
   userAssets: bigint;
 }
 
+export interface PerformanceMetrics {
+  currentPps: bigint;
+  initialPps: bigint;
+  peakPps: bigint;
+  maxDrawdownBps: number;
+  executionCount: number;
+  executionWins: number;
+  winRate: number;              // executionWins / executionCount * 100
+  allTimeReturnPct: number;     // (currentPps - initialPps) / initialPps * 100
+  ppsHistory: { timestamp: number; value: bigint }[];
+}
+
 export interface DeployVaultParams {
   agentId: `0x${string}`;
   asset: `0x${string}`;
@@ -83,6 +95,18 @@ export interface ExecuteParams {
   journal: `0x${string}`;
   seal: `0x${string}`;
   agentOutputBytes: `0x${string}`;
+}
+
+// ============ Agent Metadata ============
+
+export interface AgentMetadata {
+  name: string;
+  description: string;
+  author: string;
+  strategy: string;
+  tags: string[];
+  website?: string;
+  twitter?: string;
 }
 
 // ============ Config ============

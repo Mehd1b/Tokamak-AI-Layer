@@ -1,17 +1,29 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { usePublicClient } from 'wagmi';
+import { useQuery } from '@tanstack/react-query';
 import { useIsDeployedVault, useDeployedVaultsList } from '@/hooks/useVaultFactory';
 import { useCommentCounts } from '@/hooks/useCommentCounts';
+import { useNetwork } from '@/lib/NetworkContext';
 import { VaultCard, VaultRow } from '@/components/VaultCard';
 import { VaultExplainer } from '@/components/VaultExplainer';
+import { PROTOCOL_TYPE } from '@/lib/protocolTypes';
+import { AgentRegistryABI } from '@/lib/contracts';
 import Link from 'next/link';
 
-type SortKey = 'tvl' | 'balance' | 'newest' | 'oldest' | 'shares' | 'comments';
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
+
+type SortKey = 'tvl' | 'balance' | 'newest' | 'oldest' | 'shares' | 'comments' | 'returns' | 'drawdown';
 type ViewMode = 'grid' | 'list';
+type ProtocolFilter = 'all' | 'generic' | 'hyperliquid' | 'polymarket';
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'tvl', label: 'TVL' },
+  { key: 'returns', label: 'Returns 30d' },
+  { key: 'drawdown', label: 'Low Drawdown' },
   { key: 'balance', label: 'Balance' },
   { key: 'newest', label: 'Newest' },
   { key: 'oldest', label: 'Oldest' },
@@ -19,18 +31,314 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'comments', label: 'Comments' },
 ];
 
+const PROTOCOL_FILTERS: { key: ProtocolFilter; label: string; protocolType?: number }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'generic', label: 'Yield', protocolType: PROTOCOL_TYPE.GENERIC },
+  { key: 'hyperliquid', label: 'Perp Trading', protocolType: PROTOCOL_TYPE.HYPERLIQUID },
+  { key: 'polymarket', label: 'Prediction', protocolType: PROTOCOL_TYPE.POLYMARKET },
+];
+
+/* Color mapping for protocol filter chips */
+function filterChipColors(key: ProtocolFilter, active: boolean): string {
+  if (!active) return 'text-gray-500 hover:text-gray-300';
+  switch (key) {
+    case 'hyperliquid':
+      return 'bg-emerald-500/15 text-emerald-400 shadow-sm';
+    case 'polymarket':
+      return 'bg-blue-500/15 text-blue-400 shadow-sm';
+    case 'generic':
+      return 'bg-gray-500/15 text-gray-300 shadow-sm';
+    default:
+      return 'bg-[#A855F7]/15 text-[#C084FC] shadow-sm';
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Performance ABI (same as useVaultPerformance)                      */
+/* ------------------------------------------------------------------ */
+
+const PerformanceABI = [
+  {
+    type: 'function',
+    name: 'getPerformanceMetrics',
+    inputs: [],
+    outputs: [
+      { type: 'uint256', name: '_initialPps' },
+      { type: 'uint256', name: '_initialPpsTimestamp' },
+      { type: 'uint256', name: '_currentPps' },
+      { type: 'uint256', name: '_peakPps' },
+      { type: 'uint256', name: '_maxDrawdownBps' },
+      { type: 'uint256', name: '_executionWins' },
+      { type: 'uint256', name: '_totalExecutionCount' },
+      { type: 'uint256', name: '_checkpointIndex' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getPpsCheckpoints',
+    inputs: [],
+    outputs: [
+      { type: 'uint256[30]', name: 'values' },
+      { type: 'uint256[30]', name: 'timestamps' },
+      { type: 'uint256', name: 'index' },
+    ],
+    stateMutability: 'view',
+  },
+] as const;
+
+/* ------------------------------------------------------------------ */
+/*  Batch performance hook — page-level multicall for sorting          */
+/* ------------------------------------------------------------------ */
+
+interface BatchPerf {
+  returnSince30d: number | null;
+  maxDrawdown: number | null;
+}
+
+function useBatchPerformance(vaultAddresses: `0x${string}`[]) {
+  const { selectedChainId } = useNetwork();
+  const client = usePublicClient({ chainId: selectedChainId });
+
+  return useQuery<Record<string, BatchPerf>>({
+    queryKey: ['batchPerformance', selectedChainId, vaultAddresses.join(',')],
+    queryFn: async () => {
+      if (!client || vaultAddresses.length === 0) return {};
+
+      // Step 1: Fetch metrics for all vaults via multicall
+      const metricsCalls = vaultAddresses.map((addr) => ({
+        address: addr,
+        abi: PerformanceABI,
+        functionName: 'getPerformanceMetrics' as const,
+      }));
+
+      let metricsResults: any[] = [];
+      try {
+        metricsResults = await client.multicall({ contracts: metricsCalls });
+      } catch {
+        // If multicall fails, return empty — VaultCards still show individual data
+        return {};
+      }
+
+      // Step 2: Fetch checkpoints for vaults that have metrics
+      const checkpointCalls = vaultAddresses.map((addr) => ({
+        address: addr,
+        abi: PerformanceABI,
+        functionName: 'getPpsCheckpoints' as const,
+      }));
+
+      let checkpointResults: any[] = [];
+      try {
+        checkpointResults = await client.multicall({ contracts: checkpointCalls });
+      } catch {
+        // Proceed with metrics-only data
+      }
+
+      const result: Record<string, BatchPerf> = {};
+      const now = Math.floor(Date.now() / 1000);
+      const thirtyDaysAgo = now - 30 * 86400;
+
+      for (let i = 0; i < vaultAddresses.length; i++) {
+        const addr = vaultAddresses[i].toLowerCase();
+        const m = metricsResults[i];
+
+        if (m?.status !== 'success' || !m.result) {
+          result[addr] = { returnSince30d: null, maxDrawdown: null };
+          continue;
+        }
+
+        const [
+          initialPps, , currentPps, , maxDrawdownBps, , totalExecutionCount,
+        ] = m.result as [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint];
+
+        const execCount = Number(totalExecutionCount);
+        const maxDrawdown = maxDrawdownBps > 0n
+          ? -(Number(maxDrawdownBps) / 100)
+          : execCount > 0 ? 0 : null;
+
+        // Compute 30d return from checkpoints
+        let returnSince30d: number | null = null;
+
+        const cp = checkpointResults[i];
+        if (cp?.status === 'success' && cp.result) {
+          const [values, timestamps, idx] = cp.result as unknown as [bigint[], bigint[], bigint];
+          const count = Number(idx) < 30 ? Number(idx) : 30;
+
+          let closest30d: bigint | null = null;
+          let closest30dDist = Infinity;
+
+          for (let j = 0; j < count; j++) {
+            const bufIdx = Number(idx) <= 30 ? j : (Number(idx) - 30 + j) % 30;
+            const ts = Number(timestamps[bufIdx]);
+            const pps = values[bufIdx];
+            if (ts === 0 || pps === 0n) continue;
+
+            if (ts <= thirtyDaysAgo) {
+              const dist = thirtyDaysAgo - ts;
+              if (dist < closest30dDist) {
+                closest30dDist = dist;
+                closest30d = pps;
+              }
+            }
+          }
+
+          if (closest30d !== null && closest30d > 0n) {
+            returnSince30d = (Number(currentPps - closest30d) / Number(closest30d)) * 100;
+          }
+        }
+
+        // Fallback: if no 30d checkpoint, use total return as approximation
+        if (returnSince30d === null && initialPps > 0n) {
+          returnSince30d = (Number(currentPps - initialPps) / Number(initialPps)) * 100;
+        }
+
+        result[addr] = { returnSince30d, maxDrawdown };
+      }
+
+      return result;
+    },
+    enabled: !!client && vaultAddresses.length > 0,
+    staleTime: 30_000,
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Batch agent metadata hook — for strategy tag filtering             */
+/* ------------------------------------------------------------------ */
+
+interface AgentMeta {
+  strategy?: string;
+  tags?: string[];
+}
+
+/** Convert `ipfs://` URIs to an HTTP gateway URL. */
+function resolveUri(uri: string): string {
+  if (uri.startsWith('ipfs://')) {
+    const cid = uri.slice('ipfs://'.length);
+    return `https://gateway.pinata.cloud/ipfs/${cid}`;
+  }
+  return uri;
+}
+
+function useBatchAgentMetadata(agentIds: `0x${string}`[]) {
+  const { contracts } = useNetwork();
+  const { selectedChainId } = useNetwork();
+  const client = usePublicClient({ chainId: selectedChainId });
+
+  // Deduplicate agent IDs
+  const uniqueIds = useMemo(() => [...new Set(agentIds)], [agentIds]);
+
+  return useQuery<Record<string, AgentMeta>>({
+    queryKey: ['batchAgentMetadata', uniqueIds.join(',')],
+    queryFn: async () => {
+      if (!client || uniqueIds.length === 0 || !contracts?.agentRegistry) return {};
+
+      // Fetch metadataURI for all agents via multicall
+      const uriCalls = uniqueIds.map((id) => ({
+        address: contracts.agentRegistry,
+        abi: AgentRegistryABI,
+        functionName: 'getMetadataURI' as const,
+        args: [id] as const,
+      }));
+
+      let uriResults: any[] = [];
+      try {
+        uriResults = await client.multicall({ contracts: uriCalls });
+      } catch {
+        return {};
+      }
+
+      // Fetch JSON metadata for each valid URI
+      const result: Record<string, AgentMeta> = {};
+      const fetchPromises = uniqueIds.map(async (id, i) => {
+        const r = uriResults[i];
+        if (r?.status !== 'success' || !r.result || r.result === '') return;
+
+        try {
+          const url = resolveUri(r.result as string);
+          const resp = await fetch(url);
+          if (!resp.ok) return;
+          const json = await resp.json();
+          result[id.toLowerCase()] = {
+            strategy: json.strategy,
+            tags: json.tags,
+          };
+        } catch {
+          // Skip failed fetches
+        }
+      });
+
+      await Promise.allSettled(fetchPromises);
+      return result;
+    },
+    enabled: !!client && uniqueIds.length > 0 && !!contracts?.agentRegistry,
+    staleTime: 5 * 60 * 1000, // 5 min — metadata rarely changes
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Page component                                                     */
+/* ------------------------------------------------------------------ */
+
 export default function VaultsPage() {
   const [searchAddress, setSearchAddress] = useState('');
   const [sortBy, setSortBy] = useState<SortKey>('tvl');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [protocolFilter, setProtocolFilter] = useState<ProtocolFilter>('all');
+  const [strategyFilter, setStrategyFilter] = useState<string | null>(null);
+
   const { data: deployedVaults, isLoading: isLoadingVaults, error: vaultsError } = useDeployedVaultsList();
 
-  const vaultAddresses = (deployedVaults ?? []).map((v) => v.address);
+  const vaultAddresses = useMemo(
+    () => (deployedVaults ?? []).map((v) => v.address),
+    [deployedVaults],
+  );
+
   const { data: commentCounts } = useCommentCounts(vaultAddresses);
 
-  const sortedVaults = useMemo(() => {
+  // Batch performance data for sorting
+  const { data: batchPerf } = useBatchPerformance(vaultAddresses);
+
+  // Batch agent metadata for strategy filtering
+  const agentIds = useMemo(
+    () => (deployedVaults ?? []).map((v) => v.agentId as `0x${string}`),
+    [deployedVaults],
+  );
+  const { data: batchMeta } = useBatchAgentMetadata(agentIds);
+
+  // Collect unique strategy tags for the secondary filter
+  const strategyTags = useMemo(() => {
+    if (!batchMeta) return [];
+    const tags = new Set<string>();
+    for (const meta of Object.values(batchMeta)) {
+      if (meta.strategy) tags.add(meta.strategy);
+    }
+    return [...tags].sort();
+  }, [batchMeta]);
+
+  // Filter + sort vaults
+  const filteredAndSorted = useMemo(() => {
     if (!deployedVaults || deployedVaults.length === 0) return deployedVaults;
-    const indexed = deployedVaults.map((v, i) => ({ ...v, _idx: i }));
+
+    // Step 1: Filter by protocol type
+    let filtered = deployedVaults;
+    if (protocolFilter !== 'all') {
+      const filterDef = PROTOCOL_FILTERS.find((f) => f.key === protocolFilter);
+      if (filterDef && filterDef.protocolType !== undefined) {
+        filtered = filtered.filter((v) => (v.protocolType ?? 0) === filterDef.protocolType);
+      }
+    }
+
+    // Step 2: Filter by strategy tag
+    if (strategyFilter && batchMeta) {
+      filtered = filtered.filter((v) => {
+        const meta = batchMeta[v.agentId.toLowerCase()];
+        return meta?.strategy === strategyFilter;
+      });
+    }
+
+    // Step 3: Sort
+    const indexed = filtered.map((v, i) => ({ ...v, _idx: i }));
     return [...indexed].sort((a, b) => {
       switch (sortBy) {
         case 'tvl':
@@ -48,16 +356,41 @@ export default function VaultsPage() {
           const bc = commentCounts?.[b.address.toLowerCase()] ?? 0;
           return bc - ac;
         }
+        case 'returns': {
+          const ar = batchPerf?.[a.address.toLowerCase()]?.returnSince30d ?? -Infinity;
+          const br = batchPerf?.[b.address.toLowerCase()]?.returnSince30d ?? -Infinity;
+          return br - ar; // Highest returns first
+        }
+        case 'drawdown': {
+          // Lowest drawdown = closest to 0 (least negative). Nulls go last.
+          const ad = batchPerf?.[a.address.toLowerCase()]?.maxDrawdown ?? null;
+          const bd = batchPerf?.[b.address.toLowerCase()]?.maxDrawdown ?? null;
+          if (ad === null && bd === null) return 0;
+          if (ad === null) return 1;
+          if (bd === null) return -1;
+          return bd - ad; // Higher (closer to 0) is better
+        }
         default:
           return 0;
       }
     });
-  }, [deployedVaults, sortBy, commentCounts]);
+  }, [deployedVaults, sortBy, commentCounts, protocolFilter, strategyFilter, batchPerf, batchMeta]);
 
   const vaultHex = searchAddress.startsWith('0x') && searchAddress.length === 42
     ? (searchAddress as `0x${string}`)
     : undefined;
   const { data: isDeployed, isLoading: isCheckingVault } = useIsDeployedVault(vaultHex);
+
+  // Count vaults per protocol type for filter badges
+  const protocolCounts = useMemo(() => {
+    if (!deployedVaults) return {};
+    const counts: Record<number, number> = {};
+    for (const v of deployedVaults) {
+      const pt = v.protocolType ?? 0;
+      counts[pt] = (counts[pt] ?? 0) + 1;
+    }
+    return counts;
+  }, [deployedVaults]);
 
   return (
     <div className="max-w-7xl mx-auto px-6 lg:px-12 py-12">
@@ -117,6 +450,66 @@ export default function VaultsPage() {
           </div>
         </div>
       </div>
+
+      {/* Protocol type filter chips */}
+      {!vaultHex && deployedVaults && deployedVaults.length > 0 && (
+        <div className="mb-6">
+          <div className="flex flex-wrap items-center gap-2">
+            {PROTOCOL_FILTERS.map((f) => {
+              const isActive = protocolFilter === f.key;
+              const count = f.key === 'all'
+                ? deployedVaults.length
+                : protocolCounts[f.protocolType ?? 0] ?? 0;
+
+              return (
+                <button
+                  key={f.key}
+                  onClick={() => {
+                    setProtocolFilter(f.key);
+                    // Clear strategy filter when changing protocol
+                    if (f.key !== protocolFilter) setStrategyFilter(null);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all duration-200 border ${
+                    isActive
+                      ? `${filterChipColors(f.key, true)} border-white/10`
+                      : `${filterChipColors(f.key, false)} border-transparent hover:border-white/5`
+                  }`}
+                >
+                  {f.label}
+                  {count > 0 && (
+                    <span className={`ml-1.5 text-[10px] ${isActive ? 'opacity-70' : 'text-gray-600'}`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+
+            {/* Strategy tag chips (secondary filter) */}
+            {strategyTags.length > 0 && (
+              <>
+                <div className="w-px h-4 bg-white/10 mx-1" />
+                {strategyTags.map((tag) => {
+                  const isActive = strategyFilter === tag;
+                  return (
+                    <button
+                      key={tag}
+                      onClick={() => setStrategyFilter(isActive ? null : tag)}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-mono font-medium transition-all duration-200 border ${
+                        isActive
+                          ? 'bg-violet-500/15 text-violet-400 border-violet-500/20 shadow-sm'
+                          : 'text-gray-500 hover:text-gray-300 border-transparent hover:border-white/5'
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Search result */}
       {vaultHex && !isCheckingVault && isDeployed !== undefined && (
@@ -181,22 +574,27 @@ export default function VaultsPage() {
             </div>
           )}
 
-          {sortedVaults && sortedVaults.length > 0 && (
+          {filteredAndSorted && filteredAndSorted.length > 0 && (
             <div>
               {/* Toolbar: count + sort + view toggle */}
-              <div className="flex items-center justify-between mb-5">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5">
                 <h2 className="text-xs font-mono text-gray-500 uppercase tracking-wider">
-                  {sortedVaults.length} vault{sortedVaults.length !== 1 ? 's' : ''}
+                  {filteredAndSorted.length} vault{filteredAndSorted.length !== 1 ? 's' : ''}
+                  {(protocolFilter !== 'all' || strategyFilter) && (
+                    <span className="text-gray-600 ml-1">
+                      (filtered)
+                    </span>
+                  )}
                 </h2>
 
                 <div className="flex items-center gap-3">
                   {/* Sort pills */}
-                  <div className="flex items-center gap-1 bg-white/[0.02] rounded-lg p-0.5 border border-white/5">
+                  <div className="flex items-center gap-1 bg-white/[0.02] rounded-lg p-0.5 border border-white/5 flex-wrap">
                     {SORT_OPTIONS.map((opt) => (
                       <button
                         key={opt.key}
                         onClick={() => setSortBy(opt.key)}
-                        className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-all duration-200 ${
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-all duration-200 whitespace-nowrap ${
                           sortBy === opt.key
                             ? 'bg-[#A855F7]/15 text-[#C084FC] shadow-sm'
                             : 'text-gray-500 hover:text-gray-300'
@@ -243,7 +641,7 @@ export default function VaultsPage() {
               {/* Grid view */}
               {viewMode === 'grid' && (
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {sortedVaults.map((v, i) => (
+                  {filteredAndSorted.map((v, i) => (
                     <VaultCard
                       key={v.address}
                       address={v.address}
@@ -273,12 +671,13 @@ export default function VaultsPage() {
                     <div className="w-36 shrink-0">Address</div>
                     <div className="w-24 shrink-0">Type</div>
                     <div className="flex-1 text-right">TVL</div>
+                    <div className="w-24 text-right shrink-0 hidden md:block">30d</div>
                     <div className="w-32 text-right hidden lg:block">Balance</div>
                     <div className="w-20 text-right shrink-0">Info</div>
                     <div className="w-5 shrink-0" />
                   </div>
                   <div className="space-y-1.5">
-                    {sortedVaults.map((v, i) => (
+                    {filteredAndSorted.map((v, i) => (
                       <VaultRow
                         key={v.address}
                         address={v.address}
@@ -302,7 +701,29 @@ export default function VaultsPage() {
             </div>
           )}
 
-          {sortedVaults && sortedVaults.length === 0 && (
+          {/* Empty state: all vaults filtered out */}
+          {filteredAndSorted && filteredAndSorted.length === 0 && deployedVaults && deployedVaults.length > 0 && (
+            <div className="rounded-2xl border border-white/5 bg-[#12121a]/80 text-center py-16">
+              <div className="mb-4">
+                <div className="w-12 h-12 mx-auto rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-center">
+                  <svg viewBox="0 0 24 24" className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+                  </svg>
+                </div>
+              </div>
+              <p className="text-gray-400 text-sm mb-1">No vaults match current filters</p>
+              <p className="text-gray-600 text-xs font-mono mb-4">Try adjusting the protocol type or strategy filter.</p>
+              <button
+                onClick={() => { setProtocolFilter('all'); setStrategyFilter(null); }}
+                className="text-[11px] font-mono text-[#C084FC] hover:text-[#A855F7] transition-colors"
+              >
+                Clear all filters
+              </button>
+            </div>
+          )}
+
+          {/* Empty state: no vaults at all */}
+          {filteredAndSorted && filteredAndSorted.length === 0 && (!deployedVaults || deployedVaults.length === 0) && !isLoadingVaults && (
             <div className="rounded-2xl border border-white/5 bg-[#12121a]/80 text-center py-20">
               <div className="mb-6">
                 <div className="w-16 h-16 mx-auto rounded-2xl bg-[#A855F7]/5 border border-[#A855F7]/10 flex items-center justify-center">

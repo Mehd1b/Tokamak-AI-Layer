@@ -13,6 +13,9 @@ export { VaultFactoryABI } from './abi/VaultFactory';
 export { KernelVaultABI } from './abi/KernelVault';
 export { KernelExecutionVerifierABI } from './abi/KernelExecutionVerifier';
 
+// Utilities
+export { fetchAgentMetadata, resolveMetadataURI } from './utils/metadata';
+
 // Types
 export type {
   KernelInput,
@@ -21,9 +24,11 @@ export type {
   KernelAction,
   KernelAgentInfo,
   KernelVaultInfo,
+  PerformanceMetrics,
   DeployVaultParams,
   ExecuteParams,
   ExecutionKernelConfig,
+  AgentMetadata,
 } from './types';
 
 export {

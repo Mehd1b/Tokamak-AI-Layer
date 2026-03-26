@@ -26,6 +26,8 @@ import { PerformanceCard } from '@/components/PerformanceCard';
 import { DeprecationBanner } from '@/components/DeprecationBanner';
 import { StrategyStatusBanner } from '@/components/StrategyStatusBanner';
 import { BondStatusCard } from '@/components/BondStatusCard';
+import { useAgentMetadata } from '@/hooks/useAgentMetadata';
+import { useAgent } from '@/hooks/useKernelAgent';
 import Link from 'next/link';
 
 const ERC20_BALANCE_ABI = [
@@ -43,6 +45,11 @@ export default function VaultDetailPage() {
   const { data: userShares } = useVaultShares(vaultAddress, userAddress);
   const { tvl, pps, isLoading: historyLoading } = useVaultHistory(vaultAddress, vault.assetDecimals);
   const { executions, isLoading: executionsLoading } = useVaultExecutions(vaultAddress);
+
+  // Agent metadata for profile display
+  const agentIdHex = vault.agentId ? (String(vault.agentId) as `0x${string}`) : undefined;
+  const { data: agentMetadata, isLoading: metadataLoading } = useAgentMetadata(agentIdHex);
+  const { data: agentInfo } = useAgent(agentIdHex);
 
   // State for PostDepositConfirmation
   const [depositConfirmation, setDepositConfirmation] = useState<{
@@ -115,9 +122,9 @@ export default function VaultDetailPage() {
               </div>
               <div>
                 <h1 className="text-2xl font-light text-white" style={{ fontFamily: 'var(--font-serif), serif' }}>
-                  Vault Detail
+                  {agentMetadata?.name ?? 'Vault Detail'}
                 </h1>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="badge-info">
                     {truncateAddress(vaultAddress, 6)}
                   </span>
@@ -135,6 +142,11 @@ export default function VaultDetailPage() {
                       </span>
                     );
                   })()}
+                  {agentMetadata?.strategy && (
+                    <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium bg-violet-500/10 text-violet-400 border-violet-500/20">
+                      {agentMetadata.strategy}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -153,8 +165,17 @@ export default function VaultDetailPage() {
                 </a>
               </div>
               <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
-                <span className="text-gray-500 text-sm">Agent ID</span>
-                <span className="text-gray-300 text-sm break-all">{vault.agentId ? String(vault.agentId) : '-'}</span>
+                <span className="text-gray-500 text-sm">Agent</span>
+                <span className="text-gray-300 text-sm break-all">
+                  {vault.agentId ? (
+                    <>
+                      {agentMetadata?.name && (
+                        <span className="text-white font-medium mr-2">{agentMetadata.name}</span>
+                      )}
+                      <span className="text-gray-500">{String(vault.agentId)}</span>
+                    </>
+                  ) : '-'}
+                </span>
               </div>
               <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
                 <span className="text-gray-500 text-sm">Asset</span>
@@ -191,6 +212,125 @@ export default function VaultDetailPage() {
               </div>
             )}
           </div>
+
+          {/* Agent Profile Card */}
+          {agentIdHex && (agentMetadata || metadataLoading) && (
+            <div className="card mb-8">
+              <div className="flex items-center gap-3 mb-4">
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center"
+                  style={{
+                    background: 'rgba(168, 85, 247, 0.08)',
+                    border: '1px solid rgba(168, 85, 247, 0.15)',
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#A855F7]" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+                  </svg>
+                </div>
+                <h2 className="text-lg font-light text-white" style={{ fontFamily: 'var(--font-serif), serif' }}>
+                  Agent Profile
+                </h2>
+              </div>
+
+              {metadataLoading ? (
+                <div className="animate-pulse space-y-3">
+                  <div className="h-4 bg-white/5 rounded w-1/3" />
+                  <div className="h-3 bg-white/5 rounded w-2/3" />
+                </div>
+              ) : agentMetadata ? (
+                <div className="space-y-4" style={{ fontFamily: 'var(--font-mono), monospace' }}>
+                  {agentMetadata.name && (
+                    <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
+                      <span className="text-gray-500 text-sm">Name</span>
+                      <span className="text-white text-sm font-medium">{agentMetadata.name}</span>
+                    </div>
+                  )}
+                  {agentMetadata.description && (
+                    <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
+                      <span className="text-gray-500 text-sm shrink-0 mr-4">Description</span>
+                      <span className="text-gray-300 text-sm text-right">{agentMetadata.description}</span>
+                    </div>
+                  )}
+                  {agentMetadata.strategy && (
+                    <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
+                      <span className="text-gray-500 text-sm">Strategy</span>
+                      <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium bg-violet-500/10 text-violet-400 border-violet-500/20">
+                        {agentMetadata.strategy}
+                      </span>
+                    </div>
+                  )}
+                  {agentMetadata.author && (
+                    <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
+                      <span className="text-gray-500 text-sm">Author</span>
+                      {agentMetadata.authorUrl ? (
+                        <a
+                          href={agentMetadata.authorUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#A855F7] text-sm hover:underline"
+                        >
+                          {agentMetadata.author}
+                        </a>
+                      ) : (
+                        <span className="text-gray-300 text-sm">{agentMetadata.author}</span>
+                      )}
+                    </div>
+                  )}
+                  {/* On-chain author address from registry */}
+                  {agentInfo && (agentInfo as any).author && (
+                    <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
+                      <span className="text-gray-500 text-sm">Registered By</span>
+                      <a
+                        href={`${explorerUrl}/address/${(agentInfo as any).author}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#A855F7] text-sm hover:underline break-all"
+                      >
+                        {truncateAddress((agentInfo as any).author, 6)}
+                      </a>
+                    </div>
+                  )}
+                  {agentMetadata.sourceRepo && (
+                    <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
+                      <span className="text-gray-500 text-sm">Source</span>
+                      <a
+                        href={agentMetadata.sourceRepo}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#A855F7] text-sm hover:underline truncate max-w-[300px]"
+                      >
+                        {agentMetadata.sourceRepo.replace(/^https?:\/\/(www\.)?/, '')}
+                      </a>
+                    </div>
+                  )}
+                  {agentMetadata.version && (
+                    <div className="flex flex-col sm:flex-row sm:justify-between py-3">
+                      <span className="text-gray-500 text-sm">Version</span>
+                      <span className="text-gray-300 text-sm">{agentMetadata.version}</span>
+                    </div>
+                  )}
+                  {agentMetadata.tags && agentMetadata.tags.length > 0 && (
+                    <div className="flex flex-col sm:flex-row sm:justify-between py-3">
+                      <span className="text-gray-500 text-sm">Tags</span>
+                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                        {agentMetadata.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-medium bg-white/5 text-gray-400 border-white/10"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-gray-600 text-sm font-mono">No metadata published for this agent.</p>
+              )}
+            </div>
+          )}
 
           {/* Deprecation Warning */}
           {vault.agentId && (

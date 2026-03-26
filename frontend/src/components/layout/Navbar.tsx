@@ -6,8 +6,10 @@ import { ConnectWalletButton } from '@/components/ConnectWalletButton';
 import { NetworkSelector } from '@/components/NetworkSelector';
 import { DiamondLogo } from '@/components/icons/Logo';
 import { XIcon, GitHubIcon, LinkedInIcon } from '@/components/icons/Social';
+import { useAccount } from 'wagmi';
 import { clsx } from 'clsx';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useUserPortfolio } from '@/hooks/useUserPortfolio';
 
 const ConnectButton = ConnectWalletButton;
 
@@ -243,6 +245,10 @@ export function Navbar() {
   const [isMobileProtocolOpen, setIsMobileProtocolOpen] = useState(false);
   const [isMobileSocialsOpen, setIsMobileSocialsOpen] = useState(false);
 
+  const { address: walletAddress, isConnected: walletConnected } = useAccount();
+  const { positions } = useUserPortfolio(walletAddress as `0x${string}` | undefined);
+  const positionCount = positions.length;
+
   const protocol = useDropdown();
   const socials = useDropdown();
 
@@ -413,6 +419,24 @@ export function Navbar() {
             </div>
           </div>
 
+          {walletConnected && (
+            <Link
+              href="/portfolio"
+              className={clsx(
+                'relative px-4 py-2 rounded-lg border border-dashed transition-all tracking-wider text-sm',
+                pathname === '/portfolio'
+                  ? 'border-[#A855F7]/60 text-[#A855F7]'
+                  : 'border-white/30 text-white hover:border-white/60 hover:text-gray-300',
+              )}
+            >
+              PORTFOLIO
+              {positionCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-[#A855F7] text-white text-[10px] font-bold px-1">
+                  {positionCount}
+                </span>
+              )}
+            </Link>
+          )}
           <Link
             href="/whitepaper"
             className={clsx(
@@ -528,6 +552,23 @@ export function Navbar() {
                   </div>
                 </div>
 
+                {walletConnected && (
+                  <Link
+                    href="/portfolio"
+                    className={clsx(
+                      'block text-md font-light transition-all duration-300 tracking-wider',
+                      pathname === '/portfolio' ? 'text-[#A855F7]' : 'text-white hover:text-[#A855F7]',
+                    )}
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    PORTFOLIO
+                    {positionCount > 0 && (
+                      <span className="inline-flex items-center justify-center ml-2 min-w-[20px] h-[20px] rounded-full bg-[#A855F7] text-white text-[10px] font-bold px-1">
+                        {positionCount}
+                      </span>
+                    )}
+                  </Link>
+                )}
                 <Link
                   href="/whitepaper"
                   className={clsx(

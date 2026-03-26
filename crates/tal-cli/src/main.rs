@@ -12,6 +12,7 @@ mod deploy;
 mod doctor;
 mod fork;
 mod init;
+mod metadata;
 mod monitor;
 mod onchain;
 mod sim;
@@ -184,6 +185,56 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Manage agent metadata (name, description, strategy)
+    Metadata {
+        #[command(subcommand)]
+        action: MetadataAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum MetadataAction {
+    /// Set metadata fields and/or metadata URI on-chain
+    Set {
+        /// Agent display name
+        #[arg(long)]
+        name: Option<String>,
+
+        /// Agent description
+        #[arg(long)]
+        description: Option<String>,
+
+        /// Agent strategy description
+        #[arg(long)]
+        strategy: Option<String>,
+
+        /// Comma-separated tags (e.g. "yield,defi,perp")
+        #[arg(long)]
+        tags: Option<String>,
+
+        /// Agent website URL
+        #[arg(long)]
+        website: Option<String>,
+
+        /// Agent Twitter/X handle or URL
+        #[arg(long)]
+        twitter: Option<String>,
+
+        /// Agent ID (hex, 0x-prefixed). Falls back to AGENT_ID from .env
+        #[arg(long)]
+        agent_id: Option<String>,
+
+        /// Metadata URI to set on-chain (skip JSON generation if provided)
+        #[arg(long)]
+        uri: Option<String>,
+    },
+
+    /// Show metadata for an agent
+    Show {
+        /// Agent ID (hex, 0x-prefixed). Falls back to AGENT_ID from .env
+        agent_id: Option<String>,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -268,6 +319,37 @@ fn main() -> anyhow::Result<()> {
             chain,
             json,
         } => monitor::run(&vault, interval, chain, json, cli.verbose),
+
+        Commands::Metadata { action } => match action {
+            MetadataAction::Set {
+                name,
+                description,
+                strategy,
+                tags,
+                website,
+                twitter,
+                agent_id,
+                uri,
+            } => metadata::run_set(
+                metadata::SetArgs {
+                    name,
+                    description,
+                    strategy,
+                    tags,
+                    website,
+                    twitter,
+                    agent_id,
+                    uri,
+                },
+                &cli.config,
+                cli.verbose,
+            ),
+            MetadataAction::Show { agent_id } => metadata::run_show(
+                metadata::ShowArgs { agent_id },
+                &cli.config,
+                cli.verbose,
+            ),
+        },
     }
 }
 

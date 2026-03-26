@@ -1,10 +1,11 @@
 'use client';
 
-import { useReadContract, useReadContracts } from 'wagmi';
+import { useReadContract } from 'wagmi';
 import { useNetwork } from '@/lib/NetworkContext';
 
 export interface VaultPerformance {
   totalReturn: number | null;
+  apy: number | null;
   returnSince7d: number | null;
   returnSince30d: number | null;
   maxDrawdown: number | null;
@@ -55,7 +56,7 @@ export function useVaultPerformance(
     abi: PerformanceABI,
     functionName: 'getPerformanceMetrics',
     chainId: selectedChainId,
-    query: { enabled: !!vaultAddress },
+    query: { enabled: !!vaultAddress, staleTime: 30_000 },
   });
 
   const checkpoints = useReadContract({
@@ -63,7 +64,7 @@ export function useVaultPerformance(
     abi: PerformanceABI,
     functionName: 'getPpsCheckpoints',
     chainId: selectedChainId,
-    query: { enabled: !!vaultAddress && metrics.isSuccess },
+    query: { enabled: !!vaultAddress && metrics.isSuccess, staleTime: 30_000 },
   });
 
   const isLoading = metrics.isLoading || (metrics.isSuccess && checkpoints.isLoading);
@@ -71,6 +72,7 @@ export function useVaultPerformance(
   if (!metrics.data) {
     return {
       totalReturn: null,
+      apy: null,
       returnSince7d: null,
       returnSince30d: null,
       maxDrawdown: null,
@@ -100,6 +102,18 @@ export function useVaultPerformance(
     initialPps > 0n
       ? (Number(currentPps - initialPps) / Number(initialPps)) * 100
       : null;
+
+  // APY — annualize total return based on time elapsed since first PPS
+  let apy: number | null = null;
+  if (totalReturn !== null && initialPpsTimestamp > 0n) {
+    const now = Math.floor(Date.now() / 1000);
+    const elapsedSeconds = now - Number(initialPpsTimestamp);
+    const elapsedDays = elapsedSeconds / 86400;
+    if (elapsedDays >= 1) {
+      const dailyReturn = totalReturn / 100 / elapsedDays;
+      apy = ((1 + dailyReturn) ** 365 - 1) * 100;
+    }
+  }
 
   // Max drawdown (already computed on-chain in bps)
   const maxDrawdown =
@@ -196,6 +210,7 @@ export function useVaultPerformance(
 
   return {
     totalReturn,
+    apy,
     returnSince7d,
     returnSince30d,
     maxDrawdown,

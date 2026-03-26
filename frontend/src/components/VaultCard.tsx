@@ -5,6 +5,7 @@ import { truncateAddress, truncateBytes32, formatEther } from '@/lib/utils';
 import { NetworkBadge } from '@/components/NetworkLogo';
 import { protocolLabel, protocolColor, PROTOCOL_TYPE, type ProtocolType } from '@/lib/protocolTypes';
 import { useAgentMetadata } from '@/hooks/useAgentMetadata';
+import { useVaultPerformance } from '@/hooks/useVaultPerformance';
 
 interface VaultCardProps {
   address: string;
@@ -58,12 +59,99 @@ function protocolAccent(type: number): { border: string; glow: string; text: str
   }
 }
 
+/* Strategy badge color mapping */
+function strategyBadge(strategy: string): { bg: string; text: string; border: string } {
+  const s = strategy.toLowerCase();
+  if (s.includes('yield') || s.includes('farm')) return { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20' };
+  if (s.includes('arb') || s.includes('arbitrage')) return { bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/20' };
+  if (s.includes('hedge') || s.includes('neutral')) return { bg: 'bg-indigo-500/10', text: 'text-indigo-400', border: 'border-indigo-500/20' };
+  if (s.includes('snip') || s.includes('mev')) return { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20' };
+  if (s.includes('lp') || s.includes('liquidity')) return { bg: 'bg-teal-500/10', text: 'text-teal-400', border: 'border-teal-500/20' };
+  return { bg: 'bg-violet-500/10', text: 'text-violet-400', border: 'border-violet-500/20' };
+}
+
 function AgentName({ agentId }: { agentId: string }) {
   const { data: metadata } = useAgentMetadata(agentId as `0x${string}`);
   if (metadata?.name) {
     return <span title={agentId}>{metadata.name}</span>;
   }
   return <span>{truncateBytes32(agentId, 4)}</span>;
+}
+
+function AgentCardProfile({ agentId }: { agentId: string }) {
+  const { data: metadata } = useAgentMetadata(agentId as `0x${string}`);
+  if (!metadata) return null;
+  const hasExtra = metadata.strategy || metadata.author || metadata.description;
+  if (!hasExtra) return null;
+  return (
+    <>
+      {/* Badges row: author + strategy */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {metadata.author && (
+          <span className="text-[10px] font-mono text-gray-500 truncate max-w-[100px]" title={metadata.author}>
+            by {metadata.author}
+          </span>
+        )}
+        {metadata.strategy && (() => {
+          const badge = strategyBadge(metadata.strategy);
+          return (
+            <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider shrink-0 ${badge.bg} ${badge.text} ${badge.border}`}>
+              {metadata.strategy}
+            </span>
+          );
+        })()}
+      </div>
+      {/* Description line */}
+      {metadata.description && (
+        <p className="text-[10px] font-mono text-gray-600 leading-relaxed line-clamp-1">
+          {metadata.description}
+        </p>
+      )}
+    </>
+  );
+}
+
+function ReturnsBadge({ address }: { address: string }) {
+  const { returnSince30d, maxDrawdown, isLoading } = useVaultPerformance(address as `0x${string}`);
+
+  if (isLoading || returnSince30d === null) return null;
+
+  const isPositive = returnSince30d >= 0;
+  const arrow = isPositive ? '\u2191' : '\u2193';
+  const colorClasses = isPositive
+    ? 'bg-green-500/10 text-green-400 border-green-500/20'
+    : 'bg-red-500/10 text-red-400 border-red-500/20';
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className={`inline-flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[10px] font-mono font-semibold ${colorClasses}`}>
+        {arrow} {Math.abs(returnSince30d).toFixed(1)}%
+        <span className="text-[9px] opacity-70 ml-0.5">30d</span>
+      </span>
+      {maxDrawdown !== null && maxDrawdown < -5 && (
+        <span className="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-mono font-medium bg-amber-500/10 text-amber-400 border-amber-500/20" title="Max drawdown">
+          {maxDrawdown.toFixed(1)}% DD
+        </span>
+      )}
+    </div>
+  );
+}
+
+function RowReturnsBadge({ address }: { address: string }) {
+  const { returnSince30d, isLoading } = useVaultPerformance(address as `0x${string}`);
+
+  if (isLoading) return <span className="text-[10px] font-mono text-gray-600">...</span>;
+  if (returnSince30d === null) return <span className="text-[10px] font-mono text-gray-600">-</span>;
+
+  const isPositive = returnSince30d >= 0;
+  const arrow = isPositive ? '\u2191' : '\u2193';
+  const color = isPositive ? 'text-green-400' : 'text-red-400';
+
+  return (
+    <span className={`text-xs font-mono font-medium ${color}`}>
+      {arrow} {Math.abs(returnSince30d).toFixed(1)}%
+    </span>
+  );
 }
 
 export function VaultCard({
@@ -151,21 +239,33 @@ export function VaultCard({
           </div>
         </div>
 
-        {/* Row 3: Balance */}
-        <div className="mb-4">
-          <div className="rounded-lg bg-white/[0.03] px-3 py-2">
+        {/* Row 3: Balance + Returns */}
+        <div className="mb-4 flex items-stretch gap-2">
+          <div className="flex-1 rounded-lg bg-white/[0.03] px-3 py-2">
             <p className="text-[10px] text-gray-500 font-mono uppercase tracking-wider mb-0.5">Balance</p>
             <p className="text-xs text-gray-300 font-mono">{balance} <span className="text-gray-500">{assetSymbol}</span></p>
           </div>
+          <div className="flex items-center">
+            <ReturnsBadge address={address} />
+          </div>
         </div>
 
-        {/* Row 4: Address + Agent ID */}
+        {/* Row 4: Agent profile */}
+        <div className="mb-3">
+          <div className="rounded-lg bg-white/[0.02] px-3 py-2 space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-gray-300 truncate" title={agentId}>
+                <AgentName agentId={agentId} />
+              </span>
+            </div>
+            <AgentCardProfile agentId={agentId} />
+          </div>
+        </div>
+
+        {/* Row 5: Address */}
         <div className="flex items-center justify-between text-[11px] font-mono text-gray-500">
           <span className="group-hover:text-gray-400 transition-colors">
             {truncateAddress(address, 6)}
-          </span>
-          <span className="text-gray-600">
-            Agent <AgentName agentId={agentId} />
           </span>
         </div>
 
@@ -266,6 +366,11 @@ export function VaultRow({
         <div className="flex-1 text-right">
           <span className="text-sm font-mono text-white">{tvl}</span>
           <span className="text-xs font-mono text-gray-500 ml-1">{assetSymbol}</span>
+        </div>
+
+        {/* 30d Return */}
+        <div className="w-24 text-right shrink-0 hidden md:block">
+          <RowReturnsBadge address={address} />
         </div>
 
         {/* Balance */}
