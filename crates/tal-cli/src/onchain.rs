@@ -37,18 +37,18 @@ pub fn get_chain_config(chain_id: u64) -> Result<ChainConfig> {
             chain_id: 999,
             name: "HyperEVM Mainnet",
             rpc_url: "", // Must be provided via env
-            agent_registry: "0x8fd180069269b5800AD60998c567731894b707b4".parse().unwrap(),
-            vault_factory: "0xCB76E29808733a32946e9fB70A3Fb7b2e5a1a89a".parse().unwrap(),
+            agent_registry: "0x47E6EfFf516E8b899092ebEEF92fddCE579e9d39".parse().unwrap(),
+            vault_factory: "0xd27A7470a34903b7e215EA8d07d9cd2d21238F83".parse().unwrap(),
             usdc: "0xb88339CB7199b77E23DB6E890353E22632Ba630f".parse().unwrap(),
             core_deposit_wallet: "0x0b80659a4076e9e93c7dbe0f10675a16a3e5c206".parse().unwrap(),
             libraries: HashMap::from([
                 (
                     "src/libraries/OracleVerifier.sol:OracleVerifier",
-                    "0x2dA75E3d1a2ACF78da42122335dCB3E9B7BE0FEb".parse().unwrap(),
+                    "0x496B30da136C364975229682DFEfd8218a21A6ec".parse().unwrap(),
                 ),
                 (
                     "src/KernelOutputParser.sol:KernelOutputParser",
-                    "0x4707a929799c87588b7da2e66F85Da538148D853".parse().unwrap(),
+                    "0x2C5301af593725896Ac65242d4EE109CBDc65095".parse().unwrap(),
                 ),
             ]),
         }),
