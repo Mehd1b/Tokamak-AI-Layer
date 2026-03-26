@@ -1,0 +1,11 @@
+{
+  "name": "Tokagent Perp Trader",
+  "description": "SMA crossover + funding rate arbitrage on Hyperliquid BTC perpetuals",
+  "strategy": "perp-trading",
+  "tags": [
+    "hyperliquid",
+    "btc",
+    "automated",
+    "perp"
+  ]
+}
