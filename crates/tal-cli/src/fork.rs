@@ -201,9 +201,21 @@ async fn run_async(
         .as_ref()
         .and_then(|m| m.name.as_deref())
         .unwrap_or("agent");
+    // Sanitize: lowercase, replace spaces/invalid chars with hyphens, collapse runs
+    let sanitized = original_name
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '-' })
+        .collect::<String>();
+    let sanitized = sanitized.trim_matches('-').to_string();
+    let sanitized = sanitized
+        .split('-')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
     let fork_name = name.unwrap_or_else(|| "").to_string();
     let fork_name = if fork_name.is_empty() {
-        format!("{}-fork", original_name)
+        format!("{}-fork", if sanitized.is_empty() { "agent".to_string() } else { sanitized })
     } else {
         fork_name
     };
