@@ -51,6 +51,12 @@ export function VaultExplainer() {
           </div>
         </div>
 
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
+          <p className="text-xs text-red-400 leading-relaxed" style={{ fontFamily: 'var(--font-mono), monospace' }}>
+            <span className="font-bold uppercase">Disclaimer:</span> This is experimental software. Vaults interact with unaudited smart contracts and AI agents that execute autonomous strategies. You may lose some or all of your deposited funds. Do not deposit more than you can afford to lose. This is not financial advice.
+          </p>
+        </div>
+
         <label className="flex items-center gap-2 text-xs text-white/40 cursor-pointer select-none">
           <input
             type="checkbox"
