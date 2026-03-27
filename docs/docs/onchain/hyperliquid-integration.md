@@ -5,16 +5,28 @@ sidebar_position: 5
 
 # Hyperliquid Integration
 
-The `HyperliquidAdapter` is a singleton contract deployed on HyperEVM that routes KernelVault CALL actions to Hyperliquid's HyperCore perpetual futures order system. It enables zkVM-verified agents to trade perpetual futures with cryptographic proof of correct execution.
+Trade perpetual futures on Hyperliquid with zkVM-verified agents. The `HyperliquidAdapter` routes vault actions to Hyperliquid's HyperCore order book through per-vault sub-accounts.
 
-## Architecture
+## Quick Start with `tal`
 
-Hyperliquid operates as its own L1 chain with two layers:
+```bash
+# Deploy a Hyperliquid perp agent (registers vault + adapter in one step)
+tal deploy --hyperliquid \
+  --agent-id $AGENT_ID \
+  --asset USDC \
+  --perp-asset 0 \
+  --chain hyperevm
+```
 
-- **HyperCore** — The off-chain order book engine (accessed via REST API at `api.hyperliquid.xyz`)
-- **HyperEVM** — An EVM-compatible execution layer (Chain ID **999** mainnet, **998** testnet)
+For manual setup or advanced configuration, see the detailed steps below.
 
-The adapter bridges these layers by routing EVM CALL actions to HyperCore via system contracts.
+## How It Works
+
+Hyperliquid has two layers:
+- **HyperCore** -- The off-chain order book (REST API at `api.hyperliquid.xyz`)
+- **HyperEVM** -- An EVM execution layer (Chain ID **999**)
+
+The adapter bridges them: your vault makes EVM CALL actions, and the adapter routes those to HyperCore via system contracts. Each vault gets its own `TradingSubAccount` (deployed via CREATE2) for **position isolation**.
 
 ```mermaid
 flowchart TD
@@ -51,8 +63,6 @@ flowchart TD
     CDW --> HC
 ```
 
-Each vault gets its own `TradingSubAccount` deployed via CREATE2, ensuring **position isolation** — HyperCore positions are per-address, so each vault trades under its own HyperCore identity.
-
 ## Deployed Contracts (HyperEVM Mainnet)
 
 | Contract | Address |
@@ -60,165 +70,27 @@ Each vault gets its own `TradingSubAccount` deployed via CREATE2, ensuring **pos
 | HyperliquidAdapter | `0x0Cb59d461a366d2377ebc7eD7E50F960bEa67dc9` |
 | USDC (HyperEVM) | `0xb88339CB7199b77E23DB6E890353E22632Ba630f` |
 | CoreWriter (System) | `0x3333333333333333333333333333333333333333` |
-
-| System Address | Description |
-|----------------|-------------|
-| CoreDepositWallet | Queried via Hyperliquid `spotMeta` API (varies per deployment) |
 | Perp Position Precompile | `0x0000000000000000000000000000000000000800` |
 
-## Contract Interface
+## Trading Functions
 
-### Registration
-
-#### registerVault
-
-```solidity
-function registerVault(address vault, uint32 perpAsset)
-    external returns (address subAccount)
-```
-
-Registers a vault and deploys its `TradingSubAccount` via CREATE2. Must be called by the vault owner. The vault must have been deployed by the `VaultFactory`.
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `vault` | `address` | The KernelVault address to register |
-| `perpAsset` | `uint32` | Hyperliquid perp asset index (`0` = BTC, `1` = ETH, etc.) |
-
-**Returns:** The deployed `TradingSubAccount` address.
-
-**Access control:** Only the vault owner can register. Reverts with `NotVaultOwner()` if caller is not the vault owner, `VaultNotDeployedByFactory()` if the vault was not deployed by VaultFactory, or `VaultAlreadyRegistered()` if already registered.
-
-### Margin Management
-
-#### depositMargin
-
-```solidity
-function depositMargin(uint256 amount) external
-```
-
-Deposits USDC from the calling vault into its sub-account's HyperCore perp margin without placing an order. Used to seed the sub-account with initial margin.
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `amount` | `uint256` | USDC amount to deposit (6-decimal raw units) |
-
-**Access control:** Callable only by a registered vault. The vault must have approved USDC to the adapter.
-
-### Trading Functions
-
-These functions have fixed selectors that the perp-trader zkVM agent emits as CALL actions:
-
-#### openPosition
-
-```solidity
-function openPosition(
-    bool isBuy,
-    uint256 marginAmount,
-    uint256 orderSize,
-    uint256 limitPrice
-) external
-```
-
-Opens a perpetual position on Hyperliquid. Pulls USDC margin from the vault, deposits it to HyperCore, and places a GTC (good-til-canceled) limit order.
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `isBuy` | `bool` | `true` for long, `false` for short |
-| `marginAmount` | `uint256` | USDC margin to deposit (raw 6-decimal units, must fit `uint64`) |
-| `orderSize` | `uint256` | Position size in base asset units (szDecimals-scaled, must fit `uint64`) |
-| `limitPrice` | `uint256` | Limit price in 1e8 scaled units (must fit `uint64`) |
-
-**Selector:** `0x04ba41cb`
+| Function | Description |
+|----------|-------------|
+| `openPosition(isBuy, marginAmount, orderSize, limitPrice)` | Open a perp position. Pulls USDC, deposits to HyperCore, places GTC limit order. |
+| `closePositionAtPrice(px)` | Close full position at agent-computed price within oracle band. **Recommended for agents.** |
+| `closePosition()` | Close at extreme prices. Admin use only -- HyperCore silently rejects out-of-band orders. |
+| `withdrawToVault()` | Withdraw all USDC from sub-account back to vault. Call after settlement. |
+| `depositMargin(amount)` | Seed sub-account with USDC margin without placing an order. |
 
 :::warning
-Order execution on Hyperliquid is **asynchronous**. The `CoreWriter.sendRawAction()` call does not revert on HyperCore-level failures — the order may be rejected by the order book after the EVM transaction finalizes.
+Order execution is **asynchronous**. `CoreWriter.sendRawAction()` does not revert on HyperCore-level failures -- an order may be rejected after the EVM transaction finalizes.
 :::
 
-#### closePosition
-
-```solidity
-function closePosition() external
-```
-
-Closes the full position using extreme limit prices (MIN_PRICE/MAX_PRICE). This is available for admin/manual use but **should not be used by the zkVM agent** — HyperCore's oracle price band (~5-10%) silently rejects orders at extreme prices.
-
-**Selector:** `0xc393d0e3`
-
-#### closePositionAtPrice
-
-```solidity
-function closePositionAtPrice(uint64 px) external
-```
-
-Closes the full position at an agent-computed limit price within HyperCore's oracle price band. The agent computes the price as `mark * 0.95` for selling longs or `mark * 1.05` for buying to close shorts. This is the **recommended close function** for zkVM-verified agents.
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `px` | `uint64` | Limit price in 1e8 scaled units (must be within ~5-10% of oracle price) |
-
-**Selector:** `0x2c0f36da`
-
-#### withdrawToVault
-
-```solidity
-function withdrawToVault() external
-```
-
-Withdraws all USDC from the vault's sub-account back to the vault. Called after a position is closed and funds have returned from HyperCore to the sub-account's EVM balance.
-
-**Selector:** `0x84f22721`
-
-### View Functions
-
-#### getSubAccount
-
-```solidity
-function getSubAccount(address vault) external view returns (address)
-```
-
-Returns the `TradingSubAccount` address for a registered vault, or `address(0)` if not registered.
-
-#### isRegistered
-
-```solidity
-function isRegistered(address vault) external view returns (bool)
-```
-
-Returns `true` if the vault has been registered with the adapter.
-
-#### getVaultConfig
-
-```solidity
-function getVaultConfig(address vault)
-    external view returns (VaultConfig memory)
-```
-
-Returns the full configuration for a registered vault:
-
-```solidity
-struct VaultConfig {
-    address subAccount;  // The deployed TradingSubAccount
-    uint32 perpAsset;    // The Hyperliquid perp asset index
-}
-```
-
-#### computeSubAccountAddress
-
-```solidity
-function computeSubAccountAddress(address vault, uint32 perpAsset)
-    external view returns (address)
-```
-
-Computes the deterministic sub-account address for a vault before registration. Useful for pre-computing addresses for front-end display or configuration.
-
-## Usage Flow
+## Manual Setup Flow
 
 ### 1. Register Vault with Adapter
 
-After deploying a vault via `VaultFactory`, the vault owner registers it with the adapter:
-
 ```bash
-# Register vault for BTC perps (asset index 0)
 cast send $ADAPTER \
     "registerVault(address,uint32)" \
     $VAULT_ADDRESS 0 \
@@ -229,10 +101,9 @@ cast send $ADAPTER \
 
 ### 2. Fund Sub-Account with HYPE
 
-CoreWriter actions require HYPE on HyperCore for gas. Without HYPE, all CoreWriter actions are **silently rejected** (no revert, no error). Fund the sub-account before running the agent:
+CoreWriter actions require HYPE for gas. Without it, actions are **silently rejected**.
 
 ```bash
-# Send 0.01 HYPE to the sub-account for CoreWriter gas
 cast send $ADAPTER \
     "fundSubAccountHype(address)" $VAULT_ADDRESS \
     --value 10000000000000000 \
@@ -242,12 +113,10 @@ cast send $ADAPTER \
 ```
 
 :::tip
-The perp-trader host has automatic HYPE funding via `--min-hype` and `--hype-topup` CLI flags. When the sub-account's HYPE balance drops below `min-hype`, the host calls `fundSubAccountHype()` before submitting actions.
+The perp-trader host auto-funds HYPE via `--min-hype` and `--hype-topup` flags.
 :::
 
-### 3. Agent Execution (zkVM-Verified)
-
-The agent runs inside the zkVM and produces CALL actions targeting the adapter. The host fetches market data, builds inputs, generates a ZK proof, and submits on-chain:
+### 3. Run the Agent
 
 ```bash
 cargo run -p perp-trader-host --features full -- \
@@ -258,122 +127,47 @@ cargo run -p perp-trader-host --features full -- \
     --bundle ./crates/agents/perp-trader/bundle \
     --hl-url https://api.hyperliquid.xyz \
     --sub-account $SUB_ACCOUNT \
-    --exchange-contract $ADAPTER \
-    --usdc-address $USDC \
     --adapter-address $ADAPTER \
+    --usdc-address $USDC \
     --min-hype 5000000000000000 \
     --hype-topup 10000000000000000
 ```
 
-The vault verifies the proof, then executes the agent's actions which route through the adapter:
+### 4. Close and Recover Funds
 
-```
-Vault.execute() → CALL adapter.openPosition(...)
-                → Adapter pulls USDC from vault to sub-account
-                → Sub-account deposits margin to HyperCore
-                → Sub-account places order via CoreWriter
-```
-
-:::warning Seed Trade Bootstrapping
-When no position exists, HyperCore's position precompile returns `leverage=0`, causing CoreWriter limit orders to be silently dropped. The host automatically detects this and uses the REST API (via an API wallet) to place the first trade. After a position exists, subsequent trades go through the normal ZK-verified CoreWriter flow. Configure with `--api-wallet-key` and `--seed-leverage`.
-:::
-
-### 4. Close Position and Recovery
-
-When the agent decides to close, it emits a single `closePositionAtPrice(uint64 px)` action with a price within HyperCore's oracle band:
-
-```
-Vault.execute() → CALL adapter.closePositionAtPrice(px)
-                → Sub-account reads position via precompile
-                → Sub-account places reduce-only IOC order at agent-computed price
-```
-
-:::warning Async Settlement
-`withdrawToVault()` is **not bundled** with the close action. HyperCore settlement is asynchronous — USDC does not return to the sub-account's EVM balance in the same transaction. If both actions were bundled, `withdrawToVault` would revert (no USDC available), rolling back the close too.
-:::
-
-After HyperCore settles the close (typically a few seconds), funds must be recovered via the admin 3-step flow:
+After the agent closes a position, HyperCore settles asynchronously (a few seconds). Then recover funds:
 
 ```bash
-# 1. Transfer USDC from HyperCore perp margin to spot (action 7, 1e6 units)
+# 1. Move USDC from perp margin to spot
 cast send $ADAPTER "depositSubBalanceAdmin(address,uint256)" $VAULT 18000000 \
     --rpc-url ... --private-key ... --legacy
 
-# 2. Transfer USDC from HyperCore spot to EVM (action 6, 1e8 units)
-# (handled by transferSpotToEvm in TradingSubAccount)
+# 2. HyperCore spot-to-EVM transfer (handled internally)
 
-# 3. Withdraw ERC-20 USDC from sub-account back to vault
+# 3. Withdraw USDC from sub-account to vault
 cast send $ADAPTER "withdrawToVaultAdmin(address)" $VAULT \
     --rpc-url ... --private-key ... --legacy
 ```
 
-## TradingSubAccount Details
+:::warning
+Do not bundle `withdrawToVault()` with the close action. Settlement is async -- USDC is not available in the same transaction.
+:::
 
-Each sub-account is an isolated contract deployed per-vault via CREATE2. It interacts directly with HyperEVM system contracts.
+## Key Gotchas
 
-### System Contract Interaction
+- **Seed trade bootstrapping** -- When no position exists, `leverage=0` from the precompile causes orders to be silently dropped. The host auto-detects this and places the first trade via REST API. Configure with `--api-wallet-key` and `--seed-leverage`.
+- **HyperEVM gas** -- No EIP-1559 support. Always use `--legacy` with forge/cast. Block gas limit is 3M.
+- **USDC bridging** -- Bridge native USDC from Arbitrum One to Hyperliquid via `0x2df1c51e09aecf9cacb7bc98cb1742757f163df7` (min 5 USDC, ~1 minute).
 
-| Contract | Address | Purpose |
-|----------|---------|---------|
-| CoreWriter | `0x3333333333333333333333333333333333333333` | Submit orders to HyperCore |
-| CoreDepositWallet | Deployment-specific | Deposit USDC from EVM to HyperCore margin |
-| Perp Position Precompile | `0x0000000000000000000000000000000000000800` | Read position state from HyperCore |
+## Security
 
-### CoreWriter Encoding
-
-Orders are packed into a binary format for `CoreWriter.sendRawAction()`:
-
-```
-[0x01 version][3-byte action ID big-endian][abi.encode(asset, isBuy, px, sz, reduceOnly, tif, cloid)]
-```
-
-- Action ID `1` = limit order
-- TIF `2` = GTC (good-til-canceled), used for opening positions
-- TIF `3` = IOC (immediate-or-cancel), used for closing positions
-
-### Position Reading
-
-The sub-account reads its HyperCore position via a precompile staticcall:
-
-```solidity
-(bool success, bytes memory result) = 0x0800.staticcall(
-    abi.encode(address(this), uint16(perpAsset))
-);
-// Returns: (int64 szi, uint32 leverage, uint64 entryNtl)
-```
-
-- `szi > 0` → long position
-- `szi < 0` → short position
-- `szi == 0` → no position
-
-## Security Considerations
-
-### Access Control
-
-- Only the **vault owner** can call `registerVault()`
-- Only **registered vaults** can call `openPosition()`, `closePosition()`, `closePositionAtPrice()`, `withdrawToVault()`, and `depositMargin()`
-- Only the **adapter** can call execution functions on `TradingSubAccount`
-- All state-changing functions are protected by `ReentrancyGuard`
-
-### Asynchronous Settlement
-
-CoreWriter does **not revert** on HyperCore-level failures. An order may be rejected by the order book (insufficient margin, price out of range, etc.) without the EVM transaction reverting. Agents should check position state on subsequent executions to verify orders were filled.
-
-### HyperEVM Gas
-
-HyperEVM does not support EIP-1559 gas pricing. Always use the `--legacy` flag with `forge` and `cast` commands. The block gas limit is 3M, which affects contract deployment (deploy vaults via factory `cast send`, not forge scripts).
-
-### USDC Bridging
-
-USDC on HyperEVM is bridged from Arbitrum One:
-
-1. Hold native USDC on Arbitrum One (`0xaf88d065e77c8cC2239327C5EDb3A432268e5831`)
-2. Send to the Hyperliquid bridge: `0x2df1c51e09aecf9cacb7bc98cb1742757f163df7` on Arbitrum
-3. Funds arrive on Hyperliquid within ~1 minute (minimum 5 USDC)
-4. Transfer from HyperCore to HyperEVM via the Hyperliquid UI or API
+- Only the vault owner can call `registerVault()`
+- Only registered vaults can call trading functions
+- Only the adapter can call `TradingSubAccount` execution functions
+- All state-changing functions use `ReentrancyGuard`
 
 ## Related
 
-- [Verifier Overview](/onchain/verifier-overview) — Core contract architecture and deployed addresses
-- [Permissionless System](/onchain/permissionless-system) — Agent registration and vault deployment
-- [Security Considerations](/onchain/security-considerations) — Trust model and attack vectors
+- [Verifier Overview](/onchain/verifier-overview) -- Contract addresses
+- [Permissionless System](/onchain/permissionless-system) -- Agent registration and vault deployment
+- [Security Considerations](/onchain/security-considerations) -- Trust model and attack vectors

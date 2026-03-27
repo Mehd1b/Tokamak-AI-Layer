@@ -5,228 +5,83 @@ sidebar_position: 3
 
 # Constraints and Commitments
 
-The constraint system validates agent-proposed actions against economic safety rules. This document explains how constraints work and how commitments are computed.
+Constraints are economic safety rules that the kernel enforces after every agent execution. Your agent cannot bypass them -- they are checked automatically, and violations produce a valid proof with a `Failure` status.
 
-## Constraint System Overview
+## What constraints do
 
-Key properties of the constraint system:
+Every time your agent returns actions, the kernel checks them against a `ConstraintSetV1`:
 
-1. **Unskippable**: Constraints are enforced after every agent execution
-2. **Deterministic**: Same inputs always produce same validation results
-3. **Provable**: Constraint violations result in a valid proof with Failure status
-4. **Auditable**: Clear error codes identify which constraint was violated
+| Parameter | What it limits |
+|-----------|---------------|
+| `max_actions_per_output` | Maximum number of actions per execution (up to 64) |
+| `max_position_notional` | Maximum position size |
+| `max_leverage_bps` | Maximum leverage in basis points (10000 = 1x) |
+| `max_drawdown_bps` | Maximum portfolio drawdown in basis points |
+| `cooldown_seconds` | Minimum seconds between executions |
+| `allowed_asset_id` | Restricts which asset the agent can operate on (`[0; 32]` = all allowed) |
 
-## ConstraintSetV1
+The default constraint set is maximally permissive -- no limits on position size, 10x max leverage, 100% drawdown allowed, no cooldown, and all assets allowed.
 
-The constraint set defines economic safety parameters:
+## Violation codes
 
-```rust
-pub struct ConstraintSetV1 {
-    pub version: u32,
-    pub max_position_notional: u64,
-    pub max_leverage_bps: u32,
-    pub max_drawdown_bps: u32,
-    pub cooldown_seconds: u32,
-    pub max_actions_per_output: u32,
-    pub allowed_asset_id: [u8; 32],
-}
-```
+When a constraint is violated, the kernel sets the execution status to `Failure` and records a reason code:
 
-### Field Descriptions
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `version` | u32 | Must be 1 |
-| `max_position_notional` | u64 | Maximum position size |
-| `max_leverage_bps` | u32 | Maximum leverage in basis points (10000 = 1x) |
-| `max_drawdown_bps` | u32 | Maximum drawdown in basis points |
-| `cooldown_seconds` | u32 | Minimum seconds between executions |
-| `max_actions_per_output` | u32 | Maximum actions per output (≤ 64) |
-| `allowed_asset_id` | [u8; 32] | Single allowed asset ([0; 32] = all allowed) |
-
-### Default Constraint Set
-
-The default constraint set is maximally permissive: no position size limit (`u64::MAX`), 10x max leverage (`100_000` bps), 100% drawdown allowed, no cooldown, up to 64 actions, and all assets allowed (`[0; 32]`).
-
-## Constraint Evaluation Order
-
-Understanding the evaluation order helps you debug why your agent's output was rejected — the first violated constraint determines the error code.
-
-Constraints are evaluated in deterministic order:
-
-```mermaid
-flowchart TD
-    A[Start] --> B{Output structure valid?}
-    B -->|No| C[InvalidOutputStructure]
-    B -->|Yes| D{For each action}
-    D --> E{Action type known?}
-    E -->|No| F[UnknownActionType]
-    E -->|Yes| G{Asset whitelisted?}
-    G -->|No| H[AssetNotWhitelisted]
-    G -->|Yes| I{Position size OK?}
-    I -->|No| J[PositionTooLarge]
-    I -->|Yes| K{Leverage OK?}
-    K -->|No| L[LeverageTooHigh]
-    K -->|Yes| M{More actions?}
-    M -->|Yes| D
-    M -->|No| N{Cooldown elapsed?}
-    N -->|No| O[CooldownNotElapsed]
-    N -->|Yes| P{Drawdown OK?}
-    P -->|No| Q[DrawdownExceeded]
-    P -->|Yes| R[Success]
-```
+| Code | Name | Meaning |
+|------|------|---------|
+| `0x01` | `InvalidOutputStructure` | Too many actions or payload too large |
+| `0x02` | `UnknownActionType` | Action type not recognized |
+| `0x03` | `AssetNotWhitelisted` | Asset not in the allowed list |
+| `0x04` | `PositionTooLarge` | Position exceeds size limit |
+| `0x05` | `LeverageTooHigh` | Leverage exceeds limit |
+| `0x06` | `DrawdownExceeded` | Portfolio drawdown too high |
+| `0x07` | `CooldownNotElapsed` | Too soon since last execution |
+| `0x08` | `InvalidStateSnapshot` | State snapshot malformed or missing |
+| `0x09` | `InvalidConstraintSet` | Constraint configuration is invalid |
+| `0x0A` | `InvalidActionPayload` | Payload does not match the expected schema |
 
 Evaluation stops at the first violation.
 
-## Violation Reason Codes
+## How to check constraints
 
-| Code | Name | Description |
-|------|------|-------------|
-| 0x01 | `InvalidOutputStructure` | Too many actions or payload too large |
-| 0x02 | `UnknownActionType` | Action type not recognized |
-| 0x03 | `AssetNotWhitelisted` | Asset not in allowed list |
-| 0x04 | `PositionTooLarge` | Position exceeds size limit |
-| 0x05 | `LeverageTooHigh` | Leverage exceeds limit |
-| 0x06 | `DrawdownExceeded` | Portfolio drawdown too high |
-| 0x07 | `CooldownNotElapsed` | Too soon since last execution |
-| 0x08 | `InvalidStateSnapshot` | Snapshot malformed or invalid |
-| 0x09 | `InvalidConstraintSet` | Constraint configuration invalid |
-| 0x0A | `InvalidActionPayload` | Payload doesn't match schema |
+### During development
 
-## Failure Semantics
+Use `tal sim` to run your agent against a fixture and see which constraints pass or fail:
 
-When a constraint is violated:
-
-1. `execution_status` is set to `Failure` (0x02)
-2. `action_commitment` is computed over empty AgentOutput
-3. A valid `KernelJournalV1` is still produced
-4. Proof is valid, but verifiers should reject state transitions
-
-On failure, the `action_commitment` is computed over an empty `AgentOutput` (`[0x00, 0x00, 0x00, 0x00]`), producing the well-known constant `df3f61...b81119`. See [Cryptographic Chain](/architecture/cryptographic-chain#action-commitment) for full details.
-
-## State Snapshot
-
-For cooldown and drawdown constraints, a state snapshot is required:
-
-```
-Offset │ Field                │ Type   │ Size
-───────┼──────────────────────┼────────┼──────
-0      │ snapshot_version     │ u32    │ 4
-4      │ last_execution_ts    │ u64    │ 8
-12     │ current_ts           │ u64    │ 8
-20     │ current_equity       │ u64    │ 8
-28     │ peak_equity          │ u64    │ 8
+```bash
+tal sim fixtures/sample.json
 ```
 
-The snapshot is decoded from the first 36 bytes of `opaque_agent_inputs`.
-
-### Snapshot Rules
+The output shows each constraint with a pass/fail indicator:
 
 ```
-IF snapshot is missing AND (cooldown_seconds > 0 OR max_drawdown_bps < 10_000):
-    Violation: InvalidStateSnapshot (0x08)
-ELSE IF snapshot is missing:
-    Snapshot is considered empty; global checks are skipped
+Constraints:
+  [+] Max actions     2 / 64
+  [+] Drawdown        (disabled)
+  [+] Cooldown        OK (no cooldown)
+  [+] Leverage        (reserved)
+
+Result: PASS
 ```
 
-## Commitment Computation
+### In tests
 
-### Input Commitment
+Use `TestHarness` with `execute_kernel_with_constraints` to test constraint behavior in Rust:
 
-The `input_commitment` is `SHA-256(encoded_kernel_input_v1)`, computed over the entire encoded `KernelInputV1` bytes.
+```rust
+let result = TestHarness::new()
+    .input(my_input.encode())
+    .execute_kernel_with_constraints(kernel_main, &my_constraints);
 
-### Action Commitment
-
-On success, `action_commitment = SHA-256(encoded_agent_output)`. On failure, it is the SHA-256 of empty output (`df3f61...b81119`). See [Cryptographic Chain](/architecture/cryptographic-chain#action-commitment) for details.
-
-### Canonicalization
-
-Actions are sorted before encoding:
-
-1. Primary: `action_type` (ascending)
-2. Secondary: `target` (lexicographic)
-3. Tertiary: `payload` (lexicographic)
-
-This ensures identical outputs regardless of action order.
-
-## Supported Action Types
-
-For protocol v1, only on-chain executable action types are supported:
-
-| Code | Name | Payload Size | Description |
-|------|------|--------------|-------------|
-| 0x00000002 | CALL | Variable (≥96 bytes) | Generic contract call |
-| 0x00000003 | TRANSFER_ERC20 | 96 bytes | ERC20 token transfer |
-| 0x00000004 | NO_OP | 0 bytes | No operation (skipped) |
-
-Testing-only (not executable on-chain):
-
-| Code | Name | Payload Size | Description |
-|------|------|--------------|-------------|
-| 0x00000001 | ECHO | Variable | Test/debug action |
-
-Higher-level strategy concepts (e.g., "open position", "swap") are agent abstractions that must be compiled down to `CALL` or `TRANSFER_ERC20` actions.
-
-### Payload Schemas
-
-**CALL** (`ACTION_TYPE_CALL = 0x00000002`):
-
-Payload is ABI-encoded as `abi.encode(uint256 value, bytes callData)`:
-
-```
-Offset │ Field         │ Type          │ Size
-───────┼───────────────┼───────────────┼──────
-0      │ value         │ uint256       │ 32
-32     │ offset        │ uint256       │ 32 (always 64)
-64     │ calldata_len  │ uint256       │ 32
-96     │ calldata      │ bytes         │ variable (32-byte aligned)
+result.assert_success();  // or assert_failure()
 ```
 
-Target format: bytes32 with EVM address left-padded (upper 12 bytes = 0x00, lower 20 bytes = address).
+## Best practices for agents
 
-On-chain execution: `target.call{value: value}(callData)`
-
-**TRANSFER_ERC20** (`ACTION_TYPE_TRANSFER_ERC20 = 0x00000003`):
-
-Payload is ABI-encoded as `abi.encode(address token, address to, uint256 amount)`:
-
-```
-Offset │ Field         │ Type          │ Size
-───────┼───────────────┼───────────────┼──────
-0      │ token         │ address       │ 32 (left-padded)
-32     │ to            │ address       │ 32 (left-padded)
-64     │ amount        │ uint256       │ 32
-```
-
-Target: unused (set to zero).
-
-On-chain execution: `IERC20(token).transfer(to, amount)`
-
-**NO_OP** (`ACTION_TYPE_NO_OP = 0x00000004`):
-
-Payload must be empty (0 bytes). Skipped during on-chain execution.
-
-## Integration with Agent Development
-
-### SDK vs Constraint Engine Responsibilities
-
-| Responsibility | SDK | Constraint Engine |
-|----------------|-----|-------------------|
-| Payload encoding | ✅ Canonical constructors | - |
-| Payload decoding | ✅ Structural validation | - |
-| Direction validation | ❌ (debug assert only) | ✅ Enforced |
-| Leverage bounds | ❌ | ✅ Enforced |
-| Position size limits | ❌ | ✅ Enforced |
-| Asset whitelist | ❌ | ✅ Enforced |
-| Cooldown timing | ❌ | ✅ Enforced |
-| Drawdown limits | ❌ | ✅ Enforced |
-
-### Handling Constraint Failures in Agents
-
-Since constraint checking is unskippable, agents should understand the active constraint set, avoid obviously invalid actions, and return empty output when they know constraints will fail. See [Writing an Agent — Defensive Parsing](/sdk/writing-an-agent#defensive-parsing) for patterns.
+- Return empty output when you know constraints will fail -- this avoids wasting proof computation.
+- Keep your action count well below the limit.
+- Test edge cases around constraint boundaries with `tal sim`.
 
 ## Related
 
-- [Input Format](/kernel/input-format) - Where constraint_set_hash comes from
-- [Journal Format](/kernel/journal-format) - How execution status is reported
-- [Testing](/sdk/testing) - Testing constraint behavior
+- [Testing](/sdk/testing) -- test constraint behavior with `tal sim` and `TestHarness`
+- [Build Your First Agent](/sdk/writing-an-agent) -- defensive parsing patterns

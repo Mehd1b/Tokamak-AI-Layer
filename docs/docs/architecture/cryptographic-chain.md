@@ -5,7 +5,7 @@ sidebar_position: 3
 
 # Cryptographic Chain
 
-The security of the Execution Kernel rests on a chain of cryptographic commitments that link source code to on-chain verification. This document traces each link in that chain.
+> **TL;DR** -- A chain of SHA-256 and RISC Zero hashes links your agent source code all the way to on-chain verification. At build time, the agent source is hashed into `agent_code_hash`, and the compiled ELF binary is hashed into `imageId`. At runtime, inputs and outputs are each hashed into commitments stored in a fixed 209-byte journal. On-chain, the vault verifies the Groth16 proof against the registered `imageId` and checks that the `action_commitment` matches the submitted agent output. If any link is broken -- different source, different binary, different inputs, different outputs -- verification fails.
 
 ## Overview
 

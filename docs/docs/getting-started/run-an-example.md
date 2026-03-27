@@ -5,129 +5,55 @@ sidebar_position: 3
 
 # Run an Example
 
-This guide walks through running the example yield agent, from local testing to full on-chain execution.
+**What you'll do:** Run the built-in example agents to see how testing works, from quick unit tests to full proof generation.
 
-## The Yield Agent
+## Prerequisites
 
-The `example-yield-agent` demonstrates a complete agent lifecycle using the modern SDK APIs. It parses a 48-byte input (vault address, yield source, amount), then produces two `CALL` actions: deposit ETH to a yield source and withdraw with yield. See [Writing an Agent](/sdk/writing-an-agent) for how the `agent_input!` macro and `CallBuilder` work.
+- tal CLI installed (`tal doctor` passes)
 
-## Unit Tests (No zkVM)
+## Run unit tests
 
-Run the agent logic without proof generation:
+Test agent logic instantly, without any proof generation:
 
 ```bash
-# Using the tal CLI
+# Test the example yield agent
 tal test --local --agent example-yield-agent
 
-# Or directly via cargo
-cargo test -p example-yield-agent
+# Test the DeFi yield farmer
+tal test --local --agent defi-yield-farmer
 ```
 
-This tests:
-- Input parsing via `agent_input!`
-- Action construction with `CallBuilder`
-- Code hash consistency
+These tests check input parsing, action construction, and code hash consistency. They complete in 2-5 seconds.
 
-## Integration Tests (Kernel Execution)
+## Simulate with fixture data
 
-Run the agent through the kernel without zkVM:
+Run an agent with sample inputs and see the output actions:
 
 ```bash
-cargo test -p kernel-host-tests -- --nocapture
+tal sim fixtures/sample.json
 ```
 
-This tests:
-- Kernel input/output encoding
-- Constraint enforcement
-- Journal construction
+This executes your `agent_main()` natively with full constraint enforcement but no proof generation. Use this for rapid iteration during development.
 
-## E2E Proof Tests (Off-Chain)
+## Run proof tests
 
-Generate actual zkVM proofs:
+Generate actual zkVM proofs to verify the full pipeline:
 
 ```bash
-# Install RISC Zero toolchain first
-cargo risczero install
-
-# Run E2E proof tests
-cargo test -p e2e-tests --features risc0-e2e -- --nocapture
+tal test --proof --agent example-yield-agent
 ```
 
-Test cases include:
+This is computationally intensive (several minutes) and confirms that:
+- The agent compiles to a valid zkVM binary
+- Proof generation succeeds
+- The journal and commitments are well-formed
 
-| Test | Description |
-|------|-------------|
-| `test_e2e_success_with_yield_agent` | Happy path with valid input |
-| `test_e2e_agent_code_hash_mismatch` | Security test - wrong code hash |
-| `test_e2e_empty_output_invalid_input_size` | Invalid input handling |
-| `test_e2e_determinism` | Same input produces same output |
+## Verify it worked
 
-:::note
-Proof generation is computationally intensive. These tests can take several minutes.
-:::
+A successful test run prints a summary with pass/fail status for each test case. If all tests pass, your agent is ready for `tal build --elf` and deployment.
 
-## Full On-Chain E2E Test
+## Next steps
 
-Execute the complete flow with on-chain verification on Sepolia.
-
-### Prerequisites
-
-1. **Sepolia ETH**: Fund both the vault and yield source contracts
-2. **Environment variables**: Set RPC URL and private key
-
-### Fund the Contracts
-
-```bash
-export RPC_URL="https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY"
-export PRIVATE_KEY="0x..."
-
-export VAULT_ADDRESS=0xf7a179D55dF775d4cb3854ba3301564b44010508
-export MOCK_YIELD_ADDRESS=0xFF44663C1C3567F0CdA7D4B3817e34B4D8d82792
-
-cast send $VAULT_ADDRESS --value 0.5ether \
-    --private-key $PRIVATE_KEY --rpc-url $RPC_URL
-
-cast send $MOCK_YIELD_ADDRESS --value 1ether \
-    --private-key $PRIVATE_KEY --rpc-url $RPC_URL
-```
-
-### Run the Test
-
-```bash
-export EXECUTION_NONCE=1
-export TRANSFER_AMOUNT=10000000000000000  # 0.01 ETH in wei
-
-cargo test --release -p e2e-tests --features phase3-e2e \
-    test_full_e2e_yield_execution -- --ignored --nocapture
-```
-
-### Understanding the Flow
-
-```mermaid
-sequenceDiagram
-    participant T as Test
-    participant P as Prover
-    participant V as KernelVault
-    participant M as MockYieldSource
-
-    T->>P: Create KernelInputV1 (vault, yield_source, amount)
-    P->>P: Execute kernel with yield agent
-    P->>P: Generate Groth16 proof
-    T->>V: execute(journal, seal, agentOutput)
-    V->>V: Verify proof via RISC Zero
-    V->>V: Parse journal, verify commitments
-    V->>M: Deposit ETH
-    M->>M: Record deposit
-    V->>M: Withdraw (deposit + 10%)
-    M->>V: Return ETH + yield
-    T->>T: Verify vault balance increased by 10%
-```
-
-## Next Steps
-
-After running the example:
-
-1. [Understand the SDK](/sdk/overview)
-2. [Write your own agent](/sdk/writing-an-agent)
-3. [Deploy to testnet](/sdk/deploy-guide)
-4. [Monitor your agent](/sdk/monitoring)
+- [5-Minute Quickstart](/quickstart) -- Build and deploy your own agent
+- [DeFi Yield Farmer](/getting-started/defi-yield-farmer) -- Walkthrough of a production-grade agent
+- [Testing](/sdk/testing) -- Full testing API (`TestHarness`, `ContextBuilder`, snapshots)

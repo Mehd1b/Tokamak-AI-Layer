@@ -2,18 +2,85 @@
 sidebar_position: 4
 ---
 
-# Permissionless Agent Registry & Vault Factory
+# Permissionless Agent Lifecycle
 
-This document describes the permissionless system for agent registration and vault deployment, introduced to enable trustless and decentralized agent management.
+Anyone can register an agent, deploy a vault, and run it -- no approval needed. This page walks through the full agent lifecycle using `tal` CLI commands.
 
 ## Overview
 
-The permissionless system consists of two core components:
+Two contracts power the permissionless system:
 
-1. **AgentRegistry**: Permissionless registration of agents with deterministic IDs
-2. **VaultFactory**: CREATE2-based vault deployment with imageId pinning
+- **AgentRegistry** -- stores agent identity (imageId, code hash, metadata). Anyone can register.
+- **VaultFactory** -- deploys vaults via CREATE2 with the agent's `imageId` pinned at deployment time.
 
-This design removes the need for a trusted operator to register agents, enabling anyone to deploy and run agents in a fully decentralized manner.
+## Agent Lifecycle
+
+```
+1. Build agent  -->  2. Register on-chain  -->  3. Deploy vault  -->  4. Run & submit proofs  -->  5. (Optional) Deprecate & upgrade
+```
+
+### Step 1: Build Your Agent
+
+```bash
+tal agent new my-agent --template yield
+tal agent build my-agent --release
+```
+
+This produces an ELF binary and computes the `imageId` and `agent_code_hash`.
+
+### Step 2: Register the Agent
+
+```bash
+tal agent register \
+  --name "My Agent" \
+  --image-id $IMAGE_ID \
+  --code-hash $CODE_HASH \
+  --chain ethereum
+```
+
+The CLI calls `AgentRegistry.register()` and returns your deterministic `agentId`:
+
+```
+agentId = keccak256(your_address, salt)
+```
+
+### Step 3: Deploy a Vault
+
+```bash
+tal vault deploy \
+  --agent-id $AGENT_ID \
+  --asset USDC \
+  --chain ethereum
+```
+
+The CLI calls `VaultFactory.deployVault()`. The vault's `trustedImageId` is pinned from the registry at this moment and **cannot be changed later**.
+
+### Step 4: Run the Agent
+
+```bash
+tal agent run \
+  --vault $VAULT_ADDRESS \
+  --chain ethereum
+```
+
+The host gathers inputs, runs the agent in the zkVM, generates a proof, and submits `(journal, seal, agentOutput)` to the vault.
+
+### Step 5: Upgrade (Optional)
+
+Since `trustedImageId` is immutable, upgrading requires deploying a new vault:
+
+```bash
+# Update registry with new imageId
+tal agent update $AGENT_ID --image-id $NEW_IMAGE_ID --code-hash $NEW_CODE_HASH
+
+# Deploy new vault
+tal vault deploy --agent-id $AGENT_ID --asset USDC --chain ethereum
+
+# Deprecate old agent version
+tal agent deprecate $OLD_AGENT_ID --successor $NEW_AGENT_ID
+```
+
+Users migrate funds from the old vault to the new one. Existing vaults continue operating with their pinned imageId indefinitely.
 
 ## Deployed Contracts
 
@@ -62,141 +129,16 @@ This design removes the need for a trusted operator to register agents, enabling
 | KernelExecutionVerifier | [`0x1eB41537037fB771CBA8Cd088C7c806936325eB5`](https://sepolia.etherscan.io/address/0x1eB41537037fB771CBA8Cd088C7c806936325eB5) |
 | RISC Zero Verifier Router | [`0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187`](https://sepolia.etherscan.io/address/0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187) |
 
-## Architecture
+## Why ImageId Pinning Matters
 
-```mermaid
-graph TD
-    Author[Agent Author] -->|register| Registry[AgentRegistry]
-    Registry -->|stores| AgentInfo[AgentInfo: author, imageId, codeHash, metadataURI]
-    User[Vault Deployer] -->|deployVault| Factory[VaultFactory]
-    Factory -->|reads imageId| Registry
-    Factory -->|deploys with pinned imageId| Vault[KernelVault]
-    Vault -->|verifyAndParseWithImageId| Verifier[KernelExecutionVerifier]
-    Verifier -->|verify| RiscZero[RISC Zero Verifier]
-```
+The vault's `trustedImageId` is set once at deployment and never changes. This prevents a critical attack:
 
-## Deterministic Agent ID
+1. Malicious author registers a legitimate agent
+2. Users deposit funds into the vault
+3. Author updates the registry to point to a malicious agent
+4. Author executes the malicious agent to drain funds
 
-Agent IDs are computed deterministically from the author's address and a salt:
-
-```solidity
-agentId = keccak256(abi.encodePacked(author, salt))
-```
-
-This ensures:
-- **Author-bound**: Only the original author can update agent configuration
-- **Collision-free**: Different authors with same salt produce different IDs
-- **Predictable**: Agent ID can be computed before registration
-
-## ImageId Pinning
-
-A critical security property: **imageId is pinned at vault deployment time**.
-
-```
-At Deployment:
-  VaultFactory.deployVault(agentId, asset, salt)
-  → reads AgentRegistry.get(agentId).imageId
-  → deploys KernelVault with trustedImageId = imageId (immutable)
-
-At Execution:
-  Vault.execute(journal, seal, agentOutput)
-  → calls verifier.verifyAndParseWithImageId(trustedImageId, ...)
-  → RISC Zero verifies proof against pinned imageId
-```
-
-### Why Pinning Matters
-
-If the vault looked up `imageId` from the registry at execution time, a malicious author could:
-1. Register a legitimate agent
-2. Wait for users to deposit funds
-3. Update the registry to point to a malicious agent
-4. Execute the malicious agent and drain funds
-
-By pinning `imageId` at deployment, vaults are **immutable** to registry changes. Users know exactly what agent code will be executed.
-
-## Upgrade Policy
-
-Since `trustedImageId` is immutable, upgrading an agent requires:
-
-1. Author updates registry with new imageId
-2. Users deploy NEW vaults via VaultFactory
-3. Users migrate funds from old vault to new vault
-
-Existing vaults continue operating with their pinned imageId indefinitely.
-
-## Contract Interfaces
-
-### IAgentRegistry
-
-```solidity
-interface IAgentRegistry {
-    struct AgentInfo {
-        address author;
-        bytes32 imageId;
-        bytes32 agentCodeHash;
-        string _deprecated; // formerly metadataURI — retained for storage layout
-        bool exists;
-    }
-
-    function computeAgentId(address author, bytes32 salt) external pure returns (bytes32);
-    function register(bytes32 salt, bytes32 imageId, bytes32 agentCodeHash) external returns (bytes32);
-    function update(bytes32 agentId, bytes32 newImageId, bytes32 newAgentCodeHash) external;
-    function get(bytes32 agentId) external view returns (AgentInfo memory);
-    function agentExists(bytes32 agentId) external view returns (bool);
-
-    // Agent deprecation
-    function deprecate(bytes32 agentId) external;
-    function undeprecate(bytes32 agentId) external;
-    function setSuccessor(bytes32 agentId, bytes32 successorAgentId) external;
-    function isDeprecated(bytes32 agentId) external view returns (bool);
-    function getSuccessor(bytes32 agentId) external view returns (bytes32);
-}
-```
-
-### IVaultFactory
-
-```solidity
-interface IVaultFactory {
-    function computeVaultAddress(address owner, bytes32 agentId, address asset, bytes32 userSalt) external view returns (address, bytes32);
-    function deployVault(bytes32 agentId, address asset, bytes32 userSalt) external returns (address);
-    function registry() external view returns (address);
-    function verifier() external view returns (address);
-    function isDeployedVault(address vault) external view returns (bool);
-}
-```
-
-### verifyAndParseWithImageId
-
-```solidity
-function verifyAndParseWithImageId(
-    bytes32 expectedImageId,
-    bytes calldata journal,
-    bytes calldata seal
-) external view returns (ParsedJournal memory);
-```
-
-Unlike `verifyAndParse`, this method does NOT look up imageId from internal mappings. The vault provides its pinned `trustedImageId`, enabling permissionless verification.
-
-## Security Considerations
-
-### Invariants Maintained
-
-- **agentId binding**: Vault is bound to a specific agentId (unchanged)
-- **Nonce replay protection**: Nonces must be strictly increasing (unchanged)
-- **action_commitment binding**: Actions match committed hash (unchanged)
-- **Atomic execution**: All-or-nothing action execution (unchanged)
-- **NEW: imageId pinning**: Vault's imageId is immutable after deployment
-
-### Trust Model
-
-| Party | Trust Level | Actions |
-|-------|-------------|---------|
-| Agent Author | Untrusted | Can only update registry (not existing vaults) |
-| Vault Deployer | Untrusted | Can only deploy vaults, not modify them |
-| Registry | Trusted for initial imageId lookup | Immutable after vault deployment |
-| Vault | Trusted with deposited funds | Executes only verified proofs |
-
-### Registry Update Attack Prevention
+With pinning, step 4 fails -- the vault verifies proofs against the original imageId, not the registry.
 
 ```mermaid
 sequenceDiagram
@@ -217,149 +159,50 @@ sequenceDiagram
     Vault-->>User: Protected! Malicious proof rejected
 ```
 
-## Usage Examples
-
-### Registering an Agent
-
-```solidity
-// Deploy your agent and get the imageId from RISC Zero build
-bytes32 imageId = 0x1234...;
-bytes32 agentCodeHash = 0xabcd...;
-
-// Register with any unique salt
-bytes32 salt = keccak256("my-agent-v1");
-bytes32 agentId = registry.register(salt, imageId, agentCodeHash, "ipfs://QmMetadata");
-```
-
-### Deploying a Vault
-
-```solidity
-// Compute address first (optional, for pre-funding)
-(address vaultAddr, ) = factory.computeVaultAddress(
-    msg.sender,
-    agentId,
-    address(usdc),
-    bytes32(0) // user salt
-);
-
-// Deploy vault
-address vault = factory.deployVault(agentId, address(usdc), bytes32(0));
-
-// Deposit and use
-KernelVault(payable(vault)).depositERC20Tokens(1000e6);
-```
-
-### Upgrading to New Agent Version
-
-```solidity
-// Author releases new version
-bytes32 newImageId = 0x5678...;
-registry.update(agentId, newImageId, newCodeHash, "ipfs://QmNewMetadata");
-
-// Users deploy new vaults with updated imageId
-address newVault = factory.deployVault(agentId, address(usdc), bytes32(uint256(1)));
-
-// Migrate funds from old vault
-oldVault.withdraw(oldVault.shares(msg.sender));
-newVault.depositERC20Tokens(amount);
-```
-
-## Agent Deprecation
-
-Authors can deprecate agents to signal that a newer version is available. This provides a clean upgrade path without breaking existing vaults.
-
-### Deprecation Functions
-
-```solidity
-// Mark an agent as deprecated (author only)
-registry.deprecate(agentId);
-
-// Set a successor agent for migration guidance
-registry.setSuccessor(agentId, newAgentId);
-
-// Remove deprecation if needed
-registry.undeprecate(agentId);
-
-// Query deprecation status
-bool deprecated = registry.isDeprecated(agentId);
-bytes32 successor = registry.getSuccessor(agentId);
-```
-
-### Deprecation Flow
-
-```mermaid
-sequenceDiagram
-    participant Author
-    participant Registry
-    participant Frontend
-
-    Author->>Registry: register(salt, imageId_v2, codeHash_v2)
-    Note over Author: New agent version deployed
-
-    Author->>Registry: deprecate(agentId_v1)
-    Author->>Registry: setSuccessor(agentId_v1, agentId_v2)
-
-    Note over Frontend: Shows deprecation banner on v1 vaults
-    Frontend->>Registry: isDeprecated(agentId_v1) → true
-    Frontend->>Registry: getSuccessor(agentId_v1) → agentId_v2
-```
-
-### Important Notes
-
-- Deprecation does **not** affect existing vault operation — vaults continue executing with their pinned imageId
-- Deprecation is purely informational, helping depositors and the frontend show migration guidance
-- Only the original agent author can deprecate/undeprecate
-- Setting a successor requires the successor agent to exist in the registry
-- Undeprecation clears the successor mapping
-
 ## Agent Metadata
 
-Agents can store metadata on-chain via a URI pointing to JSON:
-
-```solidity
-function setMetadataURI(bytes32 agentId, string calldata uri) external;
-function getMetadataURI(bytes32 agentId) external view returns (string memory);
-```
-
-Only the agent author can set metadata. The URI can point to IPFS, HTTPS, or Arweave.
-
-**Metadata JSON schema:**
-
-```json
-{
-  "name": "ETH-BTC Momentum",
-  "description": "Mean-reversion strategy on ETH/BTC ratio using 4h TWAP",
-  "tags": ["perpetuals", "hyperliquid", "momentum"],
-  "sourceRepo": "https://github.com/alice/eth-btc-momentum",
-  "version": "1.2.0"
-}
-```
-
-You can also manage metadata directly from the CLI:
+Set metadata so your agent appears in the [Marketplace](https://tokagent.network/marketplace) and [Leaderboard](https://tokagent.network/leaderboard):
 
 ```bash
-# Set metadata for your agent
-tal metadata set <agent-id> --name "ETH-BTC Momentum" --description "Mean-reversion strategy" --tags perpetuals,hyperliquid
+tal metadata set <agent-id> \
+  --name "ETH-BTC Momentum" \
+  --description "Mean-reversion strategy on ETH/BTC ratio" \
+  --tags perpetuals,hyperliquid,momentum
 
-# View metadata for any agent
 tal metadata show <agent-id>
 ```
 
-Setting metadata enables:
-- **Frontend discovery** — vault cards show agent names instead of hex IDs
-- **Marketplace** — agents with metadata appear in the public marketplace at [`/marketplace`](https://tokagent.network/marketplace)
-- **Leaderboard** — agent performance rankings at [`/leaderboard`](https://tokagent.network/leaderboard)
-- **Deploy UI** — one-click vault deployment at [`/deploy`](https://tokagent.network/deploy)
-- **Referrals** — earn referral rewards by sharing agent links at [`/referrals`](https://tokagent.network/referrals)
-- **Forking** — `tal fork <agent-id>` clones the source repo and scaffolds a new project
-- **Ecosystem indexing** — third-party dashboards and aggregators can discover agents
+Metadata enables:
+- Agent names instead of hex IDs on vault cards
+- Marketplace and leaderboard listings
+- One-click deploy at [`/deploy`](https://tokagent.network/deploy)
+- Referral rewards at [`/referrals`](https://tokagent.network/referrals)
+- `tal fork <agent-id>` to clone and remix an agent
 
-## Comparison: Before and After
+## Agent Deprecation
 
-| Aspect | Before (Owner-controlled) | After (Permissionless) |
-|--------|---------------------------|------------------------|
-| Agent Registration | Owner only | Anyone |
-| Vault Deployment | Manual | Factory + CREATE2 |
-| ImageId Source | Registry lookup at execute | Pinned at deployment |
-| Upgrade Path | Owner updates registry | Deploy new vault, migrate funds |
-| Trust Requirement | Trust owner | Trust only your vault's pinned imageId |
+Deprecation is informational only -- existing vaults keep running.
+
+```bash
+# Mark as deprecated and point to successor
+tal agent deprecate $AGENT_ID --successor $NEW_AGENT_ID
+
+# Undo if needed
+tal agent undeprecate $AGENT_ID
+```
+
+The frontend shows a deprecation banner on affected vault pages with a link to the successor.
+
+## Security Invariants
+
+- **agentId binding** -- Vault is bound to a specific agent
+- **imageId pinning** -- Vault's imageId is immutable after deployment
+- **Nonce replay protection** -- Nonces must be strictly increasing
+- **Action commitment binding** -- Submitted actions must match the proven hash
+- **Atomic execution** -- All-or-nothing action execution
+
+## Related
+
+- [Verifier Overview](/onchain/verifier-overview) -- Contract addresses and function reference
+- [Bond Manager](/onchain/bond-manager) -- WSTON bonds for optimistic execution
+- [Security Considerations](/onchain/security-considerations) -- Attack vectors and validation checklist

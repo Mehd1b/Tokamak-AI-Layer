@@ -5,252 +5,72 @@ sidebar_position: 5
 
 # Frequently Asked Questions
 
-## General
+### What is Tokagent?
 
-### What is the Execution Kernel?
-
-The Execution Kernel is a consensus-critical, deterministic agent execution framework for RISC Zero zkVM. It enables verifiable DeFi ML agents that make capital allocation decisions with cryptographic proof of correct execution.
-
-### What makes an agent "verifiable"?
-
-An agent is verifiable because:
-1. It runs inside a zkVM that produces cryptographic proofs
-2. The proof commits to the exact inputs and outputs
-3. Anyone can verify the proof on-chain without re-executing the logic
-
-### Why use zero-knowledge proofs?
-
-Zero-knowledge proofs allow:
-- **Trust minimization**: Vaults don't need to trust agents
-- **Scalability**: Complex logic executes off-chain, only verification on-chain
-- **Privacy**: Agent strategies can remain private while proving correct execution
-
-## Development
-
-### How do I create a new agent?
-
-Use the `cargo agent` CLI:
-
-```bash
-cargo agent new my-agent --template yield
-```
-
-This scaffolds a complete agent project with two crates (`agent/` and `risc0-methods/`), a test harness, and a pre-populated manifest. See the [`cargo agent` CLI Reference](/sdk/cli-reference) for all options.
+Tokagent is a framework for building verifiable DeFi agents. Your agent runs inside a zero-knowledge virtual machine (zkVM) that produces a cryptographic proof of correct execution. Vaults on-chain verify the proof before executing any actions, so depositors never have to trust the agent operator.
 
 ### What language do I write agents in?
 
-Agents are written in Rust. The SDK provides a `no_std` environment compatible with the zkVM.
+Rust. The SDK provides a `no_std` environment compatible with the zkVM. You use the `agent_input!` macro for input parsing and `CallBuilder` for constructing on-chain actions.
 
-### Do I need a binding crate?
+### Do I need to understand zero-knowledge proofs?
 
-No. The `agent_entrypoint!` macro generates all kernel binding code directly in your agent crate, eliminating the need for a separate binding crate. Each agent now has just two crates: `agent/` (logic + kernel binding) and `risc0-methods/` (zkVM build).
+No. The `tal` CLI handles proof generation, and the SDK handles all the cryptographic plumbing. You write standard Rust logic; the framework makes it provable.
 
-```rust
-// In your agent's lib.rs — this replaces the entire binding crate
-kernel_sdk::agent_entrypoint!(agent_main);
+### Can I use external Rust crates?
+
+Yes, with restrictions. Crates must be `no_std` compatible and must not use floating-point math, randomness, system time, or unordered collections (`HashMap`, `HashSet`). These restrictions ensure your agent is fully deterministic inside the zkVM.
+
+### How do I create a new agent?
+
+```bash
+tal init my-agent --template yield
 ```
 
-### Can I use external crates?
-
-Yes, but with restrictions:
-- Must be `no_std` compatible
-- Must not use floating-point, randomness, or time
-- Must not use unordered collections (HashMap, HashSet)
-- Should not have unbounded memory usage
+Available templates: `yield`, `perp-trader`, `minimal`. See the [Quickstart](/quickstart) for the full walkthrough.
 
 ### How do I test my agent?
 
-Use the `cargo agent` CLI and the SDK's `TestHarness`:
-
 ```bash
-# Unit tests (agent logic only)
-cargo agent test my-agent
+# Unit tests (instant, no proof generation)
+tal test --local
 
-# Integration tests (kernel + constraints)
-cargo test -p kernel-host-tests
+# Simulate with fixture data
+tal sim fixtures/sample.json
 
-# E2E proof tests (actual zkVM proofs)
-cargo test -p e2e-tests --features risc0-e2e
+# Full proof tests (slow, only needed before deployment)
+tal test --proof
 ```
 
-In your test code, use `TestHarness` for minimal boilerplate:
-
-```rust
-use kernel_sdk::testing::*;
-use kernel_sdk::prelude::*;
-
-#[test]
-fn test_my_agent() {
-    let result = TestHarness::new()
-        .input(my_input.encode())
-        .execute(agent_main);
-
-    result.assert_action_count(2);
-    result.assert_action_type(0, ACTION_TYPE_CALL);
-}
-```
-
-See [Testing](/sdk/testing) for the full testing API.
+See [Testing](/sdk/testing) for the full API.
 
 ### How long does proof generation take?
 
-Proof generation time depends on:
-- Execution complexity
-- Number of constraints
-- Hardware capabilities
+- Simple agents: 30 seconds to 2 minutes
+- Complex agents: 2 to 10 minutes
 
-Typical times:
-- Simple agent: 30 seconds - 2 minutes
-- Complex agent: 2-10 minutes
+For development, use `tal test --local` and `tal sim` which run instantly. Only generate proofs when you are ready to deploy.
 
-### What happens if my agent panics?
+### Can an agent steal funds from a vault?
 
-If `agent_main` panics:
-- The zkVM execution aborts
-- No valid proof is produced
-- This is a "hard failure"
+No. Agents produce instructions (actions), not transactions. The vault executes the actions, and the Execution Kernel enforces safety constraints (position limits, leverage bounds, cooldown periods) inside the proof. These constraints cannot be bypassed.
 
-Best practice: Return empty output instead of panicking.
+### Can I update a deployed agent?
 
-## Security
+Yes, but it requires deploying a new vault. The vault's `IMAGE_ID` is set at creation and cannot be changed -- this is a security feature so depositors always know which code is running. To update:
 
-### Can an agent steal funds?
+```bash
+# Modify your agent code, then:
+tal build --elf
+tal deploy --testnet
+```
 
-No. Agents produce instructions; they don't have custody. The vault executes actions, and constraint checking prevents obviously malicious behavior.
-
-### What if I submit a bad agent?
-
-Bad agents result in:
-- Constraint violations → Failure status in journal, no actions executed
-- Hard failures → No proof generated, nothing submitted
-
-### How is the imageId verified?
-
-The imageId is:
-1. Computed from the compiled zkVM guest binary
-2. Registered on-chain with the verifier contract
-3. Checked during proof verification
-
-### Can I update my agent?
-
-Yes. Updates require:
-1. Modify agent code
-2. Rebuild with new imageId
-3. Register new imageId on-chain
-4. Old version can be deprecated
-
-## On-Chain
+`tal deploy` detects the changed `IMAGE_ID` and deploys a new vault automatically.
 
 ### What networks are supported?
 
-Currently deployed on Sepolia testnet. Mainnet deployment is planned.
+Tokagent contracts are deployed on Ethereum mainnet, Arbitrum One, Optimism, HyperEVM mainnet, HyperEVM testnet, and Ethereum Sepolia. See the [contract addresses table](/) for full details.
 
-### How much gas does verification cost?
+## Still stuck?
 
-Typical gas costs:
-- Groth16 verification: ~300,000 gas (fixed)
-- Journal parsing: ~20,000 gas
-- Action execution: Variable (depends on actions)
-
-### What if on-chain state changes after proof generation?
-
-The proof is valid, but actions might fail if:
-- Vault has insufficient balance
-- Target contracts reject calls
-- Nonce becomes stale
-
-Design agents to handle this with slippage tolerances or validity windows.
-
-### How do I register my agent's imageId?
-
-```bash
-# Using cast
-cast send $VERIFIER_ADDRESS "registerAgent(bytes32,bytes32)" \
-    $AGENT_ID $IMAGE_ID \
-    --private-key $PRIVATE_KEY --rpc-url $RPC_URL
-```
-
-## Constraints
-
-### What constraints can I configure?
-
-- `max_position_notional`: Maximum position size
-- `max_leverage_bps`: Maximum leverage (basis points)
-- `max_drawdown_bps`: Maximum portfolio drawdown
-- `cooldown_seconds`: Minimum time between executions
-- `max_actions_per_output`: Maximum actions per execution
-- `allowed_asset_id`: Asset whitelist
-
-### What happens when constraints are violated?
-
-1. `execution_status` is set to `Failure`
-2. `action_commitment` is set to empty output hash
-3. A valid proof is still produced
-4. On-chain verifier sees Failure status
-5. No actions are executed
-
-### Can I bypass constraints?
-
-No. Constraint checking is hardcoded in the kernel and runs unconditionally.
-
-## Performance
-
-### How can I make proof generation faster?
-
-- Use simpler agent logic
-- Minimize memory allocations
-- Avoid deep recursion
-- Use bounded loops with known iteration counts
-
-### What are the size limits?
-
-| Limit | Value |
-|-------|-------|
-| Max input size | 64,000 bytes |
-| Max actions per output | 64 |
-| Max payload per action | 16,384 bytes |
-
-### Can I batch multiple agent executions?
-
-Each proof covers one agent execution. For multiple operations, either:
-- Produce multiple actions in one execution
-- Generate multiple proofs and submit separately
-
-## Troubleshooting
-
-### My build fails with "risc0 not found"
-
-Install the RISC Zero toolchain:
-
-```bash
-cargo install cargo-risczero
-cargo risczero install
-```
-
-### My imageId keeps changing
-
-Ensure reproducible builds:
-
-```bash
-RISC0_USE_DOCKER=1 cargo build --release --features risc0
-```
-
-### Proof verification fails on-chain
-
-Check:
-1. imageId is correctly registered
-2. Journal is correctly formatted (209 bytes)
-3. Seal is complete (260 bytes with selector)
-
-### My agent produces empty output
-
-Common causes:
-- Invalid input size (check expected format)
-- Parsing error (add logging)
-- Version mismatch (check protocol/kernel versions)
-
-## Getting Help
-
-- [GitHub Issues](https://github.com/tokamak-network/Tokamak-AI-Layer/issues)
-- [Architecture Overview](/architecture/overview)
-- [SDK Documentation](/sdk/overview)
+Open an issue on [GitHub](https://github.com/tokamak-network/Tokamak-AI-Layer/issues).

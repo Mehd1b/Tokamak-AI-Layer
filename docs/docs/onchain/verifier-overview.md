@@ -3,9 +3,19 @@ title: Verifier Overview
 sidebar_position: 1
 ---
 
-# On-Chain Verifier Overview
+# On-Chain Contracts
 
-The `KernelExecutionVerifier` contract validates zkVM proofs on-chain. Combined with `AgentRegistry` and `VaultFactory`, it enables fully permissionless agent execution. This page covers the contract architecture and key functions. For integration examples (custom vaults, Foundry tests, `cast` commands), see [Solidity Integration](/onchain/solidity-integration).
+This page lists every deployed contract, what it does, and the key functions you will interact with. For most workflows you will use `tal` CLI commands instead of calling contracts directly -- see the [Quickstart](/quickstart) and [Permissionless System](/onchain/permissionless-system) pages.
+
+## Contract Summary
+
+| Contract | Purpose |
+|----------|---------|
+| **AgentRegistry** | Permissionless registry of agents. Stores `imageId`, `agentCodeHash`, and metadata. |
+| **VaultFactory** | CREATE2 factory that deploys vaults with a pinned `imageId`. |
+| **KernelExecutionVerifier** | Stateless verifier -- validates Groth16 proofs via the RISC Zero Router. |
+| **KernelVault** | Holds capital, verifies proofs, and atomically executes proven actions. |
+| **HyperliquidAdapter** | Routes vault CALL actions to Hyperliquid perp order book (HyperEVM only). |
 
 ## Architecture
 
@@ -25,7 +35,7 @@ flowchart TD
     F -->|execute actions| J[Target Contracts]
 ```
 
-## Deployed Contracts
+## Deployed Addresses
 
 ### Ethereum Mainnet
 
@@ -44,9 +54,9 @@ flowchart TD
 | VaultFactory | `0xd27A7470a34903b7e215EA8d07d9cd2d21238F83` |
 | KernelExecutionVerifier | `0xD1478689f829c4B4F882eB8Ef7914C7874ddC707` |
 | RISC Zero Verifier Router | `0x9f8d4D1f7AAf06aab1640abd565A731399862Bc8` |
-| HyperliquidAdapter | `0x30C1ab0F82CDE134A9eb91CC8AEBAD503aa736dA` |
+| HyperliquidAdapter | `0x0Cb59d461a366d2377ebc7eD7E50F960bEa67dc9` |
 
-See [Hyperliquid Integration](/onchain/hyperliquid-integration) for details on the adapter and sub-account architecture.
+See [Hyperliquid Integration](/onchain/hyperliquid-integration) for adapter details.
 
 ### Ethereum Sepolia (Testnet)
 
@@ -57,102 +67,38 @@ See [Hyperliquid Integration](/onchain/hyperliquid-integration) for details on t
 | KernelExecutionVerifier | [`0x1eB41537037fB771CBA8Cd088C7c806936325eB5`](https://sepolia.etherscan.io/address/0x1eB41537037fB771CBA8Cd088C7c806936325eB5) |
 | RISC Zero Verifier Router | [`0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187`](https://sepolia.etherscan.io/address/0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187) |
 
-## AgentRegistry
+## Key Functions
 
-Permissionless registry for agent registration with deterministic IDs.
+### AgentRegistry
 
-### Key Functions
+| Function | Description |
+|----------|-------------|
+| `register(salt, imageId, agentCodeHash)` | Register a new agent. Returns deterministic `agentId = keccak256(author, salt)`. |
+| `update(agentId, newImageId, newAgentCodeHash)` | Update agent config. Author-only. Does **not** affect existing vaults. |
+| `deprecate(agentId)` | Mark agent as deprecated. Informational only -- existing vaults keep running. |
+| `setSuccessor(agentId, successorId)` | Point depositors toward a newer agent version. |
+| `setMetadataURI(agentId, uri)` | Set metadata URI (IPFS, HTTPS, or Arweave). |
 
-#### register
+### VaultFactory
 
-```solidity
-function register(
-    bytes32 salt,
-    bytes32 imageId,
-    bytes32 agentCodeHash,
-    string calldata metadataURI
-) external returns (bytes32 agentId)
-```
+| Function | Description |
+|----------|-------------|
+| `deployVault(agentId, asset, userSalt)` | Deploy a vault with pinned `imageId`. Author-only. |
+| `computeVaultAddress(owner, agentId, asset, userSalt)` | Predict the vault address before deployment. |
 
-Registers a new agent. The `agentId` is computed deterministically:
+### KernelExecutionVerifier
 
-```solidity
-agentId = keccak256(abi.encodePacked(msg.sender, salt))
-```
+| Function | Description |
+|----------|-------------|
+| `verifyAndParseWithImageId(expectedImageId, journal, seal)` | Verify a Groth16 proof and parse the 209-byte journal. |
 
-#### update
+### KernelVault
 
-```solidity
-function update(
-    bytes32 agentId,
-    bytes32 newImageId,
-    bytes32 newAgentCodeHash,
-    string calldata newMetadataURI
-) external
-```
+| Function | Description |
+|----------|-------------|
+| `execute(journal, seal, agentOutput)` | Verify proof, validate nonce/agent/commitment, execute actions atomically. |
 
-Updates an agent's configuration. Only the original author can call this.
-
-:::warning
-Updating the registry does NOT affect existing vaults. Vaults pin their imageId at deployment time.
-:::
-
-## VaultFactory
-
-CREATE2 factory for deploying vaults with pinned imageId.
-
-### Key Functions
-
-#### deployVault
-
-```solidity
-function deployVault(
-    bytes32 agentId,
-    address asset,
-    bytes32 userSalt
-) external returns (address vault)
-```
-
-Deploys a new vault with the imageId pinned from the registry at deployment time. Only the agent author can deploy vaults for their agent.
-
-#### computeVaultAddress
-
-```solidity
-function computeVaultAddress(
-    address owner,
-    bytes32 agentId,
-    address asset,
-    bytes32 userSalt
-) external view returns (address vault, bytes32 salt)
-```
-
-Computes the deterministic vault address before deployment.
-
-## KernelExecutionVerifier
-
-Stateless verifier that validates zkVM proofs with caller-provided imageId.
-
-### Key Functions
-
-#### verifyAndParseWithImageId
-
-```solidity
-function verifyAndParseWithImageId(
-    bytes32 expectedImageId,
-    bytes calldata journal,
-    bytes calldata seal
-) external view returns (ParsedJournal memory)
-```
-
-Verifies a proof and parses the journal:
-
-1. Validates expectedImageId is not zero
-2. Parses the 209-byte journal
-3. Computes journal hash: `sha256(journal)`
-4. Calls RISC Zero verifier with seal, imageId, and journal hash
-5. Returns parsed journal if valid
-
-### Verification Flow
+## Verification Flow
 
 ```mermaid
 sequenceDiagram
@@ -169,100 +115,7 @@ sequenceDiagram
     KEV->>V: parsed
 ```
 
-## KernelVault
-
-The vault holds capital and executes agent actions after verification.
-
-### State Variables
-
-```solidity
-// Verifier contract reference
-IKernelExecutionVerifier public immutable verifier;
-
-// Pinned imageId (immutable after deployment)
-bytes32 public immutable trustedImageId;
-
-// Bound agent
-bytes32 public immutable agentId;
-
-// Replay protection
-uint64 public lastExecutionNonce;
-```
-
-### execute Function
-
-```solidity
-function execute(
-    bytes calldata journal,
-    bytes calldata seal,
-    bytes calldata agentOutput
-) external
-```
-
-1. Calls `verifier.verifyAndParseWithImageId(trustedImageId, journal, seal)`
-2. Validates execution status is Success
-3. Validates nonce is greater than lastExecutionNonce (with gap limit)
-4. Validates agentId matches bound agent
-5. Verifies action commitment matches `sha256(agentOutput)`
-6. Parses and executes actions atomically
-7. Updates lastExecutionNonce
-
-### Action Execution
-
-```solidity
-function _executeAction(Action memory action) internal {
-    if (action.actionType == ACTION_TYPE_CALL) {
-        _executeCall(action);
-    } else if (action.actionType == ACTION_TYPE_TRANSFER_ERC20) {
-        _executeTransferERC20(action);
-    } else {
-        revert UnknownActionType(action.actionType);
-    }
-}
-```
-
-## Complete Flow Example
-
-### 1. Register Agent
-
-```bash
-# Get imageId from your RISC Zero build
-export IMAGE_ID=0x1234...
-export CODE_HASH=0xabcd...
-
-# Register via cast
-cast send $AGENT_REGISTRY \
-    "register(bytes32,bytes32,bytes32,string)" \
-    0x0000000000000000000000000000000000000000000000000000000000000001 \
-    $IMAGE_ID $CODE_HASH "ipfs://QmMetadata" \
-    --private-key $PRIVATE_KEY --rpc-url $RPC_URL
-```
-
-### 2. Deploy Vault
-
-```bash
-export AGENT_ID=<returned from register>
-
-# Deploy vault for USDC
-cast send $VAULT_FACTORY \
-    "deployVault(bytes32,address,bytes32)" \
-    $AGENT_ID $USDC_ADDRESS 0x0 \
-    --private-key $PRIVATE_KEY --rpc-url $RPC_URL
-```
-
-### 3. Execute with Proof
-
-```bash
-# Submit proof to vault
-cast send $VAULT_ADDRESS \
-    "execute(bytes,bytes,bytes)" \
-    $JOURNAL $SEAL $AGENT_OUTPUT \
-    --private-key $PRIVATE_KEY --rpc-url $RPC_URL
-```
-
 ## Gas Costs
-
-Typical gas consumption:
 
 | Operation | Gas |
 |-----------|-----|
@@ -271,10 +124,10 @@ Typical gas consumption:
 | Groth16 verification | ~300,000 |
 | Journal parsing | ~20,000 |
 | Action execution | Variable |
-| Total execute() | ~400,000 - 500,000 |
+| Total `execute()` | ~400,000 - 500,000 |
 
 ## Related
 
-- [Permissionless System](/onchain/permissionless-system) - Detailed design and security model
-- [Solidity Integration](/onchain/solidity-integration) - Integration details
-- [Security Considerations](/onchain/security-considerations) - Trust assumptions
+- [Permissionless System](/onchain/permissionless-system) -- Agent lifecycle and vault deployment
+- [Solidity Integration](/onchain/solidity-integration) -- Custom vaults and Foundry testing
+- [Security Considerations](/onchain/security-considerations) -- Trust assumptions and attack vectors

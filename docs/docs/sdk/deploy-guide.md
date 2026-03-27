@@ -5,177 +5,161 @@ sidebar_position: 8
 
 # Deploying Agents On-Chain
 
-`tal deploy` handles the full on-chain deployment pipeline: agent registration, vault deployment, and configuration — all via direct RPC calls using [alloy](https://github.com/alloy-rs/alloy) (no shelling to forge or cast).
+This guide covers deploying your agent using `tal deploy`, including standard vaults, Hyperliquid perp trading, and optimistic execution.
+
+## What you'll do
+
+- Deploy your agent and vault to testnet or mainnet
+- Configure Hyperliquid adapter and sub-accounts (if trading perps)
+- Set on-chain metadata so others can discover your agent
 
 ## Prerequisites
 
-Before deploying, ensure:
+1. **Agent is built** -- run `tal build --elf` (the `dist/agent-pack.json` must contain valid `image_id` and `agent_code_hash`)
+2. **Wallet is funded** -- your deployer wallet needs HYPE (HyperEVM) or ETH for gas
+3. **Configuration is valid** -- run `tal doctor` to check
 
-1. **Agent is built and packed** — `tal build --elf` has been run, and `dist/agent-pack.json` contains valid `image_id` and `agent_code_hash` (not placeholders)
-2. **Contracts are compiled** — `forge build` has been run (artifacts exist in `contracts/out/`)
-3. **Wallet is funded** — deployer wallet has HYPE (HyperEVM) or ETH (Sepolia) for gas
+## Standard deployment
 
-Validate with:
-
-```bash
-tal doctor
-```
-
-## Quick Deploy
+The simplest deployment: register your agent and deploy a vault.
 
 ```bash
-# Standard vault
 tal deploy --testnet
-
-# Hyperliquid perp trading (full stack)
-tal deploy --testnet --hyperliquid
-
-# Optimistic vault (WSTON-bonded, deferred proofs)
-tal deploy --testnet --optimistic --min-bond 1000000000000000000000000000
-
-# Hyperliquid + optimistic (production perp trading)
-tal deploy --testnet --hyperliquid --optimistic --min-bond 1000000000000000000000000000
-
-# Deploy to mainnet
-tal deploy
 ```
 
-## What `tal deploy` Does
+**What happens:**
 
-The deploy command executes 5 steps, each with skip-if-exists logic:
+1. Reads `image_id` and `agent_code_hash` from `dist/agent-pack.json`
+2. Registers your agent on the `AgentRegistry` (or updates it if already registered)
+3. Deploys a `KernelVault` via `VaultFactory` (or reuses an existing one with matching `trustedImageId`)
+4. Prints a deployment summary with your vault address
 
-### Step 1: Preflight
-
-- Reads `image_id` and `agent_code_hash` from `dist/agent-pack.json`
-- Fails early if values contain `TODO` or `placeholder`
-- Resolves chain config (testnet=998, mainnet=999)
-- Resolves private key: `--private-key` flag → `PRIVATE_KEY` env var → `.env` file → interactive prompt
-- Checks deployer balance (rejects if zero)
-
-### Step 2: Register Agent
-
-- Computes `agentId = keccak256(deployer, salt)` via `AgentRegistry.computeAgentId()`
-- **If not registered**: calls `register(salt, imageId, agentCodeHash, metadataURI)`
-- **If registered but imageId/codeHash changed**: calls `update()` to point to new binary
-- **If registered and up-to-date**: skips
-
-### Step 3: Deploy Vault
-
-- Checks all existing vaults for this agent via `VaultFactory.getAgentVaults()`
-- **If a vault with matching `trustedImageId` exists**: reuses it
-- **If all vaults have stale `trustedImageId`**: auto-increments the salt and deploys a **new** vault
-
-```
-⚠ Existing vault 0xae55...904d has stale imageId (0xbb11... ≠ 0x31a3...)
-  Deploying new vault with salt 0x03
-✓ Vault deployed: 0x2CF7...932b6
-```
-
-This catches the immutable `trustedImageId` footgun programmatically — no more stuck vaults.
-
-- Gas limit is set to `3,000,000` (HyperEVM block limit)
-- Legacy transaction type (no EIP-1559)
-
-### Step 4: Adapter Setup (perp-trader only)
-
-Activated with the `--hyperliquid` flag. Deploys the HyperliquidAdapter and registers the vault:
-
-1. **Deploy HyperliquidAdapter** — Reads the forge build artifact from `contracts/out/`, links OracleVerifier and KernelOutputParser libraries automatically, and deploys with constructor args (USDC, CoreDepositWallet, VaultFactory). If `ADAPTER_ADDRESS` is already set in `.env`, the existing adapter is reused.
-
-2. **Register vault on adapter** — Calls `registerVault(vault, perpAsset, szDecimals)` which deploys a TradingSubAccount via CREATE2 for the vault. Configure the perp asset via `PERP_ASSET` env var (0=BTC, 1=ETH, 3=SOL) and `SZ_DECIMALS` (BTC=5, ETH=4, SOL=2).
-
-3. **Fund HYPE gas** — Sends HYPE to the sub-account for CoreWriter gas (default 0.01 HYPE, override with `HYPE_FUND_AMOUNT`).
-
-4. **Register API wallet** — If `API_WALLET_ADDRESS` is set, registers it on the sub-account for REST API seed trades.
-
-:::note
-Adapter deployment requires `forge build` to have been run first (reads bytecode from `contracts/out/`). Library addresses are resolved from the chain config automatically.
-:::
-
-### Step 5: Summary
-
-Prints the full deployment summary:
-
-```
-═══════════════════════════════════════════
-  Deployment Summary
-═══════════════════════════════════════════
-  Chain:     HyperEVM Testnet (998)
-  Agent ID:  0x12c3edf...
-  Vault:     0x2CF735...
-  IMAGE_ID:  0x31a3ab9...
-═══════════════════════════════════════════
-```
-
-## Selective Step Execution
-
-Run individual steps with `--step`:
+### Verify it worked
 
 ```bash
-tal deploy --step register     # Only register agent
-tal deploy --step vault        # Only deploy vault
-tal deploy --step adapter      # Only show adapter guidance
-tal deploy --step fund         # Only fund sub-account
+tal monitor --vault <VAULT_ADDRESS> --chain 998
 ```
 
-## Private Key Handling
+## Hyperliquid deployment
 
-The key resolution order is:
+For agents that trade perpetuals on Hyperliquid, use the `--hyperliquid` flag to deploy the full adapter stack.
+
+```bash
+tal deploy --testnet --hyperliquid
+```
+
+**What happens (in addition to standard steps):**
+
+1. Deploys or reuses a `HyperliquidAdapter`
+2. Registers your vault on the adapter, which creates a `TradingSubAccount`
+3. Funds the sub-account with HYPE for gas
+4. Registers an API wallet if `API_WALLET_ADDRESS` is set
+
+### Environment variables
+
+Set these in your `.env` file before deploying:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ADAPTER_ADDRESS` | -- | Reuse an existing adapter (skip adapter deploy) |
+| `PERP_ASSET` | `0` | Asset index (0=BTC, 1=ETH, 3=SOL) |
+| `SZ_DECIMALS` | `5` | Size decimals (BTC=5, ETH=4, SOL=2) |
+| `HYPE_FUND_AMOUNT` | `0.01` | HYPE to fund the sub-account |
+| `API_WALLET_ADDRESS` | -- | API wallet to register (optional) |
+
+## Optimistic deployment
+
+Optimistic vaults use WSTON bonds and deferred proofs for faster execution.
+
+```bash
+tal deploy --testnet --optimistic --min-bond 1000000000000000000000000000
+```
+
+**What happens (in addition to standard steps):**
+
+1. Deploys an `OptimisticKernelVault` instead of a regular vault
+2. Sets the oracle signer
+3. Configures the minimum bond and challenge window
+4. Enables optimistic execution
+
+### Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ORACLE_SIGNER` | -- | Oracle signer address (required) |
+| `ORACLE_MAX_AGE` | `900` | Max oracle data age in seconds |
+| `MIN_BOND` | -- | Min bond in wei (alternative to `--min-bond` flag) |
+| `CHALLENGE_WINDOW` | `3600` | Challenge period in seconds |
+
+## Combined: Hyperliquid + optimistic
+
+For production perp trading with deferred proofs:
+
+```bash
+tal deploy --testnet --hyperliquid --optimistic --min-bond 1000000000000000000000000000
+```
+
+## Step-by-step execution
+
+Run individual deployment steps with `--step`:
+
+```bash
+tal deploy --step register              # Only register agent
+tal deploy --step vault                 # Only deploy vault
+tal deploy --hyperliquid --step adapter # Only set up adapter
+tal deploy --hyperliquid --step fund    # Only fund sub-account
+```
+
+Each step has skip-if-exists logic, so re-running is safe.
+
+## Post-deploy: set metadata
+
+After deploying, set on-chain metadata so others can discover and fork your agent:
+
+```bash
+tal metadata set <AGENT_ID> \
+  --name "My Yield Agent" \
+  --description "Supplies idle vault tokens to AAVE V3" \
+  --tags yield,aave,defi \
+  --source-repo https://github.com/you/my-agent \
+  --version 1.0.0
+```
+
+Verify it:
+
+```bash
+tal metadata show <AGENT_ID>
+```
+
+## Private key handling
+
+`tal deploy` resolves the private key in this order:
 
 ```
 --private-key flag  >  PRIVATE_KEY env var  >  .env file  >  interactive prompt
 ```
 
-For CI/automation, set `PRIVATE_KEY` in your environment. For manual deploys, omit it and `tal deploy` will prompt securely (input is hidden).
+For CI/automation, set `PRIVATE_KEY` in your environment. For manual deploys, omit it and `tal deploy` will prompt securely.
 
-## Testnet Configuration
+## Testnet tokens
 
-`tal init` generates `.env.example` with testnet defaults pre-filled:
-
-```bash
-# HyperEVM Testnet (chain 998)
-RPC_URL=https://api.hyperliquid-testnet.xyz/evm
-CHAIN_ID=998
-```
-
-To get testnet tokens:
+To get testnet tokens for HyperEVM (chain 998):
 
 1. Get testnet HYPE from `https://app.hyperliquid-testnet.xyz/drip`
 2. Bridge to HyperEVM: send HYPE to `0x2222222222222222222222222222222222222222`
 3. Wait 10 seconds for bridge settlement
 
-## Chain Configuration
-
-`tal deploy` has hardcoded addresses for supported chains:
-
-| Chain | ID | AgentRegistry | VaultFactory |
-|-------|-----|---------------|--------------|
-| HyperEVM Mainnet | 999 | `0x47E6EfFf...` | `0xd27A7470...` |
-| Ethereum Mainnet | 1 | `0x2BF56f88...` | `0x47E6EfFf...` |
-| Arbitrum One | 42161 | `0xa6b36387...` | `0x7b0E7eDf...` |
-| Optimism | 10 | `0xa6b36387...` | `0x7b0E7eDf...` |
-| HyperEVM Testnet | 998 | `0x09447147...` | `0x4c36bCA8...` |
-
-Addresses are sourced from `crates/tal-cli/src/onchain.rs` and match the on-chain deployments in `sdk/src/addresses.ts`.
-
-## Library Linking
-
-For contract deployments requiring library linking (e.g., HyperliquidAdapter), `tal deploy` reads forge build artifacts from `contracts/out/` and patches `__$placeholder$__` values with real library addresses at runtime. The library addresses are stored per-chain in the `ChainConfig` registry.
-
-## Vault ImageId Mismatch
+## Handling image ID changes
 
 When you rebuild your agent ELF (changing `IMAGE_ID`), existing vaults become incompatible because `trustedImageId` is immutable. `tal deploy` handles this automatically:
 
 1. Updates the agent registry with the new `imageId`
-2. Detects that existing vaults have stale `trustedImageId`
+2. Detects that existing vaults have a stale `trustedImageId`
 3. Auto-increments the vault salt and deploys a new vault
 4. Warns about the stale vault so you can migrate funds
 
-See [Permissionless System](/onchain/permissionless-system#imageid-pinning) for the security rationale behind imageId pinning.
-
 ## Related
 
-- [`tal doctor`](/sdk/cli-reference#tal-doctor) — Validate configuration before deploying
-- [`tal monitor`](/sdk/monitoring) — Watch your deployed agent in real-time
-- [Permissionless System](/onchain/permissionless-system) — How agent registration and vault deployment work
-- [Hyperliquid Integration](/onchain/hyperliquid-integration) — Adapter deployment for perpetual trading
+- [`tal doctor`](/sdk/cli-reference#tal-doctor) -- validate configuration before deploying
+- [`tal monitor`](/sdk/monitoring) -- watch your deployed agent in real-time
+- [`tal` CLI Reference](/sdk/cli-reference) -- full command reference

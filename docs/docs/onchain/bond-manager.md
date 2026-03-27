@@ -5,11 +5,15 @@ sidebar_position: 6
 
 # WSTON Bond Manager
 
+:::info Prerequisites
+Before using the Bond Manager, you should understand [Permissionless System](/onchain/permissionless-system) (agent registration and vault deployment) and [Security Considerations](/onchain/security-considerations) (trust model). You also need WSTON tokens -- wrap your staked TON via the WSTON Proxy contract listed below.
+:::
+
 The `WSTONBondManager` manages WSTON (Wrapped Staked TON) bonds for optimistic execution operators. Operators stake WSTON as collateral for optimistic executions, and bonds are slashed if proofs are not submitted within the challenge window.
 
 ## Overview
 
-Optimistic execution enables immediate action execution without waiting for ZK proof generation. To prevent abuse, operators must lock WSTON bonds that can be slashed if the proof is invalid or late.
+Optimistic execution enables immediate action execution without waiting for ZK proof generation (~8-12 minutes). To prevent abuse, operators must lock WSTON bonds that can be slashed if the proof is invalid or late.
 
 ```mermaid
 sequenceDiagram

@@ -5,52 +5,89 @@ sidebar_position: 6
 
 # Testing Agents
 
-Testing happens at multiple levels, from fast unit tests to full on-chain E2E tests. The SDK provides `TestHarness`, `ContextBuilder`, and hex helpers to reduce boilerplate.
+Test your agent at multiple levels using the `tal` CLI, from instant unit tests to full ZK proof generation.
 
-## Testing Levels
+## What you'll learn
 
-```mermaid
-flowchart TD
-    A[Unit Tests] --> B[Integration Tests]
-    B --> C[E2E Proof Tests]
-    C --> D[On-Chain E2E Tests]
+- How to run unit tests, integration tests, and proof tests
+- How to use `TestHarness` for in-code testing
+- How to simulate against fixture files
 
-    A1[Fast iteration] --> A
-    B1[Kernel + constraints] --> B
-    C1[Actual zkVM proofs] --> C
-    D1[Live blockchain] --> D
+## Prerequisites
+
+- An agent project created with `tal init`
+- `tal doctor` passes (run `tal doctor --install` to fix issues)
+
+## Testing with `tal test`
+
+### Unit tests (instant)
+
+```bash
+tal test --local
 ```
 
-| Level | Speed | What It Tests |
-|-------|-------|---------------|
-| Unit Tests | Seconds | Agent logic only |
-| Integration Tests | Seconds | Kernel + agent + constraints |
-| E2E Proof Tests | Minutes | Full zkVM proof generation |
-| On-Chain E2E | Minutes | Complete flow with blockchain |
+Runs your agent's Rust unit tests natively. No zkVM compilation needed. Results in 2--5 seconds.
 
-## Native Simulation (`tal sim`)
+### Integration tests (dry run)
 
-The fastest way to test agent logic is the native simulator. It runs `agent_main()` plus constraint enforcement without zkVM compilation:
+```bash
+tal test --dry-run
+```
+
+Runs the agent host with live market data but does not generate a proof or submit transactions. Use this to verify your agent behaves correctly with real inputs.
+
+### Full ZK proof
+
+```bash
+tal test --prove
+```
+
+Generates a real ZK proof using the zkVM. Takes 8--10 minutes. Run this before deploying to verify that proof generation works end to end.
+
+### Determinism check
+
+```bash
+tal test --local --determinism-check
+```
+
+Runs the agent twice with identical inputs and verifies the output is byte-identical. Non-deterministic agents cannot produce valid proofs.
+
+### Test with a fixture file
+
+```bash
+tal test --local --input fixtures/btc-long.json
+```
+
+Tests against a saved fixture. New projects created with `tal init` include example fixtures in the `fixtures/` directory.
+
+## Verify it worked
+
+After running `tal test --local`, you should see output like:
+
+```
+Running tests for my-agent...
+  test_supply_when_rate_above_threshold  PASSED
+  test_invalid_input_returns_empty       PASSED
+  test_determinism                       PASSED
+
+3 passed, 0 failed
+```
+
+## Simulating with `tal sim`
+
+For rapid iteration, use the simulator. It runs your agent logic plus constraint enforcement natively -- no zkVM:
 
 ```bash
 tal sim fixtures/sample.json
 ```
 
-**When to use:**
-- Iterating on agent logic (edit → sim → see results in 5 seconds)
-- Testing constraint boundaries (drawdown, cooldown, max actions)
-- CI pipelines (exit code 1 on constraint failure)
+The simulator prints an actions table and shows which constraints passed or failed. Exit code 0 means all constraints passed (CI-friendly).
 
-**When to use full proving instead:**
-- Final verification before deployment
-- Testing proof generation and on-chain verification
-- Validating IMAGE_ID and AGENT_CODE_HASH binding
+## Writing tests in Rust
 
-Fixtures are JSON files with agent context and opaque inputs. New projects scaffolded with `tal init` include example fixtures in `agent/fixtures/`.
+The SDK provides `TestHarness` for writing unit tests with minimal boilerplate.
 
-## TestHarness
-
-The `TestHarness` provides a fluent API for testing agents with minimal boilerplate:
+### Basic test
 
 ```rust
 use kernel_sdk::testing::*;
@@ -59,7 +96,6 @@ use kernel_sdk::prelude::*;
 #[test]
 fn test_my_agent() {
     let result = TestHarness::new()
-        .agent_id(bytes32("0x42"))
         .input(my_input.encode())
         .execute(agent_main);
 
@@ -68,258 +104,65 @@ fn test_my_agent() {
 }
 ```
 
-### Configuration Methods
+### Test for empty output on bad input
+
+```rust
+#[test]
+fn test_invalid_input_returns_empty() {
+    let result = TestHarness::new()
+        .input(&[0u8; 10])
+        .execute(agent_main);
+
+    result.assert_empty();
+}
+```
+
+### Test determinism
+
+```rust
+#[test]
+fn test_determinism() {
+    let result = TestHarness::new()
+        .input(valid_input_bytes())
+        .execute(agent_main);
+
+    result.assert_deterministic(agent_main);
+}
+```
+
+### TestHarness configuration
 
 | Method | Description | Default |
 |--------|-------------|---------|
 | `.agent_id([u8; 32])` | Set agent ID | `[0x42; 32]` |
 | `.code_hash([u8; 32])` | Set agent code hash | `[0; 32]` |
 | `.nonce(u64)` | Set execution nonce | `1` |
-| `.input_root([u8; 32])` | Set input root | `[0; 32]` |
 | `.input(impl AsRef<[u8]>)` | Set opaque input bytes | `[]` |
 
-### Execution Methods
-
-| Method | Returns | Tests |
-|--------|---------|-------|
-| `.execute(agent_fn)` | `TestResult` | Agent logic only |
-| `.execute_kernel(kernel_fn)` | `KernelTestResult` | Full kernel pipeline |
-| `.execute_kernel_with_constraints(fn, &cs)` | `KernelTestResult` | Kernel + custom constraints |
-
-## Hex Helpers
-
-Convert hex strings to byte arrays for test inputs:
-
-```rust
-use kernel_sdk::testing::*;
-
-// 20-byte address
-let pool = addr("0x1111111111111111111111111111111111111111");
-
-// 32-byte ID
-let id = bytes32("0x4242424242424242424242424242424242424242424242424242424242424242");
-
-// Arbitrary bytes
-let data = hex_bytes("0xDEADBEEF");
-```
-
-Short inputs are right-padded with zeros:
-
-```rust
-let a = addr("0xABCD");       // [0xAB, 0xCD, 0, 0, ..., 0] (20 bytes)
-let b = bytes32("0xFF");      // [0xFF, 0, 0, ..., 0] (32 bytes)
-```
-
-## TestResult Assertions
-
-For `TestHarness::execute()` (agent-level):
+### TestResult assertions
 
 | Method | Description |
 |--------|-------------|
 | `assert_action_count(n)` | Exact number of actions |
 | `assert_action_type(index, type)` | Action type at position |
 | `assert_target(index, &[u8; 20])` | Action target address |
-| `assert_payload(index, &[u8])` | Raw payload bytes |
 | `assert_empty()` | No actions produced |
 | `assert_deterministic(agent_fn)` | Re-runs and asserts identical output |
 
-Inspectors:
+### Hex helpers
 
-| Method | Returns |
-|--------|---------|
-| `action_count()` | `usize` |
-| `action(index)` | `&ActionV1` |
-| `is_empty()` | `bool` |
-| `actions_of_type(type)` | `Vec<&ActionV1>` |
-
-## KernelTestResult Assertions
-
-For `TestHarness::execute_kernel()` (kernel-level):
-
-| Method | Description |
-|--------|-------------|
-| `assert_success()` | Execution status is Success |
-| `assert_failure()` | Execution status is Failure |
-| `assert_deterministic(kernel_fn)` | Re-runs and asserts identical journal |
-| `assert_agent_id(&[u8; 32])` | Agent ID in journal matches |
-| `assert_nonce(u64)` | Nonce in journal matches |
-
-## ContextBuilder
-
-For fine-grained control over the `AgentContext`:
+Convert hex strings to byte arrays in tests:
 
 ```rust
-use kernel_sdk::testing::ContextBuilder;
+use kernel_sdk::testing::*;
 
-let ctx = ContextBuilder::new()
-    .agent_id([0xAA; 32])
-    .code_hash([0xBB; 32])
-    .nonce(42)
-    .input_root([0xCC; 32])
-    .constraint_set_hash([0xDD; 32])
-    .build();
+let pool = addr("0x1111111111111111111111111111111111111111");
+let id = bytes32("0x42");
+let data = hex_bytes("0xDEADBEEF");
 ```
-
-Defaults: `protocol_version=1`, `kernel_version=1`, `agent_id=[0x42; 32]`, `nonce=1`.
-
-## Unit Tests
-
-Test `agent_main` directly using `TestHarness`:
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use kernel_sdk::testing::*;
-
-    #[test]
-    fn test_supply_when_rate_above_threshold() {
-        let mut input = Vec::with_capacity(MarketInput::ENCODED_SIZE);
-        input.extend_from_slice(&[0x11; 20]); // lending_pool
-        input.extend_from_slice(&[0x22; 20]); // asset_token
-        input.extend_from_slice(&[0x33; 20]); // vault_address
-        input.extend_from_slice(&1_000_000u64.to_le_bytes());
-        input.extend_from_slice(&0u64.to_le_bytes());
-        input.extend_from_slice(&500u32.to_le_bytes());   // rate above threshold
-        input.extend_from_slice(&200u32.to_le_bytes());
-        input.extend_from_slice(&8000u32.to_le_bytes());
-        input.push(0); // evaluate
-
-        let result = TestHarness::new()
-            .input(input)
-            .execute(agent_main);
-
-        result.assert_action_count(1);
-        result.assert_action_type(0, ACTION_TYPE_CALL);
-    }
-
-    #[test]
-    fn test_invalid_input_returns_empty() {
-        let result = TestHarness::new()
-            .input(&[0u8; 10])
-            .execute(agent_main);
-
-        result.assert_empty();
-    }
-
-    #[test]
-    fn test_determinism() {
-        let result = TestHarness::new()
-            .input(valid_input_bytes())
-            .execute(agent_main);
-
-        result.assert_deterministic(agent_main);
-    }
-}
-```
-
-Run unit tests:
-
-```bash
-# Using the tal CLI (recommended)
-tal test --local
-
-# Or directly via cargo
-cargo test -p my-agent
-```
-
-For determinism verification:
-
-```bash
-tal test --local --determinism-check
-```
-
-## Integration Tests
-
-Test through the kernel using `execute_kernel`:
-
-```rust
-use my_agent::kernel_main;
-
-#[test]
-fn test_kernel_execution_success() {
-    let result = TestHarness::new()
-        .agent_id([0x42; 32])
-        .input(valid_input_bytes())
-        .execute_kernel(kernel_main);
-
-    result.assert_success();
-    result.assert_agent_id(&[0x42; 32]);
-    result.assert_nonce(1);
-}
-
-#[test]
-fn test_kernel_determinism() {
-    let result = TestHarness::new()
-        .input(valid_input_bytes())
-        .execute_kernel(kernel_main);
-
-    result.assert_deterministic(kernel_main);
-}
-```
-
-Run integration tests:
-
-```bash
-cargo test -p kernel-host-tests
-```
-
-## Snapshot Testing
-
-With the `std` feature, `TestResult` and `KernelTestResult` support snapshot testing:
-
-```rust
-#[test]
-fn test_output_snapshot() {
-    let result = TestHarness::new()
-        .input(canonical_input())
-        .execute(agent_main);
-
-    result.assert_snapshot("defi_farmer_supply");
-}
-```
-
-Snapshots are saved to `tests/snapshots/<name>.snap`. Update with:
-
-```bash
-BLESS=1 cargo test test_output_snapshot
-```
-
-## CI Integration
-
-```yaml
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run unit tests
-        run: cargo test
-      - name: Run E2E proof tests
-        if: ${{ matrix.risc0-enabled }}
-        run: |
-          cargo risczero install
-          cargo test -p e2e-tests --features risc0-e2e -- --nocapture
-```
-
-## `tal test` CLI
-
-The `tal test` command provides multiple testing modes from a single interface:
-
-```bash
-tal test --local               # Unit tests (instant, default)
-tal test --dry-run             # Live data, no proof
-tal test --prove               # Full ZK proof (~8-10 min)
-tal test --determinism-check   # Run twice, compare outputs
-tal test --input fixture.json  # Test with saved fixture
-```
-
-See the [CLI Reference](/sdk/cli-reference#tal-test) for all flags.
 
 ## Related
 
-- [`agent_input!` Macro](/sdk/agent-input-macro) - Declarative input parsing
-- [CallBuilder & ERC20 Helpers](/sdk/call-builder) - Action construction
-- [Constraints](/sdk/constraints-and-commitments) - Constraint system details
-- [Run an Example](/getting-started/run-an-example) - Running the yield agent
-- [Deployment Guide](/sdk/deploy-guide) - Deploy after testing
+- [Build Your First Agent](/sdk/writing-an-agent) -- write your first agent and test it
+- [Constraints](/sdk/constraints-and-commitments) -- understand what the kernel enforces
+- [Deployment Guide](/sdk/deploy-guide) -- deploy after testing

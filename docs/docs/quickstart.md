@@ -1,126 +1,88 @@
 ---
-title: Quickstart
+title: 5-Minute Quickstart
 sidebar_position: 2
 ---
 
-# Build an Agent in 5 Minutes
+# 5-Minute Quickstart
 
-This guide takes you from zero to a working, tested agent using the `tal` CLI.
+**What you'll build:** A yield farming agent that deposits ETH into a yield source and withdraws the proceeds -- tested locally and deployed to testnet with a live vault.
 
 ## Prerequisites
 
-- Rust toolchain (`rustup`) — only needed if installing via `cargo install`
+- **Rust** -- Install with `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh` if you don't have it.
+- **tal CLI** -- Install with `curl -sSL https://raw.githubusercontent.com/tokamak-network/Tokamak-AI-Layer/master/install-tal.sh | sh` (or `cargo install tal-cli`).
 
-## Step 1: Install the CLI
+Run `tal doctor` to confirm everything is ready. If anything is missing, run `tal doctor --install` to fix it automatically.
 
-Install from prebuilt binaries (fastest — no Rust required):
-
-```bash
-curl -sSL https://raw.githubusercontent.com/tokamak-network/Tokamak-AI-Layer/master/install-tal.sh | sh
-```
-
-Or from [crates.io](https://crates.io/crates/tal-cli):
-
-```bash
-cargo install tal-cli
-```
-
-:::tip No repo clone needed
-`tal` can be installed and used without cloning the repository. You only need the repo if you want to build from source or contribute.
-:::
-
-## Step 2: Validate your environment
-
-```bash
-tal doctor
-```
-
-If anything is missing, run `tal doctor --install` to auto-install toolchains.
-
-## Step 3: Scaffold a new agent
+## Step 1: Create your agent
 
 ```bash
 tal init my-agent --template yield
 ```
 
-This creates a ready-to-build project:
+This scaffolds a complete project with agent logic, test fixtures, and deployment configuration. No repository clone needed.
 
-```
-crates/agents/my-agent/
-├── agent/               # Agent logic + kernel binding
-│   ├── Cargo.toml
-│   ├── build.rs         # AGENT_CODE_HASH computation
-│   └── src/lib.rs       # agent_main() + agent_entrypoint! macro
-├── risc0-methods/       # zkVM guest compilation
-├── .env.example         # Testnet defaults
-└── dist/
-    └── agent-pack.json  # Agent manifest
-```
-
-## Step 4: Edit your agent
-
-Open `crates/agents/my-agent/agent/src/lib.rs` and implement your logic:
-
-```rust
-use kernel_sdk::prelude::*;
-use kernel_sdk::actions::erc20;
-
-kernel_sdk::agent_input! {
-    struct MyInput {
-        token: [u8; 20],
-        recipient: [u8; 20],
-        amount: u64,
-    }
-}
-
-pub extern "Rust" fn agent_main(_ctx: &AgentContext, opaque_inputs: &[u8]) -> AgentOutput {
-    let input = match MyInput::decode(opaque_inputs) {
-        Some(i) => i,
-        None => return AgentOutput { actions: Vec::new() },
-    };
-
-    let action = erc20::transfer(&input.token, &input.recipient, input.amount);
-
-    let mut actions = Vec::with_capacity(1);
-    actions.push(action);
-    AgentOutput { actions }
-}
-
-const _: AgentEntrypoint = agent_main;
-kernel_sdk::agent_entrypoint!(agent_main);
-```
-
-## Step 5: Test
+## Step 2: Test locally
 
 ```bash
 tal test --local
 ```
 
-## Step 6: Build
+This runs your agent's logic instantly (2-5 seconds) without any proof generation. It checks that inputs parse correctly and actions are constructed as expected.
+
+## Step 3: Build
 
 ```bash
-tal build
+tal build --elf
 ```
 
-## Step 7: Deploy to testnet
+This compiles your agent into a zkVM binary and produces an `IMAGE_ID` -- the unique fingerprint of your agent that gets registered on-chain. Expect 8-10 minutes on a first build.
+
+:::tip Iterate faster with tal sim
+During development, use `tal sim fixtures/sample.json` to test your logic in seconds without a full build. Only run `tal build --elf` when you are ready to deploy.
+:::
+
+## Step 4: Deploy to testnet
+
+First, set up your environment:
 
 ```bash
-# Build the zkVM ELF binary
-tal build --elf
+cp .env.example .env
+# Edit .env with your private key
+```
 
-# Deploy agent + vault
+Then deploy:
+
+```bash
 tal deploy --testnet
+```
 
-# Monitor your vault
+This registers your agent on-chain, deploys a vault, and prints the vault address. The whole pipeline is handled for you.
+
+### Getting testnet tokens
+
+To deploy on HyperEVM testnet (chain 998):
+
+1. Get testnet HYPE from `https://app.hyperliquid-testnet.xyz/drip`
+2. Bridge to HyperEVM: send HYPE to `0x2222222222222222222222222222222222222222`
+3. Wait 10 seconds, then deploy
+
+## Step 5: Verify it worked
+
+```bash
 tal monitor --vault <VAULT_ADDRESS> --chain 998
 ```
 
+This opens a live dashboard showing your vault's status, recent executions, and proof history.
+
 ## What's next?
 
-- [Writing an Agent](/sdk/writing-an-agent) — Full development guide
-- [`agent_input!` Macro](/sdk/agent-input-macro) — Declarative input parsing
-- [CallBuilder & ERC20 Helpers](/sdk/call-builder) — Fluent action construction
-- [Testing](/sdk/testing) — `TestHarness`, `ContextBuilder`, and snapshot testing
-- [Deployment Guide](/sdk/deploy-guide) — Full `tal deploy` reference
-- [Monitoring](/sdk/monitoring) — Live dashboard for deployed agents
-- [`tal` CLI Reference](/sdk/cli-reference) — All subcommands and flags
+| Goal | Guide |
+|------|-------|
+| Understand the agent code you just deployed | [Writing an Agent](/sdk/writing-an-agent) |
+| Learn input parsing with `agent_input!` | [`agent_input!` Macro](/sdk/agent-input-macro) |
+| Build on-chain actions with `CallBuilder` | [CallBuilder & ERC20 Helpers](/sdk/call-builder) |
+| Write thorough tests | [Testing](/sdk/testing) |
+| See the full `tal deploy` reference | [Deployment Guide](/sdk/deploy-guide) |
+| Build a real DeFi agent targeting AAVE | [DeFi Yield Farmer Tutorial](/getting-started/defi-yield-farmer) |
+| Understand the system architecture | [Architecture Overview](/architecture/overview) |

@@ -3,18 +3,18 @@ import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
 const sidebars: SidebarsConfig = {
   docsSidebar: [
     'intro',
-    'getting-started',
     'quickstart',
     {
       type: 'category',
       label: 'Getting Started',
       collapsed: false,
+      link: { type: 'doc', id: 'getting-started' },
       items: [
         'getting-started/prerequisites',
-        'getting-started/local-build',
         'getting-started/run-an-example',
         'getting-started/defi-yield-farmer',
         'getting-started/faq',
+        'getting-started/local-build',
       ],
     },
     {

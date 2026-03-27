@@ -35,6 +35,46 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
+## Sprint 3 — Marketplace & Discovery
+
+### Added
+- **Agent Marketplace** — Public directory of registered agents at `/marketplace` with search, filter, and one-click deploy
+- **Leaderboard** — Agent performance rankings at `/leaderboard` with total return, Sharpe ratio, max drawdown, and win rate
+- **Referral System** — Wallet-linked referral codes and rewards dashboard at `/referrals`
+- **One-Click Deploy** — Deploy vaults from the UI at `/deploy` without touching the CLI
+- **Metadata URI** — `AgentRegistry.setMetadataURI()` and `tal metadata set` for on-chain agent metadata (name, description, tags)
+- **Performance & Management Fees** — Configurable fee structure for vault authors (performance fee on profits, management fee on AUM)
+- Glossary entries for marketplace, leaderboard, referral, metadata URI, performance fee, management fee
+
+### Changed
+- Frontend rebranded to Tokagent across all metadata and UI
+- Mobile header improved following Defiesta pattern
+- Network dropdown made scrollable on mobile
+
+---
+
+## Sprint 2 — Notification & Monitoring
+
+### Added
+- **Notification Service** — Telegram bot for vault event alerts (deposits, withdrawals, executions, slashes)
+- **Oracle Service** — Dockerized price oracle for agent input feeds
+- **`tal` SDK** — TypeScript SDK package for programmatic interaction with Tokagent contracts
+- SEO improvements: dynamic metadata, sitemap, OpenGraph images, custom 404 page
+
+---
+
+## Sprint 1 — Frontend & Staking
+
+### Added
+- **Frontend Application** — Next.js app with vault dashboard, portfolio view, staking, and agent pages
+- **Staking UI** — WSTON staking interface at `/staking`
+- **Agent Pages** — Per-agent detail pages at `/agents/[id]`
+- **Vault Pages** — Per-vault detail pages at `/vaults/[address]`
+- **Settings Page** — User preferences at `/settings`
+- **Whitepaper Page** — Embedded whitepaper at `/whitepaper`
+
+---
+
 ## [0.1.0] - Initial Release
 
 ### Protocol Version 1

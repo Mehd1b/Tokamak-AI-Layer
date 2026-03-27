@@ -5,189 +5,69 @@ sidebar_position: 1
 
 # Prerequisites
 
-Before building and running the Execution Kernel, you need to install several tools and dependencies.
+**What you'll have:** A fully configured development environment, verified with a single command.
 
-## Required Tools
-
-### Rust
-
-Install Rust using rustup:
+## Step 1: Install Rust
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
 ```
 
-Verify installation:
+Minimum version: Rust 1.75.0. Check with `rustc --version`.
+
+## Step 2: Install the tal CLI
+
+Pick one:
 
 ```bash
-rustc --version
-cargo --version
-```
-
-**Minimum version**: Rust 1.75.0 or later
-
-### RISC Zero Toolchain
-
-The RISC Zero toolchain is required for zkVM proof generation.
-
-```bash
-# Install cargo-risczero
-cargo install cargo-risczero
-
-# Install the RISC Zero toolchain (includes riscv32im target)
-cargo risczero install
-```
-
-Verify installation:
-
-```bash
-cargo risczero --version
-```
-
-### Foundry (for on-chain integration)
-
-Foundry is required for smart contract interaction and testing.
-
-```bash
-curl -L https://foundry.paradigm.xyz | bash
-foundryup
-```
-
-Verify installation:
-
-```bash
-forge --version
-cast --version
-```
-
-## Optional Tools
-
-### Docker
-
-Docker is required for reproducible builds. This ensures deterministic imageId computation.
-
-```bash
-# macOS
-brew install --cask docker
-
-# Linux
-curl -fsSL https://get.docker.com | sh
-```
-
-### Just
-
-The project uses [just](https://github.com/casey/just) as a command runner:
-
-```bash
-cargo install just
-```
-
-## Environment Setup
-
-### Install the `tal` CLI
-
-No repository clone is needed. Install the CLI directly:
-
-```bash
-# Option 1: Prebuilt binary (fastest — no Rust required)
+# Prebuilt binary (fastest -- no Rust compilation)
 curl -sSL https://raw.githubusercontent.com/tokamak-network/Tokamak-AI-Layer/master/install-tal.sh | sh
 
-# Option 2: From crates.io (requires Rust)
+# Or from crates.io
 cargo install tal-cli
 ```
 
-:::tip Contributing or building from source?
-If you want to contribute or build from source, clone the repository first:
+## Step 3: Install Foundry (optional)
+
+Only needed if you want to interact with smart contracts directly (outside of `tal deploy`):
+
 ```bash
-git clone https://github.com/tokamak-network/Tokamak-AI-Layer.git
-cd Tokamak-AI-Layer
-cargo install --path crates/tal-cli
+curl -L https://foundry.paradigm.xyz | bash && foundryup
 ```
-:::
 
-### Verify Setup
-
-Run the diagnostic tool to verify your environment is configured correctly:
+## Verify it worked
 
 ```bash
 tal doctor
 ```
 
-This checks Rust, RISC Zero, Foundry, and Node.js in one command. To auto-install missing dependencies:
+This checks Rust, RISC Zero, Foundry, and any other dependencies in one command. If anything is missing:
 
 ```bash
 tal doctor --install
 ```
 
-## Hardware Requirements
+This auto-installs the missing toolchains, including the RISC Zero zkVM toolchain -- you do not need to install it manually.
 
-### Development
+## Hardware
 
-- **CPU**: Any modern x86_64 or ARM64 processor
-- **RAM**: 8GB minimum, 16GB recommended
-- **Disk**: 10GB free space
+- **For development and testing:** Any modern machine with 8GB+ RAM. Tests run instantly without proof generation.
+- **For proof generation (deployment):** 8+ CPU cores and 32GB+ RAM recommended. Proof generation is CPU-intensive but only needed when you are ready to deploy.
 
-### Proof Generation
-
-zkVM proof generation is computationally intensive:
-
-- **CPU**: Multi-core processor recommended (8+ cores ideal)
-- **RAM**: 32GB+ recommended for complex agents
-- **Disk**: SSD recommended for faster build times
-
-:::tip
-For development, you can run tests without proof generation using the default feature set. Only enable `risc0-e2e` features when you need actual proof generation.
-:::
-
-## Network Configuration
+## Network setup (for deployment)
 
 ### HyperEVM Testnet (Chain 998)
 
-For on-chain testing, you'll need:
+1. Get testnet HYPE from `https://app.hyperliquid-testnet.xyz/drip`
+2. Bridge to HyperEVM: send HYPE to `0x2222222222222222222222222222222222222222`
+3. Copy your `.env.example` to `.env` and add your private key
 
-1. **Testnet HYPE**: Get tokens from `https://app.hyperliquid-testnet.xyz/drip`
-2. **Bridge to HyperEVM**: Send HYPE to `0x2222222222222222222222222222222222222222`
-3. **Private Key**: A wallet private key for signing transactions
+### Ethereum Sepolia
 
-The `tal init` command generates a `.env.example` with testnet defaults. Copy and configure:
+1. Get Sepolia ETH from any faucet
+2. Set `RPC_URL` and `PRIVATE_KEY` in your `.env`
 
-```bash
-cp .env.example .env
-# Edit .env with your private key
-```
+## Next steps
 
-### Sepolia Testnet
-
-For Ethereum L1 testing:
-
-1. **Sepolia ETH**: Get testnet ETH from a faucet
-2. **RPC URL**: An Ethereum Sepolia RPC endpoint (Alchemy, Infura, etc.)
-3. **Private Key**: A wallet private key for signing transactions
-
-Set environment variables:
-
-```bash
-export RPC_URL="https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY"
-export PRIVATE_KEY="0x..."
-```
-
-### Contract Addresses
-
-The following contracts are deployed on Sepolia:
-
-| Contract | Address |
-|----------|---------|
-| AgentRegistry | `0xED27f8fbB7D576f02D516d01593eEfBaAfe4b168` |
-| VaultFactory | `0x580e55fDE87fFC1cF1B6a446d6DBf8068EB07b8C` |
-| KernelExecutionVerifier | `0x1eB41537037fB771CBA8Cd088C7c806936325eB5` |
-| RISC Zero Verifier Router | `0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187` |
-
-## Next Steps
-
-Once your environment is set up:
-
-1. [Build the project locally](/getting-started/local-build)
-2. [Run the example yield agent](/getting-started/run-an-example)
-3. [Start writing your own agent](/sdk/writing-an-agent)
-4. [Deploy to testnet](/sdk/deploy-guide)
-5. [Monitor your agent](/sdk/monitoring)
+Head to the [5-Minute Quickstart](/quickstart) to build your first agent.

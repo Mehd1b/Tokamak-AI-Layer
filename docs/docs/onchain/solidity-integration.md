@@ -5,7 +5,11 @@ sidebar_position: 2
 
 # Solidity Integration
 
-This document provides details on integrating with the Execution Kernel contracts from Solidity.
+:::info You probably don't need this page
+Most developers can register agents, deploy vaults, and submit proofs entirely through the `tal` CLI without writing any Solidity. This page is for **advanced users** who need to build custom vault contracts, integrate the verifier into their own protocol, or write Foundry tests against the on-chain contracts. If that is not you, see the [Quickstart](/quickstart) instead.
+:::
+
+This page provides Solidity-level details for integrating with the Execution Kernel contracts.
 
 ## Contract Interfaces
 

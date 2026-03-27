@@ -5,202 +5,100 @@ sidebar_position: 2
 
 # Trust Model
 
-The Execution Kernel operates under a **malicious host assumption**, meaning the kernel assumes the environment running it may be adversarial. This document explains the security model and how cryptographic guarantees protect against various attack vectors.
+The Execution Kernel operates under a **malicious host assumption** -- the kernel assumes the environment running it may be adversarial. This page explains what is trusted, what is not, and how each attack vector is handled.
 
-## Security Properties
+## Security Properties at a Glance
 
-### No Custody Transfer
+| Property | What it means |
+|----------|---------------|
+| **No custody transfer** | Agents never hold funds. They produce instructions; the vault executes them. |
+| **Verifiable execution** | Every claim is backed by a Groth16 proof covering input parsing, agent logic, constraint checking, and output encoding. |
+| **Deterministic replay** | Given the same input bytes and imageId, anyone can re-execute and verify the result. |
+| **Atomic commitment** | The journal commits to both inputs and outputs atomically -- you cannot forge one without the other. |
 
-Agents never have custody of funds. They produce instructions that the vault executes. If an agent is buggy or malicious, the worst it can do is:
+## What the Proof Guarantees
 
-- Produce invalid instructions (which fail constraint checks)
-- Produce valid instructions that the capital allocator didn't intend (a governance/configuration problem)
+- The registered agent (by `agent_code_hash` and `imageId`) executed
+- The declared inputs were actually used (`input_commitment`)
+- The declared outputs were actually produced (`action_commitment`)
+- All constraints were enforced (unskippable)
 
-### Verifiable Execution
+## What the Proof Does NOT Guarantee
 
-Every claim is backed by cryptographic proof. The proof covers:
-
-- Input parsing
-- Agent logic execution
-- Constraint checking
-- Output encoding
-
-There's no trusted intermediary who could lie about what happened.
-
-### Deterministic Replay
-
-Given the input bytes and the imageId, anyone can re-execute the computation and verify they get the same result. The zkVM proves that standard computation happened correctly.
-
-### Atomic Commitment
-
-The journal commits to both inputs and outputs atomically. You can't have a valid proof that commits to different inputs than were actually used, or different outputs than were actually produced.
+- **Input correctness** -- Inputs may not reflect real-world state
+- **Economic outcomes** -- The proof cannot guarantee profitable trades
+- **Target safety** -- `action.target` is NOT validated by constraints (vault-level responsibility)
+- **Timeliness** -- The proof does not guarantee when execution happened
 
 ## Attack Vectors and Defenses
 
-### Input Forgery Attempts
+### Input Forgery
 
-**Attack**: Attacker provides crafted inputs hoping to trigger unexpected behavior.
+- **Attack**: Crafted inputs to trigger unexpected behavior
+- **Defense**: All inputs committed via `SHA-256(encoded_kernel_input_v1)` and bound to the journal
 
-**Defense**: All inputs are cryptographically committed via SHA-256. The `input_commitment` in the journal binds the proof to specific inputs.
+### Agent Substitution
 
-```rust
-input_commitment = SHA-256(encoded_kernel_input_v1)
-```
+- **Attack**: Run a different agent than registered
+- **Defense**: `agent_code_hash` is verified at kernel entry; mismatch aborts proof generation
 
-### Agent Substitution Attacks
+### Constraint Bypass
 
-**Attack**: Attacker attempts to run a different agent than expected.
+- **Attack**: Skip constraint validation
+- **Defense**: Constraint enforcement is hardcoded in the kernel flow -- there is no code path that skips it
 
-**Defense**: The `agent_code_hash` binding prevents unauthorized agents. The kernel verifies:
+### Replay
 
-```rust
-if agent.code_hash() != input.agent_code_hash {
-    panic!("AgentCodeHashMismatch");
-}
-```
+- **Attack**: Resubmit a valid proof to execute actions twice
+- **Defense**: Monotonic `execution_nonce` on-chain; each nonce can only be used once
 
-### Constraint Bypass Attempts
+### Non-Determinism
 
-**Attack**: Attacker attempts to skip constraint validation.
-
-**Defense**: Constraint checking is mandatory and unskippable. It's hardcoded in the kernel flow:
-
-```rust
-// This always runs - there's no way to skip it
-let result = enforce_constraints(&input, &agent_output);
-```
-
-### Non-Determinism Exploitation
-
-**Attack**: Attacker exploits non-deterministic behavior to generate inconsistent proofs.
-
-**Defense**: Strict deterministic execution requirements:
-
-- No floating-point operations
-- No randomness or time dependencies
-- No unordered iteration (HashMap, HashSet forbidden)
-- Bounded memory and computation
-
-### Protocol Version Confusion
-
-**Attack**: Attacker submits proof from an incompatible protocol version.
-
-**Defense**: Explicit version validation on all inputs:
-
-```rust
-if input.protocol_version != PROTOCOL_VERSION {
-    return Err(CodecError::InvalidVersion {
-        expected: PROTOCOL_VERSION,
-        actual: input.protocol_version
-    });
-}
-```
+- **Attack**: Exploit non-deterministic behavior to produce inconsistent proofs
+- **Defense**: No floats, no randomness, no `HashMap`/`HashSet`, bounded memory and computation
 
 ### Encoding Malleability
 
-**Attack**: Multiple valid encodings for the same logical value could allow proof manipulation.
+- **Attack**: Multiple valid encodings for the same logical value
+- **Defense**: Exact payload lengths enforced; trailing bytes rejected
 
-**Defense**: Exact payload lengths with trailing bytes rejected:
+### Protocol Version Confusion
 
-```rust
-if cursor != bytes.len() {
-    return Err(CodecError::InvalidLength);
-}
-```
-
-### Replay Attacks
-
-**Attack**: Resubmitting a valid proof to execute the same actions multiple times.
-
-**Defense**: The `execution_nonce` ensures each proof can only be used once:
-
-```rust
-require(
-    journal.executionNonce == lastExecutionNonce + 1,
-    "Invalid nonce"
-);
-lastExecutionNonce = journal.executionNonce;
-```
+- **Attack**: Submit a proof from an incompatible protocol version
+- **Defense**: Explicit version validation at decode time; mismatched versions cause a hard error
 
 ## ImageId and Agent Binding
 
-A critical security property is that **one imageId corresponds to exactly one agent**:
+One imageId corresponds to exactly one agent binary:
 
-```mermaid
-flowchart TD
-    A[Agent Source Code] -->|build.rs computes| B[agent_code_hash]
-    B --> C[Agent Crate]
-    C --> D[Wrapper Crate]
-    D --> E[zkVM Guest Binary]
-    E -->|RISC Zero hash| F[imageId]
-    F -->|registered with| G[On-Chain Verifier]
+```
+Agent source --> agent_code_hash (SHA-256, build time)
+Kernel + Agent --> ELF binary --> imageId (RISC Zero hash)
+imageId --> registered on-chain
 ```
 
-The imageId is a cryptographic hash of the compiled zkVM guest binary. This binary includes:
+If any component (kernel, wrapper, agent, dependency) changes, the imageId changes.
 
-- Kernel code
-- Wrapper code
-- Agent code
+## Constraint System Boundaries
 
-If any of these components change, the imageId changes.
+**Can enforce**: max position size, max leverage, max drawdown, cooldown periods, asset whitelists, action count limits.
 
-### Verification Chain
+**Cannot enforce**: target address validation, economic outcomes, external chain state.
 
-1. **Agent source code** → compiled into agent crate → **agent_code_hash** embedded at build time
-2. **Agent crate + wrapper + kernel** → compiled into zkVM guest → **imageId** computed from ELF
-3. **imageId** registered on-chain with verifier contract
-4. **Proof** ties together: execution inputs → agent decisions → journal containing agent_code_hash
-5. **On-chain verification** confirms proof matches registered imageId
-
-## Constraint System Trust Model
-
-The constraint engine operates with these trust assumptions:
-
-### What Constraints Can Enforce
-
-- Maximum position sizes
-- Maximum leverage
-- Maximum drawdown
-- Cooldown periods between executions
-- Asset whitelists
-- Action count limits
-
-### What Constraints Cannot Enforce
-
-- **Target validation**: The `action.target` field is NOT validated (P0.3 limitation)
-- **Economic outcomes**: Constraints cannot guarantee profitable trades
-- **External state**: Constraints operate on declared state, not live chain state
-
-:::warning Security Note
-Executor contracts are responsible for validating the `target` field. If an executor allows arbitrary calls based on `target`, constraints do not prevent malicious call targets.
+:::warning
+Vault contracts must implement their own target validation. Constraints do not prevent calls to arbitrary addresses.
 :::
 
 ## On-Chain Trust Assumptions
 
-The on-chain verification trusts:
+| Component | Trust level |
+|-----------|-------------|
+| RISC Zero Verifier | Trusted -- Groth16 verification is mathematically sound |
+| KernelExecutionVerifier | Trusted -- correct imageId lookup |
+| KernelVault | Trusted with deposited funds -- executes only verified proofs |
+| Agent Author | Untrusted -- can only update registry, not existing vaults |
 
-1. **RISC Zero Verifier**: The Groth16 verification is mathematically sound
-2. **KernelExecutionVerifier**: The imageId registration is correct
-3. **KernelVault**: The vault correctly parses journals and executes actions
+## Related
 
-### Verifier Contract Security
-
-```solidity
-function verify(
-    bytes32 agentId,
-    bytes calldata journal,
-    bytes calldata seal
-) external view returns (bool) {
-    bytes32 registeredImageId = registeredImageIds[agentId];
-    require(registeredImageId != bytes32(0), "Agent not registered");
-
-    // Verify the proof using RISC Zero verifier
-    return riscZeroVerifier.verify(seal, registeredImageId, sha256(journal));
-}
-```
-
-The security of this flow depends on:
-
-- Correct imageId registration (admin responsibility)
-- Sound RISC Zero proof verification
-- Correct journal parsing
+- [Security Considerations](/onchain/security-considerations) -- On-chain attack vectors and validation checklist
+- [Cryptographic Chain](/architecture/cryptographic-chain) -- Full hash chain from source to on-chain verification

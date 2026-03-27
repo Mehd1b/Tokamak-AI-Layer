@@ -5,7 +5,7 @@ sidebar_position: 1
 
 # Repository Map
 
-This document provides a complete map of the execution-kernel repository structure.
+A complete map of the Tokamak-AI-Layer repository.
 
 ## Directory Structure
 
@@ -52,6 +52,44 @@ Tokamak-AI-Layer/
 │   │   ├── KernelOutputParser.sol
 │   │   └── MockYieldSource.sol
 │   └── foundry.toml
+│
+├── frontend/                     # Next.js web application (Tokagent)
+│   └── src/app/
+│       ├── agents/               # Agent detail pages
+│       ├── deploy/               # One-click vault deployment UI
+│       ├── leaderboard/          # Agent performance rankings
+│       ├── marketplace/          # Public agent directory
+│       ├── portfolio/            # User portfolio dashboard
+│       ├── referrals/            # Referral rewards dashboard
+│       ├── settings/             # User preferences
+│       ├── staking/              # WSTON staking interface
+│       ├── vaults/               # Vault detail pages
+│       ├── whitepaper/           # Embedded whitepaper
+│       └── api/                  # API routes
+│
+├── notification-service/         # Telegram bot for vault event alerts
+│   └── src/
+│       ├── bot.ts                # Telegram bot logic
+│       ├── monitor.ts            # On-chain event listener
+│       ├── db.ts                 # Subscription storage
+│       ├── abi.ts                # Contract ABIs
+│       ├── config.ts             # Environment config
+│       └── index.ts              # Entry point
+│
+├── oracle-service/               # Dockerized price oracle for agent inputs
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   └── src/
+│
+├── sdk/                          # TypeScript SDK (tal)
+│   └── src/
+│
+├── metadata/                     # Agent metadata files
+│   └── agents/
+│
+├── scripts/                      # Deployment and utility scripts
+│   ├── golden_path_sepolia.sh
+│   └── print_registration_values.sh
 │
 ├── docs/                         # Docusaurus documentation site
 │
@@ -249,6 +287,43 @@ Unit tests for kernel logic without zkVM.
 
 End-to-end tests with zkVM proof generation.
 
+## Frontend
+
+**Path**: `frontend/`
+
+Next.js application powering the Tokagent web UI. Key routes:
+
+| Route | Description |
+|-------|-------------|
+| `/marketplace` | Public agent directory with search and deploy |
+| `/leaderboard` | Agent performance rankings |
+| `/deploy` | One-click vault deployment |
+| `/referrals` | Referral rewards dashboard |
+| `/vaults/[address]` | Vault detail page |
+| `/agents/[id]` | Agent detail page |
+| `/portfolio` | User portfolio overview |
+| `/staking` | WSTON staking interface |
+
+## Services
+
+### notification-service
+
+**Path**: `notification-service/`
+
+Telegram bot that monitors on-chain vault events (deposits, withdrawals, executions, slashes) and sends alerts to subscribed users.
+
+### oracle-service
+
+**Path**: `oracle-service/`
+
+Dockerized price oracle service that provides market data feeds for agent inputs.
+
+## TypeScript SDK
+
+**Path**: `sdk/`
+
+The `tal` TypeScript SDK for programmatic interaction with Tokagent contracts.
+
 ## Smart Contracts
 
 ### KernelExecutionVerifier
@@ -282,9 +357,14 @@ Test contract simulating a yield source.
 | `crates/agents/example-yield-agent/agent/src/lib.rs` | Reference agent logic |
 | `crates/agents/defi-yield-farmer/agent/src/lib.rs` | DeFi agent logic |
 | `crates/tools/cargo-agent/src/main.rs` | `cargo agent` CLI |
+| `frontend/src/app/marketplace/page.tsx` | Marketplace page |
+| `frontend/src/app/leaderboard/page.tsx` | Leaderboard page |
+| `notification-service/src/index.ts` | Notification service entry point |
+| `oracle-service/src/` | Oracle service source |
+| `sdk/src/` | TypeScript SDK source |
 
 ## Related
 
-- [Architecture Overview](/architecture/overview) - System design
-- [SDK Overview](/sdk/overview) - SDK documentation
-- [Glossary](/reference/glossary) - Terms and definitions
+- [Architecture Overview](/architecture/overview) -- System design
+- [SDK Overview](/sdk/overview) -- SDK documentation
+- [Glossary](/reference/glossary) -- Terms and definitions
