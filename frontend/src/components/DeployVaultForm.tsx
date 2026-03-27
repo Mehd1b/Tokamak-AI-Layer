@@ -417,8 +417,42 @@ export function DeployVaultForm() {
     );
   }
 
+  const CHAIN_NAMES: Record<number, string> = {
+    1: 'Ethereum Mainnet',
+    999: 'HyperEVM',
+    42161: 'Arbitrum One',
+    10: 'Optimism',
+    11155111: 'Sepolia Testnet',
+    998: 'HyperEVM Testnet',
+  };
+
+  const CHAIN_COLORS: Record<number, string> = {
+    1: 'border-blue-500/30 bg-blue-500/5 text-blue-400',
+    999: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-400',
+    42161: 'border-sky-500/30 bg-sky-500/5 text-sky-400',
+    10: 'border-red-500/30 bg-red-500/5 text-red-400',
+    11155111: 'border-yellow-500/30 bg-yellow-500/5 text-yellow-400',
+    998: 'border-yellow-500/30 bg-yellow-500/5 text-yellow-400',
+  };
+
   return (
     <div className="space-y-8">
+      {/* Target network info */}
+      <div className={`rounded-xl border px-4 py-3 flex items-center gap-3 ${CHAIN_COLORS[selectedChainId] ?? 'border-white/10 bg-white/5 text-gray-400'}`}>
+        <div className="w-2 h-2 rounded-full bg-current animate-pulse shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-mono font-semibold uppercase tracking-wider">
+            Deploying to {CHAIN_NAMES[selectedChainId] ?? `Chain ${selectedChainId}`}
+          </p>
+          <p className="text-[10px] font-mono opacity-60 mt-0.5 truncate">
+            Registry: {contracts?.agentRegistry ? truncateAddress(contracts.agentRegistry, 6) : '—'}
+            {' · '}
+            Factory: {contracts?.vaultFactory ? truncateAddress(contracts.vaultFactory, 6) : '—'}
+          </p>
+        </div>
+        <span className="text-[10px] font-mono opacity-40 shrink-0">ID: {selectedChainId}</span>
+      </div>
+
       {/* Step indicator */}
       <div className="flex items-center justify-between">
         {steps.map((s, i) => (
