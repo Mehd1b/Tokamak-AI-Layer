@@ -5,6 +5,13 @@ import { usePublicClient } from 'wagmi';
 import { useNetwork } from '@/lib/NetworkContext';
 import { useDeployedVaultsList, type VaultInfo } from '@/hooks/useVaultFactory';
 import { KernelVaultABI } from '@/lib/contracts';
+import {
+  paginatedGetLogs,
+  depositEvent,
+  withdrawEvent,
+  recentFromBlock,
+  getLogsClient,
+} from '@/lib/vaultEvents';
 
 export interface UserPosition {
   vaultAddress: `0x${string}`;
@@ -26,6 +33,16 @@ export interface UserPortfolio {
   totalPnL: bigint;
   isLoading: boolean;
   error: Error | null;
+}
+
+/** Mirrors the on-chain _DECIMALS_OFFSET used by KernelVault. */
+const DECIMALS_OFFSET = 1000n;
+
+/** Mirrors KernelVault.convertToAssets — accounts for the virtual offset. */
+function convertToAssets(shares: bigint, totalAssets: bigint, totalShares: bigint): bigint {
+  const denom = totalShares + DECIMALS_OFFSET;
+  if (denom === 0n) return 0n;
+  return (shares * (totalAssets + 1n)) / denom;
 }
 
 /**
@@ -74,32 +91,79 @@ export function useUserPortfolio(userAddress: `0x${string}` | undefined): UserPo
         );
       }
 
-      // Filter to vaults with shares > 0
+      // Identify vaults where the user holds shares
+      const activeVaults: { vault: VaultInfo; shares: bigint }[] = [];
+      for (let i = 0; i < allVaults.length; i++) {
+        const sharesResult = sharesResults[i];
+        if (sharesResult?.status !== 'success') continue;
+        const shares = sharesResult.result as bigint;
+        if (!shares || shares <= 0n) continue;
+        activeVaults.push({ vault: allVaults[i], shares });
+      }
+
+      if (activeVaults.length === 0) {
+        return { positions: [], totalValue: 0n, totalPnL: 0n };
+      }
+
+      // Read Deposit/Withdraw events per vault to compute cost basis.
+      // Uses the indexed `sender` field so the RPC can filter server-side.
+      const logClient = getLogsClient(client, selectedChainId);
+      let currentBlock: bigint;
+      try {
+        currentBlock = await logClient.getBlockNumber();
+      } catch {
+        currentBlock = 0n;
+      }
+      const fromBlock = currentBlock > 0n ? recentFromBlock(currentBlock) : 0n;
+
+      const eventResults = await Promise.all(
+        activeVaults.flatMap(({ vault }) => [
+          paginatedGetLogs(logClient, {
+            address: vault.address as `0x${string}`,
+            event: depositEvent,
+            args: { sender: userAddress },
+            fromBlock,
+            toBlock: currentBlock > 0n ? currentBlock : 'latest' as any,
+          }).catch(() => []),
+          paginatedGetLogs(logClient, {
+            address: vault.address as `0x${string}`,
+            event: withdrawEvent,
+            args: { sender: userAddress },
+            fromBlock,
+            toBlock: currentBlock > 0n ? currentBlock : 'latest' as any,
+          }).catch(() => []),
+        ]),
+      );
+
       const positions: UserPosition[] = [];
       let totalValue = 0n;
       let totalPnL = 0n;
 
-      for (let i = 0; i < allVaults.length; i++) {
-        const vault = allVaults[i];
-        const sharesResult = sharesResults[i];
-        if (sharesResult?.status !== 'success') continue;
+      for (let i = 0; i < activeVaults.length; i++) {
+        const { vault, shares } = activeVaults[i];
 
-        const shares = sharesResult.result as bigint;
-        if (!shares || shares <= 0n) continue;
+        // Current value via convertToAssets (mirrors contract with DECIMALS_OFFSET)
+        const currentValue = convertToAssets(shares, vault.totalAssets, vault.totalShares);
 
-        // Calculate current value of position: (shares * totalAssets) / totalShares
-        const vaultTotalShares = vault.totalShares;
-        const vaultTotalAssets = vault.totalAssets;
+        // Cost basis from on-chain Deposit/Withdraw events
+        const depositLogs = eventResults[i * 2] as any[];
+        const withdrawLogs = eventResults[i * 2 + 1] as any[];
 
-        let currentValue = 0n;
-        if (vaultTotalShares > 0n) {
-          currentValue = (shares * vaultTotalAssets) / vaultTotalShares;
+        let depositedValue = 0n;
+        for (const log of depositLogs) {
+          depositedValue += (log.args?.amount ?? 0n) as bigint;
+        }
+        for (const log of withdrawLogs) {
+          depositedValue -= (log.args?.amount ?? 0n) as bigint;
+        }
+        if (depositedValue < 0n) depositedValue = 0n;
+
+        // If no events were found (RPC limitation), fall back to currentValue
+        // so P&L displays as 0 rather than a wildly incorrect number.
+        if (depositLogs.length === 0 && withdrawLogs.length === 0) {
+          depositedValue = currentValue;
         }
 
-        // Deposited value approximation: shares at 1:1 ratio (initial deposit assumption)
-        // In ERC-4626 style vaults, initial deposit mints shares 1:1 with assets.
-        // The difference between currentValue and depositedValue is unrealized P&L.
-        const depositedValue = shares; // shares represent the original deposit amount at mint time
         const unrealizedPnL = currentValue - depositedValue;
 
         positions.push({
@@ -111,8 +175,8 @@ export function useUserPortfolio(userAddress: `0x${string}` | undefined): UserPo
           unrealizedPnL,
           assetDecimals: vault.assetDecimals,
           assetSymbol: vault.assetSymbol,
-          totalShares: vaultTotalShares,
-          totalAssets: vaultTotalAssets,
+          totalShares: vault.totalShares,
+          totalAssets: vault.totalAssets,
           protocolType: vault.protocolType,
         });
 
