@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { ConnectWalletButton } from '@/components/ConnectWalletButton';
 import { NetworkSelector } from '@/components/NetworkSelector';
 import { DiamondLogo } from '@/components/icons/Logo';
-import { XIcon, GitHubIcon, LinkedInIcon } from '@/components/icons/Social';
+import { XIcon, GitHubIcon, LinkedInIcon, YouTubeIcon } from '@/components/icons/Social';
 import { useAccount } from 'wagmi';
 import { clsx } from 'clsx';
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -27,6 +27,7 @@ const SOCIAL_ICONS = {
   x: <XIcon className="w-4 h-4" />,
   github: <GitHubIcon className="w-4 h-4" />,
   linkedin: <LinkedInIcon className="w-4 h-4" />,
+  youtube: <YouTubeIcon className="w-4 h-4" />,
 };
 
 // Protocol dropdown links
@@ -43,6 +44,7 @@ const SOCIALS_LINKS: DropdownLink[] = [
   { title: 'X', description: 'Follow us on X', href: 'https://x.com/tokagent', icon: SOCIAL_ICONS.x },
   { title: 'GitHub', description: 'View the source code', href: 'https://github.com/tokamak-network', icon: SOCIAL_ICONS.github },
   { title: 'LinkedIn', description: 'Connect with us', href: 'https://www.linkedin.com/company/tokamaknetwork/', icon: SOCIAL_ICONS.linkedin },
+  { title: 'YouTube', description: 'Watch our videos', href: 'https://www.youtube.com/@tokagent', icon: SOCIAL_ICONS.youtube },
 ];
 
 const CLOSE_DELAY = 300;

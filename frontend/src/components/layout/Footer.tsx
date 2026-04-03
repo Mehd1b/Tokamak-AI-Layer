@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { DiamondLogoGlow } from '@/components/icons/Logo';
-import { GitHubIcon, XIcon, TelegramIcon } from '@/components/icons/Social';
+import { GitHubIcon, XIcon, TelegramIcon, YouTubeIcon } from '@/components/icons/Social';
 
 const socialLinks = [
   { name: 'GitHub', href: 'https://github.com/tokamak-network', icon: <GitHubIcon /> },
   { name: 'X', href: 'https://x.com/tokagent', icon: <XIcon /> },
   { name: 'Telegram', href: 'https://t.me/tokamak_network', icon: <TelegramIcon /> },
+  { name: 'YouTube', href: 'https://www.youtube.com/@tokagent', icon: <YouTubeIcon /> },
 ];
 
 export function Footer() {
