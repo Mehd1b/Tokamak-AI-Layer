@@ -4,6 +4,7 @@ export interface DeploymentAddresses {
   kernelExecutionVerifier: `0x${string}`;
   riscZeroVerifierRouter: `0x${string}`;
   referralManager?: `0x${string}`;
+  pointsProgram?: `0x${string}`;
 }
 
 export const ETHEREUM_MAINNET_ADDRESSES: DeploymentAddresses = {

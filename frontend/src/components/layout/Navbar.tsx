@@ -35,6 +35,7 @@ const PROTOCOL_LINKS: DropdownLink[] = [
   { title: 'Vaults', description: 'Explore and deploy vaults', href: '/vaults', internal: true },
   { title: 'Deploy Vault', description: 'Launch a new AI-managed vault', href: '/deploy', internal: true },
   { title: 'Marketplace', description: 'Browse and fork agent templates', href: '/marketplace', internal: true },
+  { title: 'Points', description: 'Track your points and rewards', href: '/points', internal: true },
   { title: 'Referrals', description: 'Invite friends and earn points', href: '/referrals', internal: true },
   { title: 'Staking', description: 'WSTON staking and bridge', href: '/staking', internal: true },
 ];
@@ -464,6 +465,17 @@ export function Navbar() {
           >
             WHITEPAPER
           </Link>
+          <Link
+            href="/institutional"
+            className={clsx(
+              'px-4 py-2 rounded-lg border border-dashed transition-all tracking-wider text-sm',
+              pathname === '/institutional'
+                ? 'border-[#A855F7]/60 text-[#A855F7]'
+                : 'border-white/30 text-white hover:border-white/60 hover:text-gray-300',
+            )}
+          >
+            INSTITUTIONAL
+          </Link>
           <a
             href="https://docs.tokagent.network"
             target="_blank"
@@ -509,7 +521,7 @@ export function Navbar() {
               </Link>
               <button
                 onClick={() => setIsMenuOpen(false)}
-                className="p-2 text-white hover:text-[#A855F7] transition-colors duration-300"
+                className="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center text-white hover:text-[#A855F7] transition-colors duration-300"
                 aria-label="Close menu"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -526,7 +538,7 @@ export function Navbar() {
                 <div className="text-center">
                   <button
                     onClick={() => setIsMobileProtocolOpen(prev => !prev)}
-                    className="inline-flex items-center gap-2 text-md font-light text-white hover:text-[#A855F7] transition-all duration-300 tracking-wider"
+                    className="inline-flex items-center gap-2 text-md font-light text-white hover:text-[#A855F7] transition-all duration-300 tracking-wider min-h-[44px]"
                     aria-expanded={isMobileProtocolOpen}
                   >
                     PROTOCOL
@@ -545,13 +557,13 @@ export function Navbar() {
                       isMobileProtocolOpen ? 'max-h-96 opacity-100 mt-4' : 'max-h-0 opacity-0'
                     }`}
                   >
-                    <div className="space-y-3 text-sm">
+                    <div className="space-y-1 text-sm">
                       {PROTOCOL_LINKS.map((link) => (
                         <Link
                           key={link.href}
                           href={link.href}
                           className={clsx(
-                            'block transition-colors',
+                            'block transition-colors py-2 min-h-[44px] flex items-center justify-center',
                             pathname?.startsWith(link.href)
                               ? 'text-[#A855F7]'
                               : 'text-gray-300 hover:text-[#A855F7]',
@@ -571,7 +583,7 @@ export function Navbar() {
                 <Link
                   href="/leaderboard"
                   className={clsx(
-                    'block text-md font-light transition-all duration-300 tracking-wider',
+                    'block text-md font-light transition-all duration-300 tracking-wider min-h-[44px] flex items-center justify-center',
                     pathname === '/leaderboard' || pathname?.startsWith('/agents/')
                       ? 'text-[#A855F7]'
                       : 'text-white hover:text-[#A855F7]',
@@ -584,7 +596,7 @@ export function Navbar() {
                   <Link
                     href="/portfolio"
                     className={clsx(
-                      'block text-md font-light transition-all duration-300 tracking-wider',
+                      'block text-md font-light transition-all duration-300 tracking-wider min-h-[44px] flex items-center justify-center',
                       pathname === '/portfolio' ? 'text-[#A855F7]' : 'text-white hover:text-[#A855F7]',
                     )}
                     onClick={() => setIsMenuOpen(false)}
@@ -600,18 +612,28 @@ export function Navbar() {
                 <Link
                   href="/whitepaper"
                   className={clsx(
-                    'block text-md font-light transition-all duration-300 tracking-wider',
+                    'block text-md font-light transition-all duration-300 tracking-wider min-h-[44px] flex items-center justify-center',
                     pathname === '/whitepaper' ? 'text-[#A855F7]' : 'text-white hover:text-[#A855F7]',
                   )}
                   onClick={() => setIsMenuOpen(false)}
                 >
                   WHITEPAPER
                 </Link>
+                <Link
+                  href="/institutional"
+                  className={clsx(
+                    'block text-md font-light transition-all duration-300 tracking-wider min-h-[44px] flex items-center justify-center',
+                    pathname === '/institutional' ? 'text-[#A855F7]' : 'text-white hover:text-[#A855F7]',
+                  )}
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  INSTITUTIONAL
+                </Link>
                 <a
                   href="https://docs.tokagent.network"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block text-md font-light transition-all duration-300 tracking-wider text-white hover:text-[#A855F7]"
+                  className="block text-md font-light transition-all duration-300 tracking-wider text-white hover:text-[#A855F7] min-h-[44px] flex items-center justify-center"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   DOCS
@@ -626,12 +648,12 @@ export function Navbar() {
 
             {/* Bottom social links */}
             <div className="p-6 border-t border-gray-700/30">
-              <div className="flex space-x-6 justify-center">
+              <div className="flex space-x-4 justify-center">
                 {SOCIALS_LINKS.map((link) => (
                   <a
                     key={link.href}
                     href={link.href}
-                    className="text-gray-400 hover:text-[#A855F7] transition-colors duration-300"
+                    className="text-gray-400 hover:text-[#A855F7] transition-colors duration-300 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={link.title}

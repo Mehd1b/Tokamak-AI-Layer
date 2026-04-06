@@ -5,6 +5,7 @@ import {
   Info,
   AlertTriangle,
   Loader2,
+  HelpCircle,
 } from 'lucide-react';
 import {
   TokenIcon,
@@ -47,10 +48,12 @@ import {
   useLockBond,
   bondStatusLabel,
 } from '@/hooks/useBondManager';
+import { StakingWizard } from '@/components/staking/StakingWizard';
 
 export default function StakingPage() {
   const { address, isConnected, isL1, switchToL1 } = useWallet();
   const [activeTab, setActiveTab] = useState<'l1' | 'bonds'>('l1');
+  const [stakingView, setStakingView] = useState<'wizard' | 'advanced'>('wizard');
 
   // --- L1 Wrapping state ---
   const [depositAmount, setDepositAmount] = useState('');
@@ -243,111 +246,236 @@ export default function StakingPage() {
           <StatCard icon={<IndexIcon className="mx-auto h-8 w-8" />} value={formatIndex(stakingIndex)} label="Staking Index" delay={3} />
         </div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          {/* Deposit Card */}
-          <div className="card animate-[slide-in-left_0.5s_ease-out_0.3s_both]">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <DepositIcon className="h-5 w-5" />
-                <h2 className="text-lg font-medium text-white">Deposit {tokenMode} &rarr; WSTON</h2>
+        {/* Staking view toggle: Wizard vs Advanced */}
+        <div className="mb-6 flex items-center justify-between animate-[slide-in-left_0.5s_ease-out_0.2s_both]">
+          <div className="flex items-center rounded-lg border border-white/10 bg-white/5 p-0.5">
+            <button
+              onClick={() => setStakingView('wizard')}
+              className={`rounded-md px-4 py-2 text-xs font-medium transition-all duration-300 ${
+                stakingView === 'wizard'
+                  ? 'bg-[#A855F7]/15 text-[#C084FC] shadow-sm'
+                  : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              Staking Wizard
+            </button>
+            <button
+              onClick={() => setStakingView('advanced')}
+              className={`rounded-md px-4 py-2 text-xs font-medium transition-all duration-300 ${
+                stakingView === 'advanced'
+                  ? 'bg-[#A855F7]/15 text-[#C084FC] shadow-sm'
+                  : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              Advanced
+            </button>
+          </div>
+        </div>
+
+        {/* ---- Wizard View ---- */}
+        {stakingView === 'wizard' && (
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <StakingWizard />
+
+            {/* Withdrawal Card (always visible) */}
+            <div className="card animate-[slide-in-right_0.5s_ease-out_0.3s_both]">
+              <div className="mb-4 flex items-center gap-2">
+                <WithdrawIcon className="h-5 w-5" />
+                <h2 className="text-lg font-medium text-white">Withdraw WSTON</h2>
               </div>
-              <div className="flex items-center rounded-lg border border-white/10 bg-white/5 p-0.5">
-                {(['WTON', 'TON'] as const).map((mode) => (
-                  <button key={mode} onClick={() => { setTokenMode(mode); setDepositAmount(''); }}
-                    className={`rounded-md px-3 py-1 text-xs font-medium transition-all duration-300 ${tokenMode === mode ? 'bg-[#A855F7]/15 text-[#C084FC] shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}>
-                    {mode}
+              <p className="mb-4 text-sm text-white/40">
+                Request withdrawal of WSTON to receive WTON back. Minimum 100 WSTON. Withdrawals have a processing delay.
+              </p>
+              <div className="space-y-4">
+                <AmountInput
+                  value={withdrawAmount} onChange={setWithdrawAmount}
+                  disabled={!isConnected || !isL1} suffix="WSTON"
+                  onMax={() => { if (wstonBalance !== undefined) setWithdrawAmount(formatUnits(wstonBalance, 27)); }}
+                  available={`${formatWTON(wstonBalance)} WSTON`}
+                />
+                {withdrawAmount && parseFloat(withdrawAmount) > 0 && parseFloat(withdrawAmount) < 100 && (
+                  <div className="flex items-center gap-1 text-xs text-[#C084FC]"><AlertTriangle className="h-3 w-3" />Minimum withdrawal is 100 WSTON</div>
+                )}
+                {isWithdrawalSuccess && <SuccessMsg text="Withdrawal requested! You can claim once processing completes." />}
+                {withdrawalError && <ErrorMsg text={withdrawalError.message} />}
+                <button onClick={handleWithdraw}
+                  disabled={!isConnected || !isL1 || !withdrawAmount || parseFloat(withdrawAmount) < 100 || isRequestingWithdrawal || isWithdrawalConfirming}
+                  className="btn-secondary w-full">
+                  {isRequestingWithdrawal || isWithdrawalConfirming ? <SpinnerBtn text="Requesting..." /> : 'Request Withdrawal'}
+                </button>
+
+                <div className="mt-4 border-t border-white/10 pt-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-white/60">Claimable WTON</p>
+                      <p className="text-lg font-bold text-white">{formatWTON(claimable)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-white/60">Pending Requests</p>
+                      <p className="text-lg font-bold text-white">{withdrawalCount !== undefined ? withdrawalCount.toString() : '-'}</p>
+                    </div>
+                  </div>
+                  {isClaimSuccess && <SuccessMsg text="Claim successful!" />}
+                  <button onClick={claim}
+                    disabled={!isConnected || !isL1 || !claimable || claimable === 0n || isClaiming || isClaimConfirming}
+                    className="btn-primary w-full">
+                    {isClaiming || isClaimConfirming ? <SpinnerBtn text="Claiming..." /> : 'Claim WTON'}
                   </button>
-                ))}
+                </div>
               </div>
-            </div>
-            <p className="mb-4 text-sm text-white/40">
-              {isWTONMode
-                ? 'Deposit WTON directly into the WSTON contract (2 steps: approve + deposit).'
-                : 'Deposit TON \u2192 automatically swapped to WTON \u2192 deposited as WSTON (4 steps).'}
-            </p>
-            <div className="space-y-4">
-              <AmountInput
-                value={depositAmount} onChange={setDepositAmount}
-                disabled={!isConnected || !isL1} suffix={tokenMode}
-                onMax={() => {
-                  if (isWTONMode && wtonBalance !== undefined) setDepositAmount(formatUnits(wtonBalance, 27));
-                  else if (!isWTONMode && tonBalance !== undefined) setDepositAmount(formatUnits(tonBalance, 18));
-                }}
-                available={isWTONMode ? `${formatWTON(wtonBalance)} WTON` : `${formatBalance(tonBalance)} TON`}
-              />
-              {rawAmount && estimatedWSTON > 0n && (
-                <div className="rounded-lg bg-[#A855F7]/5 border border-[#A855F7]/10 p-3">
-                  <p className="text-xs text-white/40">Estimated WSTON received: <span className="font-semibold text-[#C084FC]">{formatWTON(estimatedWSTON)}</span></p>
-                </div>
-              )}
-              {rawAmount && (
-                <div className="space-y-1 rounded-lg bg-white/5 border border-white/10 p-3">
-                  <p className="text-xs font-medium text-white/40">Deposit steps ({totalSteps} total):</p>
-                  {isWTONMode ? (<>
-                    <StepLine label="1. Approve WTON" done={currentStep > 1 || isApproveWTONSuccess} active={currentStep === 1} />
-                    <StepLine label="2. Deposit" done={isDepositSuccess} active={currentStep === 2 && !isDepositSuccess} />
-                  </>) : (<>
-                    <StepLine label="1. Approve TON" done={currentStep > 1 || isApproveTONSuccess} active={currentStep === 1} />
-                    <StepLine label="2. Swap TON &rarr; WTON" done={currentStep > 2 || isSwapSuccess} active={currentStep === 2} />
-                    <StepLine label="3. Approve WTON" done={currentStep > 3 || isApproveWTONSuccess} active={currentStep === 3} />
-                    <StepLine label="4. Deposit" done={isDepositSuccess} active={currentStep === 4 && !isDepositSuccess} />
-                  </>)}
-                </div>
-              )}
-              {isDepositSuccess && <SuccessMsg text="Deposit successful! WSTON has been minted to your wallet." />}
-              {depositError && <ErrorMsg text={depositError.message} />}
-              <button onClick={handleDeposit} disabled={!isConnected || !isL1 || !rawAmount || isAnyDepositPending} className="btn-primary w-full">
-                {isAnyDepositPending ? <SpinnerBtn text={getDepositButtonText()} /> : getDepositButtonText()}
-              </button>
             </div>
           </div>
+        )}
 
-          {/* Withdrawal Card */}
-          <div className="card animate-[slide-in-right_0.5s_ease-out_0.3s_both]">
-            <div className="mb-4 flex items-center gap-2">
-              <WithdrawIcon className="h-5 w-5" />
-              <h2 className="text-lg font-medium text-white">Withdraw WSTON</h2>
-            </div>
-            <p className="mb-4 text-sm text-white/40">
-              Request withdrawal of WSTON to receive WTON back. Minimum 100 WSTON. Withdrawals have a processing delay.
-            </p>
-            <div className="space-y-4">
-              <AmountInput
-                value={withdrawAmount} onChange={setWithdrawAmount}
-                disabled={!isConnected || !isL1} suffix="WSTON"
-                onMax={() => { if (wstonBalance !== undefined) setWithdrawAmount(formatUnits(wstonBalance, 27)); }}
-                available={`${formatWTON(wstonBalance)} WSTON`}
-              />
-              {withdrawAmount && parseFloat(withdrawAmount) > 0 && parseFloat(withdrawAmount) < 100 && (
-                <div className="flex items-center gap-1 text-xs text-[#C084FC]"><AlertTriangle className="h-3 w-3" />Minimum withdrawal is 100 WSTON</div>
-              )}
-              {isWithdrawalSuccess && <SuccessMsg text="Withdrawal requested! You can claim once processing completes." />}
-              {withdrawalError && <ErrorMsg text={withdrawalError.message} />}
-              <button onClick={handleWithdraw}
-                disabled={!isConnected || !isL1 || !withdrawAmount || parseFloat(withdrawAmount) < 100 || isRequestingWithdrawal || isWithdrawalConfirming}
-                className="btn-secondary w-full">
-                {isRequestingWithdrawal || isWithdrawalConfirming ? <SpinnerBtn text="Requesting..." /> : 'Request Withdrawal'}
-              </button>
-
-              <div className="mt-4 border-t border-white/10 pt-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-white/60">Claimable WTON</p>
-                    <p className="text-lg font-bold text-white">{formatWTON(claimable)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-white/60">Pending Requests</p>
-                    <p className="text-lg font-bold text-white">{withdrawalCount !== undefined ? withdrawalCount.toString() : '-'}</p>
-                  </div>
+        {/* ---- Advanced View (original manual flow) ---- */}
+        {stakingView === 'advanced' && (
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            {/* Deposit Card */}
+            <div className="card animate-[slide-in-left_0.5s_ease-out_0.3s_both]">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <DepositIcon className="h-5 w-5" />
+                  <h2 className="text-lg font-medium text-white">Deposit {tokenMode} &rarr; WSTON</h2>
                 </div>
-                {isClaimSuccess && <SuccessMsg text="Claim successful!" />}
-                <button onClick={claim}
-                  disabled={!isConnected || !isL1 || !claimable || claimable === 0n || isClaiming || isClaimConfirming}
-                  className="btn-primary w-full">
-                  {isClaiming || isClaimConfirming ? <SpinnerBtn text="Claiming..." /> : 'Claim WTON'}
+                <div className="flex items-center rounded-lg border border-white/10 bg-white/5 p-0.5">
+                  {(['WTON', 'TON'] as const).map((mode) => (
+                    <button key={mode} onClick={() => { setTokenMode(mode); setDepositAmount(''); }}
+                      className={`rounded-md px-3 py-1 text-xs font-medium transition-all duration-300 ${tokenMode === mode ? 'bg-[#A855F7]/15 text-[#C084FC] shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <p className="mb-4 text-sm text-white/40">
+                {isWTONMode
+                  ? 'Deposit WTON directly into the WSTON contract (2 steps: approve + deposit).'
+                  : 'Deposit TON \u2192 automatically swapped to WTON \u2192 deposited as WSTON (4 steps).'}
+              </p>
+              <div className="space-y-4">
+                <AmountInput
+                  value={depositAmount} onChange={setDepositAmount}
+                  disabled={!isConnected || !isL1} suffix={tokenMode}
+                  onMax={() => {
+                    if (isWTONMode && wtonBalance !== undefined) setDepositAmount(formatUnits(wtonBalance, 27));
+                    else if (!isWTONMode && tonBalance !== undefined) setDepositAmount(formatUnits(tonBalance, 18));
+                  }}
+                  available={isWTONMode ? `${formatWTON(wtonBalance)} WTON` : `${formatBalance(tonBalance)} TON`}
+                />
+                {rawAmount && estimatedWSTON > 0n && (
+                  <div className="rounded-lg bg-[#A855F7]/5 border border-[#A855F7]/10 p-3">
+                    <p className="text-xs text-white/40">Estimated WSTON received: <span className="font-semibold text-[#C084FC]">{formatWTON(estimatedWSTON)}</span></p>
+                  </div>
+                )}
+                {rawAmount && (
+                  <div className="space-y-1 rounded-lg bg-white/5 border border-white/10 p-3">
+                    <p className="text-xs font-medium text-white/40">Deposit steps ({totalSteps} total):</p>
+                    {isWTONMode ? (<>
+                      <StepLine label="1. Approve WTON" done={currentStep > 1 || isApproveWTONSuccess} active={currentStep === 1} />
+                      <StepLine label="2. Deposit" done={isDepositSuccess} active={currentStep === 2 && !isDepositSuccess} />
+                    </>) : (<>
+                      <StepLine label="1. Approve TON" done={currentStep > 1 || isApproveTONSuccess} active={currentStep === 1} />
+                      <StepLine label="2. Swap TON &rarr; WTON" done={currentStep > 2 || isSwapSuccess} active={currentStep === 2} />
+                      <StepLine label="3. Approve WTON" done={currentStep > 3 || isApproveWTONSuccess} active={currentStep === 3} />
+                      <StepLine label="4. Deposit" done={isDepositSuccess} active={currentStep === 4 && !isDepositSuccess} />
+                    </>)}
+                  </div>
+                )}
+                {isDepositSuccess && <SuccessMsg text="Deposit successful! WSTON has been minted to your wallet." />}
+                {depositError && <ErrorMsg text={depositError.message} />}
+                <button onClick={handleDeposit} disabled={!isConnected || !isL1 || !rawAmount || isAnyDepositPending} className="btn-primary w-full">
+                  {isAnyDepositPending ? <SpinnerBtn text={getDepositButtonText()} /> : getDepositButtonText()}
                 </button>
               </div>
             </div>
+
+            {/* Withdrawal Card */}
+            <div className="card animate-[slide-in-right_0.5s_ease-out_0.3s_both]">
+              <div className="mb-4 flex items-center gap-2">
+                <WithdrawIcon className="h-5 w-5" />
+                <h2 className="text-lg font-medium text-white">Withdraw WSTON</h2>
+              </div>
+              <p className="mb-4 text-sm text-white/40">
+                Request withdrawal of WSTON to receive WTON back. Minimum 100 WSTON. Withdrawals have a processing delay.
+              </p>
+              <div className="space-y-4">
+                <AmountInput
+                  value={withdrawAmount} onChange={setWithdrawAmount}
+                  disabled={!isConnected || !isL1} suffix="WSTON"
+                  onMax={() => { if (wstonBalance !== undefined) setWithdrawAmount(formatUnits(wstonBalance, 27)); }}
+                  available={`${formatWTON(wstonBalance)} WSTON`}
+                />
+                {withdrawAmount && parseFloat(withdrawAmount) > 0 && parseFloat(withdrawAmount) < 100 && (
+                  <div className="flex items-center gap-1 text-xs text-[#C084FC]"><AlertTriangle className="h-3 w-3" />Minimum withdrawal is 100 WSTON</div>
+                )}
+                {isWithdrawalSuccess && <SuccessMsg text="Withdrawal requested! You can claim once processing completes." />}
+                {withdrawalError && <ErrorMsg text={withdrawalError.message} />}
+                <button onClick={handleWithdraw}
+                  disabled={!isConnected || !isL1 || !withdrawAmount || parseFloat(withdrawAmount) < 100 || isRequestingWithdrawal || isWithdrawalConfirming}
+                  className="btn-secondary w-full">
+                  {isRequestingWithdrawal || isWithdrawalConfirming ? <SpinnerBtn text="Requesting..." /> : 'Request Withdrawal'}
+                </button>
+
+                <div className="mt-4 border-t border-white/10 pt-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-white/60">Claimable WTON</p>
+                      <p className="text-lg font-bold text-white">{formatWTON(claimable)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-white/60">Pending Requests</p>
+                      <p className="text-lg font-bold text-white">{withdrawalCount !== undefined ? withdrawalCount.toString() : '-'}</p>
+                    </div>
+                  </div>
+                  {isClaimSuccess && <SuccessMsg text="Claim successful!" />}
+                  <button onClick={claim}
+                    disabled={!isConnected || !isL1 || !claimable || claimable === 0n || isClaiming || isClaimConfirming}
+                    className="btn-primary w-full">
+                    {isClaiming || isClaimConfirming ? <SpinnerBtn text="Claiming..." /> : 'Claim WTON'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ---- Info Cards ---- */}
+        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4 animate-[slide-in-left_0.5s_ease-out_0.5s_both]">
+          {/* WSTON APR */}
+          <InfoCard
+            title="WSTON APR"
+            value="~4.5%"
+            description="Estimated annual yield from Tokamak staking. Actual rate varies with network participation."
+            color="text-[#A855F7]"
+          />
+
+          {/* Bond Requirements */}
+          <InfoCard
+            title="Bond Requirement"
+            value="100 TON"
+            description="Each optimistic vault execution requires 100 TON worth of WSTON locked as bond collateral."
+            color="text-[#C084FC]"
+          />
+
+          {/* Unbonding Period */}
+          <InfoCard
+            title="Unbonding Period"
+            value="~7 days"
+            description="WSTON withdrawals have a processing delay. You can claim your WTON once the unbonding period completes."
+            color="text-[#D946EF]"
+          />
+
+          {/* Why WSTON? */}
+          <div className="card group hover:border-[#A855F7]/30 hover:shadow-[0_0_20px_rgba(168,85,247,0.1)] cursor-default">
+            <div className="flex items-start gap-2 mb-2">
+              <HelpCircle className="h-4 w-4 text-[#7C3AED] mt-0.5 flex-shrink-0" />
+              <h4 className="text-sm font-medium text-[#7C3AED]">Why WSTON?</h4>
+            </div>
+            <p className="text-xs text-white/40 leading-relaxed">
+              WSTON is a liquid staking token that represents your staked TON position.
+              It earns staking rewards automatically (reflected in the staking index) and
+              can be used as bond collateral for optimistic vault executions on Tokamak AI Layer,
+              enabling immediate execution without waiting for full proof verification.
+            </p>
           </div>
         </div>
       </>}
@@ -685,6 +813,16 @@ function SlashCard({ label, pct, description, color }: { label: string; pct: str
       <p className={`text-xs font-medium ${color}`}>{label}</p>
       <p className="text-lg font-bold text-white">{pct}</p>
       <p className="text-xs text-white/30">{description}</p>
+    </div>
+  );
+}
+
+function InfoCard({ title, value, description, color }: { title: string; value: string; description: string; color: string }) {
+  return (
+    <div className="card group hover:border-[#A855F7]/30 hover:shadow-[0_0_20px_rgba(168,85,247,0.1)] cursor-default">
+      <p className={`text-xs font-medium ${color} mb-1`}>{title}</p>
+      <p className="text-lg font-bold text-white mb-2">{value}</p>
+      <p className="text-xs text-white/40 leading-relaxed">{description}</p>
     </div>
   );
 }

@@ -462,7 +462,7 @@ export function DeployVaultForm() {
                 if (s.n < step) setStep(s.n as Step);
               }}
               disabled={s.n > step}
-              className={`flex items-center gap-2 text-xs font-mono transition-colors ${
+              className={`flex items-center gap-1.5 sm:gap-2 text-xs font-mono transition-colors min-h-[44px] sm:min-h-0 ${
                 s.n === step
                   ? 'text-[#C084FC]'
                   : s.n < step
@@ -471,7 +471,7 @@ export function DeployVaultForm() {
               }`}
             >
               <span
-                className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-colors ${
+                className={`w-6 h-6 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-colors shrink-0 ${
                   s.n === step
                     ? 'border-[#A855F7]/50 bg-[#A855F7]/10 text-[#C084FC]'
                     : s.n < step
@@ -490,7 +490,7 @@ export function DeployVaultForm() {
               <span className="hidden sm:inline">{s.label}</span>
             </button>
             {i < steps.length - 1 && (
-              <div className={`flex-1 h-px mx-2 ${s.n < step ? 'bg-emerald-500/30' : 'bg-white/5'}`} />
+              <div className={`flex-1 h-px mx-1 sm:mx-2 ${s.n < step ? 'bg-emerald-500/30' : 'bg-white/5'}`} />
             )}
           </div>
         ))}
@@ -510,7 +510,7 @@ export function DeployVaultForm() {
           <div className="flex items-center gap-2 mb-5">
             <button
               onClick={() => setUseManualAgent(false)}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all border ${
+              className={`px-3 py-2 min-h-[44px] sm:min-h-0 sm:py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all border ${
                 !useManualAgent
                   ? 'bg-[#A855F7]/15 text-[#C084FC] border-white/10'
                   : 'text-gray-500 hover:text-gray-300 border-transparent'
@@ -520,7 +520,7 @@ export function DeployVaultForm() {
             </button>
             <button
               onClick={() => setUseManualAgent(true)}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all border ${
+              className={`px-3 py-2 min-h-[44px] sm:min-h-0 sm:py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all border ${
                 useManualAgent
                   ? 'bg-[#A855F7]/15 text-[#C084FC] border-white/10'
                   : 'text-gray-500 hover:text-gray-300 border-transparent'
@@ -623,7 +623,7 @@ export function DeployVaultForm() {
             <button
               onClick={() => setStep(2)}
               disabled={!canProceedStep1}
-              className="btn-primary inline-flex items-center gap-2 text-sm"
+              className="btn-primary inline-flex items-center gap-2 text-sm min-h-[44px] w-full sm:w-auto justify-center"
             >
               Next: Choose Asset
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -648,7 +648,7 @@ export function DeployVaultForm() {
           <div className="flex items-center gap-2 mb-5">
             <button
               onClick={() => setUseCustomAsset(false)}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all border ${
+              className={`px-3 py-2 min-h-[44px] sm:min-h-0 sm:py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all border ${
                 !useCustomAsset
                   ? 'bg-[#A855F7]/15 text-[#C084FC] border-white/10'
                   : 'text-gray-500 hover:text-gray-300 border-transparent'
@@ -658,7 +658,7 @@ export function DeployVaultForm() {
             </button>
             <button
               onClick={() => setUseCustomAsset(true)}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all border ${
+              className={`px-3 py-2 min-h-[44px] sm:min-h-0 sm:py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all border ${
                 useCustomAsset
                   ? 'bg-[#A855F7]/15 text-[#C084FC] border-white/10'
                   : 'text-gray-500 hover:text-gray-300 border-transparent'
@@ -727,8 +727,8 @@ export function DeployVaultForm() {
           )}
 
           {/* Nav buttons */}
-          <div className="mt-6 flex justify-between">
-            <button onClick={() => setStep(1)} className="btn-secondary inline-flex items-center gap-2 text-sm">
+          <div className="mt-6 flex justify-between gap-3">
+            <button onClick={() => setStep(1)} className="btn-secondary inline-flex items-center gap-2 text-sm min-h-[44px]">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17l-5-5m0 0l5-5m-5 5h12" />
               </svg>
@@ -737,7 +737,7 @@ export function DeployVaultForm() {
             <button
               onClick={() => setStep(3)}
               disabled={!canProceedStep2}
-              className="btn-primary inline-flex items-center gap-2 text-sm"
+              className="btn-primary inline-flex items-center gap-2 text-sm min-h-[44px]"
             >
               Next: Configure
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -828,8 +828,8 @@ export function DeployVaultForm() {
           )}
 
           {/* Nav buttons */}
-          <div className="mt-6 flex justify-between">
-            <button onClick={() => setStep(2)} className="btn-secondary inline-flex items-center gap-2 text-sm">
+          <div className="mt-6 flex justify-between gap-3">
+            <button onClick={() => setStep(2)} className="btn-secondary inline-flex items-center gap-2 text-sm min-h-[44px]">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17l-5-5m0 0l5-5m-5 5h12" />
               </svg>
@@ -838,7 +838,7 @@ export function DeployVaultForm() {
             <button
               onClick={() => setStep(4)}
               disabled={!canProceedStep3}
-              className="btn-primary inline-flex items-center gap-2 text-sm"
+              className="btn-primary inline-flex items-center gap-2 text-sm min-h-[44px]"
             >
               Next: Deploy
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -923,11 +923,11 @@ export function DeployVaultForm() {
           )}
 
           {/* Nav + Deploy buttons */}
-          <div className="flex justify-between">
+          <div className="flex justify-between sticky bottom-16 md:static bg-[#12121a]/95 md:bg-transparent backdrop-blur-sm md:backdrop-blur-none py-3 md:py-0 -mx-6 px-6 md:mx-0 md:px-0 border-t border-white/5 md:border-0">
             <button
               onClick={() => setStep(3)}
               disabled={isDeployPending || isDeployConfirming}
-              className="btn-secondary inline-flex items-center gap-2 text-sm"
+              className="btn-secondary inline-flex items-center gap-2 text-sm min-h-[44px]"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17l-5-5m0 0l5-5m-5 5h12" />
@@ -937,7 +937,7 @@ export function DeployVaultForm() {
             <button
               onClick={handleDeploy}
               disabled={!canDeploy || isDeployPending || isDeployConfirming}
-              className="btn-primary inline-flex items-center justify-center gap-2 text-sm min-w-[160px]"
+              className="btn-primary inline-flex items-center justify-center gap-2 text-sm min-w-[160px] min-h-[44px]"
             >
               {(isDeployPending || isDeployConfirming) && <Spinner />}
               {isDeployPending

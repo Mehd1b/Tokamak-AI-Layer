@@ -393,7 +393,7 @@ export default function VaultsPage() {
   }, [deployedVaults]);
 
   return (
-    <div className="max-w-7xl mx-auto px-6 lg:px-12 py-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-8 sm:py-12">
       <VaultExplainer />
 
       {/* Header — editorial layout */}
@@ -540,7 +540,7 @@ export default function VaultsPage() {
           {isLoadingVaults && (
             <div>
               <div className="h-4 skeleton w-48 mb-6" />
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {[...Array(6)].map((_, i) => (
                   <div key={i} className="rounded-2xl border border-white/5 bg-[#12121a]/80 p-5" style={{ animationDelay: `${i * 80}ms` }}>
                     <div className="flex items-center justify-between mb-4">
@@ -587,14 +587,14 @@ export default function VaultsPage() {
                   )}
                 </h2>
 
-                <div className="flex items-center gap-3">
-                  {/* Sort pills */}
-                  <div className="flex items-center gap-1 bg-white/[0.02] rounded-lg p-0.5 border border-white/5 flex-wrap">
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  {/* Sort pills — horizontal scroll on mobile */}
+                  <div className="flex items-center gap-1 bg-white/[0.02] rounded-lg p-0.5 border border-white/5 overflow-x-auto scrollbar-none flex-1 sm:flex-initial">
                     {SORT_OPTIONS.map((opt) => (
                       <button
                         key={opt.key}
                         onClick={() => setSortBy(opt.key)}
-                        className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-all duration-200 whitespace-nowrap ${
+                        className={`px-2.5 py-1.5 min-h-[44px] sm:min-h-0 sm:py-1 rounded-md text-[11px] font-mono transition-all duration-200 whitespace-nowrap ${
                           sortBy === opt.key
                             ? 'bg-[#A855F7]/15 text-[#C084FC] shadow-sm'
                             : 'text-gray-500 hover:text-gray-300'
@@ -605,8 +605,8 @@ export default function VaultsPage() {
                     ))}
                   </div>
 
-                  {/* View toggle */}
-                  <div className="flex items-center gap-0.5 bg-white/[0.02] rounded-lg p-0.5 border border-white/5">
+                  {/* View toggle — hidden on mobile (always grid) */}
+                  <div className="hidden sm:flex items-center gap-0.5 bg-white/[0.02] rounded-lg p-0.5 border border-white/5">
                     <button
                       onClick={() => setViewMode('grid')}
                       className={`p-1.5 rounded-md transition-all duration-200 ${
@@ -640,7 +640,7 @@ export default function VaultsPage() {
 
               {/* Grid view */}
               {viewMode === 'grid' && (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {filteredAndSorted.map((v, i) => (
                     <VaultCard
                       key={v.address}

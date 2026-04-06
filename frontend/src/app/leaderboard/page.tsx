@@ -169,7 +169,7 @@ export default function LeaderboardPage() {
   }, [entries, sortKey, sortDir, timePeriod]);
 
   return (
-    <div className="max-w-7xl mx-auto px-6 lg:px-12 py-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-8 sm:py-12">
       {/* Header */}
       <div className="mb-10">
         <div className="flex items-center gap-3 mb-5">
@@ -199,7 +199,7 @@ export default function LeaderboardPage() {
             <button
               key={tp.key}
               onClick={() => setTimePeriod(tp.key)}
-              className={`px-3 py-1.5 rounded-md text-[11px] font-mono font-medium transition-all duration-200 ${
+              className={`px-3 py-1.5 min-h-[44px] sm:min-h-0 rounded-md text-[11px] font-mono font-medium transition-all duration-200 ${
                 timePeriod === tp.key
                   ? 'bg-[#A855F7]/15 text-[#C084FC] shadow-sm'
                   : 'text-gray-500 hover:text-gray-300'
@@ -275,51 +275,147 @@ export default function LeaderboardPage() {
         </div>
       )}
 
-      {/* Leaderboard table */}
+      {/* Leaderboard table — desktop */}
       {!isLoading && sorted.length > 0 && (
-        <div className="overflow-x-auto">
-          {/* Table header */}
-          <div className="flex items-center gap-4 px-5 py-2 mb-1 min-w-[800px]">
-            <div className="w-10 shrink-0">
-              <SortHeader label="#" sortKey="rank" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+        <>
+          {/* Desktop table (hidden on mobile) */}
+          <div className="hidden md:block overflow-x-auto">
+            {/* Table header */}
+            <div className="flex items-center gap-4 px-5 py-2 mb-1 min-w-[800px]">
+              <div className="w-10 shrink-0">
+                <SortHeader label="#" sortKey="rank" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+              </div>
+              <div className="flex-1 min-w-[140px]">
+                <SortHeader label="Agent" sortKey="name" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+              </div>
+              <div className="w-24 shrink-0">
+                <SortHeader label="Strategy" sortKey="strategy" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+              </div>
+              <div className="w-24 shrink-0 text-right">
+                <SortHeader label={`${periodLabel(timePeriod)} Return`} sortKey="return" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="justify-end" />
+              </div>
+              <div className="w-24 shrink-0 text-right">
+                <SortHeader label="Drawdown" sortKey="drawdown" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="justify-end" />
+              </div>
+              <div className="w-32 shrink-0 text-right">
+                <SortHeader label="TVL" sortKey="tvl" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="justify-end" />
+              </div>
+              <div className="w-16 shrink-0 text-right">
+                <SortHeader label="Vaults" sortKey="vaults" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="justify-end" />
+              </div>
+              <div className="w-20 shrink-0 text-right">
+                <SortHeader label="Execs" sortKey="executions" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="justify-end" />
+              </div>
+              <div className="w-5 shrink-0" />
             </div>
-            <div className="flex-1 min-w-[140px]">
-              <SortHeader label="Agent" sortKey="name" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+
+            {/* Table rows */}
+            <div className="space-y-1.5 min-w-[800px]">
+              {sorted.map((entry, i) => {
+                const ret = getReturnForPeriod(entry, timePeriod);
+                const isPositive = ret !== null && ret >= 0;
+                const retArrow = ret !== null ? (isPositive ? '\u2191' : '\u2193') : '';
+                const retColor = ret !== null
+                  ? isPositive ? 'text-green-400' : 'text-red-400'
+                  : 'text-gray-600';
+                const ddColor = entry.maxDrawdown !== null
+                  ? entry.maxDrawdown < -10 ? 'text-red-400'
+                    : entry.maxDrawdown < -5 ? 'text-amber-400'
+                    : 'text-gray-400'
+                  : 'text-gray-600';
+
+                const badge = entry.strategy ? strategyBadge(entry.strategy) : null;
+
+                return (
+                  <Link
+                    key={entry.agentId}
+                    href={`/agents/${encodeURIComponent(entry.agentId)}`}
+                  >
+                    <div
+                      className="group flex items-center gap-4 px-5 py-3.5 rounded-xl border border-white/5 bg-[#12121a]/80 transition-all duration-300 ease-out hover:bg-[#1a1a28]/80 hover:border-[#A855F7]/20 vault-card-enter cursor-pointer"
+                      style={{ animationDelay: `${i * 40}ms` }}
+                    >
+                      {/* Rank */}
+                      <div className="w-10 shrink-0">
+                        <span className={`text-sm font-mono font-medium ${
+                          i === 0 ? 'text-amber-400' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-orange-400' : 'text-gray-500'
+                        }`}>
+                          {i + 1}
+                        </span>
+                      </div>
+
+                      {/* Agent name */}
+                      <div className="flex-1 min-w-[140px]">
+                        <p className="text-sm font-mono text-gray-200 group-hover:text-white transition-colors truncate">
+                          {entry.name || truncateBytes32(entry.agentId, 6)}
+                        </p>
+                        {!entry.name && (
+                          <p className="text-[10px] font-mono text-gray-600 truncate">{entry.agentId}</p>
+                        )}
+                      </div>
+
+                      {/* Strategy */}
+                      <div className="w-24 shrink-0">
+                        {badge ? (
+                          <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider shrink-0 ${badge.bg} ${badge.text} ${badge.border}`}>
+                            {entry.strategy}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-mono text-gray-600">-</span>
+                        )}
+                      </div>
+
+                      {/* Return */}
+                      <div className="w-24 shrink-0 text-right">
+                        <span className={`text-sm font-mono font-medium ${retColor}`}>
+                          {ret !== null ? `${retArrow} ${Math.abs(ret).toFixed(2)}%` : '-'}
+                        </span>
+                      </div>
+
+                      {/* Drawdown */}
+                      <div className="w-24 shrink-0 text-right">
+                        <span className={`text-sm font-mono ${ddColor}`}>
+                          {entry.maxDrawdown !== null ? `${entry.maxDrawdown.toFixed(2)}%` : '-'}
+                        </span>
+                      </div>
+
+                      {/* TVL */}
+                      <div className="w-32 shrink-0 text-right">
+                        <span className="text-sm font-mono text-white">{formatTVL(entry)}</span>
+                        <span className="text-xs font-mono text-gray-500 ml-1">{assetSymbol(entry)}</span>
+                      </div>
+
+                      {/* Vault count */}
+                      <div className="w-16 shrink-0 text-right">
+                        <span className="text-sm font-mono text-gray-400">{entry.vaultCount}</span>
+                      </div>
+
+                      {/* Executions */}
+                      <div className="w-20 shrink-0 text-right">
+                        <span className="text-sm font-mono text-gray-400">{entry.executionCount}</span>
+                      </div>
+
+                      {/* Arrow */}
+                      <div className="w-5 shrink-0">
+                        <svg className="w-4 h-4 text-gray-600 group-hover:text-gray-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                        </svg>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
-            <div className="w-24 shrink-0">
-              <SortHeader label="Strategy" sortKey="strategy" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-            </div>
-            <div className="w-24 shrink-0 text-right">
-              <SortHeader label={`${periodLabel(timePeriod)} Return`} sortKey="return" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="justify-end" />
-            </div>
-            <div className="w-24 shrink-0 text-right">
-              <SortHeader label="Drawdown" sortKey="drawdown" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="justify-end" />
-            </div>
-            <div className="w-32 shrink-0 text-right">
-              <SortHeader label="TVL" sortKey="tvl" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="justify-end" />
-            </div>
-            <div className="w-16 shrink-0 text-right">
-              <SortHeader label="Vaults" sortKey="vaults" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="justify-end" />
-            </div>
-            <div className="w-20 shrink-0 text-right">
-              <SortHeader label="Execs" sortKey="executions" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="justify-end" />
-            </div>
-            <div className="w-5 shrink-0" />
           </div>
 
-          {/* Table rows */}
-          <div className="space-y-1.5 min-w-[800px]">
+          {/* Mobile card layout (visible only on mobile) */}
+          <div className="md:hidden space-y-3">
             {sorted.map((entry, i) => {
               const ret = getReturnForPeriod(entry, timePeriod);
               const isPositive = ret !== null && ret >= 0;
               const retArrow = ret !== null ? (isPositive ? '\u2191' : '\u2193') : '';
               const retColor = ret !== null
                 ? isPositive ? 'text-green-400' : 'text-red-400'
-                : 'text-gray-600';
-              const ddColor = entry.maxDrawdown !== null
-                ? entry.maxDrawdown < -10 ? 'text-red-400'
-                  : entry.maxDrawdown < -5 ? 'text-amber-400'
-                  : 'text-gray-400'
                 : 'text-gray-600';
 
               const badge = entry.strategy ? strategyBadge(entry.strategy) : null;
@@ -330,81 +426,57 @@ export default function LeaderboardPage() {
                   href={`/agents/${encodeURIComponent(entry.agentId)}`}
                 >
                   <div
-                    className="group flex items-center gap-4 px-5 py-3.5 rounded-xl border border-white/5 bg-[#12121a]/80 transition-all duration-300 ease-out hover:bg-[#1a1a28]/80 hover:border-[#A855F7]/20 vault-card-enter cursor-pointer"
+                    className="rounded-xl border border-white/5 bg-[#12121a]/80 p-4 min-h-[44px] active:bg-[#1a1a28]/80 transition-colors vault-card-enter"
                     style={{ animationDelay: `${i * 40}ms` }}
                   >
-                    {/* Rank */}
-                    <div className="w-10 shrink-0">
-                      <span className={`text-sm font-mono font-medium ${
+                    {/* Top row: rank + name + arrow */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className={`text-lg font-mono font-bold w-8 shrink-0 ${
                         i === 0 ? 'text-amber-400' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-orange-400' : 'text-gray-500'
                       }`}>
                         {i + 1}
                       </span>
-                    </div>
-
-                    {/* Agent name */}
-                    <div className="flex-1 min-w-[140px]">
-                      <p className="text-sm font-mono text-gray-200 group-hover:text-white transition-colors truncate">
-                        {entry.name || truncateBytes32(entry.agentId, 6)}
-                      </p>
-                      {!entry.name && (
-                        <p className="text-[10px] font-mono text-gray-600 truncate">{entry.agentId}</p>
-                      )}
-                    </div>
-
-                    {/* Strategy */}
-                    <div className="w-24 shrink-0">
-                      {badge ? (
-                        <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider shrink-0 ${badge.bg} ${badge.text} ${badge.border}`}>
-                          {entry.strategy}
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-mono text-gray-600">-</span>
-                      )}
-                    </div>
-
-                    {/* Return */}
-                    <div className="w-24 shrink-0 text-right">
-                      <span className={`text-sm font-mono font-medium ${retColor}`}>
-                        {ret !== null ? `${retArrow} ${Math.abs(ret).toFixed(2)}%` : '-'}
-                      </span>
-                    </div>
-
-                    {/* Drawdown */}
-                    <div className="w-24 shrink-0 text-right">
-                      <span className={`text-sm font-mono ${ddColor}`}>
-                        {entry.maxDrawdown !== null ? `${entry.maxDrawdown.toFixed(2)}%` : '-'}
-                      </span>
-                    </div>
-
-                    {/* TVL */}
-                    <div className="w-32 shrink-0 text-right">
-                      <span className="text-sm font-mono text-white">{formatTVL(entry)}</span>
-                      <span className="text-xs font-mono text-gray-500 ml-1">{assetSymbol(entry)}</span>
-                    </div>
-
-                    {/* Vault count */}
-                    <div className="w-16 shrink-0 text-right">
-                      <span className="text-sm font-mono text-gray-400">{entry.vaultCount}</span>
-                    </div>
-
-                    {/* Executions */}
-                    <div className="w-20 shrink-0 text-right">
-                      <span className="text-sm font-mono text-gray-400">{entry.executionCount}</span>
-                    </div>
-
-                    {/* Arrow */}
-                    <div className="w-5 shrink-0">
-                      <svg className="w-4 h-4 text-gray-600 group-hover:text-gray-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-mono text-gray-200 truncate">
+                          {entry.name || truncateBytes32(entry.agentId, 6)}
+                        </p>
+                        {badge && (
+                          <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider mt-1 ${badge.bg} ${badge.text} ${badge.border}`}>
+                            {entry.strategy}
+                          </span>
+                        )}
+                      </div>
+                      <svg className="w-4 h-4 text-gray-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                       </svg>
+                    </div>
+
+                    {/* Metrics grid */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <p className="text-[10px] text-gray-500 font-mono uppercase tracking-wider mb-0.5">
+                          {periodLabel(timePeriod)} Return
+                        </p>
+                        <span className={`text-sm font-mono font-medium ${retColor}`}>
+                          {ret !== null ? `${retArrow} ${Math.abs(ret).toFixed(1)}%` : '-'}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-500 font-mono uppercase tracking-wider mb-0.5">TVL</p>
+                        <span className="text-sm font-mono text-white">{formatTVL(entry)}</span>
+                        <span className="text-[10px] font-mono text-gray-500 ml-0.5">{assetSymbol(entry)}</span>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-500 font-mono uppercase tracking-wider mb-0.5">Execs</p>
+                        <span className="text-sm font-mono text-gray-400">{entry.executionCount}</span>
+                      </div>
                     </div>
                   </div>
                 </Link>
               );
             })}
           </div>
-        </div>
+        </>
       )}
     </div>
   );

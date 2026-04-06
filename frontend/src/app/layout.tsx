@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 import { Navbar } from '@/components/layout/Navbar';
+import { MobileNav } from '@/components/layout/MobileNav';
 
 // Force dynamic rendering — wagmi/web3 providers use localStorage
 // which is unavailable during static generation in Node.js
@@ -100,8 +101,9 @@ export default function RootLayout({
       <body className="flex min-h-screen flex-col bg-[#0a0a0f]">
         <Providers>
           <Navbar />
-          <main className="relative z-10 flex-1 pt-20">{children}</main>
+          <main className="relative z-10 flex-1 pt-20 pb-16 md:pb-0">{children}</main>
           <Footer />
+          <MobileNav />
         </Providers>
         <Analytics />
       </body>

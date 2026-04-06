@@ -1,5 +1,8 @@
 [workspace]
 resolver = "2"
+exclude = [
+    "prover-service",
+]
 members = [
     # Protocol crates
     "crates/protocol/kernel-core",

@@ -18,7 +18,7 @@ function formatClean(value: bigint, decimals: number): string {
 function PnLBadge({ value, decimals }: { value: bigint; decimals: number }) {
   if (value === 0n) {
     return (
-      <span className="text-gray-500 font-mono text-sm">0.00</span>
+      <span className="text-gray-500 font-mono text-xs sm:text-sm">0.00</span>
     );
   }
   const isPositive = value > 0n;
@@ -28,7 +28,7 @@ function PnLBadge({ value, decimals }: { value: bigint; decimals: number }) {
 
   return (
     <span
-      className={`font-mono text-sm ${
+      className={`font-mono text-xs sm:text-sm ${
         isPositive ? 'text-emerald-400' : 'text-red-400'
       }`}
     >
@@ -102,7 +102,7 @@ function PositionCard({ position }: { position: UserPosition }) {
             Current Value
           </p>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-light tracking-tight text-white font-mono">
+            <span className="text-xl sm:text-2xl font-light tracking-tight text-white font-mono truncate">
               {formatClean(position.currentValue, position.assetDecimals)}
             </span>
             <span className="text-xs font-mono font-medium text-[#C084FC]">
@@ -218,7 +218,7 @@ export default function PortfolioPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 lg:px-12 py-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-8 sm:py-12">
       {/* Breadcrumbs */}
       <nav className="breadcrumb">
         <Link href="/">Home</Link>
@@ -227,7 +227,7 @@ export default function PortfolioPage() {
       </nav>
 
       {/* Header */}
-      <div className="mb-10">
+      <div className="mb-8 sm:mb-10">
         <div className="flex items-center gap-3 mb-5">
           <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#A855F7] to-transparent" />
           <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C084FC] font-mono">
@@ -306,44 +306,44 @@ export default function PortfolioPage() {
       {!isLoading && !error && (
         <>
           {/* Summary cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <div className="card text-center py-6">
-              <div className="text-xs text-gray-500 font-mono uppercase tracking-wider mb-2">
+          <div className="flex flex-col sm:flex-row gap-4 mb-8">
+            <div className="card text-center py-4 sm:py-6 flex-1">
+              <div className="text-[10px] sm:text-xs text-gray-500 font-mono uppercase tracking-wider mb-1 sm:mb-2">
                 Total Value
               </div>
-              <div className="text-2xl font-light text-white font-mono">
+              <div className="text-xl sm:text-2xl font-light text-white font-mono">
                 {positions.length > 0
                   ? formatClean(totalValue, positions[0].assetDecimals)
                   : '0'}
                 {positions.length > 0 && (
-                  <span className="text-sm text-gray-400 ml-1">
+                  <span className="text-xs sm:text-sm text-gray-400 ml-1">
                     {positions[0].assetSymbol}
                   </span>
                 )}
               </div>
             </div>
-            <div className="card text-center py-6">
-              <div className="text-xs text-gray-500 font-mono uppercase tracking-wider mb-2">
+            <div className="card text-center py-4 sm:py-6 flex-1">
+              <div className="text-[10px] sm:text-xs text-gray-500 font-mono uppercase tracking-wider mb-1 sm:mb-2">
                 Total Unrealized P&L
               </div>
-              <div className="text-2xl font-light font-mono">
+              <div className="text-xl sm:text-2xl font-light font-mono">
                 {positions.length > 0 ? (
                   <PnLBadge value={totalPnL} decimals={positions[0].assetDecimals} />
                 ) : (
                   <span className="text-gray-500">0.00</span>
                 )}
                 {positions.length > 0 && (
-                  <span className="text-sm text-gray-400 ml-1">
+                  <span className="text-xs sm:text-sm text-gray-400 ml-1">
                     {positions[0].assetSymbol}
                   </span>
                 )}
               </div>
             </div>
-            <div className="card text-center py-6">
-              <div className="text-xs text-gray-500 font-mono uppercase tracking-wider mb-2">
+            <div className="card text-center py-4 sm:py-6 flex-1">
+              <div className="text-[10px] sm:text-xs text-gray-500 font-mono uppercase tracking-wider mb-1 sm:mb-2">
                 Active Positions
               </div>
-              <div className="text-2xl font-light text-white font-mono">
+              <div className="text-xl sm:text-2xl font-light text-white font-mono">
                 {positions.length}
               </div>
             </div>
@@ -355,7 +355,7 @@ export default function PortfolioPage() {
               <h2 className="text-xs font-mono text-gray-500 uppercase tracking-wider mb-5">
                 {positions.length} position{positions.length !== 1 ? 's' : ''}
               </h2>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
                 {positions.map((pos) => (
                   <PositionCard key={pos.vaultAddress} position={pos} />
                 ))}

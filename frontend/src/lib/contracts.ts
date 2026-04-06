@@ -9,6 +9,7 @@ import { KernelExecutionVerifierABI as _KernelExecutionVerifierABI } from '@ek-s
 import { OptimisticKernelVaultABI as _OptimisticKernelVaultABI } from '@ek-sdk/abi/OptimisticKernelVault';
 import { WSTONBondManagerABI as _WSTONBondManagerABI } from '@ek-sdk/abi/WSTONBondManager';
 import { ReferralManagerABI as _ReferralManagerABI } from '@ek-sdk/abi/ReferralManager';
+import { PointsProgramABI as _PointsProgramABI } from '@ek-sdk/abi/PointsProgram';
 
 export const AgentRegistryABI = _AgentRegistryABI;
 export const VaultFactoryABI = _VaultFactoryABI;
@@ -17,3 +18,4 @@ export const KernelExecutionVerifierABI = _KernelExecutionVerifierABI;
 export const OptimisticKernelVaultABI = _OptimisticKernelVaultABI;
 export const WSTONBondManagerABI = _WSTONBondManagerABI;
 export const ReferralManagerABI = _ReferralManagerABI;
+export const PointsProgramABI = _PointsProgramABI;

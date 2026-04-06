@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  prover-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-3001}:3001"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3001
+      - RUST_LOG=prover_service=info,tower_http=info
+      - WORKER_CONCURRENCY=${WORKER_CONCURRENCY:-1}
+      - API_KEYS=${API_KEYS:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

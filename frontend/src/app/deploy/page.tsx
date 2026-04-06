@@ -5,9 +5,9 @@ import Link from 'next/link';
 
 export default function DeployPage() {
   return (
-    <div className="max-w-2xl mx-auto px-6 lg:px-12 py-12">
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-12 py-8 sm:py-12">
       {/* Header — editorial layout matching vaults page */}
-      <div className="mb-10">
+      <div className="mb-8 sm:mb-10">
         <div className="flex items-center gap-3 mb-5">
           <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#A855F7] to-transparent" />
           <span
@@ -17,7 +17,7 @@ export default function DeployPage() {
           </span>
         </div>
         <h1
-          className="text-4xl md:text-5xl font-light mb-3 tracking-tight"
+          className="text-3xl sm:text-4xl md:text-5xl font-light mb-3 tracking-tight"
           style={{ fontFamily: 'var(--font-serif), serif' }}
         >
           <span className="italic text-[#A855F7]">Deploy</span>{' '}
@@ -29,8 +29,8 @@ export default function DeployPage() {
       </div>
 
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[11px] font-mono text-gray-600 mb-8">
-        <Link href="/vaults" className="hover:text-gray-400 transition-colors">
+      <div className="flex items-center gap-2 text-[11px] font-mono text-gray-600 mb-6 sm:mb-8">
+        <Link href="/vaults" className="hover:text-gray-400 transition-colors min-h-[44px] sm:min-h-0 flex items-center">
           Vaults
         </Link>
         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

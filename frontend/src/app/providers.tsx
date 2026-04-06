@@ -5,22 +5,39 @@ import { WagmiProvider, createConfig, http } from 'wagmi';
 import { mainnet, sepolia, arbitrum, optimism } from 'wagmi/chains';
 import { hyperEvmMainnet, hyperEvmTestnet, thanosSepolia } from '@/lib/chains';
 import { RainbowKitProvider, connectorsForWallets } from '@rainbow-me/rainbowkit';
-import { metaMaskWallet } from '@rainbow-me/rainbowkit/wallets';
+import {
+  metaMaskWallet,
+  coinbaseWallet,
+  walletConnectWallet,
+  rabbyWallet,
+  safeWallet,
+  ledgerWallet,
+  injectedWallet,
+} from '@rainbow-me/rainbowkit/wallets';
 import '@rainbow-me/rainbowkit/styles.css';
 import { useState, type ReactNode } from 'react';
 import { NetworkProvider } from '@/lib/NetworkContext';
 import { TokamakProvider } from '@ek-sdk/react';
 
+const walletConnectProjectId = process.env.NEXT_PUBLIC_WALLET_CONNECT_ID || 'placeholder';
+if (typeof window !== 'undefined' && walletConnectProjectId === 'placeholder') {
+  console.warn('[Tokagent] NEXT_PUBLIC_WALLET_CONNECT_ID is not set — WalletConnect will not work in production.');
+}
+
 const connectors = connectorsForWallets(
   [
     {
-      groupName: 'Supported',
-      wallets: [metaMaskWallet],
+      groupName: 'Popular',
+      wallets: [metaMaskWallet, coinbaseWallet, rabbyWallet, walletConnectWallet],
+    },
+    {
+      groupName: 'More',
+      wallets: [safeWallet, ledgerWallet, injectedWallet],
     },
   ],
   {
     appName: 'Tokagent',
-    projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_ID || 'placeholder',
+    projectId: walletConnectProjectId,
   },
 );
 
@@ -36,7 +53,7 @@ const config = createConfig({
     [hyperEvmTestnet.id]: http('/api/rpc/998'),
     [thanosSepolia.id]: http('/api/rpc/111551119090'),
   },
-  multiInjectedProviderDiscovery: false,
+  multiInjectedProviderDiscovery: true,
   ssr: true,
 });
 

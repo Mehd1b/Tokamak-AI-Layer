@@ -202,7 +202,7 @@ export function VaultCard({
 
         {/* Row 1: Badges + Status */}
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {/* Live status dot */}
             {hasActivity && (
               <span className="relative flex h-2 w-2">
@@ -230,7 +230,7 @@ export function VaultCard({
             Total Value Locked
           </p>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-light tracking-tight text-white font-mono">
+            <span className="text-xl md:text-2xl font-light tracking-tight text-white font-mono truncate">
               {tvl}
             </span>
             <span className={`text-xs font-mono font-medium ${accent.text}`}>
@@ -240,10 +240,10 @@ export function VaultCard({
         </div>
 
         {/* Row 3: Balance + Returns */}
-        <div className="mb-4 flex items-stretch gap-2">
+        <div className="mb-4 flex flex-col sm:flex-row items-stretch gap-2">
           <div className="flex-1 rounded-lg bg-white/[0.03] px-3 py-2">
             <p className="text-[10px] text-gray-500 font-mono uppercase tracking-wider mb-0.5">Balance</p>
-            <p className="text-xs text-gray-300 font-mono">{balance} <span className="text-gray-500">{assetSymbol}</span></p>
+            <p className="text-xs md:text-sm text-gray-300 font-mono truncate">{balance} <span className="text-gray-500">{assetSymbol}</span></p>
           </div>
           <div className="flex items-center">
             <ReturnsBadge address={address} />
@@ -253,7 +253,7 @@ export function VaultCard({
         {/* Row 4: Agent profile */}
         <div className="mb-3">
           <div className="rounded-lg bg-white/[0.02] px-3 py-2 space-y-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-h-[44px] md:min-h-0">
               <span className="text-xs font-medium text-gray-300 truncate" title={agentId}>
                 <AgentName agentId={agentId} />
               </span>
@@ -264,7 +264,7 @@ export function VaultCard({
 
         {/* Row 5: Address */}
         <div className="flex items-center justify-between text-[11px] font-mono text-gray-500">
-          <span className="group-hover:text-gray-400 transition-colors">
+          <span className="group-hover:text-gray-400 transition-colors truncate">
             {truncateAddress(address, 6)}
           </span>
         </div>
