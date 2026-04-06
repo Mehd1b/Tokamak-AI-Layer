@@ -5,6 +5,7 @@ export interface DeploymentAddresses {
   riscZeroVerifierRouter: `0x${string}`;
   referralManager?: `0x${string}`;
   pointsProgram?: `0x${string}`;
+  builderProgram?: `0x${string}`;
 }
 
 export const ETHEREUM_MAINNET_ADDRESSES: DeploymentAddresses = {
@@ -12,6 +13,8 @@ export const ETHEREUM_MAINNET_ADDRESSES: DeploymentAddresses = {
   vaultFactory: '0x47E6EfFf516E8b899092ebEEF92fddCE579e9d39',
   kernelExecutionVerifier: '0x5c0F88e27FADAb50EA82572950a616b4Cf4fd8B3',
   riscZeroVerifierRouter: '0x8EaB2D97Dfce405A1692a21b3ff3A172d593D319',
+  pointsProgram: '0xcd1ade9a9dc45e2008d7246735bcfaa7ac430b5f',
+  builderProgram: '0xd27a7470a34903b7e215ea8d07d9cd2d21238f83',
 } as const;
 
 export const HYPEREVM_MAINNET_ADDRESSES: DeploymentAddresses = {
@@ -19,6 +22,8 @@ export const HYPEREVM_MAINNET_ADDRESSES: DeploymentAddresses = {
   vaultFactory: '0xd27A7470a34903b7e215EA8d07d9cd2d21238F83',
   kernelExecutionVerifier: '0xD1478689f829c4B4F882eB8Ef7914C7874ddC707',
   riscZeroVerifierRouter: '0x9f8d4D1f7AAf06aab1640abd565A731399862Bc8',
+  pointsProgram: '0xb391DC76133D39280fA5348e1119ba67A4418170',
+  builderProgram: '0x27ce5DEC1162D395B5Fce025458e8e8878212443',
 } as const;
 
 export const SEPOLIA_ADDRESSES: DeploymentAddresses = {
@@ -40,6 +45,8 @@ export const ARBITRUM_ADDRESSES: DeploymentAddresses = {
   vaultFactory: '0x7b0E7eDf494acF2E90fBc9Fc97b8C412606B0611',
   kernelExecutionVerifier: '0x936782d6bB65C75dFeC03228d1a5cb5d38C59318',
   riscZeroVerifierRouter: '0x0b144e07a0826182b6b59788c34b32bfa86fb711',
+  pointsProgram: '0x5a14e3b99813277c4ecca298f9810870f087ee58',
+  builderProgram: '0x5c0f88e27fadab50ea82572950a616b4cf4fd8b3',
 } as const;
 
 export const OPTIMISM_ADDRESSES: DeploymentAddresses = {
@@ -47,6 +54,8 @@ export const OPTIMISM_ADDRESSES: DeploymentAddresses = {
   vaultFactory: '0x7b0E7eDf494acF2E90fBc9Fc97b8C412606B0611',
   kernelExecutionVerifier: '0x936782d6bB65C75dFeC03228d1a5cb5d38C59318',
   riscZeroVerifierRouter: '0x0b144e07a0826182b6b59788c34b32bfa86fb711',
+  pointsProgram: '0x5a14e3b99813277c4ecca298f9810870f087ee58',
+  builderProgram: '0x5c0f88e27fadab50ea82572950a616b4cf4fd8b3',
 } as const;
 
 export const DEPLOYMENTS: Record<number, DeploymentAddresses> = {
