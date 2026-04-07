@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { formatUnits, parseEther, parseUnits } from 'viem';
 import { useAccount, useBalance, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useDepositETH, useDepositERC20 } from '@/hooks/useKernelVault';
@@ -20,9 +20,10 @@ interface VaultDepositFormProps {
   assetDecimals?: number;
   assetSymbol?: string;
   assetAddress?: `0x${string}`;
+  onDepositSuccess?: (amount: bigint) => void;
 }
 
-export function VaultDepositForm({ vaultAddress, isEthVault = true, assetDecimals = 18, assetSymbol = 'ETH', assetAddress }: VaultDepositFormProps) {
+export function VaultDepositForm({ vaultAddress, isEthVault = true, assetDecimals = 18, assetSymbol = 'ETH', assetAddress, onDepositSuccess }: VaultDepositFormProps) {
   const [amount, setAmount] = useState('');
   const { address: userAddress } = useAccount();
   const { selectedChainId } = useNetwork();
@@ -83,6 +84,18 @@ export function VaultDepositForm({ vaultAddress, isEthVault = true, assetDecimal
   }, [isApproveSuccess, refetchAllowance]);
 
   const { isPending, isConfirming, isSuccess, error } = isEthVault ? ethDeposit : erc20Deposit;
+
+  // Fire onDepositSuccess once when deposit confirms
+  const depositSuccessFired = useRef(false);
+  useEffect(() => {
+    if (isSuccess && !depositSuccessFired.current) {
+      depositSuccessFired.current = true;
+      onDepositSuccess?.(parsedAmount);
+    }
+    if (!isSuccess) {
+      depositSuccessFired.current = false;
+    }
+  }, [isSuccess]);
 
   const hasValidAmount = !!amount && parseFloat(amount) > 0;
 

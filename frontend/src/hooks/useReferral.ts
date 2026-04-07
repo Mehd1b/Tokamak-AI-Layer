@@ -1,6 +1,8 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useSearchParams } from 'next/navigation';
 import { useNetwork } from '@/lib/NetworkContext';
 import { ReferralManagerABI } from '@/lib/contracts';
 import { useLegacyGas } from '@/hooks/useLegacyGas';
@@ -190,6 +192,42 @@ export function useRecordReferral() {
 export function useReferralAvailable(): boolean {
   const referralManager = useReferralManagerAddress();
   return !!referralManager;
+}
+
+const REFERRAL_STORAGE_KEY = 'ek-referral-code';
+
+/**
+ * Capture the ?ref= URL parameter and persist it in localStorage.
+ * Call this on any page where a referral link may land (e.g. /vaults).
+ * Returns the stored referral code (if any).
+ */
+export function useStoredReferralCode(): string | null {
+  const searchParams = useSearchParams();
+  const [code, setCode] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(REFERRAL_STORAGE_KEY);
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    const refParam = searchParams?.get('ref');
+    if (refParam) {
+      localStorage.setItem(REFERRAL_STORAGE_KEY, refParam);
+      setCode(refParam);
+    }
+  }, [searchParams]);
+
+  return code;
+}
+
+/**
+ * Clear the stored referral code (call after successfully recording it on-chain).
+ */
+export function clearStoredReferralCode() {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(REFERRAL_STORAGE_KEY);
+  }
 }
 
 export { ZERO_BYTES32, ZERO_ADDRESS };

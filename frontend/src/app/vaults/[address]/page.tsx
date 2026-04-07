@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useAccount, useBalance, useReadContract } from 'wagmi';
 import { useVaultInfo, useVaultShares } from '@/hooks/useKernelVault';
@@ -29,6 +29,7 @@ import { BondStatusCard } from '@/components/BondStatusCard';
 import { useAgentMetadata } from '@/hooks/useAgentMetadata';
 import { useAgent } from '@/hooks/useKernelAgent';
 import { useVaultFees } from '@/hooks/useVaultFees';
+import { useStoredReferralCode, useRecordReferral, hashReferralCode, clearStoredReferralCode, useReferralAvailable } from '@/hooks/useReferral';
 import Link from 'next/link';
 
 const ERC20_BALANCE_ABI = [
@@ -60,6 +61,26 @@ export default function VaultDetailPage() {
     show: boolean;
     sharesMinted: bigint;
   }>({ show: false, sharesMinted: 0n });
+
+  // Referral tracking
+  const storedRefCode = useStoredReferralCode();
+  const referralAvailable = useReferralAvailable();
+  const { record: recordReferral, isSuccess: referralRecorded } = useRecordReferral();
+  const referralFired = useRef(false);
+
+  const handleReferralRecord = useCallback((depositAmount: bigint) => {
+    if (!storedRefCode || !userAddress || !referralAvailable || referralFired.current) return;
+    referralFired.current = true;
+    const codeHash = hashReferralCode(storedRefCode);
+    recordReferral(userAddress, codeHash, depositAmount, vault.assetDecimals);
+  }, [storedRefCode, userAddress, referralAvailable, vault.assetDecimals, recordReferral]);
+
+  // Clear stored code once referral is recorded on-chain
+  useEffect(() => {
+    if (referralRecorded) {
+      clearStoredReferralCode();
+    }
+  }, [referralRecorded]);
 
   // Fetch user balance for DepositStepper
   const assetAddr = vault.asset as `0x${string}` | undefined;
@@ -503,7 +524,10 @@ export default function VaultDetailPage() {
                   assetSymbol={vault.assetSymbol}
                   assetDecimals={vault.assetDecimals}
                   userBalance={userBalanceBigInt}
-                  onSuccess={(sharesMinted) => setDepositConfirmation({ show: true, sharesMinted })}
+                  onSuccess={(sharesMinted) => {
+                    setDepositConfirmation({ show: true, sharesMinted });
+                    handleReferralRecord(sharesMinted);
+                  }}
                 />
               ) : (
                 <VaultDepositForm
@@ -512,6 +536,7 @@ export default function VaultDetailPage() {
                   assetDecimals={vault.assetDecimals}
                   assetSymbol={vault.assetSymbol}
                   assetAddress={vault.asset as `0x${string}` | undefined}
+                  onDepositSuccess={handleReferralRecord}
                 />
               )}
             </div>

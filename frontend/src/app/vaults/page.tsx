@@ -10,6 +10,7 @@ import { VaultCard, VaultRow } from '@/components/VaultCard';
 import { VaultExplainer } from '@/components/VaultExplainer';
 import { PROTOCOL_TYPE } from '@/lib/protocolTypes';
 import { AgentRegistryABI } from '@/lib/contracts';
+import { useStoredReferralCode } from '@/hooks/useReferral';
 import Link from 'next/link';
 
 /* ------------------------------------------------------------------ */
@@ -281,6 +282,9 @@ function useBatchAgentMetadata(agentIds: `0x${string}`[]) {
 /* ------------------------------------------------------------------ */
 
 export default function VaultsPage() {
+  // Capture ?ref= param from referral links and persist to localStorage
+  useStoredReferralCode();
+
   const [searchAddress, setSearchAddress] = useState('');
   const [sortBy, setSortBy] = useState<SortKey>('tvl');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
