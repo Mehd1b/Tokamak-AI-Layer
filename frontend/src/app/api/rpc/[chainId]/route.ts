@@ -14,6 +14,7 @@ function getRpcUrl(chainId: string): string | null {
     '1': process.env.RPC_MAINNET,
     '10': process.env.RPC_OPTIMISM,
     '42161': process.env.RPC_ARBITRUM,
+    '137': process.env.RPC_POLYGON,
     '11155111': process.env.RPC_SEPOLIA,
     '999': process.env.RPC_HYPER_MAINNET,
     '998': process.env.RPC_HYPER_TESTNET,

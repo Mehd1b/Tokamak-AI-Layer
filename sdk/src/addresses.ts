@@ -62,11 +62,20 @@ export const OPTIMISM_ADDRESSES: DeploymentAddresses = {
   referralManager: '0x47E6EfFf516E8b899092ebEEF92fddCE579e9d39',
 } as const;
 
+export const POLYGON_ADDRESSES: DeploymentAddresses = {
+  agentRegistry: '0x7b0E7eDf494acF2E90fBc9Fc97b8C412606B0611',
+  vaultFactory: '0x0eDa0bCFBFc51Ab245F078AEFa3ee42cB384c865',
+  kernelExecutionVerifier: '0x5A14E3b99813277c4EcCA298f9810870f087eE58',
+  riscZeroVerifierRouter: '0x496b30da136c364975229682dfefd8218a21a6ec',
+  referralManager: '0xd1478689f829c4b4f882eb8ef7914c7874ddc707',
+} as const;
+
 export const DEPLOYMENTS: Record<number, DeploymentAddresses> = {
   1: ETHEREUM_MAINNET_ADDRESSES,
   999: HYPEREVM_MAINNET_ADDRESSES,
   42161: ARBITRUM_ADDRESSES,
   10: OPTIMISM_ADDRESSES,
+  137: POLYGON_ADDRESSES,
   11155111: SEPOLIA_ADDRESSES,
   998: HYPEREVM_TESTNET_ADDRESSES,
 } as const;

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { useAccount, useChainId } from 'wagmi';
-import { mainnet, sepolia, arbitrum, optimism } from 'wagmi/chains';
+import { mainnet, sepolia, arbitrum, optimism, polygon } from 'wagmi/chains';
 import { hyperEvmMainnet, hyperEvmTestnet } from '@/lib/chains';
 import { DEPLOYMENTS, DEFAULT_CHAIN_ID, type DeploymentAddresses } from '@ek-sdk/addresses';
 
@@ -16,7 +16,7 @@ interface NetworkContextValue {
 
 const STORAGE_KEY = 'ek-selected-chain-id';
 
-const SUPPORTED_CHAINS = [mainnet, hyperEvmMainnet, arbitrum, optimism, sepolia, hyperEvmTestnet];
+const SUPPORTED_CHAINS = [mainnet, hyperEvmMainnet, arbitrum, optimism, polygon, sepolia, hyperEvmTestnet];
 const SUPPORTED_CHAIN_IDS = new Set<number>(SUPPORTED_CHAINS.map((c) => c.id));
 
 function getExplorerUrl(chainId: number): string {

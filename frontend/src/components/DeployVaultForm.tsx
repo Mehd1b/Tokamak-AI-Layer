@@ -45,6 +45,11 @@ const COMMON_ASSETS: Record<number, { label: string; address: `0x${string}` }[]>
     { label: 'USDT', address: '0x94b008aA00579c1307B0EF2c499aD98a8ce58e58' },
     { label: 'WETH', address: '0x4200000000000000000000000000000000000006' },
   ],
+  137: [
+    { label: 'USDC (Native)', address: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359' },
+    { label: 'POL (Native)', address: ZERO_ADDRESS },
+    { label: 'WETH', address: '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619' },
+  ],
   11155111: [
     { label: 'ETH (Native)', address: ZERO_ADDRESS },
   ],
