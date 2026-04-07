@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { useAccount } from 'wagmi';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useAccount, usePublicClient } from 'wagmi';
 import { ConnectWalletButton } from '@/components/ConnectWalletButton';
 import { truncateAddress } from '@/lib/utils';
 import { useNetwork } from '@/lib/NetworkContext';
@@ -14,13 +14,204 @@ import {
   useRegisterCode,
   usePointsPerDeposit,
   useReferralAvailable,
+  useReferralManagerAddress,
   hashReferralCode,
   ZERO_BYTES32,
   ZERO_ADDRESS,
 } from '@/hooks/useReferral';
+import { ReferralManagerABI } from '@/lib/contracts';
 import Link from 'next/link';
 
 const SITE_DOMAIN = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://tokagent.network';
+
+function ReferralLeaderboard({
+  explorerUrl,
+  userAddress,
+}: {
+  explorerUrl: string;
+  userAddress?: `0x${string}`;
+}) {
+  const { entries, isLoading } = useReferralLeaderboard();
+
+  const userRank = useMemo(() => {
+    if (!userAddress) return -1;
+    return entries.findIndex((e) => e.address.toLowerCase() === userAddress.toLowerCase());
+  }, [entries, userAddress]);
+
+  return (
+    <div className="card mb-8">
+      <div className="flex items-center gap-3 mb-6">
+        <div
+          className="w-10 h-10 rounded-lg flex items-center justify-center"
+          style={{
+            background: 'rgba(168, 85, 247, 0.08)',
+            border: '1px solid rgba(168, 85, 247, 0.15)',
+          }}
+        >
+          <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#A855F7]" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 01-.982-3.172M9.497 14.25a7.454 7.454 0 00.981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 007.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M18.75 4.236c.982.143 1.954.317 2.916.52A6.003 6.003 0 0016.27 9.728M18.75 4.236V4.5c0 2.108-.966 3.99-2.48 5.228m0 0a6.023 6.023 0 01-3.52 1.272 6.023 6.023 0 01-3.52-1.272" />
+          </svg>
+        </div>
+        <div>
+          <h2 className="text-lg font-light text-white" style={{ fontFamily: 'var(--font-serif), serif' }}>
+            Top Referrers
+          </h2>
+          {userRank >= 0 && (
+            <span className="text-xs font-mono text-[#C084FC]">Your rank: #{userRank + 1}</span>
+          )}
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-12 rounded-lg bg-white/[0.03] animate-pulse" />
+          ))}
+        </div>
+      ) : entries.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-gray-500 text-sm font-mono">No referrers yet</p>
+          <p className="text-gray-600 text-xs font-mono mt-1">
+            Be the first to register a code and climb the leaderboard.
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm font-mono">
+            <thead>
+              <tr className="text-left text-gray-500 text-xs uppercase tracking-wider border-b border-white/5">
+                <th className="pb-3 pr-4 w-12">Rank</th>
+                <th className="pb-3 pr-4">Referrer</th>
+                <th className="pb-3 pr-4 text-right">Referrals</th>
+                <th className="pb-3 text-right">Points</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.slice(0, 25).map((entry, i) => {
+                const isUser = userAddress && entry.address.toLowerCase() === userAddress.toLowerCase();
+                return (
+                  <tr
+                    key={entry.address}
+                    className={`border-b border-white/5 last:border-0 ${isUser ? 'bg-[#A855F7]/5' : ''}`}
+                  >
+                    <td className="py-3 pr-4">
+                      {i === 0 ? (
+                        <span className="text-yellow-400">1</span>
+                      ) : i === 1 ? (
+                        <span className="text-gray-300">2</span>
+                      ) : i === 2 ? (
+                        <span className="text-amber-600">3</span>
+                      ) : (
+                        <span className="text-gray-600">{i + 1}</span>
+                      )}
+                    </td>
+                    <td className="py-3 pr-4">
+                      <a
+                        href={`${explorerUrl}/address/${entry.address}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`hover:underline ${isUser ? 'text-[#C084FC]' : 'text-gray-300'}`}
+                      >
+                        {isUser ? 'You' : truncateAddress(entry.address, 6)}
+                      </a>
+                    </td>
+                    <td className="py-3 pr-4 text-right text-gray-400">
+                      {Number(entry.referralCount).toLocaleString()}
+                    </td>
+                    <td className="py-3 text-right">
+                      <span className={`font-medium ${i === 0 ? 'text-yellow-400' : 'text-white'}`}>
+                        {Number(entry.points).toLocaleString()}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {entries.length > 25 && (
+            <p className="text-center text-gray-600 text-xs font-mono mt-4">
+              Showing top 25 of {entries.length} referrers
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface LeaderboardEntry {
+  address: `0x${string}`;
+  points: bigint;
+  referralCount: bigint;
+}
+
+function useReferralLeaderboard() {
+  const referralManager = useReferralManagerAddress();
+  const publicClient = usePublicClient();
+  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!referralManager || !publicClient) return;
+
+    let cancelled = false;
+    setIsLoading(true);
+
+    (async () => {
+      try {
+        // Index CodeRegistered events to find all referrers
+        const logs = await publicClient.getLogs({
+          address: referralManager,
+          event: {
+            type: 'event',
+            name: 'CodeRegistered',
+            inputs: [
+              { type: 'address', name: 'referrer', indexed: true },
+              { type: 'bytes32', name: 'codeHash', indexed: true },
+            ],
+          },
+          fromBlock: 0n,
+          toBlock: 'latest',
+        });
+
+        // Deduplicate referrer addresses
+        const uniqueReferrers = [...new Set(logs.map((l) => l.args.referrer as `0x${string}`))];
+        if (cancelled || uniqueReferrers.length === 0) {
+          if (!cancelled) { setEntries([]); setIsLoading(false); }
+          return;
+        }
+
+        // Batch-read points and referral counts
+        const calls = uniqueReferrers.flatMap((addr) => [
+          { address: referralManager, abi: ReferralManagerABI, functionName: 'referralPoints', args: [addr] } as const,
+          { address: referralManager, abi: ReferralManagerABI, functionName: 'referralCount', args: [addr] } as const,
+        ]);
+
+        const results = await publicClient.multicall({ contracts: calls });
+
+        const leaderboard: LeaderboardEntry[] = uniqueReferrers
+          .map((addr, i) => ({
+            address: addr,
+            points: (results[i * 2]?.result as bigint) ?? 0n,
+            referralCount: (results[i * 2 + 1]?.result as bigint) ?? 0n,
+          }))
+          .filter((e) => e.points > 0n)
+          .sort((a, b) => (b.points > a.points ? 1 : b.points < a.points ? -1 : 0));
+
+        if (!cancelled) setEntries(leaderboard);
+      } catch (err) {
+        console.error('Failed to load referral leaderboard:', err);
+        if (!cancelled) setEntries([]);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [referralManager, publicClient]);
+
+  return { entries, isLoading };
+}
 
 export default function ReferralsPage() {
   const { address: userAddress, isConnected } = useAccount();
@@ -159,6 +350,9 @@ export default function ReferralsPage() {
           </p>
         </div>
       )}
+
+      {/* Referral Leaderboard — always visible when contract is available */}
+      {referralAvailable && <ReferralLeaderboard explorerUrl={explorerUrl} userAddress={userAddress} />}
 
       {/* Main content - connected and available */}
       {isConnected && referralAvailable && (
