@@ -15,7 +15,7 @@ export const ETHEREUM_MAINNET_ADDRESSES: DeploymentAddresses = {
   riscZeroVerifierRouter: '0x8EaB2D97Dfce405A1692a21b3ff3A172d593D319',
   pointsProgram: '0xcd1ade9a9dc45e2008d7246735bcfaa7ac430b5f',
   builderProgram: '0xd27a7470a34903b7e215ea8d07d9cd2d21238f83',
-  referralManager: '0xcd1e6b8777f0fce34fe8d64c06faf166d60cba95',
+  referralManager: '0xEE8CBCE6c590fE4c6E1C2E59094f302139101bB0',
 } as const;
 
 export const HYPEREVM_MAINNET_ADDRESSES: DeploymentAddresses = {
@@ -25,7 +25,7 @@ export const HYPEREVM_MAINNET_ADDRESSES: DeploymentAddresses = {
   riscZeroVerifierRouter: '0x9f8d4D1f7AAf06aab1640abd565A731399862Bc8',
   pointsProgram: '0xb391DC76133D39280fA5348e1119ba67A4418170',
   builderProgram: '0x27ce5DEC1162D395B5Fce025458e8e8878212443',
-  referralManager: '0x78CcEE13F8Ff9497B5AB734c44612e77bDbfb60b',
+  referralManager: '0x129576fBaCBCD2deA03b46D408cf0Aa96FC01ABe',
 } as const;
 
 export const SEPOLIA_ADDRESSES: DeploymentAddresses = {
@@ -49,7 +49,7 @@ export const ARBITRUM_ADDRESSES: DeploymentAddresses = {
   riscZeroVerifierRouter: '0x0b144e07a0826182b6b59788c34b32bfa86fb711',
   pointsProgram: '0x5a14e3b99813277c4ecca298f9810870f087ee58',
   builderProgram: '0x5c0f88e27fadab50ea82572950a616b4cf4fd8b3',
-  referralManager: '0x0eda0bcfbfc51ab245f078aefa3ee42cb384c865',
+  referralManager: '0x47E6EfFf516E8b899092ebEEF92fddCE579e9d39',
 } as const;
 
 export const OPTIMISM_ADDRESSES: DeploymentAddresses = {
@@ -59,7 +59,7 @@ export const OPTIMISM_ADDRESSES: DeploymentAddresses = {
   riscZeroVerifierRouter: '0x0b144e07a0826182b6b59788c34b32bfa86fb711',
   pointsProgram: '0x5a14e3b99813277c4ecca298f9810870f087ee58',
   builderProgram: '0x5c0f88e27fadab50ea82572950a616b4cf4fd8b3',
-  referralManager: '0x0eda0bcfbfc51ab245f078aefa3ee42cb384c865',
+  referralManager: '0x47E6EfFf516E8b899092ebEEF92fddCE579e9d39',
 } as const;
 
 export const DEPLOYMENTS: Record<number, DeploymentAddresses> = {

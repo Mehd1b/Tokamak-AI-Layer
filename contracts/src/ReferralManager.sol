@@ -4,16 +4,13 @@ pragma solidity ^0.8.24;
 /// @title ReferralManager
 /// @notice Standalone referral system for tracking deposit attributions and awarding points.
 /// @dev Non-upgradeable. Referral codes are stored as keccak256 hashes of plaintext strings.
-///      A depositor can only be referred once (first referral sticks). Points are awarded to
-///      the referrer for each referred deposit.
+///      A depositor can only be referred once (first referral sticks). Points are proportional
+///      to the deposit amount, normalized to whole token units (e.g. 2000 USDC → 2000 points).
 contract ReferralManager {
     // ============ State ============
 
-    /// @notice Contract owner (can update pointsPerDeposit)
+    /// @notice Contract owner
     address public owner;
-
-    /// @notice Points awarded to the referrer for each referred deposit
-    uint256 public pointsPerDeposit;
 
     /// @notice Code hash → referrer address
     mapping(bytes32 => address) public referralCodes;
@@ -49,9 +46,6 @@ contract ReferralManager {
     /// @notice Emitted when ownership is transferred
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
-    /// @notice Emitted when pointsPerDeposit is updated
-    event PointsPerDepositUpdated(uint256 oldValue, uint256 newValue);
-
     // ============ Errors ============
 
     /// @notice Caller is not the owner
@@ -77,10 +71,8 @@ contract ReferralManager {
 
     // ============ Constructor ============
 
-    /// @param _pointsPerDeposit Initial points awarded per referred deposit
-    constructor(uint256 _pointsPerDeposit) {
+    constructor() {
         owner = msg.sender;
-        pointsPerDeposit = _pointsPerDeposit;
         emit OwnershipTransferred(address(0), msg.sender);
     }
 
@@ -99,14 +91,6 @@ contract ReferralManager {
         require(newOwner != address(0), "zero owner");
         emit OwnershipTransferred(owner, newOwner);
         owner = newOwner;
-    }
-
-    /// @notice Update points awarded per referred deposit
-    /// @param _pointsPerDeposit New points value
-    function setPointsPerDeposit(uint256 _pointsPerDeposit) external onlyOwner {
-        uint256 old = pointsPerDeposit;
-        pointsPerDeposit = _pointsPerDeposit;
-        emit PointsPerDepositUpdated(old, _pointsPerDeposit);
     }
 
     // ============ Public Functions ============
@@ -130,18 +114,22 @@ contract ReferralManager {
     ///         frontend relayer after a vault deposit).
     /// @param depositor The address that made the deposit
     /// @param codeHash The keccak256 hash of the referral code used
-    function recordReferral(address depositor, bytes32 codeHash) external {
+    /// @param amount The raw deposit amount (in token wei, e.g. 2000e6 for 2000 USDC)
+    /// @param decimals The token's decimal count (e.g. 6 for USDC, 18 for WETH)
+    function recordReferral(address depositor, bytes32 codeHash, uint256 amount, uint8 decimals) external {
         address referrer = referralCodes[codeHash];
         if (referrer == address(0)) revert InvalidCode();
         if (depositor == referrer) revert SelfReferral();
         if (referredBy[depositor] != address(0)) revert AlreadyReferred();
 
+        uint256 points = amount / (10 ** decimals);
+
         referredBy[depositor] = referrer;
         referralCount[referrer] += 1;
-        referralPoints[referrer] += pointsPerDeposit;
+        referralPoints[referrer] += points;
         _referrals[referrer].push(depositor);
 
-        emit ReferralRecorded(depositor, referrer, codeHash, pointsPerDeposit);
+        emit ReferralRecorded(depositor, referrer, codeHash, points);
     }
 
     // ============ View Functions ============

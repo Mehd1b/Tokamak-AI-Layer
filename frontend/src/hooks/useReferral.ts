@@ -78,22 +78,6 @@ export function useReferralCount(address: `0x${string}` | undefined) {
 }
 
 /**
- * Read the points-per-deposit constant.
- */
-export function usePointsPerDeposit() {
-  const { selectedChainId } = useNetwork();
-  const referralManager = useReferralManagerAddress();
-
-  return useReadContract({
-    address: referralManager,
-    abi: ReferralManagerABI,
-    functionName: 'pointsPerDeposit',
-    chainId: selectedChainId,
-    query: { enabled: !!referralManager },
-  });
-}
-
-/**
  * Read who referred a depositor.
  */
 export function useReferredBy(address: `0x${string}` | undefined) {
@@ -185,13 +169,13 @@ export function useRecordReferral() {
     chainId: selectedChainId,
   });
 
-  const record = (depositor: `0x${string}`, codeHash: `0x${string}`) => {
+  const record = (depositor: `0x${string}`, codeHash: `0x${string}`, amount: bigint, decimals: number) => {
     if (!referralManager) return;
     writeContract({
       address: referralManager,
       abi: ReferralManagerABI,
       functionName: 'recordReferral',
-      args: [depositor, codeHash],
+      args: [depositor, codeHash, amount, decimals],
       chainId: selectedChainId,
       ...gasOverrides,
     });

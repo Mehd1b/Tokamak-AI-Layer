@@ -9,13 +9,6 @@ export const ReferralManagerABI = [
   },
   {
     type: 'function',
-    name: 'pointsPerDeposit',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     name: 'referralCodes',
     inputs: [{ name: 'codeHash', type: 'bytes32' }],
     outputs: [{ name: '', type: 'address' }],
@@ -58,13 +51,6 @@ export const ReferralManagerABI = [
     outputs: [],
     stateMutability: 'nonpayable',
   },
-  {
-    type: 'function',
-    name: 'setPointsPerDeposit',
-    inputs: [{ name: '_pointsPerDeposit', type: 'uint256' }],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
 
   // ============ Public Functions ============
   {
@@ -80,6 +66,8 @@ export const ReferralManagerABI = [
     inputs: [
       { name: 'depositor', type: 'address' },
       { name: 'codeHash', type: 'bytes32' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'decimals', type: 'uint8' },
     ],
     outputs: [],
     stateMutability: 'nonpayable',
@@ -147,14 +135,6 @@ export const ReferralManagerABI = [
     inputs: [
       { name: 'previousOwner', type: 'address', indexed: true },
       { name: 'newOwner', type: 'address', indexed: true },
-    ],
-  },
-  {
-    type: 'event',
-    name: 'PointsPerDepositUpdated',
-    inputs: [
-      { name: 'oldValue', type: 'uint256', indexed: false },
-      { name: 'newValue', type: 'uint256', indexed: false },
     ],
   },
 

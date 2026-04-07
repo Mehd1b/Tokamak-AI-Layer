@@ -12,7 +12,6 @@ import {
   useReferrals,
   useReferredBy,
   useRegisterCode,
-  usePointsPerDeposit,
   useReferralAvailable,
   useReferralManagerAddress,
   hashReferralCode,
@@ -224,7 +223,6 @@ export default function ReferralsPage() {
   const { data: count } = useReferralCount(userAddress as `0x${string}` | undefined);
   const { data: referrals } = useReferrals(userAddress as `0x${string}` | undefined);
   const { data: referredByAddr } = useReferredBy(userAddress as `0x${string}` | undefined);
-  const { data: pointsPerDep } = usePointsPerDeposit();
 
   // Register code state
   const [codeInput, setCodeInput] = useState('');
@@ -308,9 +306,7 @@ export default function ReferralsPage() {
         </h1>
         <p className="text-gray-500 max-w-lg text-sm leading-relaxed font-mono">
           Share your referral link and earn points for every deposit made through your code.
-          {pointsPerDep !== undefined && (
-            <span className="text-gray-400"> Each referred deposit earns {Number(pointsPerDep)} points.</span>
-          )}
+          <span className="text-gray-400"> Points match the deposited token amount (e.g. 2000 USDC = 2000 pts).</span>
         </p>
       </div>
 
@@ -380,7 +376,10 @@ export default function ReferralsPage() {
                 Points / Deposit
               </div>
               <div className="text-3xl font-light text-[#A855F7] font-mono">
-                {pointsPerDep !== undefined ? Number(pointsPerDep).toLocaleString() : '100'}
+                1 : 1
+              </div>
+              <div className="text-xs text-gray-600 font-mono mt-1">
+                1 token = 1 point
               </div>
             </div>
           </div>
@@ -652,7 +651,7 @@ export default function ReferralsPage() {
                 </div>
                 <h3 className="text-white text-sm font-medium mb-1">Earn Points</h3>
                 <p className="text-gray-500 text-xs font-mono">
-                  Earn {pointsPerDep !== undefined ? Number(pointsPerDep) : 100} points for every deposit via your code.
+                  Points match the deposit amount (e.g. 2000 USDC = 2000 pts).
                 </p>
               </div>
             </div>
