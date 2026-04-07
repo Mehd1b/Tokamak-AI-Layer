@@ -19,6 +19,7 @@ pub enum Template {
     Minimal,
     Yield,
     PerpTrader,
+    PolymarketBot,
 }
 
 impl Template {
@@ -27,6 +28,7 @@ impl Template {
             "minimal" => Some(Self::Minimal),
             "yield" | "yield-farmer" => Some(Self::Yield),
             "perp-trader" | "perp" | "trading" => Some(Self::PerpTrader),
+            "polymarket-bot" | "polymarket" | "prediction" => Some(Self::PolymarketBot),
             _ => None,
         }
     }
@@ -36,6 +38,7 @@ impl Template {
             Self::Minimal => "Bare agent with NO_OP action — simplest starting point",
             Self::Yield => "DeFi yield farming agent — deposit/withdraw pattern",
             Self::PerpTrader => "Perpetual trading agent — full Hyperliquid integration",
+            Self::PolymarketBot => "Prediction market agent — Polymarket trading bot",
         }
     }
 }
@@ -54,7 +57,7 @@ pub fn run(
     } else {
         Template::parse(template_str).with_context(|| {
             format!(
-                "Unknown template '{}'. Available: minimal, yield, perp-trader",
+                "Unknown template '{}'. Available: minimal, yield, perp-trader, polymarket-bot",
                 template_str
             )
         })?
@@ -96,9 +99,9 @@ pub fn run(
     println!("  Template: {}", template.description());
     println!();
 
-    // For perp-trader, clone the real agent from the repository
-    if matches!(template, Template::PerpTrader) {
-        clone_perp_trader_template(&output_dir, name, standalone)?;
+    // For perp-trader or polymarket-bot, clone the real agent from the repository
+    if matches!(template, Template::PerpTrader | Template::PolymarketBot) {
+        clone_agent_template(&output_dir, name, template, standalone)?;
     } else {
         // Create directory structure
         create_dirs(&output_dir)?;
@@ -135,7 +138,7 @@ pub fn run(
             .unwrap_or(&output_dir);
         println!("    \"{}/agent\",", rel.display());
         println!("    \"{}/risc0-methods\",", rel.display());
-        if matches!(template, Template::PerpTrader) {
+        if matches!(template, Template::PerpTrader | Template::PolymarketBot) {
             println!("    \"{}/host\",", rel.display());
         }
     }
@@ -149,6 +152,14 @@ pub fn run(
         println!("    4. tal build --elf — build zkVM binary");
         println!("    5. tal deploy --testnet — deploy agent + vault");
         println!("    6. ./run-bot.sh — start the trading bot");
+    } else if matches!(template, Template::PolymarketBot) {
+        println!("    1. Read README.md for full details");
+        println!("    2. Find a market on polymarket.com — copy the condition ID");
+        println!("    3. Configure .env with market IDs, thresholds, and keys");
+        println!("    4. tal test --local — run agent unit tests");
+        println!("    5. tal build --elf — build zkVM binary");
+        println!("    6. tal deploy — deploy agent + vault to Polygon");
+        println!("    7. ./run-bot.sh — start the prediction market bot");
     } else {
         println!("    1. Edit agent/src/lib.rs — implement your agent logic");
         println!("    2. tal test --local — test with instant feedback");
@@ -197,6 +208,11 @@ fn select_template_interactive() -> Result<Template> {
             "perp-trader".bold(),
             Template::PerpTrader.description()
         ),
+        format!(
+            "{} — {}",
+            "polymarket-bot".bold(),
+            Template::PolymarketBot.description()
+        ),
     ];
 
     let selection = Select::new()
@@ -209,6 +225,7 @@ fn select_template_interactive() -> Result<Template> {
         0 => Template::Minimal,
         1 => Template::Yield,
         2 => Template::PerpTrader,
+        3 => Template::PolymarketBot,
         _ => Template::Minimal,
     })
 }
@@ -231,16 +248,21 @@ fn find_workspace_root() -> Result<PathBuf> {
 
 /// Clone the real perp-trader agent from the Tokamak-AI-Layer repository.
 ///
-/// Uses git sparse checkout to fetch only the perp-trader directory,
-/// then copies it to the output location. If running inside the workspace,
-/// copies directly from the local crates/agents/perp-trader/ instead.
-fn clone_perp_trader_template(output_dir: &Path, _name: &str, standalone: bool) -> Result<()> {
+/// Clone an agent template from the repository or local workspace.
+/// Supports perp-trader and polymarket-bot templates.
+fn clone_agent_template(output_dir: &Path, _name: &str, template: Template, standalone: bool) -> Result<()> {
     use std::process::Command;
+
+    let template_dir = match template {
+        Template::PerpTrader => "perp-trader",
+        Template::PolymarketBot => "polymarket-bot",
+        _ => unreachable!(),
+    };
 
     // If inside the workspace, copy from local
     if !standalone {
         if let Ok(workspace) = find_workspace_root() {
-            let source = workspace.join("crates/agents/perp-trader");
+            let source = workspace.join(format!("crates/agents/{}", template_dir));
             if source.exists() {
                 println!("  Copying from local workspace...");
                 copy_dir_recursive(&source, output_dir)?;
@@ -254,7 +276,7 @@ fn clone_perp_trader_template(output_dir: &Path, _name: &str, standalone: bool) 
     }
 
     // Standalone: clone from GitHub using sparse checkout
-    println!("  Fetching perp-trader template from GitHub...");
+    println!("  Fetching {} template from GitHub...", template_dir);
 
     let tmp_dir = tempfile::tempdir()
         .context("Failed to create temp directory")?;
@@ -279,10 +301,11 @@ fn clone_perp_trader_template(output_dir: &Path, _name: &str, standalone: bool) 
         bail!("git clone failed. Check your internet connection.");
     }
 
-    // Sparse checkout just the perp-trader directory
+    // Sparse checkout just the template directory
     let repo_dir = tmp_path.join("repo");
+    let sparse_path = format!("crates/agents/{}", template_dir);
     let status = Command::new("git")
-        .args(["sparse-checkout", "set", "crates/agents/perp-trader"])
+        .args(["sparse-checkout", "set", &sparse_path])
         .current_dir(&repo_dir)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -293,9 +316,9 @@ fn clone_perp_trader_template(output_dir: &Path, _name: &str, standalone: bool) 
         bail!("git sparse-checkout failed");
     }
 
-    let source = repo_dir.join("crates/agents/perp-trader");
+    let source = repo_dir.join(&sparse_path);
     if !source.exists() {
-        bail!("perp-trader template not found in repository");
+        bail!("{} template not found in repository", template_dir);
     }
 
     // Copy to output directory
@@ -478,7 +501,7 @@ simulator = ["kernel-sdk/simulator"]
     let lib_rs = match template {
         Template::Minimal => gen_agent_lib_minimal(),
         Template::Yield => gen_agent_lib_yield(),
-        Template::PerpTrader => gen_agent_lib_perp_trader(),
+        Template::PerpTrader | Template::PolymarketBot => unreachable!("cloned from repo"),
     };
     write_file(&root.join("agent/src/lib.rs"), &lib_rs)?;
 
@@ -506,13 +529,7 @@ simulator = ["kernel-sdk/simulator"]
   "opaque_inputs": "0x11111111111111111111111111111111111111112222222222222222222222222222222222222222a086010000000000"
 }
 "#.to_string(),
-        Template::PerpTrader => r#"{
-  "agent_id": "0x0000000000000000000000000000000000000000000000000000000000000001",
-  "equity": 1000000,
-  "execution_nonce": 1,
-  "opaque_inputs": "0x"
-}
-"#.to_string(),
+        Template::PerpTrader | Template::PolymarketBot => unreachable!("cloned from repo"),
     };
     write_file(&root.join("agent/fixtures/sample.json"), &fixture_json)?;
 
@@ -1379,7 +1396,7 @@ fn generate_readme(root: &Path, name: &str, template: Template) -> Result<()> {
     let template_name = match template {
         Template::Minimal => "minimal",
         Template::Yield => "yield-farmer",
-        Template::PerpTrader => "perp-trader",
+        Template::PerpTrader | Template::PolymarketBot => unreachable!("cloned from repo"),
     };
 
     let content = format!(

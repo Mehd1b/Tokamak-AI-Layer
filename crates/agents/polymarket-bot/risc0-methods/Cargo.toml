@@ -1,0 +1,12 @@
+[package]
+name = "polymarket-bot-methods"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[build-dependencies]
+risc0-build = "0.22"
+
+[dependencies]
+risc0-zkvm = "0.22"
+polymarket-bot = { path = "../agent" }

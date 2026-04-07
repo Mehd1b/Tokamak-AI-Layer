@@ -1,0 +1,38 @@
+[package]
+name = "polymarket-bot-host"
+version = "0.1.0"
+edition = "2021"
+description = "Host-side orchestrator for the Polymarket prediction market trading agent"
+license = "Apache-2.0"
+
+[[bin]]
+name = "polymarket-bot"
+path = "src/main.rs"
+
+[dependencies]
+polymarket-bot = { path = "../agent" }
+kernel-core = { path = "../../../protocol/kernel-core", features = ["std"] }
+kernel-sdk = { path = "../../../sdk/kernel-sdk", features = ["std"] }
+reference-integrator = { path = "../../../reference-integrator" }
+
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+colored = "2"
+dotenv = "0.15"
+hex = "0.4"
+reqwest = { version = "0.12", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+k256 = { version = "0.13", features = ["ecdsa"] }
+sha2 = "0.10"
+
+# Optional features for on-chain submission and ZK proving
+alloy = { version = "0.1", optional = true, features = ["full"] }
+risc0-zkvm = { version = "0.22", optional = true }
+
+[features]
+default = []
+onchain = ["dep:alloy", "reference-integrator/onchain"]
+prove = ["dep:risc0-zkvm", "reference-integrator/prove"]
+full = ["onchain", "prove"]
