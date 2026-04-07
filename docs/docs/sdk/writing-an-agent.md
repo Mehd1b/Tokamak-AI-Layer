@@ -60,6 +60,10 @@ kernel_sdk::agent_entrypoint!(agent_main);
 
 The `yield` template generates a more complete example that parses market data and builds supply/approve actions using `CallBuilder` and `erc20` helpers. Read through it to see a real pattern.
 
+:::tip Other templates
+Besides `yield`, you can scaffold from `perp-trader` (Hyperliquid perpetuals with SMA/RSI strategies) or `polymarket-bot` (Polymarket prediction markets with probability threshold and spread capture). Each comes with a full host orchestrator, API client, and strategy logic. See [CLI Reference](/sdk/cli-reference) for details.
+:::
+
 ### Parsing inputs
 
 Use the `agent_input!` macro to declare your input format. The macro auto-generates `decode()` and `encode()` methods:

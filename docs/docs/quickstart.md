@@ -75,6 +75,20 @@ tal monitor --vault <VAULT_ADDRESS> --chain 998
 
 This opens a live dashboard showing your vault's status, recent executions, and proof history.
 
+## Other templates
+
+The quickstart above uses the `yield` template. There are other templates for different strategies:
+
+```bash
+# Perpetual trading on Hyperliquid (SMA/RSI/funding strategies)
+tal init my-trader --template perp-trader
+
+# Prediction market trading on Polymarket (probability threshold/spread capture)
+tal init my-predictor --template polymarket-bot
+```
+
+Each template comes with its own README, `.env.example`, and host orchestrator. See the [CLI Reference](/sdk/cli-reference) for all available templates.
+
 ## What's next?
 
 | Goal | Guide |

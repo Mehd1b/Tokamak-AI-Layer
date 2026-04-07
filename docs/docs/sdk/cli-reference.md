@@ -35,7 +35,7 @@ tal init <NAME> [OPTIONS]
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--template <TYPE>` | interactive | `minimal`, `yield`, or `perp-trader` |
+| `--template <TYPE>` | interactive | `minimal`, `yield`, `perp-trader`, or `polymarket-bot` |
 | `--output <PATH>` | auto | Output directory |
 | `--no-interactive` | false | Skip prompts |
 
@@ -50,6 +50,9 @@ tal init my-yield-agent --template yield
 
 # Perpetual trading agent with Hyperliquid support
 tal init my-trader --template perp-trader
+
+# Prediction market agent for Polymarket
+tal init my-predictor --template polymarket-bot
 ```
 
 ### What it generates
@@ -376,4 +379,16 @@ tal init my-trader --template perp-trader
 tal build --elf
 tal deploy --testnet --hyperliquid --optimistic --min-bond 1000000000000000000000000000
 tal monitor --vault 0x...
+```
+
+### Polymarket prediction market bot
+
+```bash
+tal init my-predictor --template polymarket-bot
+# Edit .env with market condition ID, token IDs, and thresholds
+tal test --local
+tal build --elf
+tal deploy
+./run-bot.sh --dry-run --once    # Test without on-chain submission
+./run-bot.sh                     # Start the bot
 ```
