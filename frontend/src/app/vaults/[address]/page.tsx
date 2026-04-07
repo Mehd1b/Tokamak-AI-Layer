@@ -130,7 +130,7 @@ export default function VaultDetailPage() {
       {/* Disclaimer */}
       <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 mb-6">
         <p className="text-xs text-gray-400 leading-relaxed" style={{ fontFamily: 'var(--font-mono), monospace' }}>
-          <span className="font-bold uppercase">Disclaimer:</span> Vaults use smart contracts and AI agents that execute autonomous strategies. You may lose some or all of your deposited funds. Do not deposit more than you can afford to lose. This is not financial advice.
+          <span className="font-bold uppercase">Disclaimer:</span> Vaults use smart contracts and AI agents that execute autonomous strategies. You may lose some or all of your deposited funds. Before depositing, verify the vault&apos;s Image ID to ensure the owner is executing the expected code. Do not deposit more than you can afford to lose. This is not financial advice.
         </p>
       </div>
 
