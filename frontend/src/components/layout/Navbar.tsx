@@ -40,6 +40,19 @@ const PROTOCOL_LINKS: DropdownLink[] = [
   { title: 'Staking', description: 'WSTON staking and bridge', href: '/staking', internal: true },
 ];
 
+// Dashboard dropdown links
+const DASHBOARD_LINKS: DropdownLink[] = [
+  { title: 'Leaderboard', description: 'Top agents ranked by performance', href: '/leaderboard', internal: true },
+  { title: 'Portfolio', description: 'Your vault positions and P&L', href: '/portfolio', internal: true },
+];
+
+// Resources dropdown links
+const RESOURCES_LINKS: DropdownLink[] = [
+  { title: 'Whitepaper', description: 'Technical architecture overview', href: '/whitepaper', internal: true },
+  { title: 'Institutional', description: 'Enterprise solutions', href: '/institutional', internal: true },
+  { title: 'Docs', description: 'Developer documentation', href: 'https://docs.tokagent.network' },
+];
+
 // Socials dropdown links
 const SOCIALS_LINKS: DropdownLink[] = [
   { title: 'X', description: 'Follow us on X', href: 'https://x.com/tokagent', icon: SOCIAL_ICONS.x },
@@ -249,6 +262,8 @@ export function Navbar() {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMobileProtocolOpen, setIsMobileProtocolOpen] = useState(false);
+  const [isMobileDashboardOpen, setIsMobileDashboardOpen] = useState(false);
+  const [isMobileResourcesOpen, setIsMobileResourcesOpen] = useState(false);
   const [isMobileSocialsOpen, setIsMobileSocialsOpen] = useState(false);
 
   const { address: walletAddress, isConnected: walletConnected } = useAccount();
@@ -256,6 +271,8 @@ export function Navbar() {
   const positionCount = positions.length;
 
   const protocol = useDropdown();
+  const dashboard = useDropdown();
+  const resources = useDropdown();
   const socials = useDropdown();
 
   useEffect(() => {
@@ -425,65 +442,154 @@ export function Navbar() {
             </div>
           </div>
 
-          <Link
-            href="/leaderboard"
-            className={clsx(
-              'px-4 py-2 rounded-lg border border-dashed transition-all tracking-wider text-sm',
-              pathname === '/leaderboard' || pathname?.startsWith('/agents/')
-                ? 'border-[#A855F7]/60 text-[#A855F7]'
-                : 'border-white/30 text-white hover:border-white/60 hover:text-gray-300',
-            )}
-          >
-            LEADERBOARD
-          </Link>
-          {walletConnected && (
-            <Link
-              href="/portfolio"
+          {/* DASHBOARD Dropdown */}
+          <div className="relative">
+            <button
+              ref={dashboard.triggerRef}
+              onClick={dashboard.handleClick}
+              onKeyDown={dashboard.handleKeyDown}
+              onPointerEnter={dashboard.handleTriggerPointerEnter}
+              onPointerLeave={dashboard.handleTriggerPointerLeave}
               className={clsx(
-                'relative px-4 py-2 rounded-lg border border-dashed transition-all tracking-wider text-sm',
-                pathname === '/portfolio'
+                'relative flex items-center gap-1 px-4 py-2 rounded-lg border border-dashed transition-all tracking-wider text-sm',
+                (pathname === '/leaderboard' || pathname?.startsWith('/agents/') || pathname === '/portfolio')
                   ? 'border-[#A855F7]/60 text-[#A855F7]'
                   : 'border-white/30 text-white hover:border-white/60 hover:text-gray-300',
               )}
+              aria-haspopup="true"
+              aria-expanded={dashboard.isOpen}
             >
-              PORTFOLIO
-              {positionCount > 0 && (
+              DASHBOARD
+              {positionCount > 0 && walletConnected && (
                 <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-[#A855F7] text-white text-[10px] font-bold px-1">
                   {positionCount}
                 </span>
               )}
-            </Link>
-          )}
-          <Link
-            href="/whitepaper"
-            className={clsx(
-              'px-4 py-2 rounded-lg border border-dashed transition-all tracking-wider text-sm',
-              pathname === '/whitepaper'
-                ? 'border-[#A855F7]/60 text-[#A855F7]'
-                : 'border-white/30 text-white hover:border-white/60 hover:text-gray-300',
-            )}
-          >
-            WHITEPAPER
-          </Link>
-          <Link
-            href="/institutional"
-            className={clsx(
-              'px-4 py-2 rounded-lg border border-dashed transition-all tracking-wider text-sm',
-              pathname === '/institutional'
-                ? 'border-[#A855F7]/60 text-[#A855F7]'
-                : 'border-white/30 text-white hover:border-white/60 hover:text-gray-300',
-            )}
-          >
-            INSTITUTIONAL
-          </Link>
-          <a
-            href="https://docs.tokagent.network"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-4 py-2 rounded-lg border border-dashed transition-all tracking-wider text-sm border-white/30 text-white hover:border-white/60 hover:text-gray-300"
-          >
-            DOCS
-          </a>
+              <svg
+                className={`w-4 h-4 transition-transform duration-200 ${dashboard.isOpen ? 'rotate-180' : ''}`}
+                fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <div
+              ref={dashboard.panelRef}
+              role="menu"
+              onPointerEnter={dashboard.handlePanelPointerEnter}
+              onPointerLeave={dashboard.handlePanelPointerLeave}
+              className={`absolute top-full mt-2 w-[280px] p-4 space-y-1
+                rounded-xl border border-[#A855F7]/30
+                backdrop-blur-md bg-[#0a0a0f]/90
+                transition-all duration-200 origin-top-left z-50
+                ${dashboard.isOpen
+                  ? 'opacity-100 scale-100 visible pointer-events-auto'
+                  : 'opacity-0 scale-95 invisible pointer-events-none'}`}
+              style={{ left: dashboard.panelPosition ? dashboard.panelPosition.left : 0 }}
+            >
+              {DASHBOARD_LINKS.map((link, index) => {
+                if (link.href === '/portfolio' && !walletConnected) return null;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    role="menuitem"
+                    className={clsx(
+                      'flex items-center gap-3 p-2.5 -mx-1 rounded-lg hover:bg-[#A855F7]/10 transition-colors group',
+                      pathname?.startsWith(link.href) && 'bg-[#A855F7]/5',
+                    )}
+                    onClick={() => dashboard.setIsOpen(false)}
+                    onKeyDown={(e) => dashboard.handleMenuItemKeyDown(e, index, DASHBOARD_LINKS.length)}
+                  >
+                    <div>
+                      <div className={clsx(
+                        'text-sm font-medium group-hover:text-[#A855F7] transition-colors',
+                        pathname?.startsWith(link.href) ? 'text-[#A855F7]' : 'text-white',
+                      )}>
+                        {link.title}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-0.5">{link.description}</div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* RESOURCES Dropdown */}
+          <div className="relative">
+            <button
+              ref={resources.triggerRef}
+              onClick={resources.handleClick}
+              onKeyDown={resources.handleKeyDown}
+              onPointerEnter={resources.handleTriggerPointerEnter}
+              onPointerLeave={resources.handleTriggerPointerLeave}
+              className={clsx(
+                'flex items-center gap-1 px-4 py-2 rounded-lg border border-dashed transition-all tracking-wider text-sm',
+                (pathname === '/whitepaper' || pathname === '/institutional')
+                  ? 'border-[#A855F7]/60 text-[#A855F7]'
+                  : 'border-white/30 text-white hover:border-white/60 hover:text-gray-300',
+              )}
+              aria-haspopup="true"
+              aria-expanded={resources.isOpen}
+            >
+              RESOURCES
+              <svg
+                className={`w-4 h-4 transition-transform duration-200 ${resources.isOpen ? 'rotate-180' : ''}`}
+                fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <div
+              ref={resources.panelRef}
+              role="menu"
+              onPointerEnter={resources.handlePanelPointerEnter}
+              onPointerLeave={resources.handlePanelPointerLeave}
+              className={`absolute top-full mt-2 w-[280px] p-4 space-y-1
+                rounded-xl border border-[#A855F7]/30
+                backdrop-blur-md bg-[#0a0a0f]/90
+                transition-all duration-200 origin-top-left z-50
+                ${resources.isOpen
+                  ? 'opacity-100 scale-100 visible pointer-events-auto'
+                  : 'opacity-0 scale-95 invisible pointer-events-none'}`}
+              style={{ left: resources.panelPosition ? resources.panelPosition.left : 0 }}
+            >
+              {RESOURCES_LINKS.map((link, index) => {
+                const isInternal = link.internal;
+                const Comp = isInternal ? Link : 'a';
+                const extraProps = isInternal ? {} : { target: '_blank', rel: 'noopener noreferrer' };
+                return (
+                  <Comp
+                    key={link.href}
+                    href={link.href}
+                    role="menuitem"
+                    className={clsx(
+                      'flex items-center gap-3 p-2.5 -mx-1 rounded-lg hover:bg-[#A855F7]/10 transition-colors group',
+                      isInternal && pathname === link.href && 'bg-[#A855F7]/5',
+                    )}
+                    onClick={() => resources.setIsOpen(false)}
+                    onKeyDown={(e) => resources.handleMenuItemKeyDown(e, index, RESOURCES_LINKS.length)}
+                    {...extraProps}
+                  >
+                    <div>
+                      <div className={clsx(
+                        'text-sm font-medium group-hover:text-[#A855F7] transition-colors',
+                        isInternal && pathname === link.href ? 'text-[#A855F7]' : 'text-white',
+                      )}>
+                        {link.title}
+                        {!isInternal && (
+                          <svg className="inline w-3 h-3 ml-1 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-0.5">{link.description}</div>
+                    </div>
+                  </Comp>
+                );
+              })}
+            </div>
+          </div>
           <NetworkSelector />
           <div className="ml-4">
             <ConnectButton />
@@ -580,64 +686,92 @@ export function Navbar() {
                   </div>
                 </div>
 
-                <Link
-                  href="/leaderboard"
-                  className={clsx(
-                    'block text-md font-light transition-all duration-300 tracking-wider min-h-[44px] flex items-center justify-center',
-                    pathname === '/leaderboard' || pathname?.startsWith('/agents/')
-                      ? 'text-[#A855F7]'
-                      : 'text-white hover:text-[#A855F7]',
-                  )}
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  LEADERBOARD
-                </Link>
-                {walletConnected && (
-                  <Link
-                    href="/portfolio"
-                    className={clsx(
-                      'block text-md font-light transition-all duration-300 tracking-wider min-h-[44px] flex items-center justify-center',
-                      pathname === '/portfolio' ? 'text-[#A855F7]' : 'text-white hover:text-[#A855F7]',
-                    )}
-                    onClick={() => setIsMenuOpen(false)}
+                {/* Mobile DASHBOARD Accordion */}
+                <div className="text-center">
+                  <button
+                    onClick={() => setIsMobileDashboardOpen(prev => !prev)}
+                    className="inline-flex items-center gap-2 text-md font-light text-white hover:text-[#A855F7] transition-all duration-300 tracking-wider min-h-[44px]"
+                    aria-expanded={isMobileDashboardOpen}
                   >
-                    PORTFOLIO
-                    {positionCount > 0 && (
-                      <span className="inline-flex items-center justify-center ml-2 min-w-[20px] h-[20px] rounded-full bg-[#A855F7] text-white text-[10px] font-bold px-1">
-                        {positionCount}
-                      </span>
-                    )}
-                  </Link>
-                )}
-                <Link
-                  href="/whitepaper"
-                  className={clsx(
-                    'block text-md font-light transition-all duration-300 tracking-wider min-h-[44px] flex items-center justify-center',
-                    pathname === '/whitepaper' ? 'text-[#A855F7]' : 'text-white hover:text-[#A855F7]',
-                  )}
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  WHITEPAPER
-                </Link>
-                <Link
-                  href="/institutional"
-                  className={clsx(
-                    'block text-md font-light transition-all duration-300 tracking-wider min-h-[44px] flex items-center justify-center',
-                    pathname === '/institutional' ? 'text-[#A855F7]' : 'text-white hover:text-[#A855F7]',
-                  )}
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  INSTITUTIONAL
-                </Link>
-                <a
-                  href="https://docs.tokagent.network"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-md font-light transition-all duration-300 tracking-wider text-white hover:text-[#A855F7] min-h-[44px] flex items-center justify-center"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  DOCS
-                </a>
+                    DASHBOARD
+                    <svg
+                      className={`w-4 h-4 transition-transform duration-200 ${isMobileDashboardOpen ? 'rotate-180' : ''}`}
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  <div className={`overflow-hidden transition-all duration-300 ${isMobileDashboardOpen ? 'max-h-96 opacity-100 mt-4' : 'max-h-0 opacity-0'}`}>
+                    <div className="space-y-1 text-sm">
+                      {DASHBOARD_LINKS.map((link) => {
+                        if (link.href === '/portfolio' && !walletConnected) return null;
+                        return (
+                          <Link
+                            key={link.href}
+                            href={link.href}
+                            className={clsx(
+                              'block transition-colors py-2 min-h-[44px] flex items-center justify-center',
+                              pathname?.startsWith(link.href) ? 'text-[#A855F7]' : 'text-gray-300 hover:text-[#A855F7]',
+                            )}
+                            onClick={() => { setIsMenuOpen(false); setIsMobileDashboardOpen(false); }}
+                          >
+                            {link.title}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mobile RESOURCES Accordion */}
+                <div className="text-center">
+                  <button
+                    onClick={() => setIsMobileResourcesOpen(prev => !prev)}
+                    className="inline-flex items-center gap-2 text-md font-light text-white hover:text-[#A855F7] transition-all duration-300 tracking-wider min-h-[44px]"
+                    aria-expanded={isMobileResourcesOpen}
+                  >
+                    RESOURCES
+                    <svg
+                      className={`w-4 h-4 transition-transform duration-200 ${isMobileResourcesOpen ? 'rotate-180' : ''}`}
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  <div className={`overflow-hidden transition-all duration-300 ${isMobileResourcesOpen ? 'max-h-96 opacity-100 mt-4' : 'max-h-0 opacity-0'}`}>
+                    <div className="space-y-1 text-sm">
+                      {RESOURCES_LINKS.map((link) => {
+                        if (link.internal) {
+                          return (
+                            <Link
+                              key={link.href}
+                              href={link.href}
+                              className={clsx(
+                                'block transition-colors py-2 min-h-[44px] flex items-center justify-center',
+                                pathname === link.href ? 'text-[#A855F7]' : 'text-gray-300 hover:text-[#A855F7]',
+                              )}
+                              onClick={() => { setIsMenuOpen(false); setIsMobileResourcesOpen(false); }}
+                            >
+                              {link.title}
+                            </Link>
+                          );
+                        }
+                        return (
+                          <a
+                            key={link.href}
+                            href={link.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block transition-colors py-2 min-h-[44px] flex items-center justify-center text-gray-300 hover:text-[#A855F7]"
+                            onClick={() => { setIsMenuOpen(false); setIsMobileResourcesOpen(false); }}
+                          >
+                            {link.title}
+                          </a>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
 
                 {/* Network selector inside mobile menu */}
                 <div className="flex justify-center pt-4">
