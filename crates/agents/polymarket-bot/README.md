@@ -104,7 +104,7 @@ The agent outputs CALL actions targeting the PolymarketAdapter:
 
 | Action | Selector | When |
 |--------|----------|------|
-| `buyOutcome(bool,uint256,uint256)` | `0x7a2a44d4` | Enter position |
-| `sellOutcome(bool,uint256,uint256)` | `0x3bfa5b2e` | Exit position |
-| `redeemResolved()` | `0x6a3c4165` | Market resolved, we won |
+| `buyOutcome(bool,uint256,uint256)` | `0x193099a8` | Enter position |
+| `sellOutcome(bool,uint256,uint256)` | `0xe88b997b` | Exit position |
+| `redeemResolved()` | `0xe48f8d53` | Market resolved, we won |
 | `withdrawToVault()` | `0x84f22721` | Return USDC to vault |

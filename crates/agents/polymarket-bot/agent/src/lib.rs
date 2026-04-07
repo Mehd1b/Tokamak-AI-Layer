@@ -123,9 +123,9 @@ const MIN_SPREAD_FOR_CAPTURE: u64 = 20_000; // 2%
 const USDC_DECIMALS: u64 = 1_000_000;
 
 // Function selectors for PolymarketAdapter
-const SEL_BUY_OUTCOME: u32 = 0x7a2a44d4;   // buyOutcome(bool,uint256,uint256)
-const SEL_SELL_OUTCOME: u32 = 0x3bfa5b2e;   // sellOutcome(bool,uint256,uint256)
-const SEL_REDEEM_RESOLVED: u32 = 0x6a3c4165; // redeemResolved()
+const SEL_BUY_OUTCOME: u32 = 0x193099a8;   // buyOutcome(bool,uint256,uint256)
+const SEL_SELL_OUTCOME: u32 = 0xe88b997b;   // sellOutcome(bool,uint256,uint256)
+const SEL_REDEEM_RESOLVED: u32 = 0xe48f8d53; // redeemResolved()
 const SEL_WITHDRAW: u32 = 0x84f22721;       // withdrawToVault()
 
 // ERC-20 approve selector
@@ -251,6 +251,7 @@ fn build_withdraw_to_vault(adapter: &[u8; 20]) -> ActionV1 {
 /// For buying tokens: min_tokens = usdc_amount / price * (1 - slippage)
 /// For selling tokens: min_usdc = token_amount * price * (1 - slippage)
 fn apply_slippage(amount: u64, slippage_bps: u64) -> u64 {
+    if slippage_bps >= BPS_DENOM { return 0; }
     amount * (BPS_DENOM - slippage_bps) / BPS_DENOM
 }
 
@@ -271,17 +272,18 @@ fn drawdown_breaker_active(snapshot: &StateSnapshotV1, max_drawdown_bps: u64) ->
 
 /// Calculate PnL in basis points for a position.
 /// For YES: pnl = (mid_price - entry_price) / entry_price * 10000
-/// For NO: pnl = (entry_price - mid_price) / entry_price * 10000
+/// For NO: cost = (1 - entry_price), value = (1 - mid_price)
+///         pnl = (value - cost) / cost * 10000
+///              = (entry_price - mid_price) / (PROB_SCALE - entry_price) * 10000
 fn position_pnl_bps(entry_price: u64, mid_price: u64, is_yes: bool) -> i64 {
-    if entry_price == 0 {
-        return 0;
-    }
-    let pnl = if is_yes {
+    if is_yes {
+        if entry_price == 0 { return 0; }
         (mid_price as i64 - entry_price as i64) * BPS_DENOM as i64 / entry_price as i64
     } else {
-        (entry_price as i64 - mid_price as i64) * BPS_DENOM as i64 / entry_price as i64
-    };
-    pnl
+        let no_cost = PROB_SCALE.saturating_sub(entry_price);
+        if no_cost == 0 { return 0; }
+        (entry_price as i64 - mid_price as i64) * BPS_DENOM as i64 / no_cost as i64
+    }
 }
 
 /// Calculate order size respecting max position and available balance.

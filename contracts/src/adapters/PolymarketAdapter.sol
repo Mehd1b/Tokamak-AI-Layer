@@ -9,6 +9,8 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 /// @notice Adapter for KernelVault agents to trade on Polymarket's CTF Exchange.
 ///         Routes CALL actions from registered vaults to buy/sell conditional tokens.
 /// @dev Designed for Polygon deployment alongside vaults targeting Polymarket.
+///      NOTE: buyOutcome/sellOutcome/redeemResolved contain scaffolding logic.
+///      Integrate with the actual CTF Exchange ABI before mainnet use.
 ///
 /// Architecture:
 /// ┌─────────────────────────────────────────┐
@@ -42,6 +44,7 @@ contract PolymarketAdapter is ReentrancyGuard {
 
     // ============ State ============
 
+    address public immutable deployer;
     address public immutable usdc;
     address public immutable ctfExchange;
     address public immutable vaultFactory;
@@ -60,6 +63,7 @@ contract PolymarketAdapter is ReentrancyGuard {
 
     error VaultNotRegistered();
     error VaultAlreadyRegistered();
+    error NotFactoryOrOwner();
     error InsufficientOutput();
     error ZeroAmount();
 
@@ -76,14 +80,20 @@ contract PolymarketAdapter is ReentrancyGuard {
     /// @param _ctfExchange Polymarket CTF Exchange address
     /// @param _vaultFactory VaultFactory address for access control
     constructor(address _usdc, address _ctfExchange, address _vaultFactory) {
+        deployer = msg.sender;
         usdc = _usdc;
         ctfExchange = _ctfExchange;
         vaultFactory = _vaultFactory;
     }
 
+    function owner() public view returns (address) {
+        return deployer;
+    }
+
     // ============ Registration ============
 
     /// @notice Register a vault to use this adapter for a specific market.
+    ///         Only callable by the VaultFactory or the adapter deployer (owner).
     /// @param vault The KernelVault address
     /// @param conditionId The Polymarket condition ID
     /// @param yesToken Address/ID for the YES outcome token
@@ -94,6 +104,7 @@ contract PolymarketAdapter is ReentrancyGuard {
         address yesToken,
         address noToken
     ) external {
+        if (msg.sender != vaultFactory && msg.sender != owner()) revert NotFactoryOrOwner();
         if (vaultConfigs[vault].registered) revert VaultAlreadyRegistered();
 
         vaultConfigs[vault] = VaultConfig({

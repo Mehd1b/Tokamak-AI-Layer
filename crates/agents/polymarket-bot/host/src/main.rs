@@ -111,7 +111,7 @@ async fn main() -> Result<()> {
 
         println!(
             "  {} Sleeping {}s...",
-            "⏳".yellow() if cfg!(target_os = "macos") else "...".yellow(),
+            "...".yellow(),
             config.monitor_interval_secs
         );
         tokio::time::sleep(Duration::from_secs(config.monitor_interval_secs)).await;
@@ -141,9 +141,10 @@ async fn run_cycle(
     let market = client.get_market(&config.condition_id).await?;
     let resolved = market.closed;
     let winning_side = if resolved {
+        // Determine winner by outcome name, not array position
         market.tokens.iter()
-            .position(|t| t.winner)
-            .map(|i| i as u8)
+            .find(|t| t.winner)
+            .map(|t| if t.outcome.to_lowercase() == "no" { 1u8 } else { 0u8 })
             .unwrap_or(0)
     } else {
         0
