@@ -31,6 +31,14 @@ export const OptimismLogo = ({ className }: { className?: string }) => (
   </svg>
 );
 
+// Polygon logo
+export const PolygonLogo = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 100 100" className={className} fill="none">
+    <circle cx="50" cy="50" r="48" fill="#8247E5" />
+    <path d="M68 40.5c-1.2-.7-2.8-.7-4 0L54.5 46l-6.5 3.5-9.5 5.5c-1.2.7-2.8.7-4 0l-7.5-4.3c-1.2-.7-2-2-2-3.5V39c0-1.4.8-2.7 2-3.5l7.5-4.2c1.2-.7 2.8-.7 4 0l7.5 4.2c1.2.7 2 2 2 3.5v5.5l6.5-3.8V35c0-1.4-.8-2.7-2-3.5l-13.8-8c-1.2-.7-2.8-.7-4 0l-14 8.1c-1.2.7-2 2-2 3.4v16c0 1.4.8 2.7 2 3.5l14 8c1.2.7 2.8.7 4 0l9.5-5.3 6.5-3.8 9.5-5.3c1.2-.7 2.8-.7 4 0l7.5 4.2c1.2.7 2 2 2 3.5v8.5c0 1.4-.8 2.7-2 3.5l-7.3 4.2c-1.2.7-2.8.7-4 0l-7.5-4.2c-1.2-.7-2-2-2-3.5v-5.2l-6.5 3.8v5.5c0 1.4.8 2.7 2 3.5l14 8c1.2.7 2.8.7 4 0l14-8c1.2-.7 2-2 2-3.5v-16c0-1.4-.8-2.7-2-3.5L68 40.5z" fill="#fff"/>
+  </svg>
+);
+
 // Hyperliquid logo (stylized green mark)
 export const HyperliquidLogo = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 100 100" className={className} fill="none">
@@ -47,6 +55,7 @@ const NETWORKS = [
   { chainId: 999, name: 'HyperEVM', Logo: HyperliquidLogo },
   { chainId: 42161, name: 'Arbitrum', Logo: ArbitrumLogo },
   { chainId: 10, name: 'Optimism', Logo: OptimismLogo },
+  { chainId: 137, name: 'Polygon', Logo: PolygonLogo },
   { chainId: 11155111, name: 'Sepolia', Logo: EthereumLogo },
   { chainId: 998, name: 'HyperEVM Testnet', Logo: HyperliquidLogo },
 ];

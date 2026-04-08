@@ -3,13 +3,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSwitchChain } from 'wagmi';
 import { useNetwork } from '@/lib/NetworkContext';
-import { EthereumLogo, HyperliquidLogo, ArbitrumLogo, OptimismLogo } from '@/components/NetworkLogo';
+import { EthereumLogo, HyperliquidLogo, ArbitrumLogo, OptimismLogo, PolygonLogo } from '@/components/NetworkLogo';
 
 const NETWORKS = [
   { chainId: 1, name: 'Ethereum', Logo: EthereumLogo, isMainnet: true },
   { chainId: 999, name: 'HyperEVM', Logo: HyperliquidLogo, isMainnet: true },
   { chainId: 42161, name: 'Arbitrum', Logo: ArbitrumLogo, isMainnet: true },
   { chainId: 10, name: 'Optimism', Logo: OptimismLogo, isMainnet: true },
+  { chainId: 137, name: 'Polygon', Logo: PolygonLogo, isMainnet: true },
   { chainId: 11155111, name: 'Sepolia', Logo: EthereumLogo, isMainnet: false },
   { chainId: 998, name: 'HyperEVM Testnet', Logo: HyperliquidLogo, isMainnet: false },
 ];
