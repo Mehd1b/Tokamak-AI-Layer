@@ -89,11 +89,15 @@ pub fn run(
     config_path: &str,
     verbose: bool,
     hyperliquid: bool,
+    polymarket: bool,
     optimistic: bool,
     min_bond: Option<&str>,
 ) -> Result<()> {
+    if hyperliquid && polymarket {
+        bail!("--hyperliquid and --polymarket are mutually exclusive. Choose one protocol type.");
+    }
     let rt = tokio::runtime::Runtime::new()?;
-    rt.block_on(run_async(testnet, step, config_path, verbose, hyperliquid, optimistic, min_bond))
+    rt.block_on(run_async(testnet, step, config_path, verbose, hyperliquid, polymarket, optimistic, min_bond))
 }
 
 async fn run_async(
@@ -102,13 +106,18 @@ async fn run_async(
     config_path: &str,
     verbose: bool,
     hyperliquid: bool,
+    polymarket: bool,
     optimistic: bool,
     min_bond: Option<&str>,
 ) -> Result<()> {
     let mode = if hyperliquid && optimistic {
         "Hyperliquid + Optimistic"
+    } else if polymarket && optimistic {
+        "Polymarket + Optimistic"
     } else if hyperliquid {
         "Hyperliquid"
+    } else if polymarket {
+        "Polymarket"
     } else if optimistic {
         "Optimistic"
     } else {
@@ -254,22 +263,23 @@ async fn run_async(
     // ===================================================================
     // Set protocol type on VaultFactory
     // ===================================================================
-    if hyperliquid {
+    if hyperliquid || polymarket {
         let factory = IVaultFactory::new(chain.vault_factory, &provider);
+        let (target_type, type_label) = if hyperliquid { (1u8, "Hyperliquid") } else { (2u8, "Polymarket") };
         let current_type = factory.vaultProtocolType(vault_addr).call().await.map(|r| r._0).unwrap_or(0);
 
-        if current_type != 1 {
-            println!("  Setting vault protocol type to Hyperliquid (1)...");
+        if current_type != target_type {
+            println!("  Setting vault protocol type to {} ({})...", type_label, target_type);
             let tx_data = IVaultFactory::setVaultProtocolTypeCall {
                 vault: vault_addr,
-                protocolType: 1, // HYPERLIQUID
+                protocolType: target_type,
             }
             .abi_encode();
 
             let result = send_tx(&provider, Some(chain.vault_factory), tx_data, U256::ZERO, None).await?;
             println!("  {} Protocol type set (tx: {:?})", "✓".green(), result.tx_hash);
         } else {
-            println!("  {} Vault protocol type already set to Hyperliquid", "✓".green());
+            println!("  {} Vault protocol type already set to {}", "✓".green(), type_label);
         }
         println!();
     }
@@ -419,6 +429,10 @@ async fn run_async(
     println!("    • Fund vault with USDC: transfer to {}", vault_addr);
     if hyperliquid {
         println!("    • Run bot: ./run-bot.sh");
+    }
+    if polymarket {
+        println!("    • Configure Polymarket CLOB API keys for your bot");
+        println!("    • Vault will display prediction market positions in the dashboard");
     }
     println!("    • Monitor: tal monitor --vault {}", vault_addr);
     println!();

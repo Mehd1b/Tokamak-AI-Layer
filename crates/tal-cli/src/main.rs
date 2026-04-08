@@ -134,6 +134,10 @@ enum Commands {
         #[arg(long)]
         hyperliquid: bool,
 
+        /// Tag vault as Polymarket prediction market (sets protocol type)
+        #[arg(long)]
+        polymarket: bool,
+
         /// Deploy OptimisticKernelVault instead of regular KernelVault
         #[arg(long)]
         optimistic: bool,
@@ -286,6 +290,7 @@ fn main() -> anyhow::Result<()> {
             step,
             agent,
             hyperliquid,
+            polymarket,
             optimistic,
             min_bond,
         } => deploy::run(
@@ -295,6 +300,7 @@ fn main() -> anyhow::Result<()> {
             &cli.config,
             cli.verbose,
             hyperliquid,
+            polymarket,
             optimistic,
             min_bond.as_deref(),
         ),
