@@ -82,6 +82,9 @@ interface IAaveV3Adapter {
     /// @notice Aave withdraw returned zero
     error WithdrawFailed();
 
+    /// @notice Vault attempted to withdraw more than its tracked supply
+    error InsufficientVaultPosition(uint256 requested, uint256 available);
+
     // ============ Registration ============
 
     /// @notice Register a vault for use with this adapter

@@ -187,7 +187,25 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
         TradingSubAccount(payable(config.subAccount)).executeOpen(
             isBuy, uint64(marginAmount), uint64(scaledSize), uint64(limitPrice)
         );
+
+        // M-12: emit the order intent so off-chain reconciliation can detect
+        // fills that never land (HyperCore is async and may silently reject
+        // orders; the adapter has no synchronous state read).
+        emit OrderIntentSubmitted(
+            msg.sender, isBuy, marginAmount, scaledSize, limitPrice, block.timestamp
+        );
     }
+
+    /// @notice Emitted when an order is submitted to CoreWriter. Consumers should
+    ///         pair this with the HyperCore fill stream to detect silent rejections.
+    event OrderIntentSubmitted(
+        address indexed vault,
+        bool isBuy,
+        uint256 marginAmount,
+        uint256 scaledSize,
+        uint256 limitPrice,
+        uint256 timestamp
+    );
 
     /// @inheritdoc IHyperliquidAdapter
     function closePositionAtPrice(uint64 px) external override nonReentrant onlyRegisteredVault {

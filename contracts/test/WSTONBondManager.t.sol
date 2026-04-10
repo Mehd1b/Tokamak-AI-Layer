@@ -483,12 +483,19 @@ contract WSTONBondManagerTest is Test {
         bondManager.lockBondDirect(mockVault, NONCE_1, bondAmount);
 
         uint256 treasuryBefore = mockWston.balanceOf(treasury);
+        uint256 finderBefore = mockWston.balanceOf(finder);
 
         vm.prank(relayer);
         bondManager.slashBondByRelayer(operator, mockVault, NONCE_1, finder);
 
-        // Cross-chain slash: 100% to treasury
-        assertEq(mockWston.balanceOf(treasury), treasuryBefore + bondAmount);
+        // L-25 FIX: cross-chain slash now mirrors on-chain distribution —
+        // 10% finder + 90% treasury (which internally holds the depositor share).
+        uint256 expectedFinderShare =
+            (bondAmount * bondManager.FINDER_FEE_BPS()) / bondManager.BPS_DENOMINATOR();
+        assertEq(mockWston.balanceOf(finder) - finderBefore, expectedFinderShare);
+        assertEq(
+            mockWston.balanceOf(treasury) - treasuryBefore, bondAmount - expectedFinderShare
+        );
         assertEq(bondManager.totalLockedGlobal(), 0);
     }
 
@@ -519,8 +526,8 @@ contract WSTONBondManagerTest is Test {
 
         uint256 operatorBefore = mockWston.balanceOf(operator);
 
-        // Warp past BOND_EXPIRY (30 days)
-        vm.warp(block.timestamp + 30 days + 1);
+        // Warp past BOND_EXPIRY (M-16: extended from 30 days to 90 days)
+        vm.warp(block.timestamp + 90 days + 1);
 
         vm.prank(operator);
         bondManager.reclaimExpiredBond(mockVault, NONCE_1);
@@ -565,8 +572,8 @@ contract WSTONBondManagerTest is Test {
         );
         bondManager.releaseBond(operator, mockVault, NONCE_1);
 
-        // Warp past expiry and reclaim
-        vm.warp(block.timestamp + 30 days + 1);
+        // Warp past expiry and reclaim (M-16: extended to 90 days)
+        vm.warp(block.timestamp + 90 days + 1);
 
         uint256 operatorBefore = mockWston.balanceOf(operator);
         vm.prank(operator);
@@ -609,9 +616,15 @@ contract WSTONBondManagerTest is Test {
 
     // ============ Zero-Address Guard Tests ============
 
-    function test_setTrustedRelayer_zeroAddress_reverts() public {
-        vm.expectRevert(WSTONBondManager.ZeroRelayer.selector);
+    function test_setTrustedRelayer_zeroAddress_clearsRelayer() public {
+        // L-31 FIX: clearing to zero is now allowed so the owner can revoke
+        // cross-chain lock permissions without deploying a dummy relayer.
+        address realRelayer = address(0xBEEF);
+        bondManager.setTrustedRelayer(realRelayer);
+        assertEq(bondManager.trustedRelayer(), realRelayer);
+
         bondManager.setTrustedRelayer(address(0));
+        assertEq(bondManager.trustedRelayer(), address(0));
     }
 
     // ============ Global Tracking Tests ============
@@ -632,10 +645,11 @@ contract WSTONBondManagerTest is Test {
         nonces[1] = 11;
         nonces[2] = 12;
 
+        // M-08: every batch amount must be >= minBondFloor (10 ether in tests)
         uint256[] memory amounts = new uint256[](3);
-        amounts[0] = 5 ether;
-        amounts[1] = 10 ether;
-        amounts[2] = 15 ether;
+        amounts[0] = 10 ether;
+        amounts[1] = 15 ether;
+        amounts[2] = 20 ether;
 
         uint256 operatorBefore = mockWston.balanceOf(operator);
 
@@ -645,24 +659,24 @@ contract WSTONBondManagerTest is Test {
         // Verify all three bonds stored correctly
         (uint256 amount0, uint256 lockedAt0, WSTONBondManager.BondStatus status0) =
             bondManager.bonds(operator, mockVault, 10);
-        assertEq(amount0, 5 ether);
+        assertEq(amount0, 10 ether);
         assertEq(lockedAt0, block.timestamp);
         assertEq(uint8(status0), uint8(WSTONBondManager.BondStatus.Locked));
 
         (uint256 amount1,, WSTONBondManager.BondStatus status1) =
             bondManager.bonds(operator, mockVault, 11);
-        assertEq(amount1, 10 ether);
+        assertEq(amount1, 15 ether);
         assertEq(uint8(status1), uint8(WSTONBondManager.BondStatus.Locked));
 
         (uint256 amount2,, WSTONBondManager.BondStatus status2) =
             bondManager.bonds(operator, mockVault, 12);
-        assertEq(amount2, 15 ether);
+        assertEq(amount2, 20 ether);
         assertEq(uint8(status2), uint8(WSTONBondManager.BondStatus.Locked));
 
         // Verify totals
-        assertEq(bondManager.totalBonded(operator), 30 ether);
-        assertEq(bondManager.totalLockedGlobal(), 30 ether);
-        assertEq(mockWston.balanceOf(operator), operatorBefore - 30 ether);
+        assertEq(bondManager.totalBonded(operator), 45 ether);
+        assertEq(bondManager.totalLockedGlobal(), 45 ether);
+        assertEq(mockWston.balanceOf(operator), operatorBefore - 45 ether);
     }
 
     function test_lockBondBatch_length_mismatch_reverts() public {
@@ -713,7 +727,7 @@ contract WSTONBondManagerTest is Test {
         nonces[1] = 10; // duplicate
 
         uint256[] memory amounts = new uint256[](2);
-        amounts[0] = 5 ether;
+        amounts[0] = 10 ether; // at minBondFloor
         amounts[1] = 10 ether;
 
         vm.prank(operator);

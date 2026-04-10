@@ -364,6 +364,9 @@ contract UniswapV4Adapter is ReentrancyGuard {
         returns (uint256 amountOut)
     {
         if (amountIn == 0) revert ZeroAmount();
+        // L-15: minAmountOut must be non-zero — callers supplying 0 disable
+        // slippage protection and open a sandwich vector.
+        if (minAmountOut == 0) revert SlippageTooHigh(0, 1);
 
         VaultConfig memory config = vaultConfigs[msg.sender];
 

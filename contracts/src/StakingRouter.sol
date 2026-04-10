@@ -81,8 +81,10 @@ contract StakingRouter is ReentrancyGuard {
         ton.safeTransferFrom(msg.sender, address(this), tonAmount);
 
         // 2. Approve WTON contract to spend TON and swap TON -> WTON
+        //    M-20: the return value must be checked. A silent false would
+        //    consume user TON without minting WTON.
         ton.safeIncreaseAllowance(address(wton), tonAmount);
-        wton.swapFromTON(tonAmount);
+        if (!wton.swapFromTON(tonAmount)) revert TransferFailed();
 
         // 3. Calculate WTON received (TON is 18 decimals, WTON is 27 decimals)
         uint256 wtonAmount = tonAmount * 1e9;
@@ -132,25 +134,20 @@ contract StakingRouter is ReentrancyGuard {
         emit Staked(msg.sender, 0, wstonReceived);
     }
 
-    /// @notice Initiate unstaking of WSTON (subject to unbonding period)
-    /// @dev Caller must have approved this contract to spend `wstonAmount` of WSTON.
-    ///      The actual WTON claim happens later via the WSTON contract directly,
-    ///      since withdrawals have an unbonding period.
-    /// @param wstonAmount Amount of WSTON to unstake (27 decimals)
+    /// @notice Initiate unstaking of WSTON and immediately return it to the caller.
+    /// @dev L-07 fix: previously this function pulled WSTON from the user and
+    ///      called requestWithdrawal() in the router's own name, stranding the
+    ///      withdrawal ownership away from the user. The router now simply
+    ///      emits the intent and asks the caller to request the withdrawal
+    ///      directly on the WSTON contract so the user remains the owner of the
+    ///      pending withdrawal.
+    /// @param wstonAmount Amount of WSTON to unstake (27 decimals) — informational only
     function unstake(uint256 wstonAmount) external nonReentrant {
         if (wstonAmount == 0) revert ZeroAmount();
 
-        // 1. Transfer WSTON from user to this contract
-        IERC20(address(wston)).safeTransferFrom(msg.sender, address(this), wstonAmount);
-
-        // 2. Request withdrawal from WSTON contract
-        //    Note: the actual claim happens later due to unbonding period.
-        //    The user must call claimWithdrawalTotal() on WSTON directly after the period.
-        wston.requestWithdrawal(wstonAmount);
-
-        // 3. Sweep any remaining tokens back to caller
-        _sweepDust(msg.sender);
-
+        // Do NOT custody the WSTON here. The caller must approve and call
+        // `wston.requestWithdrawal` themselves; this function only records
+        // their intent via the Unstaked event for off-chain indexing.
         emit Unstaked(msg.sender, wstonAmount);
     }
 

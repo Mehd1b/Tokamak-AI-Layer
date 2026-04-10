@@ -225,6 +225,11 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
         _agentIds.pop();
         delete _agentIdIndex[agentId];
 
+        // M-26: clear deprecation flag and successor link so off-chain consumers
+        // do not get misdirected to a non-existent agent.
+        delete _deprecated[agentId];
+        delete _successors[agentId];
+
         emit AgentUnregistered(agentId, author);
     }
 

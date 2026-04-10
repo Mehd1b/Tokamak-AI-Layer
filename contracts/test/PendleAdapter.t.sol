@@ -249,6 +249,10 @@ contract MockPendleRouter {
 
         require(netSyOut >= minSyOut, "slippage exceeded");
         require(netPtOut >= minPtOut, "slippage exceeded");
+
+        // Mint both outputs to the receiver so the adapter can forward SY.
+        (address syAddr, , ) = MockPendleMarket(market).readTokens();
+        if (netSyOut > 0) MockERC20Token(syAddr).mint(receiver, netSyOut);
     }
 
     function redeemDueInterestAndRewards(
@@ -287,11 +291,12 @@ contract MockKernelVault {
     function callMintPtYt(address adapter, address market, address tokenIn, uint256 amount)
         external
     {
-        PendleAdapter(adapter).mintPtYt(market, tokenIn, amount);
+        // Tests use zero minPyOut (no slippage); production callers MUST set a real bound.
+        PendleAdapter(adapter).mintPtYt(market, tokenIn, amount, 0);
     }
 
     function callRedeemPtYt(address adapter, address market, uint256 amount) external {
-        PendleAdapter(adapter).redeemPtYt(market, amount);
+        PendleAdapter(adapter).redeemPtYt(market, amount, 0);
     }
 
     function callSwapExactPtForToken(
@@ -336,8 +341,8 @@ contract MockKernelVault {
         PendleAdapter(adapter).claimRewards(markets);
     }
 
-    function callWithdrawToVault(address adapter) external {
-        PendleAdapter(adapter).withdrawToVault();
+    function callWithdrawToVault(address adapter, address market) external {
+        PendleAdapter(adapter).withdrawToVault(market);
     }
 }
 
@@ -1047,13 +1052,13 @@ contract PendleAdapterTest is Test {
     function test_withdrawToVault_success() public {
         _registerAndWhitelist();
 
-        vaultA.callWithdrawToVault(address(adapter));
-        // Should not revert
+        vaultA.callWithdrawToVault(address(adapter), address(market));
+        // Should not revert (no tracked position → no-op)
     }
 
     function test_withdrawToVault_revertsUnregistered() public {
         vm.expectRevert(PendleAdapter.VaultNotRegistered.selector);
-        vaultA.callWithdrawToVault(address(adapter));
+        vaultA.callWithdrawToVault(address(adapter), address(market));
     }
 
     // ============================================================================
@@ -1216,7 +1221,7 @@ contract PendleAdapterTest is Test {
 
     function test_unauthorizedCaller_withdrawToVault() public {
         vm.expectRevert(PendleAdapter.VaultNotRegistered.selector);
-        vaultB.callWithdrawToVault(address(adapter));
+        vaultB.callWithdrawToVault(address(adapter), address(market));
     }
 
     // ============================================================================

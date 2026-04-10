@@ -489,8 +489,14 @@ contract AaveV3AdapterTest is Test {
     }
 
     function test_withdraw_revertsWhenNothingSupplied() public {
-        // No supply, direct withdraw should revert with WithdrawFailed (zero returned)
-        vm.expectRevert(IAaveV3Adapter.WithdrawFailed.selector);
+        // Per-vault position tracking (C-02 fix): a vault with no tracked supply
+        // cannot withdraw, reverting with InsufficientVaultPosition instead of
+        // reaching the WithdrawFailed branch.
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAaveV3Adapter.InsufficientVaultPosition.selector, SUPPLY_AMOUNT, 0
+            )
+        );
         vm.prank(address(vault));
         adapter.withdraw(address(usdc), SUPPLY_AMOUNT);
     }
@@ -525,19 +531,20 @@ contract AaveV3AdapterTest is Test {
     }
 
     function test_borrow_revertsHealthFactorTooLow() public {
-        // Set health factor below minimum BEFORE borrow
-        mockPool.setMockHealthFactor(1.2e18); // Below 1.5e18 minimum
-
+        // Per-vault nominal health (C-02 fix): with 1000 supplied, borrowing 800 gives
+        // nominalHealth = 1000 / 800 * 1e18 = 1.25e18, below the 1.5e18 minimum.
         vm.prank(address(vault));
         adapter.supply(address(usdc), SUPPLY_AMOUNT);
 
+        uint256 unsafeBorrow = 800e6; // 1000 / 800 = 1.25 < 1.5
+        uint256 expectedHealth = (SUPPLY_AMOUNT * 1e18) / unsafeBorrow;
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAaveV3Adapter.HealthFactorTooLow.selector, 1.2e18, DEFAULT_MIN_HF
+                IAaveV3Adapter.HealthFactorTooLow.selector, expectedHealth, DEFAULT_MIN_HF
             )
         );
         vm.prank(address(vault));
-        adapter.borrow(address(usdc), BORROW_AMOUNT, 2);
+        adapter.borrow(address(usdc), unsafeBorrow, 2);
     }
 
     function test_borrow_succeedsAtExactMinHealthFactor() public {
@@ -804,18 +811,20 @@ contract AaveV3AdapterTest is Test {
     }
 
     function test_borrow_healthFactorEnforcement_justBelowThreshold() public {
-        // Set HF to just below threshold
-        mockPool.setMockHealthFactor(1.5e18 - 1);
-
+        // Per-vault nominal health: supply 1500, borrow 1001 — this gives nominalHealth
+        // = 1500 * 1e18 / 1001 = 1.4985e18, which is just below the 1.5e18 floor.
+        uint256 supplyAmt = 1500e6;
+        uint256 borrowAmt = 1001e6;
         vm.prank(address(vault));
-        adapter.supply(address(usdc), SUPPLY_AMOUNT);
+        adapter.supply(address(usdc), supplyAmt);
 
+        uint256 expectedHealth = (supplyAmt * 1e18) / borrowAmt;
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAaveV3Adapter.HealthFactorTooLow.selector, 1.5e18 - 1, DEFAULT_MIN_HF
+                IAaveV3Adapter.HealthFactorTooLow.selector, expectedHealth, DEFAULT_MIN_HF
             )
         );
         vm.prank(address(vault));
-        adapter.borrow(address(usdc), BORROW_AMOUNT, 2);
+        adapter.borrow(address(usdc), borrowAmt, 2);
     }
 }

@@ -12,6 +12,11 @@ contract ReferralManager {
     /// @notice Contract owner
     address public owner;
 
+    /// @notice Addresses authorized to record referrals (L-11 fix).
+    /// @dev Only authorized vaults/factory can call recordReferral — prevents
+    ///      self-crediting and arbitrary cap-exhausting calls.
+    mapping(address => bool) public authorizedRecorders;
+
     /// @notice Code hash → referrer address
     mapping(bytes32 => address) public referralCodes;
 
@@ -69,6 +74,9 @@ contract ReferralManager {
     /// @notice Depositor has already been referred
     error AlreadyReferred();
 
+    /// @notice Caller is not an authorized recorder (L-11)
+    error NotAuthorizedRecorder();
+
     // ============ Constructor ============
 
     constructor() {
@@ -110,13 +118,21 @@ contract ReferralManager {
         emit CodeRegistered(msg.sender, codeHash);
     }
 
-    /// @notice Record a referred deposit. Can be called by anyone (typically the depositor or the
-    ///         frontend relayer after a vault deposit).
+    /// @notice Authorize or revoke a recorder (L-11)
+    function setAuthorizedRecorder(address recorder, bool allowed) external onlyOwner {
+        authorizedRecorders[recorder] = allowed;
+    }
+
+    /// @notice Record a referred deposit. L-11: only authorized recorders (vaults,
+    ///         factory, trusted backend) may call this to prevent arbitrary self-crediting.
     /// @param depositor The address that made the deposit
     /// @param codeHash The keccak256 hash of the referral code used
     /// @param amount The raw deposit amount (in token wei, e.g. 2000e6 for 2000 USDC)
     /// @param decimals The token's decimal count (e.g. 6 for USDC, 18 for WETH)
     function recordReferral(address depositor, bytes32 codeHash, uint256 amount, uint8 decimals) external {
+        if (!authorizedRecorders[msg.sender] && msg.sender != owner) {
+            revert NotAuthorizedRecorder();
+        }
         address referrer = referralCodes[codeHash];
         if (referrer == address(0)) revert InvalidCode();
         if (depositor == referrer) revert SelfReferral();

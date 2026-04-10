@@ -49,6 +49,7 @@ interface IVaultFactory {
     /// @param asset The ERC20 asset address (or address(0) for ETH)
     /// @param userSalt A unique salt chosen by the user
     /// @param bondChainId The L1 chain ID where bonds are locked
+    /// @param challengeWindow The challenge window duration (M-17)
     /// @return vault The computed vault address
     /// @return salt The CREATE2 salt used for deployment
     function computeOptimisticVaultAddress(
@@ -56,7 +57,8 @@ interface IVaultFactory {
         bytes32 agentId,
         address asset,
         bytes32 userSalt,
-        uint256 bondChainId
+        uint256 bondChainId,
+        uint256 challengeWindow
     ) external view returns (address vault, bytes32 salt);
 
     /// @notice Image ID changed between computeVaultAddress and deployVault
@@ -149,4 +151,5 @@ interface IVaultFactory {
 
     /// @notice Vault already exists at computed address
     error VaultAlreadyExists(address vault);
+    error Create2DeploymentFailed();
 }

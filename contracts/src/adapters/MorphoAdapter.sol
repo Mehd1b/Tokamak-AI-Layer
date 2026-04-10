@@ -156,6 +156,16 @@ contract MorphoAdapter is ReentrancyGuard {
     /// @notice Track whether a market ID is already in the active list for a vault
     mapping(address vault => mapping(bytes32 marketId => bool)) internal _isMarketActive;
 
+    /// @notice Per-vault position accounting to enforce isolation on the shared Morpho account.
+    /// @dev Tracks the amount of loan tokens supplied per market by each vault.
+    mapping(address vault => mapping(bytes32 marketId => uint256)) internal _vaultSupplied;
+
+    /// @notice Per-vault tracked borrow position per market.
+    mapping(address vault => mapping(bytes32 marketId => uint256)) internal _vaultBorrowed;
+
+    /// @notice Per-vault tracked collateral position per market.
+    mapping(address vault => mapping(bytes32 marketId => uint256)) internal _vaultCollateral;
+
     // ============ Events ============
 
     /// @notice Emitted when a vault is registered
@@ -222,6 +232,9 @@ contract MorphoAdapter is ReentrancyGuard {
     /// @notice Position health is below the safety threshold after borrow
     error UnhealthyPosition(uint256 borrowValue, uint256 maxBorrowValue);
 
+    /// @notice Vault attempted to withdraw more than its tracked supply
+    error InsufficientVaultPosition(uint256 requested, uint256 available);
+
     // ============ Modifiers ============
 
     modifier onlyRegisteredVault() {
@@ -274,6 +287,31 @@ contract MorphoAdapter is ReentrancyGuard {
         isRegistered[vault] = true;
 
         emit VaultRegistered(vault);
+    }
+
+    /// @notice Unregister a vault from the adapter (L-32).
+    /// @dev Only the vault owner can unregister. The vault must have no tracked
+    ///      positions in any market — callers should drain via `withdrawToVault`
+    ///      first. Prevents a revoked vault from retaining access to the adapter.
+    function unregisterVault(address vault) external nonReentrant {
+        if (!isRegistered[vault]) revert VaultNotRegistered();
+        if (msg.sender != IKernelVaultOwner(vault).owner()) revert NotVaultOwner();
+
+        bytes32[] storage ids = _vaultMarketIds[vault];
+        for (uint256 i = 0; i < ids.length; i++) {
+            bytes32 mid = ids[i];
+            if (
+                _vaultSupplied[vault][mid] != 0
+                    || _vaultBorrowed[vault][mid] != 0
+                    || _vaultCollateral[vault][mid] != 0
+            ) {
+                revert InsufficientVaultPosition(1, 0);
+            }
+            _isMarketActive[vault][mid] = false;
+        }
+        delete _vaultMarketIds[vault];
+
+        isRegistered[vault] = false;
     }
 
     // ============ Market Whitelist Management ============
@@ -332,6 +370,9 @@ contract MorphoAdapter is ReentrancyGuard {
         // Supply to Morpho on behalf of this adapter (adapter holds the position)
         IMorpho(morpho).supply(params, assets, 0, address(this), "");
 
+        // Credit the calling vault's tracked supply so other vaults cannot withdraw it
+        _vaultSupplied[msg.sender][marketId] += assets;
+
         emit Supplied(msg.sender, marketId, assets);
     }
 
@@ -348,6 +389,13 @@ contract MorphoAdapter is ReentrancyGuard {
         if (assets == 0) revert ZeroAmount();
 
         bytes32 marketId = _marketId(params);
+
+        // Enforce per-vault position cap: a vault can only withdraw its own tracked supply
+        uint256 tracked = _vaultSupplied[msg.sender][marketId];
+        if (assets > tracked) {
+            revert InsufficientVaultPosition(assets, tracked);
+        }
+        _vaultSupplied[msg.sender][marketId] = tracked - assets;
 
         // Withdraw from Morpho: adapter is the position holder, vault is the receiver
         IMorpho(morpho).withdraw(params, assets, 0, address(this), msg.sender);
@@ -370,11 +418,17 @@ contract MorphoAdapter is ReentrancyGuard {
         bytes32 marketId = _marketId(params);
         _trackMarket(msg.sender, marketId);
 
+        // Credit the calling vault's tracked borrow BEFORE the external call so that
+        // per-vault health is enforced on the vault's own collateral only.
+        _vaultBorrowed[msg.sender][marketId] += assets;
+
         // Borrow from Morpho: adapter is the position holder, vault receives funds
         IMorpho(morpho).borrow(params, assets, 0, address(this), msg.sender);
 
-        // Health check: ensure position is within 80% of market LLTV
-        _checkHealth(marketId, params.lltv);
+        // Health check: ensure the calling vault's tracked position is within the
+        // safety threshold. Uses only the caller's tracked collateral, not the
+        // adapter's aggregate position — this prevents cross-vault collateral abuse.
+        _checkVaultHealth(msg.sender, marketId, params.lltv);
 
         emit Borrowed(msg.sender, marketId, assets);
     }
@@ -401,6 +455,14 @@ contract MorphoAdapter is ReentrancyGuard {
 
         // Repay on Morpho
         IMorpho(morpho).repay(params, assets, 0, address(this), "");
+
+        // Decrement tracked borrow (cap at the tracked amount to tolerate interest dust)
+        uint256 trackedBorrow = _vaultBorrowed[msg.sender][marketId];
+        if (assets >= trackedBorrow) {
+            _vaultBorrowed[msg.sender][marketId] = 0;
+        } else {
+            _vaultBorrowed[msg.sender][marketId] = trackedBorrow - assets;
+        }
 
         emit Repaid(msg.sender, marketId, assets);
     }
@@ -429,6 +491,9 @@ contract MorphoAdapter is ReentrancyGuard {
         // Supply collateral on Morpho
         IMorpho(morpho).supplyCollateral(params, assets, address(this), "");
 
+        // Credit the calling vault's tracked collateral
+        _vaultCollateral[msg.sender][marketId] += assets;
+
         emit CollateralSupplied(msg.sender, marketId, assets);
     }
 
@@ -446,13 +511,19 @@ contract MorphoAdapter is ReentrancyGuard {
 
         bytes32 marketId = _marketId(params);
 
+        // Enforce per-vault collateral cap
+        uint256 trackedCollateral = _vaultCollateral[msg.sender][marketId];
+        if (assets > trackedCollateral) {
+            revert InsufficientVaultPosition(assets, trackedCollateral);
+        }
+        _vaultCollateral[msg.sender][marketId] = trackedCollateral - assets;
+
         // Withdraw collateral from Morpho: adapter holds position, vault receives
         IMorpho(morpho).withdrawCollateral(params, assets, address(this), msg.sender);
 
-        // Health check after collateral withdrawal if there is outstanding debt
-        (,uint128 borrowShares,) = IMorpho(morpho).position(marketId, address(this));
-        if (borrowShares > 0) {
-            _checkHealth(marketId, params.lltv);
+        // Per-vault health check: require the caller still collateralizes their own debt
+        if (_vaultBorrowed[msg.sender][marketId] > 0) {
+            _checkVaultHealth(msg.sender, marketId, params.lltv);
         }
 
         emit CollateralWithdrawn(msg.sender, marketId, assets);
@@ -482,6 +553,14 @@ contract MorphoAdapter is ReentrancyGuard {
 
         _trackMarket(msg.sender, toMarketId);
 
+        // Enforce per-vault cap on source market supply
+        uint256 trackedFrom = _vaultSupplied[msg.sender][fromMarketId];
+        if (assets > trackedFrom) {
+            revert InsufficientVaultPosition(assets, trackedFrom);
+        }
+        _vaultSupplied[msg.sender][fromMarketId] = trackedFrom - assets;
+        _vaultSupplied[msg.sender][toMarketId] += assets;
+
         // Withdraw from source market to this adapter
         IMorpho(morpho).withdraw(from, assets, 0, address(this), address(this));
 
@@ -492,31 +571,49 @@ contract MorphoAdapter is ReentrancyGuard {
         emit Reallocated(msg.sender, fromMarketId, toMarketId, assets);
     }
 
-    /// @notice Emergency: withdraw all positions from all known markets back to the vault
-    /// @dev Iterates over all tracked markets for the calling vault and attempts to withdraw
-    ///      all supply and collateral positions. Reverts on any failure.
+    /// @notice Emergency: withdraw the calling vault's tracked positions from all known markets.
+    /// @dev Only withdraws amounts tracked for the calling vault — it CANNOT drain the
+    ///      adapter's aggregate position (other vaults' funds). Outstanding debt is repaid
+    ///      first using the vault's ERC20 allowance before collateral is withdrawn.
     function withdrawToVault() external nonReentrant onlyRegisteredVault {
         bytes32[] storage marketIds = _vaultMarketIds[msg.sender];
         uint256 length = marketIds.length;
 
         for (uint256 i = 0; i < length; i++) {
             bytes32 marketId = marketIds[i];
-            (uint256 supplyShares,, uint128 collateral) =
-                IMorpho(morpho).position(marketId, address(this));
-
             MarketParams memory params = IMorpho(morpho).idToMarketParams(marketId);
 
-            // If there are supply shares, withdraw all (using shares to withdraw everything)
-            if (supplyShares > 0) {
-                IMorpho(morpho).withdraw(params, 0, supplyShares, address(this), msg.sender);
+            uint256 vaultSupply = _vaultSupplied[msg.sender][marketId];
+            uint256 vaultBorrow = _vaultBorrowed[msg.sender][marketId];
+            uint256 vaultCollat = _vaultCollateral[msg.sender][marketId];
+
+            // Withdraw the vault's tracked supply (caller's share only)
+            if (vaultSupply > 0) {
+                _vaultSupplied[msg.sender][marketId] = 0;
+                IMorpho(morpho).withdraw(params, vaultSupply, 0, address(this), msg.sender);
             }
 
-            // If there is collateral, withdraw all (must repay debt first if any)
-            if (collateral > 0) {
+            // Repay outstanding debt before collateral withdrawal (M-18)
+            if (vaultBorrow > 0) {
+                // Pull the loan token from the vault to repay its debt
+                IERC20(params.loanToken).safeTransferFrom(
+                    msg.sender, address(this), vaultBorrow
+                );
+                IERC20(params.loanToken).forceApprove(morpho, vaultBorrow);
+                IMorpho(morpho).repay(params, vaultBorrow, 0, address(this), "");
+                _vaultBorrowed[msg.sender][marketId] = 0;
+            }
+
+            // Withdraw the vault's tracked collateral
+            if (vaultCollat > 0) {
+                _vaultCollateral[msg.sender][marketId] = 0;
                 IMorpho(morpho).withdrawCollateral(
-                    params, uint256(collateral), address(this), msg.sender
+                    params, vaultCollat, address(this), msg.sender
                 );
             }
+
+            // Clear market activation flag (M-19): allows future re-supply to retrack
+            _isMarketActive[msg.sender][marketId] = false;
 
             emit EmergencyWithdraw(msg.sender, marketId);
         }
@@ -575,26 +672,40 @@ contract MorphoAdapter is ReentrancyGuard {
         _isMarketActive[vault][marketId] = true;
     }
 
-    /// @notice Check that the adapter's position in a market is healthy
-    /// @dev Position is healthy if borrowShares == 0, or if the borrow value is within
-    ///      80% of the maximum allowed by the market's LLTV. Uses Morpho's position data.
-    ///      Note: This is a simplified check using shares as a proxy. In production, one would
-    ///      use the oracle price to convert shares to value.
-    function _checkHealth(bytes32 marketId, uint256 lltv) internal view {
-        (, uint128 borrowShares, uint128 collateral) =
-            IMorpho(morpho).position(marketId, address(this));
+    /// @notice Per-vault health check operating on tracked positions only.
+    /// @dev Isolated from other vaults: uses the CALLING vault's tracked borrow and
+    ///      collateral rather than the adapter's aggregate. This is the defense against
+    ///      cross-vault borrow abuse (C-01/C-02 class).
+    function _checkVaultHealth(address vault, bytes32 marketId, uint256 lltv) internal view {
+        uint256 vaultBorrow = _vaultBorrowed[vault][marketId];
+        uint256 vaultCollat = _vaultCollateral[vault][marketId];
 
-        if (borrowShares == 0) return;
-        if (collateral == 0) revert UnhealthyPosition(uint256(borrowShares), 0);
+        if (vaultBorrow == 0) return;
+        if (vaultCollat == 0) revert UnhealthyPosition(vaultBorrow, 0);
 
-        // Simplified health check: borrowShares must be <= collateral * lltv * 80% / 1e18
-        // In Morpho Blue, LLTV is expressed in 1e18 (e.g., 0.8e18 = 80% LTV)
-        // Safety threshold = collateral * lltv * HEALTH_FACTOR_BPS / (1e18 * 10000)
+        // maxBorrow = collateral * lltv * 80% / (1e18 * 10000)
         uint256 maxBorrow =
-            uint256(collateral) * lltv * HEALTH_FACTOR_BPS / (1e18 * 10000);
+            vaultCollat * lltv * HEALTH_FACTOR_BPS / (1e18 * 10000);
 
-        if (uint256(borrowShares) > maxBorrow) {
-            revert UnhealthyPosition(uint256(borrowShares), maxBorrow);
+        if (vaultBorrow > maxBorrow) {
+            revert UnhealthyPosition(vaultBorrow, maxBorrow);
         }
+    }
+
+    // ============ Per-Vault Position Views ============
+
+    /// @notice Get the tracked supply balance for a vault in a market
+    function vaultSupplied(address vault, bytes32 marketId) external view returns (uint256) {
+        return _vaultSupplied[vault][marketId];
+    }
+
+    /// @notice Get the tracked borrow balance for a vault in a market
+    function vaultBorrowed(address vault, bytes32 marketId) external view returns (uint256) {
+        return _vaultBorrowed[vault][marketId];
+    }
+
+    /// @notice Get the tracked collateral balance for a vault in a market
+    function vaultCollateral(address vault, bytes32 marketId) external view returns (uint256) {
+        return _vaultCollateral[vault][marketId];
     }
 }

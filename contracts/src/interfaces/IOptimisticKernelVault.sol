@@ -28,13 +28,16 @@ interface IOptimisticKernelVault {
     /// @param oracleTimestamp Oracle data timestamp
     /// @param bondAmount Amount of WSTON locked as bond on L1
     /// @param bondAttestation Oracle attestation of L1 bond lock (65-byte ECDSA signature)
+    /// @param bondAttestationTimestamp Timestamp when the oracle signed the bond
+    ///        attestation (M-10). Must be fresh per `maxOracleAge`.
     function executeOptimistic(
         bytes calldata journal,
         bytes calldata agentOutputBytes,
         bytes calldata oracleSignature,
         uint64 oracleTimestamp,
         uint256 bondAmount,
-        bytes calldata bondAttestation
+        bytes calldata bondAttestation,
+        uint64 bondAttestationTimestamp
     ) external;
 
     /// @notice Submit a proof for a pending optimistic execution (permissionless)
@@ -99,6 +102,9 @@ interface IOptimisticKernelVault {
         uint64 indexed executionNonce, address indexed slasher, uint256 bondAmount
     );
 
+    /// @notice Emitted when the bond chain id is updated (I-06)
+    event BondChainIdUpdated(uint256 newChainId);
+
     /// @notice Emitted when optimistic configuration is updated
     event OptimisticConfigUpdated(
         uint256 challengeWindow, uint256 minBond, uint256 maxPending, bool enabled
@@ -132,4 +138,19 @@ interface IOptimisticKernelVault {
 
     /// @notice Proof verification failed
     error ProofVerificationFailed();
+
+    /// @notice setMinBond(0) attempted (M-08)
+    error InvalidMinBond();
+
+    /// @notice Proof submitted after the challenge deadline (M-11)
+    error ProofTooLate(uint64 nonce, uint256 deadline, uint256 current);
+
+    /// @notice Bond chain id is zero or invalid (M-10)
+    error InvalidBondChainId();
+
+    /// @notice Bond manager was not set before enabling optimistic (M-25)
+    error BondManagerNotSet();
+
+    /// @notice Max pending was set to zero (L-06)
+    error InvalidMaxPendingZero();
 }

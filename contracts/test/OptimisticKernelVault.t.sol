@@ -65,12 +65,14 @@ contract OptimisticKernelVaultTest is Test {
             TEST_AGENT_ID,
             TEST_IMAGE_ID,
             address(this), // owner
-            BOND_CHAIN_ID
+            BOND_CHAIN_ID,
+            0 // challengeWindow: 0 → default
         );
 
         // Configure oracle signer (needed for bond attestation)
         address oracleSigner = vm.addr(ORACLE_PRIVATE_KEY);
-        vault.setOracleSigner(oracleSigner, 0); // no age check for tests
+        // M-10: non-zero maxOracleAge (bond attestation staleness enforced)
+        vault.setOracleSigner(oracleSigner, 3600);
 
         // Enable optimistic mode
         vault.setOptimisticEnabled(true);
@@ -94,13 +96,50 @@ contract OptimisticKernelVaultTest is Test {
         uint64 nonce,
         uint256 amount,
         uint256 chainId
+    ) internal view returns (bytes memory) {
+        return _signBondAttestationTs(
+            operator, vaultAddr, nonce, amount, chainId, uint64(block.timestamp)
+        );
+    }
+
+    /// @dev M-10: helper that signs the new BOND_LOCK_V2 payload including a timestamp.
+    function _signBondAttestationTs(
+        address operator,
+        address vaultAddr,
+        uint64 nonce,
+        uint256 amount,
+        uint256 chainId,
+        uint64 attestationTs
     ) internal pure returns (bytes memory) {
-        bytes32 bondHash =
-            keccak256(abi.encodePacked("BOND_LOCK_V1", operator, vaultAddr, nonce, amount, chainId));
+        bytes32 bondHash = keccak256(
+            abi.encodePacked(
+                "BOND_LOCK_V2", operator, vaultAddr, nonce, amount, chainId, attestationTs
+            )
+        );
         bytes32 ethSignedHash =
             keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", bondHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(ORACLE_PRIVATE_KEY, ethSignedHash);
         return abi.encodePacked(r, s, v);
+    }
+
+    /// @dev Helper to call executeOptimistic with `block.timestamp` as the bond
+    ///      attestation timestamp. All tests use this wrapper except where a
+    ///      specific value is needed.
+    function _executeOptimisticNow(
+        bytes memory journal,
+        bytes memory agentOutputBytes,
+        uint256 bondAmount,
+        bytes memory bondAttestation
+    ) internal {
+        vault.executeOptimistic(
+            journal,
+            agentOutputBytes,
+            "",
+            0,
+            bondAmount,
+            bondAttestation,
+            uint64(block.timestamp)
+        );
     }
 
     function _buildJournal(bytes32 agentId, uint64 nonce, bytes32 actionCommitment)
@@ -188,7 +227,7 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory bondAttestation =
             _signBondAttestation(owner, address(vault), nonce, BOND_AMOUNT, BOND_CHAIN_ID);
 
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
+        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation, uint64(block.timestamp));
     }
 
     function _submitOptimisticEmpty(uint64 nonce) internal {
@@ -198,7 +237,7 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory bondAttestation =
             _signBondAttestation(owner, address(vault), nonce, BOND_AMOUNT, BOND_CHAIN_ID);
 
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
+        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation, uint64(block.timestamp));
     }
 
     // ============ Happy Path Tests ============
@@ -213,7 +252,7 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory bondAttestation =
             _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
 
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
+        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation, uint64(block.timestamp));
 
         IOptimisticKernelVault.PendingExecution memory pending = vault.getPendingExecution(1);
         assertEq(pending.journalHash, sha256(journal));
@@ -374,7 +413,7 @@ contract OptimisticKernelVaultTest is Test {
                 IOptimisticKernelVault.InsufficientBond.selector, lowBond, BOND_AMOUNT
             )
         );
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, lowBond, bondAttestation);
+        vault.executeOptimistic(journal, agentOutputBytes, "", 0, lowBond, bondAttestation, uint64(block.timestamp));
     }
 
     function test_executeOptimistic_exactMinBond_succeeds() public {
@@ -387,7 +426,7 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory bondAttestation =
             _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
 
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
+        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation, uint64(block.timestamp));
         assertEq(vault.pendingCount(), 1);
     }
 
@@ -403,7 +442,7 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory bondAttestation =
             _signBondAttestation(owner, address(vault), 1, excessBond, BOND_CHAIN_ID);
 
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, excessBond, bondAttestation);
+        vault.executeOptimistic(journal, agentOutputBytes, "", 0, excessBond, bondAttestation, uint64(block.timestamp));
 
         IOptimisticKernelVault.PendingExecution memory pending = vault.getPendingExecution(1);
         assertEq(pending.bondAmount, excessBond);
@@ -430,7 +469,7 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory badAttestation = abi.encodePacked(r, s, v);
 
         vm.expectRevert();
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, badAttestation);
+        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, badAttestation, uint64(block.timestamp));
     }
 
     function test_invalidAttestation_wrongNonce_reverts() public {
@@ -446,9 +485,7 @@ contract OptimisticKernelVaultTest is Test {
             _signBondAttestation(owner, address(vault), 99, BOND_AMOUNT, BOND_CHAIN_ID);
 
         vm.expectRevert();
-        vault.executeOptimistic(
-            journal, agentOutputBytes, "", 0, BOND_AMOUNT, wrongNonceAttestation
-        );
+        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, wrongNonceAttestation, uint64(block.timestamp));
     }
 
     function test_invalidAttestation_wrongChainId_reverts() public {
@@ -464,9 +501,7 @@ contract OptimisticKernelVaultTest is Test {
             _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, 137);
 
         vm.expectRevert();
-        vault.executeOptimistic(
-            journal, agentOutputBytes, "", 0, BOND_AMOUNT, wrongChainAttestation
-        );
+        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, wrongChainAttestation, uint64(block.timestamp));
     }
 
     function test_invalidAttestation_emptyBytes_reverts() public {
@@ -478,7 +513,9 @@ contract OptimisticKernelVaultTest is Test {
         bytes memory journal = _buildJournal(TEST_AGENT_ID, 1, actionCommitment);
 
         vm.expectRevert();
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, "");
+        vault.executeOptimistic(
+            journal, agentOutputBytes, "", 0, BOND_AMOUNT, "", uint64(block.timestamp)
+        );
     }
 
     // ============ Nonce Ordering Tests ============
@@ -509,7 +546,7 @@ contract OptimisticKernelVaultTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(KernelVault.InvalidNonce.selector, uint64(1), uint64(1))
         );
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
+        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation, uint64(block.timestamp));
     }
 
     function test_executeOptimistic_nonceGapTooLarge_reverts() public {
@@ -526,10 +563,10 @@ contract OptimisticKernelVaultTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                KernelVault.NonceGapTooLarge.selector, uint64(1), uint64(102), uint64(100)
+                KernelVault.NonceGapTooLarge.selector, uint64(1), uint64(102), uint64(10)
             )
         );
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
+        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation, uint64(block.timestamp));
     }
 
     function test_mixedSyncAndOptimistic_nonceOrdering() public {
@@ -572,7 +609,7 @@ contract OptimisticKernelVaultTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(IOptimisticKernelVault.TooManyPending.selector, maxPend, maxPend)
         );
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
+        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation, uint64(block.timestamp));
     }
 
     function test_submitProof_decrementsPendingCount() public {
@@ -631,7 +668,7 @@ contract OptimisticKernelVaultTest is Test {
             _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
 
         vm.expectRevert();
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
+        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation, uint64(block.timestamp));
     }
 
     function test_slashExpired_worksWhilePaused() public {
@@ -701,7 +738,8 @@ contract OptimisticKernelVaultTest is Test {
             TEST_AGENT_ID,
             TEST_IMAGE_ID,
             address(this),
-            BOND_CHAIN_ID
+            BOND_CHAIN_ID,
+            0
         );
 
         vm.expectRevert(IOptimisticKernelVault.OracleSignerNotSet.selector);
@@ -820,7 +858,7 @@ contract OptimisticKernelVaultTest is Test {
             1, journalHash, BOND_AMOUNT, deadline
         );
 
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
+        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation, uint64(block.timestamp));
     }
 
     function test_submitProof_emitsEvent() public {
@@ -850,7 +888,7 @@ contract OptimisticKernelVaultTest is Test {
 
         vm.prank(nonOwner);
         vm.expectRevert(KernelVault.NotOwner.selector);
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
+        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation, uint64(block.timestamp));
     }
 
     function test_executeOptimistic_notEnabled_reverts() public {
@@ -863,7 +901,7 @@ contract OptimisticKernelVaultTest is Test {
             _signBondAttestation(owner, address(vault), 1, BOND_AMOUNT, BOND_CHAIN_ID);
 
         vm.expectRevert(IOptimisticKernelVault.OptimisticNotEnabled.selector);
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
+        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation, uint64(block.timestamp));
     }
 
     function test_executeOptimistic_wrongAgentId_reverts() public {
@@ -882,7 +920,7 @@ contract OptimisticKernelVaultTest is Test {
                 KernelVault.AgentIdMismatch.selector, TEST_AGENT_ID, wrongAgentId
             )
         );
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
+        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation, uint64(block.timestamp));
     }
 
     function test_executeOptimistic_actionCommitmentMismatch_reverts() public {
@@ -901,7 +939,7 @@ contract OptimisticKernelVaultTest is Test {
                 KernelVault.ActionCommitmentMismatch.selector, wrongCommitment, actualCommitment
             )
         );
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
+        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation, uint64(block.timestamp));
     }
 
     function test_submitProof_notPending_reverts() public {
@@ -962,7 +1000,8 @@ contract OptimisticKernelVaultTest is Test {
             hex"0000",
             uint64(block.timestamp),
             BOND_AMOUNT,
-            bondAttestation
+            bondAttestation,
+            uint64(block.timestamp)
         );
     }
 }

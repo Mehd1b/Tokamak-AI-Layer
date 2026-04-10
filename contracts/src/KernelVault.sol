@@ -33,13 +33,21 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
     /// @notice Virtual offset for share/asset math (prevents inflation/donation attacks)
     /// @dev Equivalent to OpenZeppelin ERC4626's _decimalsOffset() = 3 → 10**3 = 1000
-    uint256 internal constant _DECIMALS_OFFSET = 1e3;
+    /// @notice Virtual offset for share/asset math (I-08: public to match MetaVault)
+    uint256 public constant DECIMALS_OFFSET = 1e3;
+    uint256 internal constant _DECIMALS_OFFSET = DECIMALS_OFFSET;
 
     /// @notice Maximum allowed gap between nonces for liveness (prevents stuck execution)
     /// @dev Allows operators to skip intermediate executions if needed (e.g., if nonce N is lost/stuck,
     ///      executions N+1 through N+MAX_NONCE_GAP can still proceed). This weakens strict ordering
     ///      but improves liveness. Document: skipped nonces are permanently lost.
-    uint64 public constant MAX_NONCE_GAP = 100;
+    /// @dev L-03 fix: reduced from 100 to 10. A gap of 100 was over-permissive
+    ///      and made nonce-squatting DoS cheaper. Ten covers legitimate
+    ///      short-term failures and retries.
+    uint64 public constant MAX_NONCE_GAP = 10;
+
+    /// @notice Maximum allowed oracle age: 24 hours
+    uint64 public constant MAX_ORACLE_AGE_LIMIT = 24 hours;
 
     /// @notice Delay after which anyone can emergency-settle a stuck strategy
     uint256 public constant EMERGENCY_SETTLE_DELAY = 7 days;
@@ -104,6 +112,9 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @notice Maximum age of oracle data in seconds (0 = no age check)
     uint64 public maxOracleAge;
 
+    /// @notice Whether oracle verification is mandatory for all executions
+    bool public requireOracle;
+
     /// @notice Timestamp when the vault was paused (for emergency withdraw delay)
     uint256 public pausedAt;
 
@@ -136,6 +147,9 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
     // ============ Fee Constants ============
 
+    /// @notice Basis points denominator (I-07)
+    uint256 public constant BPS_DENOMINATOR = 10_000;
+
     /// @notice Maximum management fee: 500 bps = 5% annual
     uint256 public constant MAX_MANAGEMENT_FEE_BPS = 500;
 
@@ -144,6 +158,21 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
     /// @notice Maximum protocol fee split: 5000 bps = 50% of fees
     uint256 public constant MAX_PROTOCOL_FEE_SPLIT_BPS = 5000;
+
+    /// @notice Cooldown between fee rate changes (M-07 fix).
+    /// @dev Prevents the owner from atomically raising fees before a profitable
+    ///      execution (cycle attack). Depositors have at least this much time to
+    ///      observe fee changes and exit before new rates apply.
+    uint256 public constant FEE_CHANGE_COOLDOWN = 7 days;
+
+    /// @notice Hard cap on the combined maximum (management + performance) fee
+    ///         extraction (M-23 fix). Sum of mgmtBps+perfBps may not exceed this.
+    /// @dev 5000 bps = 50%. Prevents setting MAX both which would allow 75% of
+    ///      gross profit to be extracted as fees at max settings.
+    uint256 public constant MAX_COMBINED_FEE_BPS = 5000;
+
+    /// @notice Timestamp of the last fee-rate change (M-07)
+    uint256 public lastFeeRateChange;
 
     // ============ Performance Tracking ============
 
@@ -221,6 +250,9 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
     /// @notice Emitted when oracle signer configuration is updated
     event OracleSignerUpdated(address indexed signer, uint64 maxAge);
+
+    /// @notice Emitted when requireOracle flag is updated
+    event RequireOracleUpdated(bool required);
 
     /// @notice Emitted when management fee shares are collected
     event ManagementFeeCollected(uint256 shares, address recipient);
@@ -322,6 +354,9 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
     /// @notice Management fee exceeds maximum
     error ManagementFeeTooHigh(uint256 feeBps, uint256 maxBps);
+    error CombinedFeeTooHigh(uint256 combinedBps, uint256 maxBps);
+    error FeeChangeCooldown(uint256 nextAllowed, uint256 current);
+    error OracleAgeRequired();
 
     /// @notice Performance fee exceeds maximum
     error PerformanceFeeTooHigh(uint256 feeBps, uint256 maxBps);
@@ -334,6 +369,12 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
     /// @notice No fees to collect
     error NoFeesToCollect();
+
+    /// @notice Oracle signature is required but was not provided
+    error OracleSignatureRequired();
+
+    /// @notice Oracle age exceeds maximum allowed
+    error OracleAgeTooHigh(uint64 provided, uint64 maximum);
 
     // ============ Constructor ============
 
@@ -380,12 +421,24 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
     /// @notice Configure the trusted oracle signer and maximum data age
     /// @param _signer Oracle signer address (address(0) disables oracle verification)
-    /// @param _maxAge Maximum age of oracle data in seconds (0 = no age check)
+    /// @param _maxAge Maximum age of oracle data in seconds. L-16 fix: must be
+    ///        non-zero when a signer is set, otherwise the freshness check is
+    ///        silently disabled.
     function setOracleSigner(address _signer, uint64 _maxAge) external {
         if (msg.sender != owner) revert NotOwner();
+        if (_maxAge > MAX_ORACLE_AGE_LIMIT) revert OracleAgeTooHigh(_maxAge, MAX_ORACLE_AGE_LIMIT);
+        if (_signer != address(0) && _maxAge == 0) revert OracleAgeRequired();
         oracleSigner = _signer;
         maxOracleAge = _maxAge;
         emit OracleSignerUpdated(_signer, _maxAge);
+    }
+
+    /// @notice Enable/disable mandatory oracle verification
+    /// @param _required If true, all executions must include a valid oracle signature
+    function setRequireOracle(bool _required) external {
+        if (msg.sender != owner) revert NotOwner();
+        requireOracle = _required;
+        emit RequireOracleUpdated(_required);
     }
 
     // ============ Fee Configuration ============
@@ -397,6 +450,18 @@ contract KernelVault is ReentrancyGuard, Pausable {
         if (msg.sender != owner) revert NotOwner();
         if (mgmtBps > MAX_MANAGEMENT_FEE_BPS) revert ManagementFeeTooHigh(mgmtBps, MAX_MANAGEMENT_FEE_BPS);
         if (perfBps > MAX_PERFORMANCE_FEE_BPS) revert PerformanceFeeTooHigh(perfBps, MAX_PERFORMANCE_FEE_BPS);
+        // M-23: aggregate fee extraction cap
+        if (mgmtBps + perfBps > MAX_COMBINED_FEE_BPS) {
+            revert CombinedFeeTooHigh(mgmtBps + perfBps, MAX_COMBINED_FEE_BPS);
+        }
+        // M-07: cooldown between rate changes
+        if (lastFeeRateChange != 0
+            && block.timestamp < lastFeeRateChange + FEE_CHANGE_COOLDOWN)
+        {
+            revert FeeChangeCooldown(
+                lastFeeRateChange + FEE_CHANGE_COOLDOWN, block.timestamp
+            );
+        }
 
         // Collect any outstanding fees before changing rates
         if (managementFeeBps > 0 && totalShares > 0 && lastFeeTimestamp > 0) {
@@ -408,6 +473,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
         managementFeeBps = mgmtBps;
         performanceFeeBps = perfBps;
+        lastFeeRateChange = block.timestamp;
 
         // Initialize fee timestamp if setting fees for the first time
         if (lastFeeTimestamp == 0 && mgmtBps > 0) {
@@ -437,6 +503,19 @@ contract KernelVault is ReentrancyGuard, Pausable {
     function setProtocolTreasury(address treasury, uint256 splitBps) external {
         if (msg.sender != owner) revert NotOwner();
         if (splitBps > MAX_PROTOCOL_FEE_SPLIT_BPS) revert ProtocolFeeSplitTooHigh(splitBps, MAX_PROTOCOL_FEE_SPLIT_BPS);
+        // L-13: reject zero address when a non-zero split is configured; otherwise
+        // fee shares would be minted to address(0) and permanently burned.
+        if (splitBps > 0 && treasury == address(0)) revert ZeroFeeRecipient();
+
+        // L-10: pre-collect accrued fees before switching treasuries so the
+        // outgoing treasury gets its share.
+        if (managementFeeBps > 0 && totalShares > 0 && lastFeeTimestamp > 0 && !strategyActive) {
+            _collectManagementFee();
+        }
+        if (performanceFeeBps > 0 && totalShares > 0 && highWaterMark > 0) {
+            _collectPerformanceFee();
+        }
+
         protocolTreasury = treasury;
         protocolFeeSplitBps = splitBps;
         emit ProtocolTreasuryUpdated(treasury, splitBps);
@@ -623,6 +702,11 @@ contract KernelVault is ReentrancyGuard, Pausable {
             revert AgentIdMismatch(agentId, parsed.agentId);
         }
 
+        // If oracle is required, enforce signature presence
+        if (requireOracle && oracleSigner != address(0) && oracleSignature.length == 0) {
+            revert OracleSignatureRequired();
+        }
+
         if (oracleSigner != address(0) && oracleSignature.length > 0) {
             OracleVerifier.requireValidOracleSignature(
                 parsed.inputRoot,
@@ -747,10 +831,16 @@ contract KernelVault is ReentrancyGuard, Pausable {
             revert InsufficientShares(shareAmount, shares[msg.sender]);
         }
 
-        // Calculate assets using virtual offset formula (ERC4626)
-        // assets = shares * (effectiveAssets + 1) / (totalShares + OFFSET)
+        // Calculate assets using virtual offset formula (ERC4626).
+        // M-05 fix: during an active strategy, price against `snapshotTotalShares`
+        // instead of live `totalShares`. Live totalShares can be inflated by fee
+        // share minting after the snapshot was taken, which would otherwise
+        // dilute depositor PPS.
         uint256 effectiveAssets = effectiveTotalAssets();
-        assetsOut = (shareAmount * (effectiveAssets + 1)) / (totalShares + _DECIMALS_OFFSET);
+        uint256 denomShares =
+            strategyActive ? snapshotTotalShares : totalShares;
+        assetsOut =
+            (shareAmount * (effectiveAssets + 1)) / (denomShares + _DECIMALS_OFFSET);
         if (assetsOut == 0) revert ZeroAssetsOut();
 
         // Cap to actual available balance during active strategy
@@ -986,15 +1076,25 @@ contract KernelVault is ReentrancyGuard, Pausable {
             revert InsufficientShares(shareAmount, shares[msg.sender]);
         }
 
-        // Calculate assets using virtual offset formula (ERC4626)
+        // Calculate fair-share assets using the snapshot (virtual offset formula)
         uint256 effectiveAssets = effectiveTotalAssets();
         assetsOut = (shareAmount * (effectiveAssets + 1)) / (totalShares + _DECIMALS_OFFSET);
         if (assetsOut == 0) revert ZeroAssetsOut();
 
-        // Cap to actual available balance during active strategy
+        // H-03 fix: during an active strategy the live balance may be smaller than
+        // the fair share (assets deployed externally). Rather than reverting and
+        // permanently locking depositors, we perform a PARTIAL emergency withdraw:
+        // pay out what is liquidly available and burn shares proportionally so the
+        // remaining claim on the snapshot is preserved.
         uint256 available = totalAssets();
         if (assetsOut > available) {
-            revert InsufficientAvailableAssets(assetsOut, available);
+            uint256 origAssets = assetsOut;
+            // Scale the share burn: user gets `available` assets and burns a
+            // proportional slice of their requested shares. The unburned shares
+            // retain their claim on the rest of the snapshot.
+            shareAmount = (shareAmount * available) / origAssets;
+            if (shareAmount == 0) revert ZeroAssetsOut();
+            assetsOut = available;
         }
 
         // Burn shares
@@ -1004,8 +1104,17 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
         // Update snapshot to reflect withdrawal
         if (strategyActive) {
-            snapshotTotalAssets -= assetsOut;
-            snapshotTotalShares -= shareAmount;
+            // Clamp to avoid underflow when partial-burn dust overshoots.
+            if (assetsOut > snapshotTotalAssets) {
+                snapshotTotalAssets = 0;
+            } else {
+                snapshotTotalAssets -= assetsOut;
+            }
+            if (shareAmount > snapshotTotalShares) {
+                snapshotTotalShares = 0;
+            } else {
+                snapshotTotalShares -= shareAmount;
+            }
         }
 
         // Transfer tokens or ETH
@@ -1149,6 +1258,13 @@ contract KernelVault is ReentrancyGuard, Pausable {
     function _collectManagementFee() internal returns (uint256 feeShares) {
         if (managementFeeBps == 0 || totalShares == 0 || lastFeeTimestamp == 0) return 0;
 
+        // M-21 fix: do NOT accrue management fees while a strategy is active.
+        // The snapshot is frozen at pre-strategy assets, which the fee formula
+        // would charge against regardless of the strategy's true P&L (potentially
+        // taxing depositors on capital they cannot access because emergency
+        // withdraw is restricted during the active period).
+        if (strategyActive) return 0;
+
         uint256 timeElapsed = block.timestamp - lastFeeTimestamp;
         if (timeElapsed == 0) return 0;
 
@@ -1235,11 +1351,10 @@ contract KernelVault is ReentrancyGuard, Pausable {
         }
     }
 
-    /// @notice Allow receiving ETH for CALL actions with value
-    /// @dev Updates tracked ETH balance for ETH vaults to prevent donation inflation
+    /// @notice Allow receiving ETH for CALL actions with value (ETH vaults only)
+    /// @dev Reverts for ERC20 vaults to prevent stuck ETH
     receive() external payable {
-        if (address(asset) == address(0)) {
-            trackedETHBalance += msg.value;
-        }
+        if (address(asset) != address(0)) revert WrongDepositFunction();
+        trackedETHBalance += msg.value;
     }
 }

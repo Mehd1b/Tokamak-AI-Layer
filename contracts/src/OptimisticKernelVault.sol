@@ -14,7 +14,9 @@ import { OracleVerifier } from "./libraries/OracleVerifier.sol";
 contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
     // ============ Constants ============
 
-    uint256 public constant MIN_CHALLENGE_WINDOW = 15 minutes;
+    // M-24 fix: raise minimum from 15 minutes to 30 minutes to give legitimate
+    // operators enough margin after RISC Zero proof generation (~10-12 min).
+    uint256 public constant MIN_CHALLENGE_WINDOW = 30 minutes;
     uint256 public constant MAX_CHALLENGE_WINDOW = 24 hours;
     uint256 public constant DEFAULT_CHALLENGE_WINDOW = 1 hours;
     uint256 public constant DEFAULT_MAX_PENDING = 3;
@@ -43,9 +45,25 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
         bytes32 _agentId,
         bytes32 _trustedImageId,
         address _owner,
-        uint256 _bondChainId
+        uint256 _bondChainId,
+        uint256 _challengeWindow
     ) KernelVault(_asset, _verifier, _agentId, _trustedImageId, _owner) {
-        challengeWindow = DEFAULT_CHALLENGE_WINDOW;
+        // M-17: honour the caller-specified challenge window. Fall back to the
+        // default only if zero is passed so the factory can still deploy with
+        // "use default" semantics.
+        if (_challengeWindow == 0) {
+            challengeWindow = DEFAULT_CHALLENGE_WINDOW;
+        } else {
+            if (
+                _challengeWindow < MIN_CHALLENGE_WINDOW
+                    || _challengeWindow > MAX_CHALLENGE_WINDOW
+            ) {
+                revert InvalidChallengeWindow(
+                    _challengeWindow, MIN_CHALLENGE_WINDOW, MAX_CHALLENGE_WINDOW
+                );
+            }
+            challengeWindow = _challengeWindow;
+        }
         maxPending = DEFAULT_MAX_PENDING;
         bondChainId = _bondChainId;
     }
@@ -59,7 +77,8 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
         bytes calldata oracleSignature,
         uint64 oracleTimestamp,
         uint256 bondAmount,
-        bytes calldata bondAttestation
+        bytes calldata bondAttestation,
+        uint64 bondAttestationTimestamp
     ) external nonReentrant whenNotPaused {
         if (msg.sender != owner) revert NotOwner();
         if (!optimisticEnabled) revert OptimisticNotEnabled();
@@ -67,45 +86,89 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
             revert TooManyPending(_pendingCount, maxPending);
         }
 
-        // 1. Parse journal (no proof verification — optimistic)
+        // 1. Parse + validate journal
         IKernelExecutionVerifier.ParsedJournal memory parsed = verifier.parseJournal(journal);
-
-        // 2. Validate agentId, nonce, oracle sig, action commitment (shared with KernelVault)
         uint64 providedNonce =
             _validateParsedJournal(parsed, agentOutputBytes, oracleSignature, oracleTimestamp);
 
-        // 3. Verify oracle attestation of L1 bond lock
+        // 2. Verify oracle signature bound to action commitment (M-09) and the
+        //    L1 bond attestation with timestamp binding (M-10). Extracted to a
+        //    helper to keep this function under the stack-depth limit.
+        _verifyOptimisticOracleAndBond(
+            OptimisticVerifyArgs({
+                inputRoot: parsed.inputRoot,
+                actionCommitment: parsed.actionCommitment,
+                providedNonce: providedNonce,
+                oracleSignature: oracleSignature,
+                oracleTimestamp: oracleTimestamp,
+                bondAmount: bondAmount,
+                bondAttestation: bondAttestation,
+                bondAttestationTimestamp: bondAttestationTimestamp
+            })
+        );
+
+        // 3. Store pending execution (stack-depth: hash computed outside the literal)
+        bytes32 journalHash = sha256(journal);
+        uint256 deadline = block.timestamp + challengeWindow;
+        PendingExecution storage pe = pendingExecutions[providedNonce];
+        pe.journalHash = journalHash;
+        pe.actionCommitment = parsed.actionCommitment;
+        pe.bondAmount = bondAmount;
+        pe.deadline = deadline;
+        pe.status = STATUS_PENDING;
+        _pendingCount++;
+
+        // 4. Execute actions
+        _executeActions(agentOutputBytes, parsed.agentId, providedNonce, parsed.actionCommitment);
+
+        emit OptimisticExecutionSubmitted(providedNonce, journalHash, bondAmount, deadline);
+    }
+
+    /// @dev Struct used by `_verifyOptimisticOracleAndBond` to keep argument count
+    ///      under the Solc stack-depth limit.
+    struct OptimisticVerifyArgs {
+        bytes32 inputRoot;
+        bytes32 actionCommitment;
+        uint64 providedNonce;
+        bytes oracleSignature;
+        uint64 oracleTimestamp;
+        uint256 bondAmount;
+        bytes bondAttestation;
+        uint64 bondAttestationTimestamp;
+    }
+
+    /// @notice Oracle signature and bond attestation verification (M-09, M-10).
+    function _verifyOptimisticOracleAndBond(OptimisticVerifyArgs memory a) internal view {
+        // M-09: bound oracle signature
+        if (oracleSigner != address(0) && a.oracleSignature.length > 0) {
+            OracleVerifier.requireValidOracleSignatureBound(
+                a.inputRoot,
+                a.actionCommitment,
+                a.oracleSignature,
+                oracleSigner,
+                a.oracleTimestamp,
+                block.chainid,
+                address(this),
+                maxOracleAge
+            );
+        }
+
+        // M-10: oracle-signed bond attestation with timestamp binding
         if (oracleSigner == address(0)) revert OracleSignerNotSet();
         OracleVerifier.requireValidBondAttestation(
-            bondAttestation,
+            a.bondAttestation,
             oracleSigner,
             msg.sender,
             address(this),
-            providedNonce,
-            bondAmount,
-            bondChainId
+            a.providedNonce,
+            a.bondAmount,
+            bondChainId,
+            a.bondAttestationTimestamp,
+            maxOracleAge
         );
-        if (bondAmount < minBond) {
-            revert InsufficientBond(bondAmount, minBond);
+        if (a.bondAmount < minBond) {
+            revert InsufficientBond(a.bondAmount, minBond);
         }
-
-        // 4. Store pending execution
-        uint256 deadline = block.timestamp + challengeWindow;
-        pendingExecutions[providedNonce] = PendingExecution({
-            journalHash: sha256(journal),
-            actionCommitment: parsed.actionCommitment,
-            bondAmount: bondAmount,
-            deadline: deadline,
-            status: STATUS_PENDING
-        });
-        _pendingCount++;
-
-        // 5. Execute actions (shared with KernelVault)
-        _executeActions(agentOutputBytes, parsed.agentId, providedNonce, parsed.actionCommitment);
-
-        emit OptimisticExecutionSubmitted(
-            providedNonce, pendingExecutions[providedNonce].journalHash, bondAmount, deadline
-        );
     }
 
     // ============ Proof Submission ============
@@ -115,6 +178,12 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
         PendingExecution storage pending = pendingExecutions[executionNonce];
         if (pending.status != STATUS_PENDING) {
             revert ExecutionNotPending(executionNonce, pending.status);
+        }
+        // M-11 fix: proof must be submitted within the challenge window. Otherwise
+        // operators could race slashExpired by submitting late and escape the
+        // bond's economic guarantee.
+        if (block.timestamp > pending.deadline) {
+            revert ProofTooLate(executionNonce, pending.deadline, block.timestamp);
         }
 
         try verifier.verify(seal, trustedImageId, pending.journalHash) { }
@@ -171,6 +240,12 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
         if (window < MIN_CHALLENGE_WINDOW || window > MAX_CHALLENGE_WINDOW) {
             revert InvalidChallengeWindow(window, MIN_CHALLENGE_WINDOW, MAX_CHALLENGE_WINDOW);
         }
+        // L-05: do not shorten the challenge window for ALREADY-PENDING executions.
+        // We can't cheaply iterate all pendings, but we can require that no
+        // pending executions exist when shortening. Lengthening is always safe.
+        if (window < challengeWindow && _pendingCount > 0) {
+            revert TooManyPending(_pendingCount, 0);
+        }
         challengeWindow = window;
         _emitConfig();
     }
@@ -178,6 +253,10 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
     /// @inheritdoc IOptimisticKernelVault
     function setMinBond(uint256 amount) external {
         if (msg.sender != owner) revert NotOwner();
+        // M-08: setMinBond(0) neutralizes optimistic security; require a non-zero
+        // vault-level floor. The WSTONBondManager also enforces its own global
+        // floor, so the effective minimum is max(vault.minBond, manager.minBondFloor).
+        if (amount == 0) revert InvalidMinBond();
         minBond = amount;
         _emitConfig();
     }
@@ -185,6 +264,8 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
     /// @inheritdoc IOptimisticKernelVault
     function setMaxPending(uint256 max) external {
         if (msg.sender != owner) revert NotOwner();
+        // L-06: explicitly reject zero to prevent silent disabling.
+        if (max == 0) revert InvalidMaxPendingZero();
         if (max > MAX_MAX_PENDING) {
             revert InvalidMaxPending(max, MAX_MAX_PENDING);
         }
@@ -195,8 +276,13 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
     /// @inheritdoc IOptimisticKernelVault
     function setOptimisticEnabled(bool enabled) external {
         if (msg.sender != owner) revert NotOwner();
-        if (enabled && oracleSigner == address(0)) {
-            revert OracleSignerNotSet();
+        if (enabled) {
+            // M-25: enabling optimistic requires BOTH an oracle signer (to verify
+            // bond attestations) AND a non-zero bond chain id. Previously only
+            // oracleSigner was checked while the BondManagerNotSet error was
+            // unreachable dead code.
+            if (oracleSigner == address(0)) revert OracleSignerNotSet();
+            if (bondChainId == 0) revert BondManagerNotSet();
         }
         optimisticEnabled = enabled;
         _emitConfig();
@@ -205,7 +291,11 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
     /// @inheritdoc IOptimisticKernelVault
     function setBondChainId(uint256 _bondChainId) external {
         if (msg.sender != owner) revert NotOwner();
+        // M-10: reject zero chain id. Further validation (known L1) is a policy
+        // concern left to the owner.
+        if (_bondChainId == 0) revert InvalidBondChainId();
         bondChainId = _bondChainId;
+        emit BondChainIdUpdated(_bondChainId);
     }
 
     function _emitConfig() internal {

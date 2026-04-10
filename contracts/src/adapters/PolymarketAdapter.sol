@@ -51,6 +51,12 @@ contract PolymarketAdapter is ReentrancyGuard {
 
     mapping(address vault => VaultConfig) public vaultConfigs;
 
+    /// @notice Per-vault USDC position (H-02 fix).
+    /// @dev The adapter pools USDC across vaults for CTF trades. Without per-vault
+    ///      accounting, a single vault could withdraw every vault's USDC via
+    ///      `withdrawToVault()`. This mapping enforces isolation.
+    mapping(address vault => uint256) public vaultUsdcBalance;
+
     // ============ Events ============
 
     event VaultRegistered(address indexed vault, bytes32 conditionId);
@@ -66,6 +72,8 @@ contract PolymarketAdapter is ReentrancyGuard {
     error NotFactoryOrOwner();
     error InsufficientOutput();
     error ZeroAmount();
+    error NotImplemented();
+    error InsufficientVaultBalance(uint256 requested, uint256 available);
 
     // ============ Modifiers ============
 
@@ -114,68 +122,61 @@ contract PolymarketAdapter is ReentrancyGuard {
             registered: true
         });
 
-        // Approve CTF Exchange to spend USDC on behalf of this adapter
-        IERC20(usdc).approve(ctfExchange, type(uint256).max);
+        // NOTE (L-14): the unlimited USDC approval to the CTF Exchange was removed.
+        // It is not needed while the trading functions are stubs, and would allow a
+        // compromised CTF Exchange to drain every vault's pooled USDC.
 
         emit VaultRegistered(vault, conditionId);
     }
 
     // ============ Trading Functions ============
 
-    /// @notice Buy outcome tokens (YES or NO) with USDC from the vault.
-    /// @param isYes true = buy YES tokens, false = buy NO tokens
-    /// @param usdcAmount Amount of USDC to spend
-    /// @param minTokens Minimum tokens to receive (slippage protection)
-    function buyOutcome(
-        bool isYes,
-        uint256 usdcAmount,
-        uint256 minTokens
-    ) external onlyRegisteredVault nonReentrant {
+    /// @notice Deposit USDC into the adapter for future Polymarket trading.
+    /// @dev Until the CTF Exchange integration is implemented, USDC is simply held
+    ///      in the adapter against a per-vault ledger and can be withdrawn at any
+    ///      time. Each vault can only touch its own tracked balance.
+    function depositUSDC(uint256 usdcAmount) external onlyRegisteredVault nonReentrant {
         if (usdcAmount == 0) revert ZeroAmount();
-
-        // Transfer USDC from vault to adapter
         IERC20(usdc).safeTransferFrom(msg.sender, address(this), usdcAmount);
+        vaultUsdcBalance[msg.sender] += usdcAmount;
+        emit OutcomeBought(msg.sender, false, usdcAmount, 0);
+    }
 
-        // TODO: Integrate with Polymarket CTF Exchange
-        // In production, this calls the CTF Exchange to buy conditional tokens.
-        // The exact interface depends on whether using the CTF Exchange or
-        // NegRiskCtfExchange. For now, this is a placeholder that emits events.
-        //
-        // ICTFExchange(ctfExchange).buyTokens(conditionId, isYes, usdcAmount, minTokens);
-
-        emit OutcomeBought(msg.sender, isYes, usdcAmount, 0);
+    /// @notice Buy outcome tokens (YES or NO) with USDC from the vault.
+    /// @dev NOT IMPLEMENTED: the CTF Exchange integration is a stub. This function
+    ///      reverts rather than silently stranding USDC. Use {depositUSDC} and
+    ///      {withdrawToVault} until the integration is complete.
+    function buyOutcome(
+        bool, /* isYes */
+        uint256, /* usdcAmount */
+        uint256 /* minTokens */
+    ) external view onlyRegisteredVault {
+        revert NotImplemented();
     }
 
     /// @notice Sell outcome tokens back for USDC.
-    /// @param isYes true = sell YES tokens, false = sell NO tokens
-    /// @param tokenAmount Amount of outcome tokens to sell
-    /// @param minUsdc Minimum USDC to receive (slippage protection)
+    /// @dev NOT IMPLEMENTED: the CTF Exchange integration is a stub.
     function sellOutcome(
-        bool isYes,
-        uint256 tokenAmount,
-        uint256 minUsdc
-    ) external onlyRegisteredVault nonReentrant {
-        if (tokenAmount == 0) revert ZeroAmount();
-
-        // TODO: Integrate with CTF Exchange to sell conditional tokens
-        // ICTFExchange(ctfExchange).sellTokens(conditionId, isYes, tokenAmount, minUsdc);
-
-        emit OutcomeSold(msg.sender, isYes, tokenAmount, 0);
+        bool, /* isYes */
+        uint256, /* tokenAmount */
+        uint256 /* minUsdc */
+    ) external view onlyRegisteredVault {
+        revert NotImplemented();
     }
 
     /// @notice Redeem winning tokens after market resolution.
-    function redeemResolved() external onlyRegisteredVault nonReentrant {
-        // TODO: Call CTF Exchange to redeem winning conditional tokens for USDC
-        // ICTFExchange(ctfExchange).redeemPositions(conditionId);
-
-        uint256 usdcBalance = IERC20(usdc).balanceOf(address(this));
-        emit Redeemed(msg.sender, usdcBalance);
+    /// @dev NOT IMPLEMENTED: the CTF Exchange integration is a stub.
+    function redeemResolved() external view onlyRegisteredVault {
+        revert NotImplemented();
     }
 
-    /// @notice Withdraw all USDC from adapter back to the calling vault.
+    /// @notice Withdraw the calling vault's tracked USDC balance (H-02 fix).
+    /// @dev Only drains the caller's own tracked balance, not the adapter's
+    ///      aggregate USDC — this prevents cross-vault theft.
     function withdrawToVault() external onlyRegisteredVault nonReentrant {
-        uint256 balance = IERC20(usdc).balanceOf(address(this));
+        uint256 balance = vaultUsdcBalance[msg.sender];
         if (balance > 0) {
+            vaultUsdcBalance[msg.sender] = 0;
             IERC20(usdc).safeTransfer(msg.sender, balance);
         }
         emit WithdrawnToVault(msg.sender, balance);

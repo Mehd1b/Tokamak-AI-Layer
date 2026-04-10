@@ -133,6 +133,7 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         require(newStore != address(0), "zero vaultCodeStore");
         require(newStore.code.length > 0, "no code at store");
         _vaultCreationCodeStore = newStore;
+        emit VaultCreationCodeStoreUpdated(newStore); // I-06
     }
 
     /// @notice Update the OptimisticVaultCreationCodeStore (owner only).
@@ -143,11 +144,21 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         require(newStore != address(0), "zero optimisticVaultCodeStore");
         require(newStore.code.length > 0, "no code at store");
         _optimisticVaultCreationCodeStore = newStore;
+        emit OptimisticVaultCreationCodeStoreUpdated(newStore); // I-06
     }
+
+    /// @notice Emitted when the vault creation code store is updated (I-06)
+    event VaultCreationCodeStoreUpdated(address indexed newStore);
+
+    /// @notice Emitted when the optimistic vault creation code store is updated (I-06)
+    event OptimisticVaultCreationCodeStoreUpdated(address indexed newStore);
 
     /// @notice Set the protocol treasury address (owner only)
     /// @param treasury The new protocol treasury address
+    /// @dev L-13: reject zero address — factory-deployed vaults inherit this
+    ///      value and sending fees to address(0) burns them permanently.
     function setProtocolTreasury(address treasury) external onlyOwner {
+        require(treasury != address(0), "zero treasury");
         protocolTreasury = treasury;
         emit ProtocolTreasuryUpdated(treasury);
     }
@@ -244,9 +255,9 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
             vault := create2(0, add(bytecode, 0x20), mload(bytecode), salt)
         }
 
-        // Verify deployment succeeded
+        // Verify deployment succeeded (L-23: proper error, not VaultAlreadyExists)
         if (vault == address(0)) {
-            revert VaultAlreadyExists(vault);
+            revert Create2DeploymentFailed();
         }
 
         // Track deployment
@@ -289,7 +300,7 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
 
         // Get creation bytecode with constructor args (owner = agent author = msg.sender)
         bytes memory bytecode = _getOptimisticCreationBytecode(
-            asset, agentId, agentInfo.imageId, msg.sender, bondChainId
+            asset, agentId, agentInfo.imageId, msg.sender, bondChainId, challengeWindow
         );
 
         // Deploy with CREATE2
@@ -297,9 +308,9 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
             vault := create2(0, add(bytecode, 0x20), mload(bytecode), salt)
         }
 
-        // Verify deployment succeeded
+        // Verify deployment succeeded (L-23: proper error, not VaultAlreadyExists)
         if (vault == address(0)) {
-            revert VaultAlreadyExists(vault);
+            revert Create2DeploymentFailed();
         }
 
         // Track deployment (shared tracking with regular vaults)
@@ -319,7 +330,8 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         bytes32 agentId,
         address asset,
         bytes32 userSalt,
-        uint256 bondChainId
+        uint256 bondChainId,
+        uint256 challengeWindow
     ) external view returns (address vault, bytes32 salt) {
         // Compute CREATE2 salt
         salt = _computeSalt(owner_, agentId, asset, userSalt);
@@ -330,9 +342,10 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
             revert AgentNotRegistered(agentId);
         }
 
-        // Compute CREATE2 address
-        bytes memory bytecode =
-            _getOptimisticCreationBytecode(asset, agentId, agentInfo.imageId, owner_, bondChainId);
+        // Compute CREATE2 address — include challengeWindow (M-17)
+        bytes memory bytecode = _getOptimisticCreationBytecode(
+            asset, agentId, agentInfo.imageId, owner_, bondChainId, challengeWindow
+        );
         bytes32 bytecodeHash = keccak256(bytecode);
 
         vault = address(
@@ -444,12 +457,15 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         bytes32 agentId,
         bytes32 imageId,
         address vaultOwner,
-        uint256 bondChainId
+        uint256 bondChainId,
+        uint256 challengeWindow
     ) internal view returns (bytes memory) {
         require(_optimisticVaultCreationCodeStore != address(0), "optimistic code store not set");
         return abi.encodePacked(
             _optimisticVaultCreationCodeStore.code,
-            abi.encode(asset, _verifier, agentId, imageId, vaultOwner, bondChainId)
+            abi.encode(
+                asset, _verifier, agentId, imageId, vaultOwner, bondChainId, challengeWindow
+            )
         );
     }
 }

@@ -66,7 +66,8 @@ contract OptimisticIntegrationTest is Test {
             TEST_AGENT_ID,
             TEST_IMAGE_ID,
             address(this),
-            BOND_CHAIN_ID
+            BOND_CHAIN_ID,
+            0 // default challengeWindow
         );
 
         // Set oracle signer and enable optimistic execution
@@ -87,9 +88,17 @@ contract OptimisticIntegrationTest is Test {
         view
         returns (bytes memory)
     {
+        // M-10: attestation now binds a timestamp
+        uint64 ts = uint64(block.timestamp);
         bytes32 bondHash = keccak256(
             abi.encodePacked(
-                "BOND_LOCK_V1", operator, address(vault), nonce, bondAmount, BOND_CHAIN_ID
+                "BOND_LOCK_V2",
+                operator,
+                address(vault),
+                nonce,
+                bondAmount,
+                BOND_CHAIN_ID,
+                ts
             )
         );
         bytes32 ethSignedHash =
@@ -180,7 +189,15 @@ contract OptimisticIntegrationTest is Test {
         bytes32 actionCommitment = sha256(agentOutputBytes);
         bytes memory journal = _buildJournal(TEST_AGENT_ID, nonce, actionCommitment);
         bytes memory bondAttestation = _signBondAttestation(address(this), nonce, BOND_AMOUNT);
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
+        vault.executeOptimistic(
+            journal,
+            agentOutputBytes,
+            "",
+            0,
+            BOND_AMOUNT,
+            bondAttestation,
+            uint64(block.timestamp)
+        );
     }
 
     function _submitOptimisticTransfer(uint64 nonce, uint256 transferAmount) internal {
@@ -189,7 +206,15 @@ contract OptimisticIntegrationTest is Test {
         bytes32 actionCommitment = sha256(agentOutputBytes);
         bytes memory journal = _buildJournal(TEST_AGENT_ID, nonce, actionCommitment);
         bytes memory bondAttestation = _signBondAttestation(address(this), nonce, BOND_AMOUNT);
-        vault.executeOptimistic(journal, agentOutputBytes, "", 0, BOND_AMOUNT, bondAttestation);
+        vault.executeOptimistic(
+            journal,
+            agentOutputBytes,
+            "",
+            0,
+            BOND_AMOUNT,
+            bondAttestation,
+            uint64(block.timestamp)
+        );
     }
 
     function _submitSyncEmpty(uint64 nonce) internal {

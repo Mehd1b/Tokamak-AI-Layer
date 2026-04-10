@@ -90,8 +90,14 @@ library OracleVerifier {
 
     // ============ Bond Attestation ============
 
+    /// @notice Thrown when bond attestation timestamp is too old
+    error BondAttestationStale(uint64 attestationTs, uint64 maxAge, uint256 blockTs);
+
     /// @notice Verify an oracle attestation that a bond was locked on another chain (reverts on failure)
-    /// @dev Attestation format: oracle signs keccak256("BOND_LOCK_V1" || operator || vault || nonce || amount || chainId)
+    /// @dev M-10 fix: the signed payload now includes an attestation timestamp and
+    ///      the vault enforces a maximum staleness so that replay after bond
+    ///      reclamation is impossible.
+    /// @dev Attestation format: oracle signs keccak256("BOND_LOCK_V2" || operator || vault || nonce || amount || chainId || attestationTs)
     /// @param attestation 65-byte ECDSA signature (r[32] || s[32] || v[1])
     /// @param expectedSigner The trusted oracle signer address
     /// @param operator The operator who locked the bond
@@ -99,6 +105,8 @@ library OracleVerifier {
     /// @param nonce The execution nonce
     /// @param amount The bond amount
     /// @param chainId The chain ID where the bond was locked
+    /// @param attestationTs Timestamp when the oracle signed the attestation
+    /// @param maxAge Max allowed staleness (0 disables the check)
     function requireValidBondAttestation(
         bytes memory attestation,
         address expectedSigner,
@@ -106,10 +114,23 @@ library OracleVerifier {
         address vault,
         uint64 nonce,
         uint256 amount,
-        uint256 chainId
-    ) public pure {
+        uint256 chainId,
+        uint64 attestationTs,
+        uint64 maxAge
+    ) public view {
         if (attestation.length != 65) {
             revert InvalidBondAttestation();
+        }
+
+        // Staleness check (guard against future timestamps to prevent underflow)
+        if (
+            maxAge > 0
+                && (
+                    attestationTs > block.timestamp
+                        || block.timestamp - attestationTs > maxAge
+                )
+        ) {
+            revert BondAttestationStale(attestationTs, maxAge, block.timestamp);
         }
 
         bytes32 r;
@@ -130,8 +151,11 @@ library OracleVerifier {
             revert InvalidBondAttestation();
         }
 
-        bytes32 bondHash =
-            keccak256(abi.encodePacked("BOND_LOCK_V1", operator, vault, nonce, amount, chainId));
+        bytes32 bondHash = keccak256(
+            abi.encodePacked(
+                "BOND_LOCK_V2", operator, vault, nonce, amount, chainId, attestationTs
+            )
+        );
         bytes32 ethSignedHash =
             keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", bondHash));
 
@@ -139,6 +163,32 @@ library OracleVerifier {
         if (recovered == address(0) || recovered != expectedSigner) {
             revert InvalidBondAttestation();
         }
+    }
+
+    /// @notice Variant of requireValidOracleSignature that binds the oracle signature
+    ///         to an action commitment, closing the M-09 gap where the optimistic
+    ///         path allowed the owner to pair any valid price signature with any
+    ///         fabricated journal.
+    function requireValidOracleSignatureBound(
+        bytes32 feedHash,
+        bytes32 actionCommitment,
+        bytes memory signature,
+        address expectedSigner,
+        uint64 oracleTimestamp,
+        uint256 chainId,
+        address vaultAddress,
+        uint64 maxOracleAge
+    ) public view {
+        bytes32 boundFeed = keccak256(abi.encodePacked(feedHash, actionCommitment));
+        requireValidOracleSignature(
+            boundFeed,
+            signature,
+            expectedSigner,
+            oracleTimestamp,
+            chainId,
+            vaultAddress,
+            maxOracleAge
+        );
     }
 
     /// @notice Verify an ECDSA signature over a feed hash (reverts on failure)

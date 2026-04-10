@@ -393,7 +393,8 @@ contract PendleAdapter is ReentrancyGuard {
     /// @param market The Pendle market address
     /// @param tokenIn The input token address (e.g., USDC, WETH)
     /// @param amount The amount of tokenIn to spend
-    function mintPtYt(address market, address tokenIn, uint256 amount)
+    /// @param minPyOut Minimum PT+YT pair amount to mint (M-03 slippage protection)
+    function mintPtYt(address market, address tokenIn, uint256 amount, uint256 minPyOut)
         external
         nonReentrant
         onlyRegisteredVault
@@ -425,9 +426,9 @@ contract PendleAdapter is ReentrancyGuard {
             })
         });
 
-        // Mint PT + YT (received by this adapter)
+        // Mint PT + YT (received by this adapter). minPyOut enforces M-03 slippage.
         uint256 netPyOut = IPendleRouter(pendleRouter).mintPyFromToken(
-            address(this), YT, 0, input
+            address(this), YT, minPyOut, input
         );
 
         // Track balances
@@ -442,7 +443,8 @@ contract PendleAdapter is ReentrancyGuard {
     ///      The vault must have sufficient PT and YT balances tracked by this adapter.
     /// @param market The Pendle market address
     /// @param amount The amount of PT+YT pairs to redeem
-    function redeemPtYt(address market, uint256 amount)
+    /// @param minTokenOut Minimum token output (M-03 slippage protection)
+    function redeemPtYt(address market, uint256 amount, uint256 minTokenOut)
         external
         nonReentrant
         onlyRegisteredVault
@@ -467,10 +469,10 @@ contract PendleAdapter is ReentrancyGuard {
         IERC20(PT).forceApprove(pendleRouter, amount);
         IERC20(YT).forceApprove(pendleRouter, amount);
 
-        // Build TokenOutput struct (direct redemption)
+        // Build TokenOutput struct (direct redemption) — minTokenOut enforces M-03
         TokenOutput memory output = TokenOutput({
             tokenOut: SY, // redeem to SY
-            minTokenOut: 0,
+            minTokenOut: minTokenOut,
             tokenRedeemSy: SY,
             pendleSwap: address(0),
             swapData: SwapData({
@@ -665,9 +667,19 @@ contract PendleAdapter is ReentrancyGuard {
         // Approve market to burn LP tokens
         IERC20(market).forceApprove(pendleRouter, lpAmount);
 
-        // Remove liquidity (SY sent to vault, PT tracked here)
+        // M-02 fix: PT must be received by THIS adapter so the tracked ptBalance
+        // reflects a real, spendable balance. Previously `receiver = msg.sender`
+        // sent PT to the vault but we still credited ptBalance here, producing
+        // "phantom" PT that later swaps would fail on.
         (uint256 netSyOut, uint256 netPtOut) = IPendleRouter(pendleRouter)
-            .removeLiquidityDualSyAndPt(msg.sender, market, lpAmount, minSyOut, minPtOut);
+            .removeLiquidityDualSyAndPt(address(this), market, lpAmount, minSyOut, minPtOut);
+
+        // SY was sent to the adapter as well; forward it to the vault so the
+        // externally-observable behaviour of "SY to caller" is preserved.
+        (address SY, , ) = IPendleMarket(market).readTokens();
+        if (netSyOut > 0) {
+            IERC20(SY).safeTransfer(msg.sender, netSyOut);
+        }
 
         // Update balances
         pos.lpBalance -= lpAmount;
@@ -702,19 +714,42 @@ contract PendleAdapter is ReentrancyGuard {
         emit RewardsClaimed(msg.sender, markets);
     }
 
-    /// @notice Emergency withdraw: transfer all token balances held by this adapter to the vault
-    /// @dev Called by registered vault to recover any tokens held by the adapter.
-    ///      Does NOT unwind Pendle positions — only transfers ERC20 balances.
-    function withdrawToVault()
+    /// @notice Emergency withdraw PT, YT, LP, and any SY the adapter holds for the
+    ///         calling vault back into the vault's custody (M-04 fix).
+    /// @dev Transfers tracked token balances; does NOT unwind positions through the
+    ///      router (which could fail under market stress). The vault can subsequently
+    ///      redeem/swap the tokens at its discretion. Per-vault tracked balances are
+    ///      cleared on success.
+    function withdrawToVault(address market)
         external
         nonReentrant
         onlyRegisteredVault
+        onlyWhitelistedMarket(market)
     {
-        // This is a simplified emergency exit that transfers any token balances
-        // the adapter holds on behalf of this vault. In practice, positions should
-        // be unwound first via redeemPtYt / removeLiquidity / swapExactPtForToken.
-        // This function is a safety net.
-        emit WithdrawnToVault(msg.sender, address(0), 0);
+        MarketPosition storage pos = positions[msg.sender][market];
+        uint256 ptOut = pos.ptBalance;
+        uint256 ytOut = pos.ytBalance;
+        uint256 lpOut = pos.lpBalance;
+
+        // Clear the tracked position first (checks-effects-interactions)
+        pos.ptBalance = 0;
+        pos.ytBalance = 0;
+        pos.lpBalance = 0;
+
+        (, address PT, address YT) = IPendleMarket(market).readTokens();
+
+        if (ptOut > 0) {
+            IERC20(PT).safeTransfer(msg.sender, ptOut);
+            emit WithdrawnToVault(msg.sender, PT, ptOut);
+        }
+        if (ytOut > 0) {
+            IERC20(YT).safeTransfer(msg.sender, ytOut);
+            emit WithdrawnToVault(msg.sender, YT, ytOut);
+        }
+        if (lpOut > 0) {
+            IERC20(market).safeTransfer(msg.sender, lpOut);
+            emit WithdrawnToVault(msg.sender, market, lpOut);
+        }
     }
 
     // ============ View Functions ============

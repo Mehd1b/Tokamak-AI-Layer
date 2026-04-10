@@ -49,8 +49,13 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     uint256 public constant BPS_DENOMINATOR = 10000;
 
     /// @notice Bond expiry: operators can reclaim bonds after this duration if not released/slashed
-    /// @dev Safety valve against stuck bonds (revoked vaults, lost relayer keys, etc.)
-    uint256 public constant BOND_EXPIRY = 30 days;
+    /// @dev Safety valve against stuck bonds (revoked vaults, lost relayer keys, etc.).
+    ///      M-16: extended from 30 to 90 days to give relayers a larger window to
+    ///      resolve pending slashes before the expiry valve opens.
+    uint256 public constant BOND_EXPIRY = 90 days;
+
+    /// @notice Maximum number of bonds that can be locked in a single batch
+    uint256 public constant MAX_BATCH_SIZE = 20;
 
     // ============ State ============
 
@@ -126,6 +131,11 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     error BondNotExpired(uint256 lockedAt, uint256 expiry, uint256 current);
     error InsufficientRescuableBalance(uint256 requested, uint256 available);
 
+    /// @notice Batch size exceeds maximum
+    error BatchTooLarge(uint256 size, uint256 maximum);
+    error BondBelowFloor(uint256 amount, uint256 floor);
+    error UnresolvedSlashPending();
+
     // ============ Modifiers ============
 
     modifier onlyOwner() {
@@ -171,6 +181,9 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         onlyAuthorizedVault
     {
         if (amount == 0) revert ZeroBondAmount();
+        // M-08: enforce minBondFloor at the bond manager level — prevents dust
+        // bonds that neutralize slashing economics.
+        if (amount < minBondFloor) revert BondBelowFloor(amount, minBondFloor);
 
         BondInfo storage bond = bonds[operator][vault][nonce];
         if (bond.status != BondStatus.Empty) {
@@ -270,6 +283,7 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     /// @param amount The bond amount to lock
     function lockBondDirect(address vault, uint64 nonce, uint256 amount) external nonReentrant {
         if (amount == 0) revert ZeroBondAmount();
+        if (amount < minBondFloor) revert BondBelowFloor(amount, minBondFloor);
         if (trustedRelayer == address(0)) revert RelayerNotSet();
 
         BondInfo storage bond = bonds[msg.sender][vault][nonce];
@@ -337,8 +351,17 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         totalBonded[operator] -= amount;
         totalLockedGlobal -= amount;
 
-        // Cross-chain slash: 100% to treasury (treasury redistributes off-chain or via bridge)
-        wston.safeTransfer(treasury, amount);
+        // L-25 fix: same distribution shape as slashBond (10% treasury, 10%
+        // finder, 80% depositors via treasury-as-escrow since depositors live on
+        // another chain). The treasury role is unchanged for depositors because
+        // cross-chain value transfer is out of scope.
+        uint256 treasuryShare = (amount * TREASURY_SHARE_BPS) / BPS_DENOMINATOR;
+        uint256 finderShare;
+        if (slasher != address(0)) {
+            finderShare = (amount * FINDER_FEE_BPS) / BPS_DENOMINATOR;
+            wston.safeTransfer(slasher, finderShare);
+        }
+        wston.safeTransfer(treasury, amount - finderShare);
 
         emit BondSlashed(operator, vault, nonce, amount, slasher);
     }
@@ -357,11 +380,14 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
             vaults.length == nonces.length && nonces.length == amounts.length, "length mismatch"
         );
         require(vaults.length > 0, "empty batch");
+        if (vaults.length > MAX_BATCH_SIZE) revert BatchTooLarge(vaults.length, MAX_BATCH_SIZE);
         if (trustedRelayer == address(0)) revert RelayerNotSet();
 
         uint256 totalAmount = 0;
+        uint256 _minFloor = minBondFloor;
         for (uint256 i = 0; i < vaults.length; i++) {
             if (amounts[i] == 0) revert ZeroBondAmount();
+            if (amounts[i] < _minFloor) revert BondBelowFloor(amounts[i], _minFloor);
             BondInfo storage bond = bonds[msg.sender][vaults[i]][nonces[i]];
             if (bond.status != BondStatus.Empty) {
                 revert BondAlreadyExists(msg.sender, vaults[i], nonces[i]);
@@ -476,8 +502,11 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         emit VaultRevoked(vault);
     }
 
+    /// @notice Update the trusted relayer (L-31: allow clearing to zero to revoke).
+    /// @dev Cross-chain functions (lockBondDirect, lockBondBatch) require a
+    ///      non-zero relayer, so clearing it cleanly stops new cross-chain
+    ///      bonds without breaking the existing bonds.
     function setTrustedRelayer(address relayer) external onlyOwner {
-        if (relayer == address(0)) revert ZeroRelayer();
         trustedRelayer = relayer;
         emit TrustedRelayerUpdated(relayer);
     }

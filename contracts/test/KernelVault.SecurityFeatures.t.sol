@@ -352,6 +352,48 @@ contract KernelVaultSecurityFeaturesTest is Test {
         assertGt(assetsOut, 0, "Should withdraw at exact boundary");
     }
 
+    /// @notice H-03 regression: emergency withdraw must not permanently block
+    ///         depositors during an active strategy.
+    function test_H03_emergencyWithdraw_partialDuringActiveStrategy() public {
+        // 1. Deposit and activate a strategy that deploys most of the funds out
+        _depositAs(user, DEPOSIT_AMOUNT);
+
+        uint256 totalBefore = vault.totalAssets();
+        // Strategy transfers ~90% of assets externally
+        uint256 deploymentAmount = (totalBefore * 90) / 100;
+        bytes memory agentOutput = _buildTransferAction(
+            address(token), recipient, deploymentAmount
+        );
+        bytes32 commitment = sha256(agentOutput);
+        bytes memory journal = _buildJournal(TEST_AGENT_ID, 1, commitment);
+        vault.execute(journal, "", agentOutput);
+        assertTrue(vault.strategyActive(), "Strategy should be active");
+
+        // 2. Owner disappears; user must emergency-exit
+        vault.pause();
+        vm.warp(block.timestamp + 14 days + 1);
+
+        // 3. Emergency withdraw must NOT revert with InsufficientAvailableAssets
+        //    anymore — it should gracefully return the liquid balance.
+        uint256 userShares = vault.shares(user);
+        uint256 balBefore = token.balanceOf(user);
+        uint256 liquidBefore = vault.totalAssets();
+        assertLt(liquidBefore, DEPOSIT_AMOUNT, "Live balance should be depleted");
+
+        vm.prank(user);
+        uint256 assetsOut = vault.emergencyWithdraw(userShares);
+
+        // 4. User receives at most the liquid balance and still holds shares
+        //    proportional to the unwithdrawn snapshot (partial burn).
+        assertEq(assetsOut, liquidBefore, "Should receive full liquid balance");
+        assertEq(
+            token.balanceOf(user) - balBefore,
+            liquidBefore,
+            "Balance delta equals liquid-out"
+        );
+        assertGt(vault.shares(user), 0, "Residual shares remain on snapshot");
+    }
+
     // ============ CALL Self-Blocking Tests ============
 
     function test_executeCall_selfTarget_reverts() public {

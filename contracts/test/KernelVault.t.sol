@@ -385,14 +385,14 @@ contract KernelVaultTest is Test {
 
         vault.execute(journal1, seal, agentOutputBytes1);
 
-        // Try to execute with nonce 102 (gap of 101 exceeds MAX_NONCE_GAP of 100)
+        // L-03 fix: MAX_NONCE_GAP lowered to 10.
         bytes memory agentOutputBytes2 = _buildTransferAction(address(token), recipient, 2 ether);
         bytes32 actionCommitment2 = sha256(agentOutputBytes2);
         uint64 nonce2 = 102;
         bytes memory journal2 = _buildJournal(TEST_AGENT_ID, nonce2, actionCommitment2);
 
         vm.expectRevert(
-            abi.encodeWithSelector(KernelVault.NonceGapTooLarge.selector, nonce1, nonce2, 100)
+            abi.encodeWithSelector(KernelVault.NonceGapTooLarge.selector, nonce1, nonce2, 10)
         );
         vault.execute(journal2, seal, agentOutputBytes2);
     }

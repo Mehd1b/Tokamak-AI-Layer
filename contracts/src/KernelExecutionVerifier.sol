@@ -121,8 +121,35 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
 
     // ============ UUPS ============
 
-    /// @notice Authorize upgrade (only owner)
-    function _authorizeUpgrade(address) internal override onlyOwner { }
+    /// @notice Authorize upgrade (only owner).
+    /// @dev M-15: require that the new implementation preserves the core journal
+    ///      format constants (protocol version, kernel version, journal length).
+    ///      A mismatch would break every deployed vault's execute() path since
+    ///      KernelVault stores an immutable reference to this proxy.
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        // Read the new implementation's constants and require they match the
+        // current contract's values. Static calls are safe because the constants
+        // live in the new impl's code section (pure functions / constants).
+        (bool ok1, bytes memory ret1) = newImplementation.staticcall(
+            abi.encodeWithSignature("EXPECTED_PROTOCOL_VERSION()")
+        );
+        require(ok1 && ret1.length == 32, "upgrade: missing proto version");
+        uint32 newProtoVersion = abi.decode(ret1, (uint32));
+        require(
+            newProtoVersion == EXPECTED_PROTOCOL_VERSION,
+            "upgrade: incompatible protocol version"
+        );
+
+        (bool ok2, bytes memory ret2) = newImplementation.staticcall(
+            abi.encodeWithSignature("JOURNAL_LENGTH()")
+        );
+        require(ok2 && ret2.length == 32, "upgrade: missing journal length");
+        uint256 newJournalLength = abi.decode(ret2, (uint256));
+        require(
+            newJournalLength == JOURNAL_LENGTH,
+            "upgrade: incompatible journal length"
+        );
+    }
 
     // ============ Core Verification ============
 

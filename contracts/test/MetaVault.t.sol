@@ -117,6 +117,12 @@ contract MockKernelVault {
         return asset.balanceOf(address(this));
     }
 
+    /// @notice Mirror of KernelVault.effectiveTotalAssets. Mock has no strategy
+    ///         mode so effective == live.
+    function effectiveTotalAssets() external view returns (uint256) {
+        return totalAssets();
+    }
+
     function simulateGain(uint256 amount) external {
         MockERC20MV(address(asset)).mint(address(this), amount);
     }

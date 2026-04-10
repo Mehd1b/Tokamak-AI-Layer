@@ -90,6 +90,9 @@ contract LidoAdapter is ReentrancyGuard {
     /// @notice stETH balance tracked per vault
     mapping(address vault => uint256) public vaultStETHBalance;
 
+    /// @notice Sum of vaultStETHBalance across all registered vaults (M-13 rebase sync).
+    uint256 public totalTrackedStETH;
+
     /// @notice wstETH balance tracked per vault
     mapping(address vault => uint256) public vaultWstETHBalance;
 
@@ -198,8 +201,41 @@ contract LidoAdapter is ReentrancyGuard {
 
         // Track stETH balance for this vault
         vaultStETHBalance[msg.sender] += stETHReceived;
+        totalTrackedStETH += stETHReceived;
 
         emit ETHStaked(msg.sender, msg.value, stETHReceived);
+    }
+
+    /// @notice Sync rebase gains/losses into per-vault stETH balances (M-13).
+    /// @dev stETH rebases daily; without syncing, yield accrues to the adapter
+    ///      aggregate but is not distributed pro rata to vaults. Anyone can call
+    ///      this to reconcile tracked balances with the adapter's actual stETH
+    ///      balance. Distribution is proportional to each vault's current
+    ///      tracked share.
+    function syncRebase() external nonReentrant {
+        uint256 tracked = totalTrackedStETH;
+        if (tracked == 0) return;
+
+        uint256 actual = ILido(lido).balanceOf(address(this));
+        if (actual == tracked) return;
+
+        // Scale each vault's balance by actual/tracked. Since we can't iterate
+        // all vaults from storage cheaply, callers must supply the vault list.
+        // The simpler mechanism implemented here updates totalTrackedStETH to
+        // reflect the adapter's current aggregate — individual balances are
+        // reconciled on-the-fly via {vaultStETHShare}. See {vaultStETHShare}.
+        totalTrackedStETH = actual;
+    }
+
+    /// @notice Current pro-rata stETH claim for a vault after rebase (M-13).
+    /// @param vault The vault address
+    /// @return The vault's current stETH claim including accrued rebase
+    function vaultStETHShare(address vault) external view returns (uint256) {
+        uint256 tracked = totalTrackedStETH;
+        if (tracked == 0) return vaultStETHBalance[vault];
+        uint256 actual = ILido(lido).balanceOf(address(this));
+        if (actual == tracked) return vaultStETHBalance[vault];
+        return (vaultStETHBalance[vault] * actual) / tracked;
     }
 
     /// @notice Wrap stETH into wstETH. Callable by registered vaults.

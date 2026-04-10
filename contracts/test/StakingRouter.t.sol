@@ -406,7 +406,9 @@ contract StakingRouterTest is Test {
     // ============ unstake Tests ============
 
     function test_unstake_basicFlow() public {
-        // First stake to get WSTON
+        // L-07 FIX: unstake no longer custodies WSTON. It just emits the
+        // Unstaked event so the caller can call wston.requestWithdrawal
+        // themselves while remaining the withdrawal owner.
         ton.mint(alice, TON_AMOUNT);
         vm.startPrank(alice);
         ton.approve(address(router), TON_AMOUNT);
@@ -415,13 +417,15 @@ contract StakingRouterTest is Test {
         uint256 wstonBal = wston.balanceOf(alice);
         assertGt(wstonBal, 0, "Should have WSTON");
 
-        // Now unstake
-        wston.approve(address(router), wstonBal);
+        // Emit intent
+        vm.expectEmit(true, false, false, true);
+        emit StakingRouter.Unstaked(alice, wstonBal);
         router.unstake(wstonBal);
         vm.stopPrank();
 
-        assertEq(wston.balanceOf(alice), 0, "WSTON should be 0 after unstake");
-        assertEq(wston.pendingWithdrawals(address(router)), wstonBal, "Pending withdrawal recorded");
+        // WSTON stays with Alice; router custodies nothing
+        assertEq(wston.balanceOf(alice), wstonBal, "WSTON retained by caller");
+        assertEq(wston.balanceOf(address(router)), 0, "router holds no WSTON");
     }
 
     function test_unstake_emitsUnstakedEvent() public {
@@ -444,10 +448,12 @@ contract StakingRouterTest is Test {
     }
 
     function test_unstake_revertsWithoutApproval() public {
+        // L-07 FIX: unstake no longer requires an allowance since it doesn't
+        // custody WSTON. The call succeeds and just emits the intent.
         _mintWSTON(alice, WTON_AMOUNT);
         vm.prank(alice);
-        vm.expectRevert();
         router.unstake(WTON_AMOUNT);
+        // No assertion beyond non-revert
     }
 
     // ============ Reentrancy Tests ============

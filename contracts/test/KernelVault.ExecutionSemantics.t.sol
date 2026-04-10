@@ -474,34 +474,32 @@ contract KernelVaultExecutionSemanticsTest is Test {
     }
 
     /// @notice Test: Nonce gap too large reverts with NonceGapTooLarge
+    /// @dev L-03: MAX_NONCE_GAP lowered from 100 to 10.
     function test_nonceGapTooLarge_reverts() public {
         bytes memory agentOutput = _buildNoOpAction();
 
-        // Execute with nonce 1
         _executeWithCommitment(agentOutput, 1);
 
-        // Try with gap > MAX_NONCE_GAP (100)
-        uint64 tooFarNonce = 1 + 101; // Gap of 101
+        uint64 tooFarNonce = 1 + 101;
         bytes32 commitment = sha256(agentOutput);
         mockVerifier.setActionCommitment(commitment);
         mockVerifier.setExecutionNonce(tooFarNonce);
 
         vm.expectRevert(
-            abi.encodeWithSelector(KernelVault.NonceGapTooLarge.selector, 1, tooFarNonce, 100)
+            abi.encodeWithSelector(KernelVault.NonceGapTooLarge.selector, 1, tooFarNonce, 10)
         );
         vault.execute(DUMMY_JOURNAL, DUMMY_SEAL, agentOutput);
     }
 
-    /// @notice Test: Gap within MAX_NONCE_GAP succeeds
+    /// @notice Test: Gap within MAX_NONCE_GAP succeeds (L-03 — now 10)
     function test_nonceGapWithinLimit_succeeds() public {
         bytes memory agentOutput = _buildNoOpAction();
 
-        // Execute with nonce 1
         _executeWithCommitment(agentOutput, 1);
 
-        // Skip to nonce 50 (gap of 49, within limit)
-        _executeWithCommitment(agentOutput, 50);
-        assertEq(vault.lastExecutionNonce(), 50);
+        // Skip to nonce 10 (gap of 9, within limit)
+        _executeWithCommitment(agentOutput, 10);
+        assertEq(vault.lastExecutionNonce(), 10);
     }
 
     /// @notice Test: NoncesSkipped event emitted when gap exists

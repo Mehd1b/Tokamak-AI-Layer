@@ -211,6 +211,25 @@ contract VaultAccessControl {
         emit DepositRecorded(user, amount, deposited[user]);
     }
 
+    /// @notice Record a withdrawal to release deposit-cap capacity (M-22 fix).
+    /// @dev Previously, the `deposited` counter monotonically increased — a user
+    ///      who deposited up to their cap could never re-deposit even after a
+    ///      full withdrawal. This function lets the vault (or owner) mirror
+    ///      withdrawals back into the counter so the cap behaves as
+    ///      "current balance" rather than "lifetime total".
+    /// @param user The depositor address
+    /// @param amount The withdrawal amount
+    function recordWithdrawal(address user, uint256 amount) external {
+        require(msg.sender == vault || msg.sender == owner, "not vault or owner");
+        uint256 current = deposited[user];
+        if (amount >= current) {
+            deposited[user] = 0;
+        } else {
+            deposited[user] = current - amount;
+        }
+        emit DepositRecorded(user, 0, deposited[user]);
+    }
+
     // ============ View Functions ============
 
     /// @notice Check if a user can deposit a given amount, considering all enabled gates
