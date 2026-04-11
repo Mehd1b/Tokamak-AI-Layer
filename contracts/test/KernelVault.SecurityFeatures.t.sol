@@ -191,12 +191,16 @@ contract KernelVaultSecurityFeaturesTest is Test {
         assertEq(vault.pausedAt(), ts, "pausedAt should match block.timestamp");
     }
 
-    function test_unpause_clearsPausedAt() public {
+    /// @dev [H-02 FIX] `pausedAt` is permanent once set and is NOT cleared
+    ///      on unpause. Prevents the pause/unpause cycling attack that
+    ///      reset the 14-day emergency withdrawal deadline.
+    function test_unpause_doesNotClearPausedAt() public {
         vm.warp(1000);
         vault.pause();
         assertEq(vault.pausedAt(), 1000);
         vault.unpause();
-        assertEq(vault.pausedAt(), 0, "pausedAt should be cleared on unpause");
+        // [H-02 FIX] pausedAt must REMAIN at its first-pause value.
+        assertEq(vault.pausedAt(), 1000, "[H-02] pausedAt must not be cleared on unpause");
     }
 
     // ============ whenNotPaused Tests ============
@@ -355,12 +359,16 @@ contract KernelVaultSecurityFeaturesTest is Test {
     /// @notice H-03 regression: emergency withdraw must not permanently block
     ///         depositors during an active strategy.
     function test_H03_emergencyWithdraw_partialDuringActiveStrategy() public {
-        // 1. Deposit and activate a strategy that deploys most of the funds out
+        // 1. Deposit and activate a strategy that deploys the per-action cap.
+        //    The liquid residual is smaller than the user's pro-rata share
+        //    (because the snapshot includes the deployed funds), which is
+        //    exactly the scenario that exercises the partial-burn emergency
+        //    withdrawal path.
         _depositAs(user, DEPOSIT_AMOUNT);
 
         uint256 totalBefore = vault.totalAssets();
-        // Strategy transfers ~90% of assets externally
-        uint256 deploymentAmount = (totalBefore * 90) / 100;
+        uint256 deploymentAmount =
+            (totalBefore * vault.MAX_CALL_VALUE_BPS()) / vault.BPS_DENOMINATOR();
         bytes memory agentOutput = _buildTransferAction(
             address(token), recipient, deploymentAmount
         );
@@ -479,11 +487,18 @@ contract TransferOwnershipTest is Test {
         factory = VaultFactory(address(facProxy));
     }
 
-    // ============ AgentRegistry transferOwnership ============
+    // ============ AgentRegistry transferOwnership (two-step) ============
 
     function test_registry_transferOwnership_succeeds() public {
         registry.transferOwnership(newOwner);
+        // Ownership is only pending — owner unchanged until acceptOwnership.
+        assertEq(registry.owner(), originalOwner);
+        assertEq(registry.pendingOwner(), newOwner);
+
+        vm.prank(newOwner);
+        registry.acceptOwnership();
         assertEq(registry.owner(), newOwner);
+        assertEq(registry.pendingOwner(), address(0));
     }
 
     function test_registry_transferOwnership_nonOwnerReverts() public {
@@ -492,30 +507,52 @@ contract TransferOwnershipTest is Test {
         registry.transferOwnership(newOwner);
     }
 
+    /// @notice Passing address(0) cancels any pending proposal — it is NOT
+    ///         a completed transfer, and it MUST NOT revert. A reverting
+    ///         cancel path would make typo recovery impossible.
     function test_registry_transferOwnership_zeroAddressReverts() public {
-        vm.expectRevert("zero owner");
+        registry.transferOwnership(newOwner);
+        assertEq(registry.pendingOwner(), newOwner);
+
+        // Cancel by proposing address(0)
         registry.transferOwnership(address(0));
+        assertEq(registry.pendingOwner(), address(0));
+        // Owner is unchanged
+        assertEq(registry.owner(), originalOwner);
     }
 
     function test_registry_transferOwnership_newOwnerCanAct() public {
         registry.transferOwnership(newOwner);
-        // New owner should be able to transfer again
+        vm.prank(newOwner);
+        registry.acceptOwnership();
+
+        // New owner can then propose another transfer
         vm.prank(newOwner);
         registry.transferOwnership(address(0xCC));
+        vm.prank(address(0xCC));
+        registry.acceptOwnership();
         assertEq(registry.owner(), address(0xCC));
     }
 
     function test_registry_transferOwnership_oldOwnerLosesAccess() public {
         registry.transferOwnership(newOwner);
-        // Original owner should no longer be able to transfer
+        vm.prank(newOwner);
+        registry.acceptOwnership();
+
+        // Original owner should no longer be able to propose
         vm.expectRevert();
         registry.transferOwnership(address(0xDD));
     }
 
-    // ============ VaultFactory transferOwnership ============
+    // ============ VaultFactory transferOwnership (two-step) ============
 
     function test_factory_transferOwnership_succeeds() public {
         factory.transferOwnership(newOwner);
+        assertEq(factory.owner(), originalOwner);
+        assertEq(factory.pendingOwner(), newOwner);
+
+        vm.prank(newOwner);
+        factory.acceptOwnership();
         assertEq(factory.owner(), newOwner);
     }
 
@@ -525,15 +562,25 @@ contract TransferOwnershipTest is Test {
         factory.transferOwnership(newOwner);
     }
 
+    /// @notice Passing address(0) cancels a pending proposal.
     function test_factory_transferOwnership_zeroAddressReverts() public {
-        vm.expectRevert("zero owner");
+        factory.transferOwnership(newOwner);
+        assertEq(factory.pendingOwner(), newOwner);
+
         factory.transferOwnership(address(0));
+        assertEq(factory.pendingOwner(), address(0));
+        assertEq(factory.owner(), originalOwner);
     }
 
-    // ============ KernelExecutionVerifier transferOwnership ============
+    // ============ KernelExecutionVerifier transferOwnership (two-step) ============
 
     function test_verifier_transferOwnership_succeeds() public {
         verifier.transferOwnership(newOwner);
+        assertEq(verifier.owner(), originalOwner);
+        assertEq(verifier.pendingOwner(), newOwner);
+
+        vm.prank(newOwner);
+        verifier.acceptOwnership();
         assertEq(verifier.owner(), newOwner);
     }
 
@@ -543,8 +590,13 @@ contract TransferOwnershipTest is Test {
         verifier.transferOwnership(newOwner);
     }
 
+    /// @notice Passing address(0) cancels a pending proposal.
     function test_verifier_transferOwnership_zeroAddressReverts() public {
-        vm.expectRevert("zero owner");
+        verifier.transferOwnership(newOwner);
+        assertEq(verifier.pendingOwner(), newOwner);
+
         verifier.transferOwnership(address(0));
+        assertEq(verifier.pendingOwner(), address(0));
+        assertEq(verifier.owner(), originalOwner);
     }
 }

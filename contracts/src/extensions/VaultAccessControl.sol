@@ -186,6 +186,11 @@ contract VaultAccessControl {
 
     /// @notice Enable or disable KYC verifier mode
     /// @param enabled Whether KYC verifier mode should be enabled
+    /// @dev I-03 fix: when enabled, the canDeposit() check already returns false
+    ///      if kycVerifier is unset, which is the documented safety behaviour.
+    ///      Callers should set the verifier BEFORE enabling; enabling without a
+    ///      verifier is permitted but effectively blocks all deposits until
+    ///      setKycVerifier is called.
     function setKycVerifierEnabled(bool enabled) external onlyOwner {
         kycVerifierEnabled = enabled;
         emit KycVerifierEnabledUpdated(enabled);

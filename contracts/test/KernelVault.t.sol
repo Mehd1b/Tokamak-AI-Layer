@@ -936,6 +936,7 @@ contract KernelVaultTest is Test {
         vault.emergencyWithdraw(DEPOSIT_AMOUNT * OFFSET);
     }
 
+    /// @dev [H-02 FIX] pausedAt is permanent once set; unpause does NOT clear it.
     function test_pausedAt_tracksTimestamp() public {
         assertEq(vault.pausedAt(), 0);
 
@@ -944,7 +945,8 @@ contract KernelVaultTest is Test {
         assertEq(vault.pausedAt(), 1000);
 
         vault.unpause();
-        assertEq(vault.pausedAt(), 0);
+        // [H-02] pausedAt remains at the first-pause timestamp after unpause.
+        assertEq(vault.pausedAt(), 1000, "[H-02] pausedAt must not be cleared on unpause");
     }
 
     function test_rounding_depositorGetsFewer() public {

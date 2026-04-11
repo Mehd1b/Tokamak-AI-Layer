@@ -224,6 +224,9 @@ contract UniswapV4Adapter is ReentrancyGuard {
     /// @notice Emitted when slippage is updated
     event SlippageUpdated(address indexed vault, uint256 newSlippageBps);
 
+    /// @notice L-54: emitted when the default swap fee tier is updated
+    event DefaultFeeUpdated(address indexed vault, uint24 newFee);
+
     /// @notice Emitted when all positions are withdrawn to vault
     event WithdrawnToVault(address indexed vault);
 
@@ -340,11 +343,16 @@ contract UniswapV4Adapter is ReentrancyGuard {
     /// @dev Only callable by the vault owner
     /// @param vault The vault to configure
     /// @param fee New default fee tier (e.g., 500, 3000, 10000)
+    /// @dev L-54 fix: reject zero-fee (would silently change routing to an
+    ///      unintended tier) and emit a dedicated event so admin changes are
+    ///      observable off-chain.
     function setDefaultFee(address vault, uint24 fee) external nonReentrant {
         if (!vaultConfigs[vault].registered) revert VaultNotRegistered();
         if (msg.sender != IKernelVaultOwner(vault).owner()) revert NotVaultOwner();
+        require(fee > 0, "zero fee");
 
         vaultConfigs[vault].defaultFee = fee;
+        emit DefaultFeeUpdated(vault, fee);
     }
 
     // ============ Core Functions ============
@@ -443,25 +451,10 @@ contract UniswapV4Adapter is ReentrancyGuard {
         // Mint position
         uint256 actualAmount0;
         uint256 actualAmount1;
-        (positionId, liquidity, actualAmount0, actualAmount1) = INonfungiblePositionManager(
-            positionManager
-        ).mint(
-            INonfungiblePositionManager.MintParams({
-                token0: token0,
-                token1: token1,
-                fee: fee,
-                tickLower: tickLower,
-                tickUpper: tickUpper,
-                amount0Desired: amount0,
-                amount1Desired: amount1,
-                amount0Min: 0, // We check minLiquidity instead
-                amount1Min: 0,
-                recipient: address(this), // Adapter holds the NFT
-                deadline: block.timestamp
-            })
-        );
+        (positionId, liquidity, actualAmount0, actualAmount1) =
+            _mintPosition(token0, token1, fee, tickLower, tickUpper, amount0, amount1);
 
-        // Verify minimum liquidity
+        // Verify minimum liquidity (top-level caller slippage guard)
         require(liquidity >= minLiquidity, "Insufficient liquidity minted");
 
         // Track position
@@ -659,5 +652,51 @@ contract UniswapV4Adapter is ReentrancyGuard {
                 return;
             }
         }
+    }
+
+    /// @notice L-13 helper: internal mint wrapper that derives slippage minimums
+    ///         from the vault's configured slippageBps. Extracted to avoid
+    ///         stack-too-deep in addLiquidity.
+    function _mintPosition(
+        address token0,
+        address token1,
+        uint24 fee,
+        int24 tickLower,
+        int24 tickUpper,
+        uint256 amount0,
+        uint256 amount1
+    ) internal returns (uint256, uint128, uint256, uint256) {
+        uint256 slipBps = vaultConfigs[msg.sender].slippageBps;
+        if (slipBps == 0) slipBps = DEFAULT_SLIPPAGE_BPS;
+        return INonfungiblePositionManager(positionManager).mint(
+            INonfungiblePositionManager.MintParams({
+                token0: token0,
+                token1: token1,
+                fee: fee,
+                tickLower: tickLower,
+                tickUpper: tickUpper,
+                amount0Desired: amount0,
+                amount1Desired: amount1,
+                amount0Min: amount0 - (amount0 * slipBps) / BPS_DENOMINATOR,
+                amount1Min: amount1 - (amount1 * slipBps) / BPS_DENOMINATOR,
+                recipient: address(this),
+                deadline: block.timestamp
+            })
+        );
+    }
+
+    // ============ ERC721 Receiver ============
+
+    /// @notice L-06 fix: implement ERC721Receiver so the Uniswap V4 position
+    ///         manager can `safeTransferFrom` position NFTs to this adapter.
+    ///         Without this selector, any `safeTransferFrom` call reverts and
+    ///         the LP NFT becomes permanently unclaimable.
+    function onERC721Received(
+        address, /* operator */
+        address, /* from */
+        uint256, /* tokenId */
+        bytes calldata /* data */
+    ) external pure returns (bytes4) {
+        return this.onERC721Received.selector;
     }
 }

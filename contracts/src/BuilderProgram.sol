@@ -205,7 +205,12 @@ contract BuilderProgram {
 
     /// @notice Update stats for a builder (owner or authorized updater only)
     /// @param builder The builder address
-    /// @param tvl New total TVL value
+    /// @param tvl New total TVL value, expressed in 18-decimal normalised
+    ///        units. Callers with a multi-decimal vault mix MUST scale
+    ///        the vault's native TVL up to 18 decimals before calling —
+    ///        e.g. a $50,000 USDC TVL (6 decimals) should be passed as
+    ///        `50_000e18`, NOT `50_000e6`. Use `updateStatsWithDecimals`
+    ///        if you want the contract to normalise on your behalf.
     /// @param fees New total fees earned value
     /// @param executions New total executions value
     function updateStats(
@@ -214,6 +219,46 @@ contract BuilderProgram {
         uint256 fees,
         uint256 executions
     ) external onlyAuthorized {
+        _updateStatsNormalized(builder, tvl, fees, executions);
+    }
+
+    /// @notice Update stats for a builder with automatic decimal
+    ///         normalisation.
+    /// @param builder The builder address
+    /// @param rawTvl TVL in the native decimal precision of `assetDecimals`
+    /// @param assetDecimals Number of decimals of the underlying vault
+    ///        asset (e.g. 6 for USDC, 8 for WBTC, 18 for WETH).
+    /// @param fees New total fees earned value
+    /// @param executions New total executions value
+    /// @dev Convenience wrapper for callers that track TVL in the vault's
+    ///      native decimals. Scales `rawTvl` up to 18-decimal units so
+    ///      the tier thresholds — which are denominated in 18-decimal
+    ///      units — apply uniformly to all asset decimals. Overflow is
+    ///      not a concern because `assetDecimals` is bounded to 18 and
+    ///      the multiplier is at most `10 ** 12`.
+    function updateStatsWithDecimals(
+        address builder,
+        uint256 rawTvl,
+        uint8 assetDecimals,
+        uint256 fees,
+        uint256 executions
+    ) external onlyAuthorized {
+        uint256 normalized;
+        if (assetDecimals >= 18) {
+            normalized = rawTvl / (10 ** (assetDecimals - 18));
+        } else {
+            normalized = rawTvl * (10 ** (18 - assetDecimals));
+        }
+        _updateStatsNormalized(builder, normalized, fees, executions);
+    }
+
+    /// @dev Shared body — assumes `tvl` is already in 18-decimal units.
+    function _updateStatsNormalized(
+        address builder,
+        uint256 tvl,
+        uint256 fees,
+        uint256 executions
+    ) internal {
         if (builders[builder].registeredAt == 0) revert NotRegistered();
 
         Builder storage b = builders[builder];
@@ -344,8 +389,19 @@ contract BuilderProgram {
         // If builder already has a grant, add to it (keeping earliest startTime)
         Grant storage g = grants[builder];
         if (g.totalAmount > 0) {
+            // L-16 fix: reject top-ups on grants that have already fully vested.
+            // Otherwise the incremental amount would be immediately claimable
+            // (getClaimable returns g.totalAmount when elapsed >= duration),
+            // bypassing the vesting schedule entirely.
+            if (block.timestamp >= g.startTime + g.vestingDuration) {
+                revert InvalidGrant();
+            }
             // Top-up: add amount, keep existing vesting schedule
             g.totalAmount += amount;
+            // L-53 fix: the stored schedule was NOT updated by the top-up, so
+            // emit the ACTUAL in-effect vestingDuration rather than the caller's
+            // parameter that would mislead indexers.
+            emit GrantAllocated(builder, amount, g.vestingDuration);
         } else {
             grants[builder] = Grant({
                 totalAmount: amount,
@@ -353,9 +409,8 @@ contract BuilderProgram {
                 startTime: block.timestamp,
                 vestingDuration: vestingDuration
             });
+            emit GrantAllocated(builder, amount, vestingDuration);
         }
-
-        emit GrantAllocated(builder, amount, vestingDuration);
     }
 
     /// @notice Claim vested portion of a builder's grant

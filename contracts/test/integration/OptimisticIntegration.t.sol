@@ -21,6 +21,8 @@ contract OptimisticIntegrationTest is Test {
     MockERC20 public token;
 
     uint256 public constant ORACLE_PRIVATE_KEY = 0xA11CE;
+    /// @dev C-02: separate key for bond attestation (Role B).
+    uint256 public constant BOND_PRIVATE_KEY = 0xB0ED;
     address public oracleSigner;
 
     address public owner = address(this);
@@ -70,10 +72,13 @@ contract OptimisticIntegrationTest is Test {
             0 // default challengeWindow
         );
 
-        // Set oracle signer and enable optimistic execution
+        // Set oracle signer (Role A — price) and bond signer (Role B — bond).
+        // C-02: the two roles use DISTINCT keys.
         vault.setOracleSigner(oracleSigner, 900);
-        vault.setOptimisticEnabled(true);
+        vault.setBondSigner(vm.addr(BOND_PRIVATE_KEY));
+        // C-01: minBond must be non-zero BEFORE enabling optimistic mode.
         vault.setMinBond(BOND_AMOUNT);
+        vault.setOptimisticEnabled(true);
 
         // Mint tokens to user and set up approvals
         token.mint(user, INITIAL_BALANCE);
@@ -103,7 +108,8 @@ contract OptimisticIntegrationTest is Test {
         );
         bytes32 ethSignedHash =
             keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", bondHash));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ORACLE_PRIVATE_KEY, ethSignedHash);
+        // C-02: bond attestation MUST be signed by the bond key, not the oracle key.
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(BOND_PRIVATE_KEY, ethSignedHash);
         return abi.encodePacked(r, s, v);
     }
 

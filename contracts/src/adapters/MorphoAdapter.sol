@@ -21,6 +21,19 @@ struct MarketParams {
     uint256 lltv;
 }
 
+/// @notice Morpho Blue per-market price oracle interface (C-04 fix)
+/// @dev Morpho's IOracle returns the price of 1 unit of collateral quoted in
+///      loan token, scaled by `ORACLE_PRICE_SCALE = 1e36`. The adapter uses
+///      the same convention.
+interface IMorphoOracle {
+    function price() external view returns (uint256);
+}
+
+/// @notice Minimal interface to read ERC-20 decimals
+interface IERC20Decimals {
+    function decimals() external view returns (uint8);
+}
+
 /// @notice Morpho Blue core protocol interface
 interface IMorpho {
     function supply(
@@ -324,6 +337,14 @@ contract MorphoAdapter is ReentrancyGuard {
         if (!isRegistered[vault]) revert VaultNotRegistered();
         if (msg.sender != IKernelVaultOwner(vault).owner()) revert NotVaultOwner();
 
+        // L-36 fix: reject markets without an oracle or IRM. Morpho Blue allows
+        // oracle-less markets but whitelisting one in the adapter disables the
+        // health-factor check downstream, producing phantom collateralisation.
+        require(params.oracle != address(0), "zero oracle");
+        require(params.irm != address(0), "zero irm");
+        require(params.collateralToken != address(0), "zero collateral");
+        require(params.loanToken != address(0), "zero loan token");
+
         bytes32 marketKey = keccak256(abi.encode(params));
         isMarketWhitelisted[vault][marketKey] = true;
 
@@ -428,7 +449,7 @@ contract MorphoAdapter is ReentrancyGuard {
         // Health check: ensure the calling vault's tracked position is within the
         // safety threshold. Uses only the caller's tracked collateral, not the
         // adapter's aggregate position — this prevents cross-vault collateral abuse.
-        _checkVaultHealth(msg.sender, marketId, params.lltv);
+        _checkVaultHealth(msg.sender, marketId, params.lltv, params.oracle);
 
         emit Borrowed(msg.sender, marketId, assets);
     }
@@ -523,7 +544,7 @@ contract MorphoAdapter is ReentrancyGuard {
 
         // Per-vault health check: require the caller still collateralizes their own debt
         if (_vaultBorrowed[msg.sender][marketId] > 0) {
-            _checkVaultHealth(msg.sender, marketId, params.lltv);
+            _checkVaultHealth(msg.sender, marketId, params.lltv, params.oracle);
         }
 
         emit CollateralWithdrawn(msg.sender, marketId, assets);
@@ -672,20 +693,46 @@ contract MorphoAdapter is ReentrancyGuard {
         _isMarketActive[vault][marketId] = true;
     }
 
+    /// @notice Morpho Blue's ORACLE_PRICE_SCALE constant (C-04)
+    /// @dev Per Morpho Blue spec, prices returned by market oracles are scaled
+    ///      such that: collateralValueInLoanToken
+    ///        = collateral * price / ORACLE_PRICE_SCALE
+    ///      where ORACLE_PRICE_SCALE = 10 ** (36 + loanDecimals - collateralDecimals)
+    ///      in the default implementation. We use the canonical `1e36`.
+    uint256 internal constant ORACLE_PRICE_SCALE = 1e36;
+
     /// @notice Per-vault health check operating on tracked positions only.
-    /// @dev Isolated from other vaults: uses the CALLING vault's tracked borrow and
-    ///      collateral rather than the adapter's aggregate. This is the defense against
-    ///      cross-vault borrow abuse (C-01/C-02 class).
-    function _checkVaultHealth(address vault, bytes32 marketId, uint256 lltv) internal view {
+    /// @dev C-04 fix: previously the check compared `collateral` (in collateral
+    ///      token units) against `maxBorrow` (derived from `collateral` again)
+    ///      without consulting the per-market oracle. That silently assumed a
+    ///      1:1 unit parity between collateral and loan token — disastrously
+    ///      wrong for any market with differing decimals or prices. The fix
+    ///      plumbs the market's own oracle through and converts collateral
+    ///      to loan-token value before computing maxBorrow.
+    function _checkVaultHealth(
+        address vault,
+        bytes32 marketId,
+        uint256 lltv,
+        address oracle
+    ) internal view {
         uint256 vaultBorrow = _vaultBorrowed[vault][marketId];
         uint256 vaultCollat = _vaultCollateral[vault][marketId];
 
         if (vaultBorrow == 0) return;
         if (vaultCollat == 0) revert UnhealthyPosition(vaultBorrow, 0);
 
-        // maxBorrow = collateral * lltv * 80% / (1e18 * 10000)
+        // C-04: convert collateral to loan-token value via the market oracle.
+        require(oracle != address(0), "market oracle unset");
+        uint256 price = IMorphoOracle(oracle).price();
+        require(price > 0, "zero oracle price");
+        uint256 collatValueLoan = (vaultCollat * price) / ORACLE_PRICE_SCALE;
+
+        // Morpho spec: maxBorrow = collateralValue * lltv / 1e18
+        // We additionally apply the HEALTH_FACTOR_BPS haircut so the adapter
+        // stays strictly more conservative than Morpho's own liquidation
+        // threshold.
         uint256 maxBorrow =
-            vaultCollat * lltv * HEALTH_FACTOR_BPS / (1e18 * 10000);
+            (collatValueLoan * lltv * HEALTH_FACTOR_BPS) / (1e18 * 10000);
 
         if (vaultBorrow > maxBorrow) {
             revert UnhealthyPosition(vaultBorrow, maxBorrow);

@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { IVaultFactory } from "../interfaces/IVaultFactory.sol";
 
 /// @title PolymarketAdapter
 /// @notice Adapter for KernelVault agents to trade on Polymarket's CTF Exchange.
@@ -65,6 +66,9 @@ contract PolymarketAdapter is ReentrancyGuard {
     event Redeemed(address indexed vault, uint256 usdcReceived);
     event WithdrawnToVault(address indexed vault, uint256 amount);
 
+    /// @notice I-07 fix: dedicated event for pure USDC deposits (no market position)
+    event USDCDeposited(address indexed vault, uint256 amount);
+
     // ============ Errors ============
 
     error VaultNotRegistered();
@@ -74,6 +78,8 @@ contract PolymarketAdapter is ReentrancyGuard {
     error ZeroAmount();
     error NotImplemented();
     error InsufficientVaultBalance(uint256 requested, uint256 available);
+    /// @notice L-39: vault is not a factory-deployed vault
+    error VaultNotDeployedByFactory();
 
     // ============ Modifiers ============
 
@@ -114,6 +120,13 @@ contract PolymarketAdapter is ReentrancyGuard {
     ) external {
         if (msg.sender != vaultFactory && msg.sender != owner()) revert NotFactoryOrOwner();
         if (vaultConfigs[vault].registered) revert VaultAlreadyRegistered();
+        // L-39 fix: verify the vault is actually a factory-deployed vault.
+        // Previously the caller authority check (factory OR deployer) did NOT
+        // validate the vault address itself, so the adapter deployer could
+        // register arbitrary contracts — bypassing the vault isolation model.
+        if (!IVaultFactory(vaultFactory).isDeployedVault(vault)) {
+            revert VaultNotDeployedByFactory();
+        }
 
         vaultConfigs[vault] = VaultConfig({
             conditionId: conditionId,
@@ -139,7 +152,9 @@ contract PolymarketAdapter is ReentrancyGuard {
         if (usdcAmount == 0) revert ZeroAmount();
         IERC20(usdc).safeTransferFrom(msg.sender, address(this), usdcAmount);
         vaultUsdcBalance[msg.sender] += usdcAmount;
-        emit OutcomeBought(msg.sender, false, usdcAmount, 0);
+        // I-07 fix: emit a dedicated USDCDeposited event so downstream indexers
+        // do not misinterpret a plain deposit as an outcome purchase.
+        emit USDCDeposited(msg.sender, usdcAmount);
     }
 
     /// @notice Buy outcome tokens (YES or NO) with USDC from the vault.

@@ -71,6 +71,19 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
     /// @notice Mapping from vault address to its configuration (sub-account + perp asset)
     mapping(address vault => VaultConfig) public vaultConfigs;
 
+    /// @notice Adapter deployer — can permanently disable the raw CoreWriter
+    ///         escape hatch (L-35 kill switch).
+    address public immutable adapterDeployer;
+
+    /// @notice L-35 fix: once set to true, `rawCoreWriterAdmin` and
+    ///         `addApiWalletAdmin` will revert unconditionally. The flag is
+    ///         IRREVERSIBLE so the defense-in-depth guarantee cannot be
+    ///         silently undone by a compromised key.
+    bool public rawCoreWriterDisabled;
+
+    /// @notice Emitted when the raw CoreWriter escape hatch is disabled.
+    event RawCoreWriterDisabled();
+
     // ============ Modifiers ============
 
     modifier onlyRegisteredVault() {
@@ -93,6 +106,17 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
         usdc = _usdc;
         coreDepositWallet = _coreDepositWallet;
         vaultFactory = _vaultFactory;
+        adapterDeployer = msg.sender;
+    }
+
+    /// @notice L-35 fix: irreversibly kill the raw CoreWriter backdoor.
+    ///         After calling this, `rawCoreWriterAdmin` always reverts and
+    ///         all CoreWriter actions must flow through the typed wrappers.
+    ///         Only callable by the adapter deployer.
+    function disableRawCoreWriter() external {
+        require(msg.sender == adapterDeployer, "not deployer");
+        rawCoreWriterDisabled = true;
+        emit RawCoreWriterDisabled();
     }
 
     // ============ Registration ============
@@ -214,9 +238,12 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
     }
 
     /// @inheritdoc IHyperliquidAdapter
-    function closePosition() external override nonReentrant onlyRegisteredVault {
-        VaultConfig memory config = vaultConfigs[msg.sender];
-        TradingSubAccount(payable(config.subAccount)).executeClose();
+    /// @dev DEPRECATED — C-05 fix: this function used MIN_PRICE/MAX_PRICE which
+    ///      fall outside HyperCore's oracle price band and are silently dropped.
+    ///      Vaults must call `closePositionAtPrice(px)` with a price inside the
+    ///      oracle band instead.
+    function closePosition() external override {
+        revert("closePosition deprecated: use closePositionAtPrice");
     }
 
     /// @inheritdoc IHyperliquidAdapter
@@ -275,15 +302,29 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
         TradingSubAccount(payable(config.subAccount)).closePositionAtPrice(px);
     }
 
-    /// @notice Close the full position for a vault's sub-account. Callable by vault owner.
-    /// @dev WARNING: Uses extreme prices (MIN_PRICE/MAX_PRICE) which may be outside HyperCore's
-    ///      oracle price band, causing silent rejection. Prefer closePositionAtPriceAdmin().
-    /// @param vault The vault whose sub-account position to close
-    function closePositionAdmin(address vault) external nonReentrant {
+    /// @notice DEPRECATED — C-05 fix: this path invoked `executeClose` which
+    ///         uses MIN_PRICE/MAX_PRICE extreme values that HyperCore silently
+    ///         drops (oracle band violation), producing EVM/HC state drift.
+    ///         The underlying function now reverts; this wrapper is kept only
+    ///         to preserve the public ABI and emits a clear deprecation revert.
+    /// @dev Use `closePositionAtPriceAdmin(vault, px)` with a price inside the
+    ///      oracle band instead.
+    function closePositionAdmin(address vault) external view {
+        vault; // silence unused
+        revert("closePositionAdmin deprecated: use closePositionAtPriceAdmin");
+    }
+
+    /// @notice C-05 readback helper: expose the current HyperCore position for
+    ///         the vault's sub-account so off-chain monitors can detect
+    ///         silent-drop drift between EVM and HC state.
+    function readSubAccountPosition(address vault)
+        external
+        view
+        returns (int64 szi, uint32 leverage, uint64 entryNtl)
+    {
         VaultConfig memory config = vaultConfigs[vault];
         if (config.subAccount == address(0)) revert VaultNotRegistered();
-        if (msg.sender != IKernelVaultOwner(vault).owner()) revert NotVaultOwner();
-        TradingSubAccount(payable(config.subAccount)).executeClose();
+        return TradingSubAccount(payable(config.subAccount)).readPosition();
     }
 
     // ============ Margin Recovery (vault owner only) ============
@@ -312,11 +353,16 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
     /// @dev Step 2 of 3. Must be called after transferPerpToSpot has settled.
     ///      After this settles, call withdrawToVaultAdmin to move USDC to the vault.
     /// @param vault The vault whose sub-account to recover margin from
-    /// @param usdcAmount Amount in USDC native 1e6 decimals (e.g., 10000000 = 10 USDC)
+    /// @param usdcAmount Amount in USDC native 1e6 decimals (e.g., 10000000 = 10 USDC).
+    /// @dev L-34 fix: validate `usdcAmount * 100` does not overflow uint64 before
+    ///      passing to the spotSend wei-format (1e8) encoding. Otherwise large
+    ///      amounts silently wrap and transmit an unintended value.
     function transferSpotToEvm(address vault, uint64 usdcAmount) external nonReentrant {
         VaultConfig memory config = vaultConfigs[vault];
         if (config.subAccount == address(0)) revert VaultNotRegistered();
         if (msg.sender != IKernelVaultOwner(vault).owner()) revert NotVaultOwner();
+        // L-34: overflow guard for the 100× scaling
+        require(usdcAmount <= type(uint64).max / 100, "amount overflow");
         // spotSend uses 1e8 "wei" format — multiply USDC amount by 100
         TradingSubAccount(payable(config.subAccount)).executeSpotToEvm(usdcAmount * 100);
     }
@@ -356,6 +402,10 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
     /// @param vault The vault whose sub-account to send the action from
     /// @param rawData The complete CoreWriter payload (version + actionId + abi.encode(...))
     function rawCoreWriterAdmin(address vault, bytes calldata rawData) external nonReentrant {
+        // L-35 fix: once `disableRawCoreWriter()` has been called the backdoor
+        // is permanently disabled and all CoreWriter actions must flow through
+        // the typed wrappers above.
+        require(!rawCoreWriterDisabled, "raw core writer disabled");
         VaultConfig memory config = vaultConfigs[vault];
         if (config.subAccount == address(0)) revert VaultNotRegistered();
         if (msg.sender != IKernelVaultOwner(vault).owner()) revert NotVaultOwner();

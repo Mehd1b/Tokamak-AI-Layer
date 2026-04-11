@@ -110,6 +110,12 @@ contract StakingRouter is ReentrancyGuard {
     /// @notice Stake WTON directly in a single transaction: WTON -> WSTON
     /// @dev Caller must have approved this contract to spend `wtonAmount` of WTON.
     /// @param wtonAmount Amount of WTON to stake (27 decimals)
+    /// @dev I-06 fix: emit the Staked event with the TON-equivalent of the
+    ///      WTON input. WTON is the 27-decimal wrapped TON, so the TON-value
+    ///      scale is `wtonAmount / 1e18` (27 → 9 decimals drop). We instead
+    ///      pass the raw WTON amount as the TON-equivalent placeholder until
+    ///      an explicit scaling constant is agreed with off-chain analytics;
+    ///      this is still more informative than the previous hardcoded `0`.
     function stakeFromWTON(uint256 wtonAmount) external nonReentrant {
         if (wtonAmount == 0) revert ZeroAmount();
 
@@ -131,7 +137,8 @@ contract StakingRouter is ReentrancyGuard {
         // 4. Sweep any dust tokens back to caller
         _sweepDust(msg.sender);
 
-        emit Staked(msg.sender, 0, wstonReceived);
+        // I-06: WTON is 27 decimals, TON is 18 decimals → scale down by 1e9.
+        emit Staked(msg.sender, wtonAmount / 1e9, wstonReceived);
     }
 
     /// @notice Initiate unstaking of WSTON and immediately return it to the caller.

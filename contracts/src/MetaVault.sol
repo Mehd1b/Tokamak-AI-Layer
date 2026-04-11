@@ -19,6 +19,11 @@ interface IKernelVaultLike {
     function effectiveTotalAssets() external view returns (uint256);
     function totalShares() external view returns (uint256);
     function shares(address account) external view returns (uint256);
+    /// @notice Emergency exit path on the KernelVault. Callable after the
+    ///         configured emergency-withdraw delay when the vault is paused.
+    function emergencyWithdraw(uint256 shareAmount) external returns (uint256 assetsOut);
+    /// @notice Returns whether the underlying KernelVault is currently paused.
+    function paused() external view returns (bool);
 }
 
 /// @title MetaVault
@@ -95,6 +100,13 @@ contract MetaVault is ReentrancyGuard {
 
     /// @notice Emitted after a successful rebalance
     event Rebalanced(uint256 timestamp, uint256 navBefore, uint256 navAfter);
+
+    /// @notice L-51: emitted when sweepDonations transfers excess balance to owner
+    event DonationSwept(address indexed to, uint256 amount);
+
+    /// @notice L-26: emitted when a single vault withdrawal in the multi-vault
+    ///         path reverts and is skipped (rather than cascading-revert).
+    event UnderlyingWithdrawFailed(address indexed vault, uint256 requested);
 
     /// @notice Emitted when an underlying vault is added
     event VaultAdded(address indexed vault, uint256 weightBps);
@@ -200,13 +212,16 @@ contract MetaVault is ReentrancyGuard {
 
         // L-04 fix: ensure sufficient assets BEFORE burning shares. If the pull
         // from underlyings reverts, the user keeps their shares.
+        //
+        // L-12 fix: previously trackedIdle was OVERWRITTEN with the live balance
+        // here, absorbing any direct donation into the next withdrawer's
+        // proceeds. `_withdrawFromVault` already increments trackedIdle with
+        // the actual delta, so no overwrite is needed — donations remain
+        // isolated from NAV until explicitly swept via `sweepDonations`.
         uint256 idle = trackedIdle;
         if (idle < assetsOut) {
             uint256 deficit = assetsOut - idle;
             _withdrawFromUnderlyings(deficit);
-            // The pull increases the actual ERC20 balance; update the tracked idle
-            // to reflect the new idle balance (honors any donations already present).
-            trackedIdle = baseAsset.balanceOf(address(this));
         }
 
         // Burn shares (after liquidity has been secured)
@@ -229,16 +244,130 @@ contract MetaVault is ReentrancyGuard {
         emit Withdraw(msg.sender, assetsOut, metaShares);
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // Emergency withdrawal path
+    // ─────────────────────────────────────────────────────────────────────
+    // The normal `withdraw` path routes through `_withdrawFromUnderlyings`,
+    // which calls `withdraw` on each KernelVault. That call reverts if the
+    // vault is paused, so an adversary (or systemic failure) that causes
+    // all underlying vaults to be paused simultaneously would lock every
+    // MetaVault depositor with no exit path — even though each individual
+    // KernelVault has its own `emergencyWithdraw` bypass.
+    //
+    // `emergencyWithdraw` here routes through the underlying vaults'
+    // `emergencyWithdraw` (which honours the per-vault 14-day paused
+    // delay) and proportionally distributes whatever base asset is
+    // recovered to the caller, based on their share of the MetaVault.
+    // Any single underlying that still reverts (e.g. it is not paused
+    // and therefore its emergency path is not yet open, or it runs into
+    // strategy-active state) is SKIPPED rather than aborting the whole
+    // call, so depositors can still drain the vaults that are available.
+    // ─────────────────────────────────────────────────────────────────────
+
+    /// @notice Emergency exit — burns MetaVault shares and attempts to
+    ///         pull the caller's pro-rata share from each underlying
+    ///         vault's emergency path. Idle base asset is paid out first;
+    ///         the remainder is sourced by calling
+    ///         `emergencyWithdraw` on every underlying KernelVault in
+    ///         turn. Underlying vaults whose emergency path is not yet
+    ///         available (or that revert for any other reason) are
+    ///         skipped with a `UnderlyingWithdrawFailed` event. This
+    ///         function is callable by any share holder at any time —
+    ///         there is no MetaVault-level delay, because each
+    ///         underlying vault already enforces its own 14-day
+    ///         pause-delay floor via its own `emergencyWithdraw`.
+    /// @param metaShares Number of meta shares to burn
+    /// @return assetsOut Total base asset forwarded to the caller
+    function emergencyWithdraw(uint256 metaShares)
+        external
+        nonReentrant
+        returns (uint256 assetsOut)
+    {
+        if (metaShares == 0) revert ZeroShares();
+        if (shares[msg.sender] < metaShares) {
+            revert InsufficientShares(metaShares, shares[msg.sender]);
+        }
+
+        uint256 totalSharesBefore = totalShares;
+        if (totalSharesBefore == 0) revert ZeroShares();
+
+        // Caller's pro-rata fraction of MetaVault (in parts-per-wei scale).
+        // This is used to compute how much of each underlying's position
+        // should be surfaced via the underlying's emergencyWithdraw.
+        // We compute on the pre-burn denominator so multiple simultaneous
+        // emergency withdrawers each see a fair share.
+
+        // Burn the caller's MetaVault shares up front. Any idle-asset
+        // payout that lands AFTER the burn is still safe because the
+        // burn is deterministic and the underlying calls are guarded by
+        // the reentrancy modifier on this function.
+        shares[msg.sender] -= metaShares;
+        totalShares = totalSharesBefore - metaShares;
+
+        // Step 1 — pay out the caller's pro-rata share of the idle buffer
+        // first. This uses the pre-burn denominator so the share is
+        // correctly sized against the state the caller saw on entry.
+        uint256 idleShare = (trackedIdle * metaShares) / totalSharesBefore;
+        if (idleShare > 0) {
+            trackedIdle -= idleShare;
+            baseAsset.safeTransfer(msg.sender, idleShare);
+            assetsOut = idleShare;
+        }
+
+        // Step 2 — attempt a pro-rata emergency withdraw from each
+        // underlying KernelVault. The caller receives
+        //   (underlyingKernelVaultSharesOwnedByMetaVault * metaShares /
+        //    totalSharesBefore)
+        // worth of shares from each underlying, routed through the
+        // underlying's `emergencyWithdraw`. Failures on any single
+        // underlying are emitted and skipped so one stuck vault does
+        // not block exits from the rest.
+        uint256 len = underlyingVaults.length;
+        for (uint256 i = 0; i < len; i++) {
+            address vault = underlyingVaults[i];
+            IKernelVaultLike kv = IKernelVaultLike(vault);
+            uint256 kvSharesHeld = kv.shares(address(this));
+            if (kvSharesHeld == 0) continue;
+
+            uint256 kvSharesToBurn = (kvSharesHeld * metaShares) / totalSharesBefore;
+            if (kvSharesToBurn == 0) continue;
+
+            uint256 balBefore = baseAsset.balanceOf(address(this));
+            try this._emergencyWithdrawExternal(vault, kvSharesToBurn) {
+                uint256 delta = baseAsset.balanceOf(address(this)) - balBefore;
+                if (delta > 0) {
+                    baseAsset.safeTransfer(msg.sender, delta);
+                    assetsOut += delta;
+                }
+            } catch {
+                emit UnderlyingWithdrawFailed(vault, kvSharesToBurn);
+            }
+        }
+
+        emit Withdraw(msg.sender, assetsOut, metaShares);
+    }
+
+    /// @notice External wrapper around a single underlying
+    ///         `emergencyWithdraw`, used by `emergencyWithdraw` so it
+    ///         can try/catch each vault independently. Only callable
+    ///         by `this` contract itself.
+    function _emergencyWithdrawExternal(address vault, uint256 shareAmount) external {
+        require(msg.sender == address(this), "only self");
+        IKernelVaultLike(vault).emergencyWithdraw(shareAmount);
+    }
+
     /// @notice Sweep ERC20 donations above the tracked idle to the owner.
     /// @dev M-14: prevents donation NAV inflation. Anyone who transfers baseAsset
     ///      directly to the MetaVault forfeits those funds — the owner can reclaim
     ///      the delta between the true balance and the tracked idle without
     ///      affecting NAV.
+    /// @dev L-51 fix: emit an event so silent admin outflows are observable.
     function sweepDonations() external nonReentrant onlyOwner {
         uint256 actual = baseAsset.balanceOf(address(this));
         if (actual > trackedIdle) {
             uint256 excess = actual - trackedIdle;
             baseAsset.safeTransfer(owner, excess);
+            emit DonationSwept(owner, excess);
         }
     }
 
@@ -295,15 +424,19 @@ contract MetaVault is ReentrancyGuard {
             }
         }
 
-        // L-02 fix: re-read NAV after Phase 1 so Phase 2 deposits are sized against
-        // the actual post-withdraw NAV (which may have shifted due to slippage/ rounding).
-        uint256 navMid = getNav();
-
-        // Phase 2: Deposit to underweight vaults (using post-Phase-1 NAV)
+        // Phase 2: Deposit to underweight vaults. NAV is re-read INSIDE the
+        // loop so each iteration sees the post-deposit state of the previous
+        // iteration rather than a stale snapshot. Without the fresh read, a
+        // deposit to vault A that moves A's allocation upward would leave
+        // the loop's target for vault B computed against a pre-A NAV —
+        // systematically over- or under-allocating B based on which vault
+        // went first. Re-reading per iteration makes the target weights
+        // self-consistent at the moment each deposit actually happens.
         for (uint256 i = 0; i < underlyingVaults.length; i++) {
             address vault = underlyingVaults[i];
+            uint256 navCurrent = getNav();
             uint256 currentValue = _vaultAllocation(vault);
-            uint256 targetValue = (navMid * targetWeights[vault]) / BPS_DENOMINATOR;
+            uint256 targetValue = (navCurrent * targetWeights[vault]) / BPS_DENOMINATOR;
 
             if (currentValue < targetValue) {
                 uint256 deficit = targetValue - currentValue;
@@ -349,6 +482,16 @@ contract MetaVault is ReentrancyGuard {
         IKernelVaultLike kernelVault = IKernelVaultLike(vault);
         if (address(kernelVault.asset()) != address(baseAsset)) {
             revert VaultAssetMismatch(vault);
+        }
+
+        // L-42 fix: ensure the NEW global weight sum does not exceed BPS_DENOMINATOR.
+        // Over-allocation is what permits the rebalance over-withdraw window.
+        uint256 newSum = weightBps;
+        for (uint256 i = 0; i < underlyingVaults.length; i++) {
+            newSum += targetWeights[underlyingVaults[i]];
+        }
+        if (newSum > BPS_DENOMINATOR) {
+            revert WeightSumMismatch(newSum, BPS_DENOMINATOR);
         }
 
         isUnderlyingVault[vault] = true;
@@ -466,6 +609,11 @@ contract MetaVault is ReentrancyGuard {
 
     /// @notice Withdraw deficit from underlying vaults in reverse weight order (heaviest last)
     /// @param deficit Amount of base asset needed beyond idle balance
+    /// @dev L-26 fix: wrap each vault withdrawal in try/catch via an
+    ///      external wrapper so that a single underlying reverting (e.g.
+    ///      because it is strategy-locked) does NOT cascade into a DoS
+    ///      for all MetaVault depositors. Failed vaults are skipped and
+    ///      emitted, remaining deficit is drawn from the next vault.
     function _withdrawFromUnderlyings(uint256 deficit) internal {
         // Withdraw in reverse order of underlyingVaults (reverse weight order)
         uint256 remaining = deficit;
@@ -477,8 +625,11 @@ contract MetaVault is ReentrancyGuard {
             if (allocation == 0) continue;
 
             uint256 toWithdraw = remaining < allocation ? remaining : allocation;
-            uint256 actualOut = _withdrawFromVault(vault, toWithdraw);
-            remaining = actualOut >= remaining ? 0 : remaining - actualOut;
+            try this.withdrawFromVaultExternal(vault, toWithdraw) returns (uint256 actualOut) {
+                remaining = actualOut >= remaining ? 0 : remaining - actualOut;
+            } catch {
+                emit UnderlyingWithdrawFailed(vault, toWithdraw);
+            }
         }
     }
 

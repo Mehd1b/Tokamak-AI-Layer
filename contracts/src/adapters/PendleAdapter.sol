@@ -372,6 +372,10 @@ contract PendleAdapter is ReentrancyGuard {
         emit MarketWhitelistUpdated(vault, market, whitelisted);
     }
 
+    /// @notice Minimum expiry buffer — L-37: prevents `setExpiryBuffer(0)` from
+    ///         silently disabling the pre-expiry guard entirely.
+    uint256 public constant MIN_EXPIRY_BUFFER = 1 hours;
+
     /// @notice Update the expiry buffer for a vault
     /// @dev Only callable by the vault owner
     /// @param vault The vault to configure
@@ -379,6 +383,10 @@ contract PendleAdapter is ReentrancyGuard {
     function setExpiryBuffer(address vault, uint256 newBuffer) external nonReentrant {
         if (!vaultConfigs[vault].registered) revert VaultNotRegistered();
         if (msg.sender != IKernelVaultOwner(vault).owner()) revert NotVaultOwner();
+        // L-37 fix: enforce a minimum buffer so opening positions seconds
+        // before market expiry (where PT/YT redemption math is non-standard)
+        // remains impossible.
+        require(newBuffer >= MIN_EXPIRY_BUFFER, "buffer below min");
 
         vaultConfigs[vault].expiryBuffer = newBuffer;
         emit ExpiryBufferUpdated(vault, newBuffer);
@@ -579,10 +587,18 @@ contract PendleAdapter is ReentrancyGuard {
             })
         });
 
-        // Default approx params for Pendle's iterative solver
+        // Default approx params for Pendle's iterative solver.
+        // L-38 fix: bound `guessMax` proportionally to the caller's minPtOut so
+        // Newton-Raphson cannot diverge over the full uint256 range under
+        // adversarial pool skew (each iteration operates over the full range ⇒
+        // DoS). `minPtOut * 1024` gives the solver 10× search headroom while
+        // capping the per-iteration gas cost.
+        uint256 boundedGuessMax = minPtOut == 0
+            ? tokenAmount * 1024 // fallback to caller-side tokenAmount scale
+            : minPtOut * 1024;
         ApproxParams memory guessParams = ApproxParams({
             guessMin: 0,
-            guessMax: type(uint256).max,
+            guessMax: boundedGuessMax,
             guessOffchain: 0,
             maxIteration: 256,
             eps: 1e15 // 0.1%
@@ -688,9 +704,22 @@ contract PendleAdapter is ReentrancyGuard {
         emit LiquidityRemoved(msg.sender, market, lpAmount, netSyOut, netPtOut);
     }
 
-    /// @notice Claim PENDLE rewards from multiple markets
+    /// @notice Claim PENDLE rewards from multiple markets and forward
+    ///         them to the calling vault.
     /// @param markets Array of Pendle market addresses to claim from
-    function claimRewards(address[] calldata markets)
+    /// @param rewardTokens Reward token contracts to forward to the
+    ///        caller. Typical markets earn in the PENDLE token but some
+    ///        earn in additional reward tokens; all expected reward
+    ///        contracts must be listed here. Any token omitted will
+    ///        remain stranded at the adapter.
+    /// @dev Rewards must land at an address that Pendle recognises as
+    ///      the LP/YT holder, which is this adapter. After the claim,
+    ///      the balance delta for each listed reward token is forwarded
+    ///      to `msg.sender` (the calling vault). Using a snapshot delta
+    ///      prevents the forward step from ever sending more than was
+    ///      just claimed, even if the adapter happens to hold other
+    ///      balances in the same token for unrelated reasons.
+    function claimRewards(address[] calldata markets, address[] calldata rewardTokens)
         external
         nonReentrant
         onlyRegisteredVault
@@ -702,14 +731,38 @@ contract PendleAdapter is ReentrancyGuard {
             }
         }
 
+        // Snapshot reward token balances BEFORE the claim so we can
+        // compute the exact amount produced by THIS claim call and
+        // forward only that delta. This avoids draining unrelated
+        // adapter balances (e.g., dust from prior stranded claims that
+        // pre-dated this fix) and keeps the forwarding step strictly
+        // proportional to the current caller's entitlement.
+        uint256[] memory balancesBefore = new uint256[](rewardTokens.length);
+        for (uint256 i = 0; i < rewardTokens.length; i++) {
+            balancesBefore[i] = IERC20(rewardTokens[i]).balanceOf(address(this));
+        }
+
         // Build empty arrays for SYs and YTs (claim only from markets)
         address[] memory emptySys = new address[](0);
         address[] memory emptyYts = new address[](0);
 
-        // Claim rewards (sent to this adapter, then forwarded to vault)
+        // Claim rewards. Pendle requires the `user` argument to match
+        // the holder of the YT/LP positions, which is this adapter.
         IPendleRouter(pendleRouter).redeemDueInterestAndRewards(
             address(this), emptySys, emptyYts, markets
         );
+
+        // Forward the delta for each listed reward token to the caller.
+        // If the claim produced no delta for a given token (because the
+        // caller had no rewards accumulated in it), the corresponding
+        // transfer is a no-op.
+        for (uint256 i = 0; i < rewardTokens.length; i++) {
+            uint256 balanceAfter = IERC20(rewardTokens[i]).balanceOf(address(this));
+            uint256 delta = balanceAfter - balancesBefore[i];
+            if (delta > 0) {
+                IERC20(rewardTokens[i]).safeTransfer(msg.sender, delta);
+            }
+        }
 
         emit RewardsClaimed(msg.sender, markets);
     }

@@ -128,8 +128,9 @@ contract PermissionlessIntegrationTest is Test {
             "Total shares should be updated (with virtual offset)"
         );
 
-        // Step 4: Execute with valid proof
-        uint256 transferAmount = 50 ether;
+        // Step 4: Execute with valid proof (transfer must respect the
+        //          per-action 40% cap of the current vault balance)
+        uint256 transferAmount = 40 ether;
         bytes memory agentOutput = _buildTransferAction(address(token), recipient, transferAmount);
         bytes32 actionCommitment = sha256(agentOutput);
 

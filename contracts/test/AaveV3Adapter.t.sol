@@ -52,6 +52,36 @@ contract MockERC20Token {
 }
 
 /// @notice Mock Aave V3 Pool that simulates supply/withdraw/borrow/repay
+/// @notice Mock Aave V3 Price Oracle (C-03 fix)
+contract MockPriceOracle {
+    mapping(address => uint256) public prices;
+    uint256 public BASE_CURRENCY_UNIT = 1e8;
+    address public BASE_CURRENCY = address(0); // USD
+
+    function setPrice(address asset, uint256 price) external {
+        prices[asset] = price;
+    }
+
+    function getAssetPrice(address asset) external view returns (uint256) {
+        uint256 p = prices[asset];
+        require(p > 0, "no price");
+        return p;
+    }
+}
+
+/// @notice Mock Aave V3 PoolAddressesProvider (C-03 fix)
+contract MockAddressesProvider {
+    address public priceOracle;
+
+    constructor(address _oracle) {
+        priceOracle = _oracle;
+    }
+
+    function getPriceOracle() external view returns (address) {
+        return priceOracle;
+    }
+}
+
 contract MockPool {
     // Track supplied amounts per (user, asset)
     mapping(address => mapping(address => uint256)) public supplied;
@@ -65,6 +95,17 @@ contract MockPool {
     // Total collateral and debt for getUserAccountData
     uint256 public mockTotalCollateral = 0;
     uint256 public mockTotalDebt = 0;
+
+    // C-03 fix: addresses provider for the price oracle lookup
+    address public _addressesProvider;
+
+    function setAddressesProvider(address provider) external {
+        _addressesProvider = provider;
+    }
+
+    function ADDRESSES_PROVIDER() external view returns (address) {
+        return _addressesProvider;
+    }
 
     function setMockHealthFactor(uint256 hf) external {
         mockHealthFactor = hf;
@@ -204,6 +245,8 @@ contract AaveV3AdapterTest is Test {
 
     AaveV3Adapter public adapter;
     MockPool public mockPool;
+    MockPriceOracle public mockOracle;
+    MockAddressesProvider public mockProvider;
     MockRewardsController public mockRewards;
     MockVaultFactory public mockFactory;
     MockKernelVault public vault;
@@ -228,6 +271,14 @@ contract AaveV3AdapterTest is Test {
         mockPool = new MockPool();
         mockRewards = new MockRewardsController();
         mockFactory = new MockVaultFactory();
+
+        // C-03 fix: deploy oracle + addresses provider and wire them to the pool.
+        // Prices in Aave oracle base units (1e8 = 1 USD). USDC ≈ $1, WETH ≈ $2000.
+        mockOracle = new MockPriceOracle();
+        mockOracle.setPrice(address(usdc), 1e8);
+        mockOracle.setPrice(address(weth), 2000e8);
+        mockProvider = new MockAddressesProvider(address(mockOracle));
+        mockPool.setAddressesProvider(address(mockProvider));
 
         // Deploy adapter
         adapter = new AaveV3Adapter(

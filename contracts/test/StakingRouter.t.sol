@@ -390,8 +390,9 @@ contract StakingRouterTest is Test {
         vm.startPrank(alice);
         wton.approve(address(router), WTON_AMOUNT);
 
+        // I-06 fix: Staked now emits the TON-equivalent (WTON scaled by 1e9).
         vm.expectEmit(true, false, false, true);
-        emit StakingRouter.Staked(alice, 0, WTON_AMOUNT);
+        emit StakingRouter.Staked(alice, WTON_AMOUNT / 1e9, WTON_AMOUNT);
 
         router.stakeFromWTON(WTON_AMOUNT);
         vm.stopPrank();

@@ -338,7 +338,18 @@ contract MockKernelVault {
     }
 
     function callClaimRewards(address adapter, address[] calldata markets) external {
-        PendleAdapter(adapter).claimRewards(markets);
+        // Empty reward token list — test helper just exercises the
+        // adapter's router call; reward forwarding is tested separately.
+        address[] memory emptyRewards = new address[](0);
+        PendleAdapter(adapter).claimRewards(markets, emptyRewards);
+    }
+
+    function callClaimRewardsWithTokens(
+        address adapter,
+        address[] calldata markets,
+        address[] calldata rewardTokens
+    ) external {
+        PendleAdapter(adapter).claimRewards(markets, rewardTokens);
     }
 
     function callWithdrawToVault(address adapter, address market) external {
@@ -1117,19 +1128,16 @@ contract PendleAdapterTest is Test {
         vaultA.callMintPtYt(address(adapter), address(market), address(tokenIn), MINT_AMOUNT);
     }
 
-    function test_expiryGuard_zeroBuffer_allowsAnything() public {
+    function test_expiryGuard_zeroBuffer_rejected() public {
         _registerAndWhitelist();
         _fundVault(MINT_AMOUNT);
 
-        // Set buffer to 0
+        // L-37 fix: setExpiryBuffer(0) is now rejected because zero buffer
+        // would disable the pre-expiry guard entirely and allow positions to
+        // be opened seconds before market expiry (where PT/YT math breaks).
         vm.prank(ownerA);
+        vm.expectRevert(bytes("buffer below min"));
         adapter.setExpiryBuffer(address(vaultA), 0);
-
-        // Set expiry to 1 second from now
-        market.setExpiry(block.timestamp + 1);
-
-        // Should not revert because buffer is 0
-        vaultA.callMintPtYt(address(adapter), address(market), address(tokenIn), MINT_AMOUNT);
     }
 
     function test_expiryGuard_pastExpiry() public {

@@ -351,7 +351,9 @@ contract HyperliquidAdapterTest is Test {
 
     function test_closePosition_revertsIfNotRegistered() public {
         vm.prank(address(vaultA));
-        vm.expectRevert(IHyperliquidAdapter.VaultNotRegistered.selector);
+        // C-05 fix: closePosition is now deprecated unconditionally and
+        // reverts with the deprecation message regardless of registration.
+        vm.expectRevert(bytes("closePosition deprecated: use closePositionAtPrice"));
         adapter.closePosition();
     }
 
@@ -532,43 +534,29 @@ contract HyperliquidAdapterTest is Test {
 
     // ============ closePosition ============
 
-    function test_closePosition_longPosition() public {
+    function test_closePosition_longPosition_deprecated() public {
         _registerVaultA();
 
-        // Set up a long position at the precompile address
-        // The precompile is etched, so we use vm.store to set position
-        MockPerpPositionPrecompile precompile =
-            MockPerpPositionPrecompile(0x0000000000000000000000000000000000000800);
-        vm.store(
-            address(precompile),
-            bytes32(uint256(0)),
-            bytes32(uint256(uint64(1000e8))) // szi = 1000e8 (long)
-        );
-
+        // C-05 fix: closePosition is now DEPRECATED because it used
+        // MIN_PRICE/MAX_PRICE that HyperCore silently drops. Any call reverts.
+        vm.expectRevert(bytes("closePosition deprecated: use closePositionAtPrice"));
         vaultA.callClosePosition(address(adapter));
     }
 
-    function test_closePosition_shortPosition() public {
+    function test_closePosition_shortPosition_deprecated() public {
         _registerVaultA();
 
-        // Set up a short position (negative szi)
-        MockPerpPositionPrecompile precompile =
-            MockPerpPositionPrecompile(0x0000000000000000000000000000000000000800);
-        // Store negative szi: -500e8 as int64 in storage slot 0
-        // int64(-500e8) = -50000000000 = 0xFFFFFFFF4190AB00 in two's complement
-        int64 shortSzi = -500e8;
-        vm.store(
-            address(precompile), bytes32(uint256(0)), bytes32(uint256(uint64(int64(shortSzi))))
-        );
-
+        // C-05 fix: see above — deprecated.
+        vm.expectRevert(bytes("closePosition deprecated: use closePositionAtPrice"));
         vaultA.callClosePosition(address(adapter));
     }
 
-    function test_closePosition_revertsWithNoPosition() public {
+    function test_closePosition_revertsWithNoPosition_deprecated() public {
         _registerVaultA();
 
-        // Default position is zero
-        vm.expectRevert(TradingSubAccount.NoPositionToClose.selector);
+        // C-05 fix: the function is deprecated unconditionally; the revert
+        // message is the deprecation string rather than NoPositionToClose.
+        vm.expectRevert(bytes("closePosition deprecated: use closePositionAtPrice"));
         vaultA.callClosePosition(address(adapter));
     }
 

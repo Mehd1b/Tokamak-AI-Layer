@@ -61,6 +61,23 @@ contract MockERC20Token {
     }
 }
 
+/// @notice Mock Morpho market oracle (C-04 fix)
+/// @dev Matches Morpho Blue's IOracle interface: returns the price of 1 unit
+///      of collateral in loan tokens, scaled by ORACLE_PRICE_SCALE (1e36).
+///      Example: for WETH collateral at $3000 and USDC loan token:
+///        price = 3000 * 1e36 / 1e12 (adjusting for 18-vs-6 decimals)
+contract MockMorphoOracle {
+    uint256 public price;
+
+    constructor(uint256 _price) {
+        price = _price;
+    }
+
+    function setPrice(uint256 _price) external {
+        price = _price;
+    }
+}
+
 /// @notice Mock Morpho Blue protocol for testing
 contract MockMorpho {
     struct Position {
@@ -307,6 +324,10 @@ contract MorphoAdapterTest is Test {
     bytes32 public market1Id;
     bytes32 public market2Id;
 
+    // C-04 fix: real mock oracle for the health check
+    MockMorphoOracle public oracle1;
+    MockMorphoOracle public oracle2;
+
     // LLTV = 80% (0.8e18)
     uint256 public constant LLTV = 0.8e18;
 
@@ -337,11 +358,20 @@ contract MorphoAdapterTest is Test {
         factory.setDeployedVault(address(vaultA), true);
         factory.setDeployedVault(address(vaultB), true);
 
+        // C-04 fix: real mock oracles. Prices assume 1:1 collateral→loan token
+        // (scaled to ORACLE_PRICE_SCALE = 1e36). Tests that need specific
+        // collateral-vs-loan pricing can override via oracle1.setPrice().
+        // For a collateral token with 18 decimals and a loan token with the
+        // same decimals at 1:1, price = 1e36. The existing tests use
+        // simplified unit math, so 1e36 gives parity.
+        oracle1 = new MockMorphoOracle(1e36);
+        oracle2 = new MockMorphoOracle(1e36);
+
         // Set up market params
         market1 = MarketParams({
             loanToken: address(loanToken),
             collateralToken: address(collateralToken),
-            oracle: address(0x1111),
+            oracle: address(oracle1),
             irm: address(0x2222),
             lltv: LLTV
         });
@@ -349,7 +379,7 @@ contract MorphoAdapterTest is Test {
         market2 = MarketParams({
             loanToken: address(loanToken2),
             collateralToken: address(collateralToken),
-            oracle: address(0x1111),
+            oracle: address(oracle2),
             irm: address(0x2222),
             lltv: LLTV
         });

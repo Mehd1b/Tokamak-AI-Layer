@@ -158,15 +158,37 @@ contract KernelVaultExecutionSemanticsTest is Test {
         );
     }
 
-    /// @notice Test: TRANSFER_ERC20 with exact vault balance (drain)
+    /// @notice Test: TRANSFER_ERC20 cannot move more than the per-action cap (40% of vault)
+    /// @dev A single action attempting to drain the full balance must revert to
+    ///      enforce diversified exposure across multiple actions/epochs.
     function test_transferERC20_drainVault() public {
         uint256 vaultBalance = token.balanceOf(address(vault));
+        uint256 maxAmount =
+            (vaultBalance * vault.MAX_CALL_VALUE_BPS()) / vault.BPS_DENOMINATOR();
 
-        bytes memory agentOutput = _buildTransferAction(address(token), recipient, vaultBalance);
-        _executeWithCommitment(agentOutput, 1);
+        // Attempting a full drain reverts with CallValueExceedsLimit
+        bytes memory drainOutput =
+            _buildTransferAction(address(token), recipient, vaultBalance);
+        bytes32 drainCommitment = sha256(drainOutput);
+        mockVerifier.setActionCommitment(drainCommitment);
+        mockVerifier.setExecutionNonce(1);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                KernelVault.CallValueExceedsLimit.selector, vaultBalance, maxAmount
+            )
+        );
+        vault.execute(DUMMY_JOURNAL, DUMMY_SEAL, drainOutput);
 
-        assertEq(token.balanceOf(address(vault)), 0, "vault should be empty");
-        assertEq(token.balanceOf(recipient), vaultBalance, "recipient should receive all");
+        // A transfer at the cap succeeds
+        bytes memory capOutput = _buildTransferAction(address(token), recipient, maxAmount);
+        _executeWithCommitment(capOutput, 1);
+
+        assertEq(
+            token.balanceOf(address(vault)),
+            vaultBalance - maxAmount,
+            "vault should retain residual"
+        );
+        assertEq(token.balanceOf(recipient), maxAmount, "recipient should receive cap");
     }
 
     /// @notice Test: TRANSFER_ERC20 rejects token != vault.asset

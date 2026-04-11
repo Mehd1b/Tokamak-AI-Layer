@@ -276,49 +276,33 @@ contract TradingSubAccount {
         emit OrderSubmitted(perpAsset, isBuy, px, sz, true, TIF_IOC);
     }
 
-    /// @notice Close the full position on this sub-account's perpetual asset
-    /// @dev Reads position via precompile, places reduce-only IOC order at extreme price.
-    ///      WARNING: MIN_PRICE/MAX_PRICE may be outside HyperCore's oracle price band,
-    ///      causing silent rejection. Prefer closePositionAtPrice() with agent-computed price.
-    function executeClose() external onlyAdapter {
-        // 1. Read current position via precompile
-        (bool success, bytes memory result) =
-            PERP_POSITION_PRECOMPILE.staticcall(abi.encode(address(this), uint16(perpAsset)));
+    /// @notice DEPRECATED — C-05 fix: this function used MIN_PRICE/MAX_PRICE which
+    ///         lie outside HyperCore's oracle price band and are silently dropped by
+    ///         the CoreWriter system contract, leaving the EVM side believing the
+    ///         position was closed while HyperCore state is unchanged. Always use
+    ///         `executeCloseAtPrice` (via `closePositionAtPriceAdmin`) with a price
+    ///         inside the oracle band.
+    function executeClose() external view onlyAdapter {
+        revert("executeClose deprecated: use closePositionAtPriceAdmin");
+    }
 
-        if (!success) revert NoPositionToClose();
-
-        // Decode position: struct Position { int64 szi; uint32 leverage; uint64 entryNtl; }
-        (int64 szi,,) = abi.decode(result, (int64, uint32, uint64));
-
-        if (szi == 0) revert NoPositionToClose();
-
-        // 2. Determine close direction and size (in szDecimals format from precompile)
-        bool isBuy;
-        uint64 szRaw; // szDecimals-scaled
-        uint64 px;
-
-        if (szi > 0) {
-            // Long position -> sell to close
-            isBuy = false;
-            szRaw = uint64(szi);
-            px = MIN_PRICE;
-        } else {
-            // Short position -> buy to close
-            isBuy = true;
-            szRaw = uint64(uint256(-int256(szi)));
-            px = MAX_PRICE;
-        }
-
-        // 3. Scale from szDecimals to 1e8 (CoreWriter expects 1e8-scaled sizes)
-        uint64 sz = szRaw * uint64(10 ** (8 - szDecimals));
-
-        // 4. Place reduce-only IOC order via CoreWriter
-        bytes memory encodedAction = abi.encode(perpAsset, isBuy, px, sz, true, TIF_IOC, uint128(0));
-
-        bytes memory data = _packCoreWriterAction(ACTION_LIMIT_ORDER, encodedAction);
-        ICoreWriter(CORE_WRITER).sendRawAction(data);
-
-        emit OrderSubmitted(perpAsset, isBuy, px, sz, true, TIF_IOC);
+    /// @notice C-05 readback: return the current HyperCore position for this
+    ///         sub-account's perp asset. Callers should invoke this AFTER any
+    ///         executeClose / executeOpen flow and compare against the EVM
+    ///         expectation before trusting downstream vault accounting.
+    /// @return szi Signed size (positive=long, negative=short, 0=flat) in szDecimals units
+    /// @return leverage Current leverage setting
+    /// @return entryNtl Entry notional in 1e8 wei units
+    function readPosition()
+        external
+        view
+        returns (int64 szi, uint32 leverage, uint64 entryNtl)
+    {
+        (bool success, bytes memory result) = PERP_POSITION_PRECOMPILE.staticcall(
+            abi.encode(address(this), uint16(perpAsset))
+        );
+        if (!success) return (0, 0, 0);
+        (szi, leverage, entryNtl) = abi.decode(result, (int64, uint32, uint64));
     }
 
     /// @notice Withdraw all USDC from this sub-account to a recipient (the vault)

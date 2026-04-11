@@ -51,9 +51,30 @@ contract MiniERC20 {
 }
 
 /// @dev Mock Aave Pool with supply/withdraw accounting only
+contract MiniAaveOracle {
+    mapping(address => uint256) public prices;
+    function setPrice(address a, uint256 p) external { prices[a] = p; }
+    function getAssetPrice(address a) external view returns (uint256) {
+        uint256 p = prices[a];
+        require(p > 0, "no price");
+        return p;
+    }
+    function BASE_CURRENCY_UNIT() external pure returns (uint256) { return 1e8; }
+}
+
+contract MiniAaveProvider {
+    address public priceOracle;
+    constructor(address o) { priceOracle = o; }
+    function getPriceOracle() external view returns (address) { return priceOracle; }
+}
+
 contract MiniAavePool {
     mapping(address => mapping(address => uint256)) public supplied;
     mapping(address => mapping(address => uint256)) public borrowed;
+    address public _ap;
+
+    function setAddressesProvider(address p) external { _ap = p; }
+    function ADDRESSES_PROVIDER() external view returns (address) { return _ap; }
 
     function supply(address asset, uint256 amount, address onBehalfOf, uint16) external {
         MiniERC20(asset).transferFrom(msg.sender, address(this), amount);
@@ -129,6 +150,12 @@ contract MiniVault {
         require(ok, string(ret));
         return ret;
     }
+}
+
+contract MiniMorphoOracle {
+    uint256 public price;
+    constructor(uint256 p) { price = p; }
+    function setPrice(uint256 p) external { price = p; }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -264,6 +291,13 @@ contract AdapterCrossVaultIsolationTest is Test {
         usdc = new MiniERC20("USDC", "USDC", 6);
         aavePool = new MiniAavePool();
         rewards = new MiniRewards();
+
+        // C-03 fix: wire oracle + addresses provider
+        MiniAaveOracle oracle = new MiniAaveOracle();
+        oracle.setPrice(address(usdc), 1e8); // $1
+        MiniAaveProvider provider = new MiniAaveProvider(address(oracle));
+        aavePool.setAddressesProvider(address(provider));
+
         aave = new AaveV3Adapter(address(aavePool), address(rewards), address(factory), 1.5e18);
 
         vaultA = new MiniVault(OWNER_A);
@@ -302,10 +336,12 @@ contract AdapterCrossVaultIsolationTest is Test {
         vm.prank(OWNER_B);
         morpho.registerVault(address(vaultB));
 
+        // C-04 fix: real oracle that returns 1e36 scale (1:1 loan/collat)
+        MiniMorphoOracle morphoOracle = new MiniMorphoOracle(1e36);
         mkt = MarketParams({
             loanToken: address(loan),
             collateralToken: address(collat),
-            oracle: address(0x1),
+            oracle: address(morphoOracle),
             irm: address(0x2),
             lltv: 0.8e18
         });

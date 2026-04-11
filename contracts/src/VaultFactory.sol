@@ -47,13 +47,58 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     /// @notice Default protocol fee split in basis points (e.g., 1000 = 10%)
     uint256 public defaultProtocolFeeSplitBps;
 
-    /// @notice Storage gap for future upgrades
-    uint256[40] private __gap;
+    // ─────────────────────────────────────────────────────────────────────
+    // UUPS implementation-upgrade timelock state
+    // ─────────────────────────────────────────────────────────────────────
+    // The factory proxy is upgradable by its owner. The previous
+    // `_authorizeUpgrade` implementation was an `onlyOwner` no-op, meaning
+    // a single compromised deployer key could swap the whole factory
+    // implementation in one block. The new pattern requires a candidate
+    // implementation to be scheduled via `scheduleImplementation` and to
+    // sit for at least `UPGRADE_DELAY` before the upgrade transaction can
+    // take effect. This gives depositors and monitoring tooling a visible
+    // window to react to a pending upgrade.
+    // ─────────────────────────────────────────────────────────────────────
+
+    /// @notice Mandatory delay between scheduling and activating a UUPS upgrade.
+    uint256 public constant UPGRADE_DELAY = 48 hours;
+
+    /// @notice Implementation contract currently scheduled for upgrade.
+    address public pendingImplementation;
+
+    /// @notice Earliest `block.timestamp` at which the pending implementation
+    ///         may be activated.
+    uint256 public pendingImplementationActivatesAt;
+
+    /// @notice Proposed owner awaiting acceptance (two-step ownership transfer).
+    address public pendingOwner;
+
+    /// @notice Storage gap for future upgrades. Reduced from 40 → 37 slots
+    ///         to accommodate the new state above.
+    uint256[37] private __gap;
 
     // ============ Errors ============
 
     /// @notice Caller is not the owner
     error OwnableUnauthorizedAccount(address account);
+
+    /// @notice Upgrade attempted without a matching scheduled proposal
+    error UpgradeNotScheduled(address attempted);
+
+    /// @notice Upgrade attempted before the scheduling timelock elapsed
+    error UpgradeTimelockNotElapsed(uint256 currentTime, uint256 activatesAt);
+
+    /// @notice No implementation upgrade is currently pending
+    error NoPendingImplementation();
+
+    /// @notice Ownership acceptance attempted by the wrong caller
+    error NotPendingOwner(address caller, address expected);
+
+    /// @notice No pending ownership transfer exists
+    error NoPendingOwner();
+
+    /// @notice Zero implementation address
+    error ZeroImplementation();
 
     // ============ Events ============
 
@@ -65,6 +110,15 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
 
     /// @notice Emitted when default protocol fee split is updated
     event DefaultProtocolFeeSplitUpdated(uint256 splitBps);
+
+    /// @notice Emitted when a UUPS implementation upgrade is scheduled.
+    event ImplementationScheduled(address indexed implementation, uint256 activatesAt);
+
+    /// @notice Emitted when a scheduled UUPS upgrade is cancelled.
+    event ImplementationCancelled(address indexed implementation);
+
+    /// @notice Emitted when an ownership transfer is proposed.
+    event OwnershipTransferProposed(address indexed currentOwner, address indexed proposedOwner);
 
     // ============ Modifiers ============
 
@@ -112,18 +166,69 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         return _owner;
     }
 
-    /// @notice Transfer ownership to a new address
-    /// @param newOwner The address of the new owner
+    /// @notice Propose a new owner. Completes only when the proposed
+    ///         owner explicitly calls `acceptOwnership`. Pass address(0)
+    ///         to cancel a pending proposal.
+    /// @param newOwner The proposed owner address
     function transferOwnership(address newOwner) external onlyOwner {
-        require(newOwner != address(0), "zero owner");
-        emit OwnershipTransferred(_owner, newOwner);
-        _owner = newOwner;
+        pendingOwner = newOwner;
+        emit OwnershipTransferProposed(_owner, newOwner);
     }
 
-    // ============ UUPS ============
+    /// @notice Accept a pending ownership transfer. Callable only by the
+    ///         proposed owner. Proves they control the key before
+    ///         completing the transfer.
+    function acceptOwnership() external {
+        address proposed = pendingOwner;
+        if (proposed == address(0)) revert NoPendingOwner();
+        if (msg.sender != proposed) revert NotPendingOwner(msg.sender, proposed);
+        address previous = _owner;
+        _owner = proposed;
+        pendingOwner = address(0);
+        emit OwnershipTransferred(previous, proposed);
+    }
 
-    /// @notice Authorize upgrade (only owner)
-    function _authorizeUpgrade(address) internal override onlyOwner { }
+    // ============ UUPS Implementation Upgrade Scheduling ============
+    //
+    // Two-step UUPS upgrades: the owner schedules a candidate
+    // implementation, waits `UPGRADE_DELAY`, then calls `upgradeTo` (or
+    // `upgradeToAndCall`). The upgrade entry points call `_authorizeUpgrade`
+    // which enforces that the exact candidate was scheduled and the
+    // timelock has elapsed. Unscheduled upgrades revert.
+
+    /// @notice Schedule a UUPS implementation upgrade. Overwrites any
+    ///         previously pending upgrade.
+    /// @param newImplementation Implementation contract to schedule.
+    function scheduleImplementation(address newImplementation) external onlyOwner {
+        if (newImplementation == address(0)) revert ZeroImplementation();
+        pendingImplementation = newImplementation;
+        pendingImplementationActivatesAt = block.timestamp + UPGRADE_DELAY;
+        emit ImplementationScheduled(newImplementation, pendingImplementationActivatesAt);
+    }
+
+    /// @notice Cancel a scheduled UUPS upgrade before activation.
+    function cancelImplementation() external onlyOwner {
+        if (pendingImplementation == address(0)) revert NoPendingImplementation();
+        emit ImplementationCancelled(pendingImplementation);
+        pendingImplementation = address(0);
+        pendingImplementationActivatesAt = 0;
+    }
+
+    /// @notice Authorize upgrade (only owner, scheduled, timelocked).
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        // The implementation MUST have been scheduled at least
+        // UPGRADE_DELAY ago. This prevents a single-transaction swap.
+        if (newImplementation != pendingImplementation || newImplementation == address(0)) {
+            revert UpgradeNotScheduled(newImplementation);
+        }
+        if (block.timestamp < pendingImplementationActivatesAt) {
+            revert UpgradeTimelockNotElapsed(block.timestamp, pendingImplementationActivatesAt);
+        }
+        // Clear the pending slot; any subsequent upgrade requires a fresh
+        // schedule + wait.
+        pendingImplementation = address(0);
+        pendingImplementationActivatesAt = 0;
+    }
 
     /// @notice Update the VaultCreationCodeStore (owner only).
     /// @dev Used when KernelVault bytecode changes (e.g., adding rescueTokens).

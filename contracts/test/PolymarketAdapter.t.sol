@@ -62,6 +62,19 @@ contract PolymarketAdapterTest is Test {
         vaultA = new PmVault();
         vaultB = new PmVault();
 
+        // L-39 fix: registerVault now verifies isDeployedVault(vault) on the
+        // factory. Mock the factory to return true for both test vaults.
+        vm.mockCall(
+            factory,
+            abi.encodeWithSignature("isDeployedVault(address)", address(vaultA)),
+            abi.encode(true)
+        );
+        vm.mockCall(
+            factory,
+            abi.encodeWithSignature("isDeployedVault(address)", address(vaultB)),
+            abi.encode(true)
+        );
+
         // Factory registers vaults
         vm.startPrank(factory);
         adapter.registerVault(address(vaultA), bytes32(uint256(1)), address(0x1), address(0x2));

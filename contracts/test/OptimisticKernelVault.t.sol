@@ -37,6 +37,9 @@ contract OptimisticKernelVaultTest is Test {
     uint256 public constant BOND_CHAIN_ID = 1; // Ethereum mainnet
 
     uint256 internal constant ORACLE_PRIVATE_KEY = 0xA11CE;
+    /// @dev C-02 fix: separate key for bond attestation (Role B). Must
+    ///      differ from ORACLE_PRIVATE_KEY so role separation is enforced.
+    uint256 internal constant BOND_PRIVATE_KEY = 0xB0ED;
 
     /// @dev Virtual offset multiplier
     uint256 internal constant OFFSET = 1000;
@@ -69,16 +72,20 @@ contract OptimisticKernelVaultTest is Test {
             0 // challengeWindow: 0 → default
         );
 
-        // Configure oracle signer (needed for bond attestation)
+        // Configure oracle signer (price attestation — Role A)
         address oracleSigner = vm.addr(ORACLE_PRIVATE_KEY);
         // M-10: non-zero maxOracleAge (bond attestation staleness enforced)
         vault.setOracleSigner(oracleSigner, 3600);
 
+        // C-02 fix: configure a separate bond signer (Role B) — distinct key.
+        vault.setBondSigner(vm.addr(BOND_PRIVATE_KEY));
+
+        // C-01 fix: set minBond BEFORE enabling optimistic mode. The enable
+        // gate now requires minBond > 0 to prevent the zero-bond drain path.
+        vault.setMinBond(BOND_AMOUNT);
+
         // Enable optimistic mode
         vault.setOptimisticEnabled(true);
-
-        // Set minBond
-        vault.setMinBond(BOND_AMOUNT);
 
         // Mint tokens to user
         token.mint(user, INITIAL_BALANCE);
@@ -103,6 +110,7 @@ contract OptimisticKernelVaultTest is Test {
     }
 
     /// @dev M-10: helper that signs the new BOND_LOCK_V2 payload including a timestamp.
+    /// @dev C-02: signed with BOND_PRIVATE_KEY (Role B), NOT the oracle key.
     function _signBondAttestationTs(
         address operator,
         address vaultAddr,
@@ -118,7 +126,7 @@ contract OptimisticKernelVaultTest is Test {
         );
         bytes32 ethSignedHash =
             keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", bondHash));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ORACLE_PRIVATE_KEY, ethSignedHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(BOND_PRIVATE_KEY, ethSignedHash);
         return abi.encodePacked(r, s, v);
     }
 

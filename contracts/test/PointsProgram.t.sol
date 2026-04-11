@@ -279,7 +279,8 @@ contract PointsProgramTest is Test {
         // Skip past early adopter period
         vm.warp(block.timestamp + 31 days);
 
-        // Set referrer for user
+        // L-14 fix: setReferrer requires msg.sender == user
+        vm.prank(user);
         points.setReferrer(user, referrer);
 
         // Set deposit balance
@@ -298,18 +299,22 @@ contract PointsProgramTest is Test {
     }
 
     function test_referral_selfReferral_reverts() public {
+        vm.prank(user);
         vm.expectRevert(PointsProgram.SelfReferral.selector);
         points.setReferrer(user, user);
     }
 
     function test_referral_alreadyReferred_reverts() public {
+        vm.prank(user);
         points.setReferrer(user, referrer);
 
+        vm.prank(user);
         vm.expectRevert(PointsProgram.AlreadyReferred.selector);
         points.setReferrer(user, user2);
     }
 
     function test_referral_zeroAddress_reverts() public {
+        vm.prank(user);
         vm.expectRevert(PointsProgram.ZeroAddress.selector);
         points.setReferrer(user, address(0));
     }
@@ -335,21 +340,42 @@ contract PointsProgramTest is Test {
         points.setSeasonEnd(block.timestamp - 1);
     }
 
+    function test_setSeasonEnd_shortNotice_reverts() public {
+        vm.warp(1000);
+        // L-52 fix: setSeasonEnd now requires MIN_SEASON_NOTICE (24h) of lead time
+        vm.expectRevert(bytes("notice too short"));
+        points.setSeasonEnd(block.timestamp + 1 hours);
+    }
+
     function test_setSeasonEnd_notOwner_reverts() public {
         vm.prank(unauthorized);
         vm.expectRevert(PointsProgram.NotOwner.selector);
         points.setSeasonEnd(block.timestamp + 90 days);
     }
 
-    function test_accrual_afterSeasonEnd_reverts() public {
-        points.setSeasonEnd(block.timestamp + 1 days);
+    function test_accrual_afterSeasonEnd_clampsToSeasonEnd() public {
+        // L-30 fix: accruePoints no longer reverts after season end; it clamps
+        // the accrual window to seasonEnd so users can still collect their final
+        // pro-rata points even if they call later.
+        uint256 seasonDuration = 2 days;
+        points.setSeasonEnd(block.timestamp + seasonDuration);
         points.updateDepositBalance(vault, user, DEPOSIT_AMOUNT);
 
-        // Warp past season end
-        vm.warp(block.timestamp + 2 days);
+        uint256 accrualStart = block.timestamp;
+        uint256 sEnd = points.seasonEnd();
 
-        vm.expectRevert(PointsProgram.SeasonEnded.selector);
+        // Warp far past season end
+        vm.warp(block.timestamp + 10 days);
+
         points.accruePoints(vault, user);
+
+        // Expected: accrual window is (sEnd - accrualStart) seconds
+        // Multiplier is 3 (early adopter period still active).
+        uint256 expectedElapsed = sEnd - accrualStart;
+        uint256 multiplier = points.getMultiplier();
+        uint256 expectedPoints =
+            (DEPOSIT_AMOUNT * expectedElapsed * multiplier) / (1e18 * 86400);
+        assertEq(points.getPoints(user), expectedPoints);
     }
 
     // ============ Points Breakdown Tests ============
@@ -358,7 +384,8 @@ contract PointsProgramTest is Test {
         // Skip past early adopter period
         vm.warp(block.timestamp + 31 days);
 
-        // Set referrer
+        // L-14 fix: setReferrer requires msg.sender == user
+        vm.prank(user);
         points.setReferrer(user, referrer);
 
         // Set deposit balance and accrue

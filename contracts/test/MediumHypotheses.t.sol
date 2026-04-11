@@ -266,7 +266,7 @@ contract Test_H11_FeeDilutionDuringStrategy is MediumHypothesesBase {
         vault.depositERC20Tokens(100_000e6);
 
         _executeNoOp(1);
-        _executeTransfer(2, attacker, 50_000e6);
+        _executeTransfer(2, attacker, 40_000e6);
 
         assertTrue(vault.strategyActive(), "strategy must be active");
 
@@ -287,7 +287,7 @@ contract Test_H11_FeeDilutionDuringStrategy is MediumHypothesesBase {
         vault.depositERC20Tokens(100_000e6);
 
         _executeNoOp(1);
-        _executeTransfer(2, attacker, 50_000e6);
+        _executeTransfer(2, attacker, 40_000e6);
 
         uint256 snapAssets = vault.snapshotTotalAssets();
         uint256 totalSharesPre = vault.totalShares();
@@ -593,7 +593,7 @@ contract Test_H28_ManagementFeeAfterLoss is MediumHypothesesBase {
         vault.depositERC20Tokens(100_000e6);
 
         _executeNoOp(1);
-        _executeTransfer(2, attacker, 90_000e6);
+        _executeTransfer(2, attacker, 40_000e6);
         assertTrue(vault.strategyActive(), "strategy active");
 
         // Advance 1 year
@@ -805,7 +805,7 @@ contract MockFactoryWithVault {
 contract Test_H73_SetOptimisticEnabledChecksOracleSigner is MediumHypothesesBase {
     function test_H73_OnlyOracleSignerChecked_NotBondManager() public {
         // M-25 FIX: setOptimisticEnabled now checks BOTH oracleSigner and bondChainId.
-        // Deploy with a VALID bondChainId so only the oracleSigner check matters here.
+        // C-01/C-02 FIX: also requires minBond > 0 AND a distinct bondSigner.
         vm.prank(owner);
         OptimisticKernelVault optVault = new OptimisticKernelVault(
             address(token), address(executionVerifier), TEST_AGENT_ID, TEST_IMAGE_ID, owner, 1, 0
@@ -816,20 +816,40 @@ contract Test_H73_SetOptimisticEnabledChecksOracleSigner is MediumHypothesesBase
         vm.expectRevert(abi.encodeWithSignature("OracleSignerNotSet()"));
         optVault.setOptimisticEnabled(true);
 
-        // Set oracleSigner (bondChainId already set in constructor)
+        // Set oracleSigner
         vm.prank(owner);
         optVault.setOracleSigner(address(0x5001), 24 hours);
 
-        // setOptimisticEnabled now succeeds with both preconditions met
+        // C-01: minBond must be > 0 — still 0, should revert
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSignature("InvalidMinBond()"));
+        optVault.setOptimisticEnabled(true);
+
+        // Set minBond
+        vm.prank(owner);
+        optVault.setMinBond(1 ether);
+
+        // C-02: bondSigner must be set AND distinct from oracleSigner
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSignature("BondSignerNotSet()"));
+        optVault.setOptimisticEnabled(true);
+
+        // Set bondSigner to a distinct address
+        vm.prank(owner);
+        optVault.setBondSigner(address(0x5002));
+
+        // Now setOptimisticEnabled succeeds with all preconditions met
         vm.prank(owner);
         optVault.setOptimisticEnabled(true);
 
-        console2.log("=== M-25 fix: setOptimisticEnabled checks oracleSigner + bondChainId ===");
+        console2.log("=== M-25 + C-01 + C-02: setOptimisticEnabled preconditions ===");
         console2.log("optimisticEnabled:", optVault.optimisticEnabled());
         console2.log("oracleSigner     :", optVault.oracleSigner());
+        console2.log("bondSigner       :", optVault.bondSigner());
+        console2.log("minBond          :", optVault.minBond());
 
         assertTrue(optVault.optimisticEnabled(),
-            "M-25 FIXED: both oracleSigner and bondChainId required");
+            "M-25 + C-01 + C-02: all preconditions enforced");
     }
 }
 

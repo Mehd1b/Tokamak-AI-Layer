@@ -47,8 +47,33 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
     /// @notice Mapping of agent ID to metadata URI (IPFS/HTTPS pointer to JSON)
     mapping(bytes32 => string) internal _agentMetadataURI;
 
-    /// @notice Storage gap for future upgrades
-    uint256[43] private __gap;
+    // ─────────────────────────────────────────────────────────────────────
+    // UUPS implementation-upgrade timelock state
+    // ─────────────────────────────────────────────────────────────────────
+    // The registry proxy's `_authorizeUpgrade` previously only enforced
+    // `onlyOwner`, allowing a single-transaction implementation swap by a
+    // compromised owner key. The new flow requires an upgrade candidate
+    // to be scheduled via `scheduleImplementation` and to sit for at
+    // least `UPGRADE_DELAY` before any `upgradeTo`/`upgradeToAndCall`
+    // call can take effect.
+    // ─────────────────────────────────────────────────────────────────────
+
+    /// @notice Mandatory delay between scheduling and activating a UUPS upgrade.
+    uint256 public constant UPGRADE_DELAY = 48 hours;
+
+    /// @notice Implementation currently scheduled for upgrade.
+    address public pendingImplementation;
+
+    /// @notice Earliest `block.timestamp` at which the pending
+    ///         implementation may be activated.
+    uint256 public pendingImplementationActivatesAt;
+
+    /// @notice Proposed owner awaiting acceptance (two-step ownership transfer).
+    address public pendingOwner;
+
+    /// @notice Storage gap for future upgrades. Reduced from 43 → 40 slots
+    ///         to accommodate the new state above.
+    uint256[40] private __gap;
 
     // ============ Errors ============
 
@@ -58,6 +83,24 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
     /// @notice Too many vaults to check during unregister — empty some vaults first
     error TooManyVaultsToUnregister(bytes32 agentId, uint256 vaultCount, uint256 maxAllowed);
 
+    /// @notice Upgrade attempted without a matching scheduled proposal
+    error UpgradeNotScheduled(address attempted);
+
+    /// @notice Upgrade attempted before the scheduling timelock elapsed
+    error UpgradeTimelockNotElapsed(uint256 currentTime, uint256 activatesAt);
+
+    /// @notice No implementation upgrade is currently pending
+    error NoPendingImplementation();
+
+    /// @notice Ownership acceptance attempted by the wrong caller
+    error NotPendingOwner(address caller, address expected);
+
+    /// @notice No pending ownership transfer exists
+    error NoPendingOwner();
+
+    /// @notice Zero implementation address
+    error ZeroImplementation();
+
     // ============ Events ============
 
     /// @notice Emitted when ownership is transferred
@@ -65,6 +108,15 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
 
     /// @notice Emitted when the factory address is updated
     event FactoryUpdated(address indexed previousFactory, address indexed newFactory);
+
+    /// @notice Emitted when a UUPS implementation upgrade is scheduled.
+    event ImplementationScheduled(address indexed implementation, uint256 activatesAt);
+
+    /// @notice Emitted when a scheduled UUPS upgrade is cancelled.
+    event ImplementationCancelled(address indexed implementation);
+
+    /// @notice Emitted when an ownership transfer is proposed.
+    event OwnershipTransferProposed(address indexed currentOwner, address indexed proposedOwner);
 
     // ============ Modifiers ============
 
@@ -98,12 +150,25 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
         return _owner;
     }
 
-    /// @notice Transfer ownership to a new address
-    /// @param newOwner The address of the new owner
+    /// @notice Propose a new owner. Completes only when the proposed
+    ///         owner explicitly calls `acceptOwnership`. Pass address(0)
+    ///         to cancel a pending proposal.
+    /// @param newOwner The proposed owner address
     function transferOwnership(address newOwner) external onlyOwner {
-        require(newOwner != address(0), "zero owner");
-        emit OwnershipTransferred(_owner, newOwner);
-        _owner = newOwner;
+        pendingOwner = newOwner;
+        emit OwnershipTransferProposed(_owner, newOwner);
+    }
+
+    /// @notice Accept a pending ownership transfer. Callable only by
+    ///         the proposed owner.
+    function acceptOwnership() external {
+        address proposed = pendingOwner;
+        if (proposed == address(0)) revert NoPendingOwner();
+        if (msg.sender != proposed) revert NotPendingOwner(msg.sender, proposed);
+        address previous = _owner;
+        _owner = proposed;
+        pendingOwner = address(0);
+        emit OwnershipTransferred(previous, proposed);
     }
 
     /// @notice Returns the VaultFactory address
@@ -120,10 +185,40 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
         emit FactoryUpdated(previous, factory_);
     }
 
-    // ============ UUPS ============
+    // ============ UUPS Implementation Upgrade Scheduling ============
 
-    /// @notice Authorize upgrade (only owner)
-    function _authorizeUpgrade(address) internal override onlyOwner { }
+    /// @notice Schedule a UUPS implementation upgrade. Overwrites any
+    ///         previously pending upgrade.
+    /// @param newImplementation Implementation contract to schedule.
+    function scheduleImplementation(address newImplementation) external onlyOwner {
+        if (newImplementation == address(0)) revert ZeroImplementation();
+        pendingImplementation = newImplementation;
+        pendingImplementationActivatesAt = block.timestamp + UPGRADE_DELAY;
+        emit ImplementationScheduled(newImplementation, pendingImplementationActivatesAt);
+    }
+
+    /// @notice Cancel a scheduled UUPS upgrade before activation.
+    function cancelImplementation() external onlyOwner {
+        if (pendingImplementation == address(0)) revert NoPendingImplementation();
+        emit ImplementationCancelled(pendingImplementation);
+        pendingImplementation = address(0);
+        pendingImplementationActivatesAt = 0;
+    }
+
+    /// @notice Authorize upgrade (only owner, scheduled, timelocked).
+    ///         An implementation MUST have been scheduled via
+    ///         `scheduleImplementation` and the `UPGRADE_DELAY` must
+    ///         have elapsed before an upgrade transaction can succeed.
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        if (newImplementation != pendingImplementation || newImplementation == address(0)) {
+            revert UpgradeNotScheduled(newImplementation);
+        }
+        if (block.timestamp < pendingImplementationActivatesAt) {
+            revert UpgradeTimelockNotElapsed(block.timestamp, pendingImplementationActivatesAt);
+        }
+        pendingImplementation = address(0);
+        pendingImplementationActivatesAt = 0;
+    }
 
     // ============ External Functions ============
 
@@ -284,6 +379,10 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
     }
 
     /// @inheritdoc IAgentRegistry
+    /// @dev L-45 fix: walk the successor chain to reject multi-hop cycles.
+    ///      Previously only direct self-loops (`A → A`) were blocked, so
+    ///      `setSuccessor(A, B)` followed by `setSuccessor(B, A)` created
+    ///      an unbounded traversal for any consumer following successor links.
     function setSuccessor(bytes32 agentId, bytes32 successorAgentId) external {
         AgentInfo storage agent = _agents[agentId];
         if (!agent.exists) revert AgentNotFound(agentId);
@@ -291,6 +390,17 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
         if (!_deprecated[agentId]) revert AgentNotDeprecated(agentId);
         if (!_agents[successorAgentId].exists) revert SuccessorDoesNotExist(successorAgentId);
         if (agentId == successorAgentId) revert CannotSucceedSelf(agentId);
+
+        // L-45: cycle detection — walk the successor chain starting at the
+        // proposed successor and abort if we encounter `agentId`.
+        bytes32 current = successorAgentId;
+        uint256 maxDepth = 64; // hard cap to bound gas
+        for (uint256 i = 0; i < maxDepth; i++) {
+            bytes32 next = _successors[current];
+            if (next == bytes32(0)) break;
+            if (next == agentId) revert CannotSucceedSelf(agentId);
+            current = next;
+        }
 
         _successors[agentId] = successorAgentId;
 

@@ -152,10 +152,37 @@ contract MockMorphoBlue {
 }
 
 /// @notice Mock Aave V3 Pool - uses same units for collateral and debt (like real Aave base currency)
+contract MockVCHMorphoOracle {
+    uint256 public price;
+    constructor(uint256 p) { price = p; }
+    function setPrice(uint256 p) external { price = p; }
+}
+
+contract MockAaveOracleVCH {
+    mapping(address => uint256) public prices;
+    function setPrice(address a, uint256 p) external { prices[a] = p; }
+    function getAssetPrice(address a) external view returns (uint256) {
+        uint256 p = prices[a];
+        require(p > 0, "no price");
+        return p;
+    }
+    function BASE_CURRENCY_UNIT() external pure returns (uint256) { return 1e8; }
+}
+
+contract MockAaveProviderVCH {
+    address public priceOracle;
+    constructor(address o) { priceOracle = o; }
+    function getPriceOracle() external view returns (address) { return priceOracle; }
+}
+
 contract MockAavePool {
     mapping(address => mapping(address => uint256)) public aTokenBalance;
     mapping(address => uint256) public totalCollateral;
     mapping(address => uint256) public totalDebt;
+    address public _ap;
+
+    function setAddressesProvider(address p) external { _ap = p; }
+    function ADDRESSES_PROVIDER() external view returns (address) { return _ap; }
 
     function supply(address asset, uint256 amount, address onBehalfOf, uint16) external {
         MockToken(asset).transferFrom(msg.sender, address(this), amount);
@@ -325,10 +352,12 @@ contract Test_H2_MorphoAdapter_CrossVaultDrain is Test {
         vm.prank(ownerB);
         adapter.registerVault(address(vaultB));
 
+        // C-04 fix: real oracle
+        MockVCHMorphoOracle _morphoOracle = new MockVCHMorphoOracle(1e36);
         market = MarketParams({
             loanToken: address(loanToken),
             collateralToken: address(collateralToken),
-            oracle: address(0x1234),
+            oracle: address(_morphoOracle),
             irm: address(0x5678),
             lltv: 0.8e18
         });
@@ -400,6 +429,12 @@ contract Test_H3_AaveV3Adapter_CrossVaultBorrow is Test {
         pool = new MockAavePool();
         rewards = new MockRewardsController();
         factory = new MockFactory();
+
+        // C-03 fix: oracle + provider
+        MockAaveOracleVCH _oracle = new MockAaveOracleVCH();
+        _oracle.setPrice(address(tokenUSDC), 1e8);
+        MockAaveProviderVCH _provider = new MockAaveProviderVCH(address(_oracle));
+        pool.setAddressesProvider(address(_provider));
 
         adapter = new AaveV3Adapter(
             address(pool), address(rewards), address(factory), 1.5e18
@@ -593,6 +628,10 @@ contract Test_H4_PolymarketAdapter_USDCDrain is Test {
 
         vaultA = new MockVault(address(0xA004));
         vaultB = new MockVault(address(0xB004));
+
+        // L-39 fix: registerVault now verifies the vault is factory-deployed
+        factory.setDeployedVault(address(vaultA), true);
+        factory.setDeployedVault(address(vaultB), true);
 
         adapter.registerVault(address(vaultA), bytes32(uint256(1)), address(0x1111), address(0x2222));
         adapter.registerVault(address(vaultB), bytes32(uint256(2)), address(0x3333), address(0x4444));

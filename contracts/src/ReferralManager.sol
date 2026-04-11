@@ -51,6 +51,9 @@ contract ReferralManager {
     /// @notice Emitted when ownership is transferred
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
+    /// @notice L-51: emitted when an authorized recorder is added or removed
+    event AuthorizedRecorderSet(address indexed recorder, bool allowed);
+
     // ============ Errors ============
 
     /// @notice Caller is not the owner
@@ -119,8 +122,11 @@ contract ReferralManager {
     }
 
     /// @notice Authorize or revoke a recorder (L-11)
+    /// @dev L-51 fix: emit an event so off-chain monitoring can audit the
+    ///      authorized recorder set.
     function setAuthorizedRecorder(address recorder, bool allowed) external onlyOwner {
         authorizedRecorders[recorder] = allowed;
+        emit AuthorizedRecorderSet(recorder, allowed);
     }
 
     /// @notice Record a referred deposit. L-11: only authorized recorders (vaults,

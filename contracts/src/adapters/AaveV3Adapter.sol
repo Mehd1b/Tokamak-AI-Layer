@@ -39,6 +39,27 @@ interface IPool {
             uint256 ltv,
             uint256 healthFactor
         );
+    function ADDRESSES_PROVIDER() external view returns (address);
+}
+
+/// @title IPoolAddressesProvider
+/// @notice Minimal Aave V3 addresses provider — used to locate the price oracle
+interface IPoolAddressesProvider {
+    function getPriceOracle() external view returns (address);
+}
+
+/// @title IPriceOracleGetter
+/// @notice Aave V3 price oracle interface — returns asset prices in base currency
+interface IPriceOracleGetter {
+    function getAssetPrice(address asset) external view returns (uint256);
+    function BASE_CURRENCY() external view returns (address);
+    function BASE_CURRENCY_UNIT() external view returns (uint256);
+}
+
+/// @title IERC20Decimals
+/// @notice Minimal interface to read ERC-20 decimals for normalisation
+interface IERC20Decimals {
+    function decimals() external view returns (uint8);
 }
 
 /// @title IRewardsController
@@ -130,6 +151,21 @@ contract AaveV3Adapter is IAaveV3Adapter, ReentrancyGuard {
 
     /// @notice Per-vault borrowed amount per asset.
     mapping(address vault => mapping(address asset => uint256)) internal _vaultBorrowed;
+
+    /// @notice C-03 support: list of assets the vault has outstanding borrows in.
+    ///         Needed so `_checkVaultHealth` can enumerate borrows even when
+    ///         the asset is not in `_suppliedAssets` (borrowing without
+    ///         supplying the same asset).
+    mapping(address vault => address[]) internal _borrowedAssets;
+
+    /// @notice C-03 support: whether an asset is already tracked in `_borrowedAssets[vault]`
+    mapping(address vault => mapping(address asset => bool)) internal _borrowedAssetTracked;
+
+    // ============ Events (not in interface) ============
+
+    /// @notice L-08: emitted when emergency withdrawToVault clears a non-zero
+    ///         tracked borrow without repaying the underlying debt on Aave.
+    event BorrowForfeited(address indexed vault, address indexed asset, uint256 amount);
 
     // ============ Modifiers ============
 
@@ -288,13 +324,36 @@ contract AaveV3Adapter is IAaveV3Adapter, ReentrancyGuard {
         if (toWithdraw > tracked) {
             revert InsufficientVaultPosition(toWithdraw, tracked);
         }
-        _vaultSupplied[msg.sender][asset] = tracked - toWithdraw;
+        uint256 newTracked = tracked - toWithdraw;
+        _vaultSupplied[msg.sender][asset] = newTracked;
 
         // Withdraw from Aave Pool directly to the vault (msg.sender)
         uint256 withdrawn = pool.withdraw(asset, toWithdraw, msg.sender);
         if (withdrawn == 0) revert WithdrawFailed();
 
+        // L-44 fix: when the tracked supply drops to zero AND there is no
+        // outstanding borrow for the asset, swap-and-pop the entry from
+        // `_suppliedAssets` so the array does not grow monotonically and
+        // eventually exceed the per-call gas budget.
+        if (newTracked == 0 && _vaultBorrowed[msg.sender][asset] == 0) {
+            _removeSuppliedAsset(msg.sender, asset);
+        }
+
         emit Withdrawn(msg.sender, asset, withdrawn);
+    }
+
+    /// @notice L-44 helper: swap-and-pop an asset from the supplied list
+    function _removeSuppliedAsset(address vault, address asset) internal {
+        address[] storage assets = _suppliedAssets[vault];
+        uint256 length = assets.length;
+        for (uint256 i = 0; i < length; i++) {
+            if (assets[i] == asset) {
+                assets[i] = assets[length - 1];
+                assets.pop();
+                _assetTracked[vault][asset] = false;
+                return;
+            }
+        }
     }
 
     /// @inheritdoc IAaveV3Adapter
@@ -311,6 +370,12 @@ contract AaveV3Adapter is IAaveV3Adapter, ReentrancyGuard {
         // per-vault health check operates on the CALLER's own tracked position, not the
         // adapter's aggregate (the C-02 root cause).
         _vaultBorrowed[msg.sender][asset] += amount;
+
+        // C-03: track borrowed-only assets so the health check can enumerate them
+        if (!_borrowedAssetTracked[msg.sender][asset]) {
+            _borrowedAssets[msg.sender].push(asset);
+            _borrowedAssetTracked[msg.sender][asset] = true;
+        }
 
         // Borrow from Aave Pool on behalf of this adapter
         pool.borrow(asset, amount, rateMode, 0, address(this));
@@ -355,9 +420,29 @@ contract AaveV3Adapter is IAaveV3Adapter, ReentrancyGuard {
         // Repay debt on Aave Pool
         pool.repay(asset, toRepay, rateMode, address(this));
 
-        _vaultBorrowed[msg.sender][asset] = trackedBorrow - toRepay;
+        uint256 newBorrow = trackedBorrow - toRepay;
+        _vaultBorrowed[msg.sender][asset] = newBorrow;
+
+        // C-03: remove from _borrowedAssets when fully repaid
+        if (newBorrow == 0) {
+            _removeBorrowedAsset(msg.sender, asset);
+        }
 
         emit Repaid(msg.sender, asset, toRepay, rateMode);
+    }
+
+    /// @notice C-03 helper: swap-and-pop the asset from _borrowedAssets
+    function _removeBorrowedAsset(address vault, address asset) internal {
+        address[] storage list = _borrowedAssets[vault];
+        uint256 len = list.length;
+        for (uint256 i = 0; i < len; i++) {
+            if (list[i] == asset) {
+                list[i] = list[len - 1];
+                list.pop();
+                _borrowedAssetTracked[vault][asset] = false;
+                return;
+            }
+        }
     }
 
     /// @inheritdoc IAaveV3Adapter
@@ -381,6 +466,13 @@ contract AaveV3Adapter is IAaveV3Adapter, ReentrancyGuard {
     }
 
     /// @inheritdoc IAaveV3Adapter
+    /// @dev L-08 fix: emergency withdrawToVault now also clears stale
+    ///      `_vaultBorrowed` entries so the vault is NOT permanently bricked
+    ///      by a ghost debt record after an emergency exit. Outstanding debt
+    ///      on Aave is not settled by this function (the adapter cannot know
+    ///      how the underlying is to be unwound); if a non-zero borrow is
+    ///      cleared we emit `BorrowForfeited` so the off-chain monitor can
+    ///      reconcile. Use `repay` before `withdrawToVault` for a clean exit.
     function withdrawToVault() external override nonReentrant onlyRegisteredVault {
         address[] memory assets = _suppliedAssets[msg.sender];
 
@@ -390,19 +482,42 @@ contract AaveV3Adapter is IAaveV3Adapter, ReentrancyGuard {
             // Only withdraw the calling vault's TRACKED position — this is the core
             // isolation guarantee that prevents cross-vault emergency drains.
             uint256 tracked = _vaultSupplied[msg.sender][asset];
-            if (tracked == 0) continue;
+            if (tracked > 0) {
+                _vaultSupplied[msg.sender][asset] = 0;
 
-            _vaultSupplied[msg.sender][asset] = 0;
+                // Withdraw from the pool to the calling vault. We use the tracked amount
+                // rather than type(uint256).max because max would drain other vaults too.
+                try pool.withdraw(asset, tracked, msg.sender) returns (uint256) {
+                    // Success — asset withdrawn
+                } catch {
+                    // On failure, restore the tracked balance so the user may retry.
+                    _vaultSupplied[msg.sender][asset] = tracked;
+                }
+            }
 
-            // Withdraw from the pool to the calling vault. We use the tracked amount
-            // rather than type(uint256).max because max would drain other vaults too.
-            try pool.withdraw(asset, tracked, msg.sender) returns (uint256) {
-                // Success — asset withdrawn
-            } catch {
-                // On failure, restore the tracked balance so the user may retry.
-                _vaultSupplied[msg.sender][asset] = tracked;
+            // L-08: clear any lingering `_vaultBorrowed` tracking for this vault so
+            // subsequent `_checkVaultHealth` calls do not revert with a stale debt
+            // against a zeroed supply (which would brick the vault forever).
+            uint256 trackedBorrow = _vaultBorrowed[msg.sender][asset];
+            if (trackedBorrow > 0) {
+                _vaultBorrowed[msg.sender][asset] = 0;
+                emit BorrowForfeited(msg.sender, asset, trackedBorrow);
             }
         }
+
+        // C-03: also clear borrowed-only assets (those never supplied) so the
+        // _borrowedAssets array doesn't leak stale debt references.
+        address[] memory borrowedOnly = _borrowedAssets[msg.sender];
+        for (uint256 i = 0; i < borrowedOnly.length; i++) {
+            address asset = borrowedOnly[i];
+            uint256 trackedBorrow = _vaultBorrowed[msg.sender][asset];
+            if (trackedBorrow > 0) {
+                _vaultBorrowed[msg.sender][asset] = 0;
+                emit BorrowForfeited(msg.sender, asset, trackedBorrow);
+            }
+            _borrowedAssetTracked[msg.sender][asset] = false;
+        }
+        delete _borrowedAssets[msg.sender];
 
         emit EmergencyWithdrawn(msg.sender);
     }
@@ -445,32 +560,68 @@ contract AaveV3Adapter is IAaveV3Adapter, ReentrancyGuard {
     // ============ Internal Functions ============
 
     /// @notice Per-vault health check operating on TRACKED positions only.
-    /// @dev Prevents the C-02 class of attack where a vault could borrow against
-    ///      another vault's collateral because the old aggregate health check
-    ///      validated the adapter's combined position.
+    /// @dev C-03 fix: normalise each asset through Aave's own price oracle and
+    ///      the asset's decimal scale BEFORE aggregating. Previously the check
+    ///      summed raw units 1:1 across heterogeneous assets, which let a vault
+    ///      stack cheap 18-decimal collateral to mint expensive 8-decimal debt
+    ///      (the H-02 decimal mismatch PoC).
     ///
-    ///      Notes on the simplified nominal check:
-    ///      - Values are summed with the 1:1-unit assumption across the vault's
-    ///        allowlisted assets (the vault owner picks the asset set).
-    ///      - Oracle-priced health would be more precise but requires a trusted
-    ///        price feed per asset; that is a future hardening step. This check
-    ///        is strictly more restrictive than the previous aggregate check
-    ///        for the cross-vault attack scenarios.
+    ///      Math:
+    ///        assetValueBase = rawAmount * price / 10**decimals
+    ///      All values are in the Aave oracle's base currency (USD or ETH with
+    ///      BASE_CURRENCY_UNIT scale, typically 1e8 for USD). The ratio
+    ///      `supplied/borrowed` is dimensionless so the scale cancels.
     function _checkVaultHealth(address vault) internal view {
-        address[] memory assets = _suppliedAssets[vault];
+        address[] memory supplied = _suppliedAssets[vault];
+        address[] memory borrowedOnly = _borrowedAssets[vault];
+        uint256 supLen = supplied.length;
+        uint256 borLen = borrowedOnly.length;
+        if (supLen == 0 && borLen == 0) return;
 
-        uint256 totalSupplied;
-        uint256 totalBorrowed;
-        uint256 length = assets.length;
-        for (uint256 i = 0; i < length; i++) {
-            totalSupplied += _vaultSupplied[vault][assets[i]];
-            totalBorrowed += _vaultBorrowed[vault][assets[i]];
+        IPriceOracleGetter oracle = IPriceOracleGetter(
+            IPoolAddressesProvider(pool.ADDRESSES_PROVIDER()).getPriceOracle()
+        );
+
+        uint256 totalSuppliedBase;
+        uint256 totalBorrowedBase;
+
+        // Phase 1: enumerate every asset the vault has SUPPLIED (collateral
+        // contribution) and include any borrow of the same asset.
+        for (uint256 i = 0; i < supLen; i++) {
+            address asset = supplied[i];
+            uint256 sAmt = _vaultSupplied[vault][asset];
+            uint256 bAmt = _vaultBorrowed[vault][asset];
+            if (sAmt == 0 && bAmt == 0) continue;
+
+            uint256 price = oracle.getAssetPrice(asset);
+            require(price > 0, "zero oracle price");
+            uint256 unit = 10 ** IERC20Decimals(asset).decimals();
+
+            if (sAmt > 0) totalSuppliedBase += (sAmt * price) / unit;
+            if (bAmt > 0) totalBorrowedBase += (bAmt * price) / unit;
         }
 
-        if (totalBorrowed == 0) return;
+        // Phase 2: enumerate assets that were BORROWED WITHOUT being supplied.
+        // These must still count toward totalBorrowedBase; otherwise a vault
+        // could borrow asset X without supplying X and the health check would
+        // silently exclude the debt.
+        for (uint256 i = 0; i < borLen; i++) {
+            address asset = borrowedOnly[i];
+            // Skip if already counted in phase 1 (asset appears in both lists)
+            if (_assetTracked[vault][asset]) continue;
 
-        // Compute nominal health: (supplied * 1e18) / borrowed
-        uint256 nominalHealth = (totalSupplied * 1e18) / totalBorrowed;
+            uint256 bAmt = _vaultBorrowed[vault][asset];
+            if (bAmt == 0) continue;
+
+            uint256 price = oracle.getAssetPrice(asset);
+            require(price > 0, "zero oracle price");
+            uint256 unit = 10 ** IERC20Decimals(asset).decimals();
+            totalBorrowedBase += (bAmt * price) / unit;
+        }
+
+        if (totalBorrowedBase == 0) return;
+
+        uint256 nominalHealth = (totalSuppliedBase * 1e18) / totalBorrowedBase;
         if (nominalHealth < minHealthFactor) {
             revert HealthFactorTooLow(nominalHealth, minHealthFactor);
         }

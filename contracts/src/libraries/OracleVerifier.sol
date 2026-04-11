@@ -29,6 +29,11 @@ library OracleVerifier {
     // ============ Functions ============
 
     /// @notice Verify an ECDSA signature over a feed hash (view, does not revert)
+    /// @dev L-23 / I-05 fix: this public variant is dead code in the current
+    ///      codebase — consumers use `requireValidOracleSignature` or the
+    ///      bound variant. Changed to `internal` so it cannot be called
+    ///      externally (which would create a cross-path signature replay
+    ///      vector relative to the revert-style path).
     /// @param feedHash SHA-256 hash of the oracle price feed body
     /// @param signature 65-byte ECDSA signature (r[32] || s[32] || v[1])
     /// @param expectedSigner The trusted oracle signer address
@@ -45,15 +50,16 @@ library OracleVerifier {
         uint256 chainId,
         address vaultAddress,
         uint64 maxOracleAge
-    ) public view returns (bool) {
+    ) internal view returns (bool) {
         if (signature.length != 65) return false;
 
         // Check freshness (guard against future timestamps to prevent underflow)
+        // I-05 fix: strict `>=` so `age == maxAge` is rejected (the intent of the check).
         if (
             maxOracleAge > 0
                 && (
                     oracleTimestamp > block.timestamp
-                        || block.timestamp - oracleTimestamp > maxOracleAge
+                        || block.timestamp - oracleTimestamp >= maxOracleAge
                 )
         ) return false;
 
@@ -123,11 +129,12 @@ library OracleVerifier {
         }
 
         // Staleness check (guard against future timestamps to prevent underflow)
+        // I-05 fix: use `>=` for strict freshness.
         if (
             maxAge > 0
                 && (
                     attestationTs > block.timestamp
-                        || block.timestamp - attestationTs > maxAge
+                        || block.timestamp - attestationTs >= maxAge
                 )
         ) {
             revert BondAttestationStale(attestationTs, maxAge, block.timestamp);
@@ -213,11 +220,13 @@ library OracleVerifier {
         }
 
         // Check freshness (guard against future timestamps to prevent underflow)
+        // I-05 fix: use `>=` so `age == maxAge` is rejected, matching the
+        // intent of the check (data strictly younger than maxAge is accepted).
         if (
             maxOracleAge > 0
                 && (
                     oracleTimestamp > block.timestamp
-                        || block.timestamp - oracleTimestamp > maxOracleAge
+                        || block.timestamp - oracleTimestamp >= maxOracleAge
                 )
         ) {
             revert OracleDataStale(oracleTimestamp, maxOracleAge, block.timestamp);

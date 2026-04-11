@@ -3,6 +3,8 @@ pragma solidity ^0.8.24;
 
 import { IVaultFactory } from "../interfaces/IVaultFactory.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 // ============================================================================
 // Lido Protocol Interfaces
@@ -66,6 +68,8 @@ interface IKernelVaultOwner {
 ///      - Vault registration is permissioned: only vault owner + factory-deployed vaults
 ///      - Minimum stake amount enforced to prevent dust deposits
 contract LidoAdapter is ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     // ============ Constants ============
 
     /// @notice Minimum ETH amount for staking (0.01 ETH)
@@ -260,6 +264,13 @@ contract LidoAdapter is ReentrancyGuard {
         // Update per-vault tracking
         vaultStETHBalance[msg.sender] -= stethAmount;
         vaultWstETHBalance[msg.sender] += actualReceived;
+        // L-01 fix: symmetric decrement — stETH is leaving the stETH tracking
+        // (being converted to wstETH), so the aggregate denominator must shrink.
+        if (stethAmount > totalTrackedStETH) {
+            totalTrackedStETH = 0;
+        } else {
+            totalTrackedStETH -= stethAmount;
+        }
 
         emit StETHWrapped(msg.sender, stethAmount, actualReceived);
     }
@@ -283,6 +294,10 @@ contract LidoAdapter is ReentrancyGuard {
         // Update per-vault tracking
         vaultWstETHBalance[msg.sender] -= wstethAmount;
         vaultStETHBalance[msg.sender] += actualReceived;
+        // L-01 fix: symmetric increment — stETH is re-entering the stETH
+        // tracking via the unwrap path, so the aggregate denominator must
+        // grow by the actual amount received.
+        totalTrackedStETH += actualReceived;
 
         emit WstETHUnwrapped(msg.sender, wstethAmount, actualReceived);
     }
@@ -310,6 +325,14 @@ contract LidoAdapter is ReentrancyGuard {
 
         // Update tracking
         vaultStETHBalance[msg.sender] -= totalAmount;
+        // L-01 fix: stETH is leaving the adapter balance at request time (locked
+        // in the Lido withdrawal queue), so the aggregate denominator must also
+        // shrink or subsequent `vaultStETHShare` reads will understate claims.
+        if (totalAmount > totalTrackedStETH) {
+            totalTrackedStETH = 0;
+        } else {
+            totalTrackedStETH -= totalAmount;
+        }
         for (uint256 i = 0; i < requestIds.length; i++) {
             _vaultWithdrawalRequestIds[msg.sender].push(requestIds[i]);
         }
@@ -343,6 +366,12 @@ contract LidoAdapter is ReentrancyGuard {
         IWithdrawalQueue(withdrawalQueue).claimWithdrawal(requestId);
         uint256 ethReceived = address(this).balance - ethBefore;
 
+        // L-48 fix: if the withdrawal claim returns zero ETH (edge case, e.g.
+        // the request was never fulfillable), revert so we do not silently
+        // leave the vault with neither stETH nor ETH while the request is
+        // irretrievably removed from tracking.
+        require(ethReceived > 0, "zero ETH received");
+
         // Send ETH to vault
         (bool success,) = msg.sender.call{ value: ethReceived }("");
         if (!success) revert ETHTransferFailed();
@@ -365,6 +394,9 @@ contract LidoAdapter is ReentrancyGuard {
         vaultWstETHBalance[msg.sender] = 0;
 
         // Transfer stETH to vault
+        // L-48 fix: use SafeERC20.safeTransfer instead of raw `transfer` so
+        // non-compliant return values (stETH does not always revert on failure)
+        // are caught and revert explicitly.
         uint256 stETHReturned;
         if (stETHAmount > 0) {
             // Due to stETH rebasing, the actual transferable amount may differ by 1-2 wei.
@@ -372,7 +404,13 @@ contract LidoAdapter is ReentrancyGuard {
             uint256 actualStETH = ILido(lido).balanceOf(address(this));
             stETHReturned = stETHAmount > actualStETH ? actualStETH : stETHAmount;
             if (stETHReturned > 0) {
-                ILido(lido).transfer(msg.sender, stETHReturned);
+                IERC20(lido).safeTransfer(msg.sender, stETHReturned);
+            }
+            // Keep aggregate tracking in sync with the actual transferred amount.
+            if (stETHReturned > totalTrackedStETH) {
+                totalTrackedStETH = 0;
+            } else {
+                totalTrackedStETH -= stETHReturned;
             }
         }
 
@@ -382,7 +420,7 @@ contract LidoAdapter is ReentrancyGuard {
             uint256 actualWstETH = IWstETH(wstETH).balanceOf(address(this));
             wstETHReturned = wstETHAmount > actualWstETH ? actualWstETH : wstETHAmount;
             if (wstETHReturned > 0) {
-                IWstETH(wstETH).transfer(msg.sender, wstETHReturned);
+                IERC20(wstETH).safeTransfer(msg.sender, wstETHReturned);
             }
         }
 
@@ -409,4 +447,24 @@ contract LidoAdapter is ReentrancyGuard {
 
     /// @notice Accept ETH from Lido withdrawal claims
     receive() external payable { }
+
+    // ============ Rescue ============
+
+    /// @notice I-02 fix: owner-gated sweep for ETH that landed here outside the
+    ///         `claimWithdrawal` flow (accidental transfers, selfdestruct
+    ///         forwarding, etc.). The adapter has no on-chain owner variable
+    ///         beyond the factory registration — we delegate authority to the
+    ///         factory owner who can call this via a proxy or governance.
+    /// @dev Only rescuable ETH is the balance that is NOT immediately being
+    ///      returned to a vault by `claimWithdrawal`, which is an atomic
+    ///      external call — so any residual balance here is definitionally
+    ///      untracked. Caller must be the vaultFactory owner.
+    function rescueETH(address payable to, uint256 amount) external nonReentrant {
+        address factoryOwner = IKernelVaultOwner(vaultFactory).owner();
+        if (msg.sender != factoryOwner) revert NotVaultOwner();
+        if (to == address(0)) revert ZeroAddress();
+        require(amount <= address(this).balance, "amount exceeds balance");
+        (bool ok,) = to.call{ value: amount }("");
+        if (!ok) revert ETHTransferFailed();
+    }
 }
