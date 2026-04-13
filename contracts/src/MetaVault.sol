@@ -502,13 +502,25 @@ contract MetaVault is ReentrancyGuard {
     }
 
     /// @notice Remove an underlying vault from the whitelist
-    /// @dev Must withdraw all allocation from the vault first (allocation must be 0)
+    /// @dev [M-12 FIX] First redeems any remaining shares (including dust from
+    ///      integer-division rounding). Uses share-based redemption to ensure ALL
+    ///      shares are burned, preventing permanent dust stranding.
     /// @param vault Address of the KernelVault to remove
     function removeVault(address vault) external onlyOwner {
         if (!isUnderlyingVault[vault]) revert VaultNotWhitelisted(vault);
 
-        uint256 allocation = _vaultAllocation(vault);
-        if (allocation > 0) revert VaultHasAllocation(vault, allocation);
+        // [M-12 FIX] Redeem any remaining shares (including dust) before removing.
+        // Integer division in share-to-asset conversion can leave 1-1000 wei of
+        // shares that are too small to redeem via asset-based withdrawal. By
+        // redeeming ALL remaining shares here, dust is swept cleanly.
+        IKernelVaultLike kv = IKernelVaultLike(vault);
+        uint256 remainingShares = kv.shares(address(this));
+        if (remainingShares > 0) {
+            uint256 balBefore = baseAsset.balanceOf(address(this));
+            kv.withdraw(remainingShares);
+            uint256 recovered = baseAsset.balanceOf(address(this)) - balBefore;
+            trackedIdle += recovered;
+        }
 
         isUnderlyingVault[vault] = false;
         targetWeights[vault] = 0;

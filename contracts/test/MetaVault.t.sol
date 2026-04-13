@@ -684,11 +684,19 @@ contract MetaVaultTest is Test {
         metaVault.removeVault(address(vaultA));
     }
 
-    function test_removeVault_revertsWhenAllocationExists() public {
+    function test_removeVault_redeemsRemainingShares() public {
+        // [M-12 FIX] removeVault now redeems any remaining shares (including dust)
+        // instead of reverting when allocation exists.
         _depositAndRebalance(DEPOSIT_AMOUNT);
 
-        vm.expectRevert(); // VaultHasAllocation
+        uint256 idleBefore = metaVault.trackedIdle();
         metaVault.removeVault(address(vaultA));
+        uint256 idleAfter = metaVault.trackedIdle();
+
+        // Vault removed successfully
+        assertFalse(metaVault.isUnderlyingVault(address(vaultA)));
+        // Redeemed shares should have increased idle balance
+        assertGe(idleAfter, idleBefore);
     }
 
     function test_removeVault_emitsEvent() public {

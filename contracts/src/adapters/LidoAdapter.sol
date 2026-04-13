@@ -399,18 +399,29 @@ contract LidoAdapter is ReentrancyGuard {
         // are caught and revert explicitly.
         uint256 stETHReturned;
         if (stETHAmount > 0) {
-            // Due to stETH rebasing, the actual transferable amount may differ by 1-2 wei.
-            // Use the lesser of tracked balance and actual contract balance.
+            // [M-05 FIX] Use pro-rata share of actual stETH balance instead of
+            // nominal tracked amount. After a Lido slash (negative rebase), the
+            // adapter's actual stETH < totalTrackedStETH. Using nominal amounts
+            // would let the first caller get their full nominal amount while the
+            // last caller absorbs the entire deficit. Pro-rata distributes loss fairly.
             uint256 actualStETH = ILido(lido).balanceOf(address(this));
-            stETHReturned = stETHAmount > actualStETH ? actualStETH : stETHAmount;
+            if (totalTrackedStETH > 0 && actualStETH < totalTrackedStETH) {
+                // Negative rebase: compute pro-rata share
+                stETHReturned = (stETHAmount * actualStETH) / totalTrackedStETH;
+            } else {
+                // No rebase deficit or positive rebase: use nominal, capped at actual
+                stETHReturned = stETHAmount > actualStETH ? actualStETH : stETHAmount;
+            }
             if (stETHReturned > 0) {
                 IERC20(lido).safeTransfer(msg.sender, stETHReturned);
             }
-            // Keep aggregate tracking in sync with the actual transferred amount.
-            if (stETHReturned > totalTrackedStETH) {
+            // Keep aggregate tracking in sync — decrement by the NOMINAL amount
+            // (what the vault originally deposited) so remaining vaults' shares
+            // stay proportionally correct.
+            if (stETHAmount > totalTrackedStETH) {
                 totalTrackedStETH = 0;
             } else {
-                totalTrackedStETH -= stETHReturned;
+                totalTrackedStETH -= stETHAmount;
             }
         }
 

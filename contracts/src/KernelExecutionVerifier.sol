@@ -152,6 +152,16 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
     ///         verify() and verifyAndParseWithImageId() both revert.
     bool public verificationPaused;
 
+    /// @notice [M-11 FIX] Timestamp when verification was paused. Used to
+    ///         auto-expire the pause after MAX_PAUSE_DURATION so a single
+    ///         compromised/absent owner key cannot permanently halt all
+    ///         vault executions across the ecosystem.
+    uint256 public pausedSince;
+
+    /// @notice [M-11 FIX] Maximum pause duration (7 days). After this,
+    ///         verification automatically resumes without owner action.
+    uint256 public constant MAX_PAUSE_DURATION = 7 days;
+
     // ─────────────────────────────────────────────────────────────────────
     // Two-step ownership transfer state
     // ─────────────────────────────────────────────────────────────────────
@@ -339,6 +349,8 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
     /// @param paused New pause state
     function setVerificationPaused(bool paused) external onlyOwner {
         verificationPaused = paused;
+        // [M-11 FIX] Record pause start time for auto-expiry.
+        pausedSince = paused ? block.timestamp : 0;
         emit VerificationPauseSet(paused);
     }
 
@@ -549,7 +561,11 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
         // immediately stop accepting any proof. This does NOT require
         // the UUPS upgrade timelock; it provides an instantaneous
         // circuit breaker while a scheduled upgrade proceeds separately.
-        if (verificationPaused) revert VerificationPaused();
+        // [M-11 FIX] Auto-expire after MAX_PAUSE_DURATION to prevent
+        // indefinite execution halt from a single key.
+        if (verificationPaused && block.timestamp < pausedSince + MAX_PAUSE_DURATION) {
+            revert VerificationPaused();
+        }
 
         // Validate expectedImageId is not zero
         if (expectedImageId == bytes32(0)) revert ZeroImageId();
@@ -572,7 +588,10 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
     /// @param journalDigest The SHA256 digest of the journal
     function verify(bytes calldata seal, bytes32 imageId, bytes32 journalDigest) external view {
         // Emergency halt — see `verifyAndParseWithImageId` for rationale.
-        if (verificationPaused) revert VerificationPaused();
+        // [M-11 FIX] Auto-expire after MAX_PAUSE_DURATION.
+        if (verificationPaused && block.timestamp < pausedSince + MAX_PAUSE_DURATION) {
+            revert VerificationPaused();
+        }
         if (imageId == bytes32(0)) revert ZeroImageId();
         verifier.verify(seal, imageId, journalDigest);
     }

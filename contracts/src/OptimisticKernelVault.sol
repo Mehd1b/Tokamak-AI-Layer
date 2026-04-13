@@ -267,10 +267,12 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
         if (pending.status != STATUS_PENDING) {
             revert ExecutionNotPending(executionNonce, pending.status);
         }
-        // M-11 fix: proof must be submitted within the challenge window. Otherwise
-        // operators could race slashExpired by submitting late and escape the
-        // bond's economic guarantee.
-        if (block.timestamp > pending.deadline) {
+        // M-11 fix + [M-09 FIX]: proof must be submitted STRICTLY BEFORE the
+        // challenge window deadline. Changed from `>` to `>=` so that at the
+        // exact deadline timestamp, only slashExpired can proceed. This removes
+        // the race condition where the sequencer could choose the bond outcome
+        // by ordering submitProof vs slashExpired in the same block.
+        if (block.timestamp >= pending.deadline) {
             revert ProofTooLate(executionNonce, pending.deadline, block.timestamp);
         }
 

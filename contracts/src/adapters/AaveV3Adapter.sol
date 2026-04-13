@@ -571,59 +571,23 @@ contract AaveV3Adapter is IAaveV3Adapter, ReentrancyGuard {
     ///      All values are in the Aave oracle's base currency (USD or ETH with
     ///      BASE_CURRENCY_UNIT scale, typically 1e8 for USD). The ratio
     ///      `supplied/borrowed` is dimensionless so the scale cancels.
-    function _checkVaultHealth(address vault) internal view {
-        address[] memory supplied = _suppliedAssets[vault];
-        address[] memory borrowedOnly = _borrowedAssets[vault];
-        uint256 supLen = supplied.length;
-        uint256 borLen = borrowedOnly.length;
-        if (supLen == 0 && borLen == 0) return;
+    function _checkVaultHealth(address /* vault */) internal view {
+        // [M-08 FIX] Use Aave's own health factor as the canonical source of truth.
+        // The previous implementation computed a nominal health ratio treating all
+        // collateral at 100% borrowing power, ignoring Aave's per-asset Liquidation
+        // Threshold (LT) weighting. This caused up to 17.5% divergence: the adapter
+        // would allow positions that Aave considers near-liquidation.
+        //
+        // Aave's getUserAccountData() returns the actual health factor that accounts
+        // for LT weighting, e-mode, and isolation mode — the same value Aave's
+        // liquidation logic uses.
+        (,,,,, uint256 aaveHealthFactor) = pool.getUserAccountData(address(this));
 
-        IPriceOracleGetter oracle = IPriceOracleGetter(
-            IPoolAddressesProvider(pool.ADDRESSES_PROVIDER()).getPriceOracle()
-        );
+        // If no debt, Aave returns type(uint256).max — skip the check.
+        if (aaveHealthFactor == type(uint256).max) return;
 
-        uint256 totalSuppliedBase;
-        uint256 totalBorrowedBase;
-
-        // Phase 1: enumerate every asset the vault has SUPPLIED (collateral
-        // contribution) and include any borrow of the same asset.
-        for (uint256 i = 0; i < supLen; i++) {
-            address asset = supplied[i];
-            uint256 sAmt = _vaultSupplied[vault][asset];
-            uint256 bAmt = _vaultBorrowed[vault][asset];
-            if (sAmt == 0 && bAmt == 0) continue;
-
-            uint256 price = oracle.getAssetPrice(asset);
-            require(price > 0, "zero oracle price");
-            uint256 unit = 10 ** IERC20Decimals(asset).decimals();
-
-            if (sAmt > 0) totalSuppliedBase += (sAmt * price) / unit;
-            if (bAmt > 0) totalBorrowedBase += (bAmt * price) / unit;
-        }
-
-        // Phase 2: enumerate assets that were BORROWED WITHOUT being supplied.
-        // These must still count toward totalBorrowedBase; otherwise a vault
-        // could borrow asset X without supplying X and the health check would
-        // silently exclude the debt.
-        for (uint256 i = 0; i < borLen; i++) {
-            address asset = borrowedOnly[i];
-            // Skip if already counted in phase 1 (asset appears in both lists)
-            if (_assetTracked[vault][asset]) continue;
-
-            uint256 bAmt = _vaultBorrowed[vault][asset];
-            if (bAmt == 0) continue;
-
-            uint256 price = oracle.getAssetPrice(asset);
-            require(price > 0, "zero oracle price");
-            uint256 unit = 10 ** IERC20Decimals(asset).decimals();
-            totalBorrowedBase += (bAmt * price) / unit;
-        }
-
-        if (totalBorrowedBase == 0) return;
-
-        uint256 nominalHealth = (totalSuppliedBase * 1e18) / totalBorrowedBase;
-        if (nominalHealth < minHealthFactor) {
-            revert HealthFactorTooLow(nominalHealth, minHealthFactor);
+        if (aaveHealthFactor < minHealthFactor) {
+            revert HealthFactorTooLow(aaveHealthFactor, minHealthFactor);
         }
     }
 

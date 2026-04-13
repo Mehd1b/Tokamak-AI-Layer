@@ -582,20 +582,21 @@ contract AaveV3AdapterTest is Test {
     }
 
     function test_borrow_revertsHealthFactorTooLow() public {
-        // Per-vault nominal health (C-02 fix): with 1000 supplied, borrowing 800 gives
-        // nominalHealth = 1000 / 800 * 1e18 = 1.25e18, below the 1.5e18 minimum.
+        // [M-08 FIX] Now uses Aave's own health factor from getUserAccountData().
+        // Set mock to return a health factor below threshold.
         vm.prank(address(vault));
         adapter.supply(address(usdc), SUPPLY_AMOUNT);
 
-        uint256 unsafeBorrow = 800e6; // 1000 / 800 = 1.25 < 1.5
-        uint256 expectedHealth = (SUPPLY_AMOUNT * 1e18) / unsafeBorrow;
+        uint256 lowHF = 1.25e18; // below 1.5e18 minimum
+        mockPool.setMockHealthFactor(lowHF);
+
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAaveV3Adapter.HealthFactorTooLow.selector, expectedHealth, DEFAULT_MIN_HF
+                IAaveV3Adapter.HealthFactorTooLow.selector, lowHF, DEFAULT_MIN_HF
             )
         );
         vm.prank(address(vault));
-        adapter.borrow(address(usdc), unsafeBorrow, 2);
+        adapter.borrow(address(usdc), 800e6, 2);
     }
 
     function test_borrow_succeedsAtExactMinHealthFactor() public {
@@ -862,20 +863,19 @@ contract AaveV3AdapterTest is Test {
     }
 
     function test_borrow_healthFactorEnforcement_justBelowThreshold() public {
-        // Per-vault nominal health: supply 1500, borrow 1001 — this gives nominalHealth
-        // = 1500 * 1e18 / 1001 = 1.4985e18, which is just below the 1.5e18 floor.
-        uint256 supplyAmt = 1500e6;
-        uint256 borrowAmt = 1001e6;
-        vm.prank(address(vault));
-        adapter.supply(address(usdc), supplyAmt);
+        // [M-08 FIX] Now uses Aave's real health factor. Set mock to just below threshold.
+        uint256 justBelowHF = 1.4985e18;
+        mockPool.setMockHealthFactor(justBelowHF);
 
-        uint256 expectedHealth = (supplyAmt * 1e18) / borrowAmt;
+        vm.prank(address(vault));
+        adapter.supply(address(usdc), 1500e6);
+
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAaveV3Adapter.HealthFactorTooLow.selector, expectedHealth, DEFAULT_MIN_HF
+                IAaveV3Adapter.HealthFactorTooLow.selector, justBelowHF, DEFAULT_MIN_HF
             )
         );
         vm.prank(address(vault));
-        adapter.borrow(address(usdc), borrowAmt, 2);
+        adapter.borrow(address(usdc), 1001e6, 2);
     }
 }

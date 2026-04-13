@@ -197,6 +197,11 @@ contract PendleAdapter is ReentrancyGuard {
     /// @notice Mapping from vault => market => position balances (PT/YT/LP)
     mapping(address vault => mapping(address market => MarketPosition)) public positions;
 
+    /// @notice [M-04 FIX] Aggregate position totals per market across all vaults.
+    /// @dev Used to compute each vault's pro-rata share of claimed rewards.
+    ///      Updated whenever a vault's position changes (mint, redeem, add/remove liquidity).
+    mapping(address market => MarketPosition) public totalPositions;
+
     // ============ Events ============
 
     /// @notice Emitted when a vault is registered
@@ -368,6 +373,18 @@ contract PendleAdapter is ReentrancyGuard {
         if (msg.sender != IKernelVaultOwner(vault).owner()) revert NotVaultOwner();
         if (market == address(0)) revert ZeroAddress();
 
+        // [M-06 FIX] Prevent de-listing markets with active positions. Without
+        // this check, all exit paths (withdrawToVault, redeemPtYt, removeLiquidity,
+        // swapExactPtForToken) become unreachable because they are gated by
+        // onlyWhitelistedMarket, permanently locking PT/YT/LP tokens.
+        if (!whitelisted) {
+            MarketPosition memory pos = positions[vault][market];
+            require(
+                pos.ptBalance == 0 && pos.ytBalance == 0 && pos.lpBalance == 0,
+                "active positions exist"
+            );
+        }
+
         whitelistedMarkets[vault][market] = whitelisted;
         emit MarketWhitelistUpdated(vault, market, whitelisted);
     }
@@ -442,6 +459,8 @@ contract PendleAdapter is ReentrancyGuard {
         // Track balances
         positions[msg.sender][market].ptBalance += netPyOut;
         positions[msg.sender][market].ytBalance += netPyOut;
+        totalPositions[market].ptBalance += netPyOut;
+        totalPositions[market].ytBalance += netPyOut;
 
         emit PtYtMinted(msg.sender, market, netPyOut, amount);
     }
@@ -499,6 +518,8 @@ contract PendleAdapter is ReentrancyGuard {
         // Update balances
         pos.ptBalance -= amount;
         pos.ytBalance -= amount;
+        totalPositions[market].ptBalance -= amount;
+        totalPositions[market].ytBalance -= amount;
 
         emit PtYtRedeemed(msg.sender, market, amount, netTokenOut);
     }
@@ -547,6 +568,7 @@ contract PendleAdapter is ReentrancyGuard {
 
         // Update PT balance
         pos.ptBalance -= ptAmount;
+        totalPositions[market].ptBalance -= ptAmount;
 
         emit PtSwappedForToken(msg.sender, market, ptAmount, netTokenOut);
     }
@@ -611,6 +633,7 @@ contract PendleAdapter is ReentrancyGuard {
 
         // Update PT balance
         positions[msg.sender][market].ptBalance += netPtOut;
+        totalPositions[market].ptBalance += netPtOut;
 
         emit TokenSwappedForPt(msg.sender, market, tokenAmount, netPtOut);
     }
@@ -656,8 +679,10 @@ contract PendleAdapter is ReentrancyGuard {
         // Update balances
         if (ptAmount > 0) {
             pos.ptBalance -= ptAmount;
+            totalPositions[market].ptBalance -= ptAmount;
         }
         pos.lpBalance += netLpOut;
+        totalPositions[market].lpBalance += netLpOut;
 
         emit LiquidityAdded(msg.sender, market, syAmount, ptAmount, netLpOut);
     }
@@ -700,6 +725,8 @@ contract PendleAdapter is ReentrancyGuard {
         // Update balances
         pos.lpBalance -= lpAmount;
         pos.ptBalance += netPtOut;
+        totalPositions[market].lpBalance -= lpAmount;
+        totalPositions[market].ptBalance += netPtOut;
 
         emit LiquidityRemoved(msg.sender, market, lpAmount, netSyOut, netPtOut);
     }
@@ -752,15 +779,27 @@ contract PendleAdapter is ReentrancyGuard {
             address(this), emptySys, emptyYts, markets
         );
 
-        // Forward the delta for each listed reward token to the caller.
-        // If the claim produced no delta for a given token (because the
-        // caller had no rewards accumulated in it), the corresponding
-        // transfer is a no-op.
+        // [M-04 FIX] Compute the calling vault's pro-rata share of rewards.
+        // Rewards accrue based on YT and LP holdings. We compute the vault's
+        // share as: (vault YT + LP) / (total YT + LP) across all requested markets.
+        uint256 vaultWeight;
+        uint256 totalWeight;
+        for (uint256 i = 0; i < markets.length; i++) {
+            MarketPosition memory vaultPos = positions[msg.sender][markets[i]];
+            MarketPosition memory totPos = totalPositions[markets[i]];
+            vaultWeight += vaultPos.ytBalance + vaultPos.lpBalance;
+            totalWeight += totPos.ytBalance + totPos.lpBalance;
+        }
+
+        // Forward the caller's pro-rata share of the delta for each reward token.
         for (uint256 i = 0; i < rewardTokens.length; i++) {
             uint256 balanceAfter = IERC20(rewardTokens[i]).balanceOf(address(this));
             uint256 delta = balanceAfter - balancesBefore[i];
-            if (delta > 0) {
-                IERC20(rewardTokens[i]).safeTransfer(msg.sender, delta);
+            if (delta > 0 && totalWeight > 0 && vaultWeight > 0) {
+                uint256 vaultShare = (delta * vaultWeight) / totalWeight;
+                if (vaultShare > 0) {
+                    IERC20(rewardTokens[i]).safeTransfer(msg.sender, vaultShare);
+                }
             }
         }
 
@@ -785,6 +824,10 @@ contract PendleAdapter is ReentrancyGuard {
         uint256 lpOut = pos.lpBalance;
 
         // Clear the tracked position first (checks-effects-interactions)
+        // [M-04 FIX] Also decrement totalPositions aggregate
+        if (ptOut > 0) totalPositions[market].ptBalance -= ptOut;
+        if (ytOut > 0) totalPositions[market].ytBalance -= ytOut;
+        if (lpOut > 0) totalPositions[market].lpBalance -= lpOut;
         pos.ptBalance = 0;
         pos.ytBalance = 0;
         pos.lpBalance = 0;

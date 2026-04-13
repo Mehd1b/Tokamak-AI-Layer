@@ -1251,10 +1251,21 @@ contract PendleAdapterTest is Test {
         _registerAndWhitelist();
         _fundVault(MINT_AMOUNT);
 
-        // Mint succeeds
+        // Mint succeeds — creates tracked positions
         vaultA.callMintPtYt(address(adapter), address(market), address(tokenIn), MINT_AMOUNT);
 
-        // Remove market from whitelist
+        // [M-06 FIX] Attempting to de-whitelist with active positions should revert
+        vm.prank(ownerA);
+        vm.expectRevert("active positions exist");
+        adapter.setMarketWhitelist(address(vaultA), address(market), false);
+
+        // De-whitelisting without active positions works (separate test case)
+    }
+
+    function test_whitelistEnforcement_afterDewhitelist_noPositions() public {
+        _registerAndWhitelist();
+
+        // No positions minted — de-whitelist should succeed
         vm.prank(ownerA);
         adapter.setMarketWhitelist(address(vaultA), address(market), false);
 

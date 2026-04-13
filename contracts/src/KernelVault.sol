@@ -9,6 +9,11 @@ import { OracleVerifier } from "./libraries/OracleVerifier.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
+/// @notice [M-10 FIX] Minimal interface for VaultAccessControl withdrawal recording
+interface IVaultAccessControl {
+    function recordWithdrawal(address user, uint256 amount) external;
+}
+
 /// @title KernelVault
 /// @notice MVP vault that executes agent actions verified by RISC Zero proofs
 /// @dev This contract:
@@ -235,6 +240,18 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @notice Tracked ETH balance for ETH vaults (prevents donation/selfdestruct inflation attacks)
     /// @dev Only meaningful when asset == address(0). Updated in depositETH, withdraw, execute, receive.
     uint256 public trackedETHBalance;
+
+    /// @notice [H-03 FIX] Initial vault balance captured at the start of _executeActions.
+    /// @dev Used by _executeCall to cap the per-action asset delta against the INITIAL
+    ///      balance rather than the current (diminishing) balance. Without this, N actions
+    ///      compound: 1-(0.6)^N drain (3 actions = 78.4%, 10 = 99.4%). With this fix,
+    ///      cumulative drain across ALL actions is hard-capped at 40%.
+    uint256 internal _executionInitialBalance;
+
+    /// @notice [M-10 FIX] Optional VaultAccessControl address. When set, _processWithdraw
+    ///         calls recordWithdrawal() to decrement the deposit counter, allowing users
+    ///         who withdraw to re-deposit up to their cap.
+    address public accessControl;
 
     // ============ Fee State ============
 
@@ -605,6 +622,13 @@ contract KernelVault is ReentrancyGuard, Pausable {
         if (_required && oracleSigner == address(0)) revert OracleSignatureRequired();
         requireOracle = _required;
         emit RequireOracleUpdated(_required);
+    }
+
+    /// @notice [M-10 FIX] Set the VaultAccessControl contract for automatic
+    ///         deposit counter management. Pass address(0) to disable.
+    function setAccessControl(address _accessControl) external {
+        if (msg.sender != owner) revert NotOwner();
+        accessControl = _accessControl;
     }
 
     // ============ Fee Configuration ============
@@ -1017,6 +1041,13 @@ contract KernelVault is ReentrancyGuard, Pausable {
     ) internal {
         lastExecutionNonce = providedNonce;
 
+        // [H-03 FIX] Capture the initial balance BEFORE any actions execute.
+        // _executeCall uses this to cap each action's delta against the initial
+        // balance, preventing compound drain: N actions each draining 40% of the
+        // *current* balance would compound to 1-(0.6)^N. With this fix, the
+        // cumulative drain across ALL actions is capped at 40% of the initial balance.
+        _executionInitialBalance = totalAssets();
+
         // Snapshot PPS before execution for performance tracking
         uint256 ppsBefore = currentPps();
         preExecutionPps = ppsBefore;
@@ -1110,16 +1141,31 @@ contract KernelVault is ReentrancyGuard, Pausable {
             (shareAmount * (effectiveAssets + 1)) / (denomShares + _DECIMALS_OFFSET);
         if (assetsOut == 0) revert ZeroAssetsOut();
 
-        // Cap to actual available balance during active strategy
+        // [M-02 FIX] Cap to actual available balance during active strategy.
+        // Previously, this hard-reverted, locking depositors out of withdrawals
+        // when most funds are deployed externally. Now uses a partial-withdrawal
+        // fallback matching _processEmergencyWithdraw: scale share burn
+        // proportionally and send what's available.
         uint256 available = totalAssets();
         if (assetsOut > available) {
-            revert InsufficientAvailableAssets(assetsOut, available);
+            uint256 origAssets = assetsOut;
+            shareAmount = (shareAmount * available) / origAssets;
+            if (shareAmount == 0) revert ZeroAssetsOut();
+            assetsOut = available;
         }
 
         // Burn shares
         shares[msg.sender] -= shareAmount;
         totalShares -= shareAmount;
         totalWithdrawn += assetsOut;
+
+        // [M-10 FIX] Decrement the deposit counter in VaultAccessControl so
+        // users who withdraw can re-deposit up to their cap. Without this,
+        // the deposited[user] counter monotonically increases and users who
+        // reach their cap are permanently locked out after withdrawal.
+        if (accessControl != address(0)) {
+            IVaultAccessControl(accessControl).recordWithdrawal(msg.sender, assetsOut);
+        }
 
         // If the vault has emptied completely, reset the fee epoch so the
         // next generation of depositors starts with a clean slate. See
@@ -1301,9 +1347,11 @@ contract KernelVault is ReentrancyGuard, Pausable {
     //         - ETH vaults against a re-entrant target that drains more
     //           than the per-call `value` cap via receive/fallback tricks.
     //
-    // Both caps use 40% so that an attacker must execute AT LEAST 3
-    // separate CALL actions across 3 separate blocks to fully drain the
-    // vault — giving monitoring systems a window to detect and pause.
+    // Both caps use 40% of the INITIAL balance (captured at the start of
+    // _executeActions). This means cumulative drain across ALL actions in a
+    // single execute() call is hard-capped at 40%, requiring multiple
+    // separate execute() calls (each needing a fresh ZK proof) to fully
+    // drain the vault — giving monitoring systems a window to detect and pause.
     //
     // Nothing here changes the pre-existing trust assumption that the
     // primary gate is the ZK proof + pinned trustedImageId. The caps are
@@ -1359,16 +1407,20 @@ contract KernelVault is ReentrancyGuard, Pausable {
             revert CallFailed(action.target, returnData);
         }
 
-        // [C-04] ASSET DELTA CAP — both vault types. See block comment above.
-        // Reject any CALL whose net effect drops the vault's own asset
-        // balance by more than 40%, regardless of how the outflow happened
-        // (value transfer, callData-driven pull, re-entrant drain).
+        // [C-04 + H-03 FIX] ASSET DELTA CAP — both vault types.
+        // Cap is now computed against _executionInitialBalance (set once at the
+        // start of _executeActions) instead of the per-action balanceBefore.
+        // This prevents compound drain: with the old code, 3 actions each draining
+        // 40% of current balance would remove 78.4%. With this fix, cumulative
+        // drain across ALL actions is capped at 40% of the initial balance.
         uint256 balanceAfter = totalAssets();
         if (balanceAfter < balanceBefore) {
-            uint256 delta = balanceBefore - balanceAfter;
-            uint256 maxDelta = (balanceBefore * MAX_CALL_ASSET_DELTA_BPS) / BPS_DENOMINATOR;
-            if (delta > maxDelta) {
-                revert CallAssetDeltaExceedsLimit(delta, maxDelta);
+            uint256 cumulativeDrain = _executionInitialBalance > balanceAfter
+                ? _executionInitialBalance - balanceAfter
+                : 0;
+            uint256 maxDelta = (_executionInitialBalance * MAX_CALL_ASSET_DELTA_BPS) / BPS_DENOMINATOR;
+            if (cumulativeDrain > maxDelta) {
+                revert CallAssetDeltaExceedsLimit(cumulativeDrain, maxDelta);
             }
         }
 
@@ -1643,6 +1695,17 @@ contract KernelVault is ReentrancyGuard, Pausable {
         snapshotTotalAssets = 0;
         snapshotTotalShares = 0;
         strategyActivatedAt = 0;
+
+        // [M-01 FIX] Advance lastFeeTimestamp to prevent retroactive lump-sum
+        // fee accumulation. Without this, _collectManagementFee() returns 0
+        // during strategy (correct) but does NOT advance the timestamp. On
+        // settlement, the next fee collection computes timeElapsed spanning
+        // the entire strategy duration, charging the full fee as a single
+        // lump-sum. With this fix, the strategy period is skipped for fee
+        // purposes — consistent with the intent of the strategyActive guard.
+        if (lastFeeTimestamp > 0) {
+            lastFeeTimestamp = block.timestamp;
+        }
 
         emit StrategySettled(settledAssets, currentAssets);
     }

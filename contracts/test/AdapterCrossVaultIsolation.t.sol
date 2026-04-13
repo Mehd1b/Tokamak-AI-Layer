@@ -105,14 +105,19 @@ contract MiniAavePool {
         return rep;
     }
 
+    // [M-08 FIX] Configurable health factor for testing
+    uint256 public mockHF = type(uint256).max;
+
+    function setMockHealthFactor(uint256 hf) external {
+        mockHF = hf;
+    }
+
     function getUserAccountData(address)
         external
-        pure
+        view
         returns (uint256, uint256, uint256, uint256, uint256, uint256)
     {
-        // Aggregate health factor: always max (the broken aggregate check is bypassed
-        // by the per-vault nominal health check introduced in the fix).
-        return (0, 0, 0, 8000, 7500, type(uint256).max);
+        return (0, 0, 0, 8000, 7500, mockHF);
     }
 }
 
@@ -420,20 +425,21 @@ contract AdapterCrossVaultIsolationTest is Test {
     // C-02: per-vault nominal health factor enforced
     // ==========================================================
     function test_C02_aave_crossVaultBorrowBlocked() public {
-        // A supplies 100k (will become the adapter's aggregate collateral)
+        // A supplies 100k, B supplies 10k
         vaultA.callAdapter(
             address(aave), abi.encodeCall(aave.supply, (address(usdc), 100_000e6))
         );
-        // B supplies 10k only
         vaultB.callAdapter(
             address(aave), abi.encodeCall(aave.supply, (address(usdc), 10_000e6))
         );
 
-        // B tries to borrow 50k (5x its supply) — blocked by per-vault nominal HF.
-        // Nominal = 10_000 / 50_000 * 1e18 = 0.2e18 < 1.5e18
+        // [M-08 FIX] Now uses Aave's real health factor. Set mock to unhealthy.
+        uint256 lowHF = 0.2e18;
+        aavePool.setMockHealthFactor(lowHF);
+
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAaveV3Adapter.HealthFactorTooLow.selector, 0.2e18, 1.5e18
+                IAaveV3Adapter.HealthFactorTooLow.selector, lowHF, 1.5e18
             )
         );
         vaultB.callAdapter(

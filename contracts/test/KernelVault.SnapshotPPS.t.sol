@@ -293,14 +293,16 @@ contract KernelVaultSnapshotPPSTest is Test {
         assertTrue(vault.strategyActive());
         assertEq(vault.totalAssets(), 60 ether);
 
-        // Try to withdraw 80_000 shares → PPS says 80 tokens, but only 60 available
+        // [M-02 FIX] Withdraw 80_000 shares → PPS says 80 tokens, but only 60
+        // available. With partial-withdrawal fallback, the vault caps to 60 tokens
+        // and burns proportional shares instead of reverting.
+        uint256 balBefore = token.balanceOf(userA);
         vm.prank(userA);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                KernelVault.InsufficientAvailableAssets.selector, 80 ether, 60 ether
-            )
-        );
         vault.withdraw(80 ether * OFFSET);
+        uint256 received = token.balanceOf(userA) - balBefore;
+        // User should receive at most 60 tokens (the available balance)
+        assertLe(received, 60 ether);
+        assertGt(received, 0);
     }
 
     // ============ Settlement ============

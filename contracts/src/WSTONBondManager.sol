@@ -113,6 +113,12 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     ///         delay.
     bool public relayerInitialized;
 
+    /// @notice [H-02 FIX] Tracks bonds that have been slashed on the vault
+    ///         chain (HyperEVM) but not yet resolved on L1. Prevents operators
+    ///         from reclaiming bonds via the 90-day expiry safety valve while
+    ///         a slash is pending cross-chain relay.
+    mapping(address => mapping(address => mapping(uint64 => bool))) public slashPending;
+
     // ============ Events ============
 
     event BondLocked(
@@ -143,6 +149,8 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     event TokensRescued(address indexed token, address indexed to, uint256 amount);
     /// @notice L-11: emitted when a new trusted relayer is proposed and queued
     event TrustedRelayerProposed(address indexed newRelayer, uint256 activatesAt);
+    /// @notice [H-02 FIX] emitted when a bond is flagged as slash-pending
+    event SlashPendingMarked(address indexed operator, address indexed vault, uint64 indexed nonce);
 
     // ============ Errors ============
 
@@ -358,9 +366,25 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         emit BondReleased(operator, vault, nonce, amount);
     }
 
+    /// @notice [H-02 FIX] Mark a bond as having a pending slash from the vault chain.
+    ///         Called by the relayer (or owner as backup) when an ExecutionSlashed event
+    ///         is observed on HyperEVM but before the L1 slash is executed. This prevents
+    ///         the operator from racing the relayer via reclaimExpiredBond().
+    /// @param operator The operator whose bond is being flagged
+    /// @param vault The vault address
+    /// @param nonce The execution nonce
+    function markSlashPending(address operator, address vault, uint64 nonce) external {
+        require(msg.sender == trustedRelayer || msg.sender == owner, "not relayer or owner");
+        BondInfo storage bond = bonds[operator][vault][nonce];
+        if (bond.status != BondStatus.Locked) {
+            revert InvalidBondStatus(operator, vault, nonce, bond.status);
+        }
+        slashPending[operator][vault][nonce] = true;
+        emit SlashPendingMarked(operator, vault, nonce);
+    }
+
     /// @notice Slash a bond via trusted relayer (cross-chain: oracle relays ExecutionSlashed from HyperEVM)
-    /// @dev Cross-chain slash sends 100% to treasury. Treasury handles redistribution to HyperEVM
-    ///      depositors off-chain or via bridge (cannot transfer directly to cross-chain vault).
+    /// @dev Cross-chain slash sends proceeds to treasury. Treasury handles redistribution.
     /// @param operator The operator address
     /// @param vault The cross-chain vault address
     /// @param nonce The execution nonce
@@ -374,6 +398,9 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         if (bond.status != BondStatus.Locked) {
             revert InvalidBondStatus(operator, vault, nonce, bond.status);
         }
+
+        // [H-02 FIX] Clear the slash-pending flag (if set) now that the slash is being executed.
+        slashPending[operator][vault][nonce] = false;
 
         uint256 amount = bond.amount;
         bond.status = BondStatus.Slashed;
@@ -461,6 +488,14 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         BondInfo storage bond = bonds[msg.sender][vault][nonce];
         if (bond.status != BondStatus.Locked) {
             revert InvalidBondStatus(msg.sender, vault, nonce, bond.status);
+        }
+
+        // [H-02 FIX] Block reclamation if a cross-chain slash is pending.
+        // Without this check, an operator could drain a vault via malicious
+        // optimistic execution, wait 90 days for the relayer to fail, and
+        // reclaim the full bond — zero economic penalty.
+        if (slashPending[msg.sender][vault][nonce]) {
+            revert UnresolvedSlashPending();
         }
 
         uint256 expiry = bond.lockedAt + BOND_EXPIRY;

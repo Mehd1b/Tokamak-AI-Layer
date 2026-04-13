@@ -73,9 +73,26 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     /// @notice Proposed owner awaiting acceptance (two-step ownership transfer).
     address public pendingOwner;
 
-    /// @notice Storage gap for future upgrades. Reduced from 40 → 37 slots
+    // ─────────────────────────────────────────────────────────────────────
+    // [M-07 FIX] Code store swap timelock state
+    // ─────────────────────────────────────────────────────────────────────
+    // setVaultCreationCodeStore and setOptimisticVaultCreationCodeStore were
+    // simple onlyOwner setters with no timelock. A compromised owner key could
+    // swap the bytecode and deploy malicious vaults instantly. These now use
+    // the same schedule-then-activate pattern as UUPS upgrades.
+    // ─────────────────────────────────────────────────────────────────────
+
+    /// @notice Pending new vault creation code store awaiting timelock.
+    address public pendingVaultCodeStore;
+    uint256 public pendingVaultCodeStoreActivatesAt;
+
+    /// @notice Pending new optimistic vault creation code store awaiting timelock.
+    address public pendingOptimisticVaultCodeStore;
+    uint256 public pendingOptimisticVaultCodeStoreActivatesAt;
+
+    /// @notice Storage gap for future upgrades. Reduced from 40 → 33 slots
     ///         to accommodate the new state above.
-    uint256[37] private __gap;
+    uint256[33] private __gap;
 
     // ============ Errors ============
 
@@ -230,27 +247,69 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         pendingImplementationActivatesAt = 0;
     }
 
-    /// @notice Update the VaultCreationCodeStore (owner only).
-    /// @dev Used when KernelVault bytecode changes (e.g., adding rescueTokens).
-    ///      Only affects new vaults — already-deployed vaults are immutable.
-    /// @param newStore The new VaultCreationCodeStore contract address
+    // ─────────────────────────────────────────────────────────────────────
+    // [M-07 FIX] Code store swap with timelock (schedule → wait → activate)
+    // ──────────────────��─────────────────────────────────────��────────────
+
+    /// @notice Set vault creation code store directly (only works for initial setup when current is zero).
+    /// @dev For subsequent changes, use schedule + activate with timelock.
     function setVaultCreationCodeStore(address newStore) external onlyOwner {
+        require(_vaultCreationCodeStore == address(0), "use schedule/activate");
         require(newStore != address(0), "zero vaultCodeStore");
         require(newStore.code.length > 0, "no code at store");
         _vaultCreationCodeStore = newStore;
-        emit VaultCreationCodeStoreUpdated(newStore); // I-06
+        emit VaultCreationCodeStoreUpdated(newStore);
     }
 
-    /// @notice Update the OptimisticVaultCreationCodeStore (owner only).
-    /// @dev Used when OptimisticKernelVault bytecode changes.
-    ///      Only affects new vaults — already-deployed vaults are immutable.
-    /// @param newStore The new OptimisticVaultCreationCodeStore contract address
+    /// @notice Set optimistic vault creation code store directly (only works for initial setup when current is zero).
     function setOptimisticVaultCreationCodeStore(address newStore) external onlyOwner {
+        require(_optimisticVaultCreationCodeStore == address(0), "use schedule/activate");
         require(newStore != address(0), "zero optimisticVaultCodeStore");
         require(newStore.code.length > 0, "no code at store");
         _optimisticVaultCreationCodeStore = newStore;
-        emit OptimisticVaultCreationCodeStoreUpdated(newStore); // I-06
+        emit OptimisticVaultCreationCodeStoreUpdated(newStore);
     }
+
+    /// @notice Schedule a new VaultCreationCodeStore (begins timelock).
+    function scheduleVaultCreationCodeStore(address newStore) external onlyOwner {
+        require(newStore != address(0), "zero vaultCodeStore");
+        require(newStore.code.length > 0, "no code at store");
+        pendingVaultCodeStore = newStore;
+        pendingVaultCodeStoreActivatesAt = block.timestamp + UPGRADE_DELAY;
+        emit VaultCodeStoreScheduled(newStore, pendingVaultCodeStoreActivatesAt);
+    }
+
+    /// @notice Activate a previously scheduled VaultCreationCodeStore after timelock.
+    function activateVaultCreationCodeStore() external onlyOwner {
+        require(pendingVaultCodeStore != address(0), "no pending code store");
+        require(block.timestamp >= pendingVaultCodeStoreActivatesAt, "timelock not elapsed");
+        _vaultCreationCodeStore = pendingVaultCodeStore;
+        emit VaultCreationCodeStoreUpdated(pendingVaultCodeStore);
+        pendingVaultCodeStore = address(0);
+        pendingVaultCodeStoreActivatesAt = 0;
+    }
+
+    /// @notice Schedule a new OptimisticVaultCreationCodeStore (begins timelock).
+    function scheduleOptimisticVaultCreationCodeStore(address newStore) external onlyOwner {
+        require(newStore != address(0), "zero optimisticVaultCodeStore");
+        require(newStore.code.length > 0, "no code at store");
+        pendingOptimisticVaultCodeStore = newStore;
+        pendingOptimisticVaultCodeStoreActivatesAt = block.timestamp + UPGRADE_DELAY;
+        emit OptimisticVaultCodeStoreScheduled(newStore, pendingOptimisticVaultCodeStoreActivatesAt);
+    }
+
+    /// @notice Activate a previously scheduled OptimisticVaultCreationCodeStore after timelock.
+    function activateOptimisticVaultCreationCodeStore() external onlyOwner {
+        require(pendingOptimisticVaultCodeStore != address(0), "no pending code store");
+        require(block.timestamp >= pendingOptimisticVaultCodeStoreActivatesAt, "timelock not elapsed");
+        _optimisticVaultCreationCodeStore = pendingOptimisticVaultCodeStore;
+        emit OptimisticVaultCreationCodeStoreUpdated(pendingOptimisticVaultCodeStore);
+        pendingOptimisticVaultCodeStore = address(0);
+        pendingOptimisticVaultCodeStoreActivatesAt = 0;
+    }
+
+    event VaultCodeStoreScheduled(address indexed newStore, uint256 activatesAt);
+    event OptimisticVaultCodeStoreScheduled(address indexed newStore, uint256 activatesAt);
 
     /// @notice Emitted when the vault creation code store is updated (I-06)
     event VaultCreationCodeStoreUpdated(address indexed newStore);
