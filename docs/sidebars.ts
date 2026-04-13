@@ -13,6 +13,7 @@ const sidebars: SidebarsConfig = {
         'getting-started/prerequisites',
         'getting-started/run-an-example',
         'getting-started/defi-yield-farmer',
+        'getting-started/build-a-rebalancer',
         'getting-started/faq',
         'getting-started/local-build',
       ],
