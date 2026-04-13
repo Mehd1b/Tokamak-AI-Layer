@@ -100,7 +100,7 @@ library OracleVerifier {
     error BondAttestationStale(uint64 attestationTs, uint64 maxAge, uint256 blockTs);
 
     /// @notice Verify an oracle attestation that a bond was locked on another chain (reverts on failure)
-    /// @dev M-10 fix: the signed payload now includes an attestation timestamp and
+    /// @dev The signed payload now includes an attestation timestamp and
     ///      the vault enforces a maximum staleness so that replay after bond
     ///      reclamation is impossible.
     /// @dev Attestation format: oracle signs keccak256("BOND_LOCK_V2" || operator || vault || nonce || amount || chainId || attestationTs)

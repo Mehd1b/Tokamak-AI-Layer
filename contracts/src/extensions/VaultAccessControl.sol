@@ -216,7 +216,7 @@ contract VaultAccessControl {
         emit DepositRecorded(user, amount, deposited[user]);
     }
 
-    /// @notice Record a withdrawal to release deposit-cap capacity (M-22 fix).
+    /// @notice Record a withdrawal to release deposit-cap capacity.
     /// @dev Previously, the `deposited` counter monotonically increased — a user
     ///      who deposited up to their cap could never re-deposit even after a
     ///      full withdrawal. This function lets the vault (or owner) mirror

@@ -40,11 +40,11 @@ contract PointsProgram {
     /// @notice Bonus points awarded per depositor for each successful vault execution
     uint256 public constant EXECUTION_BONUS_POINTS = 50;
 
-    /// @notice L-29 fix: maximum depositors per recordExecution call (bounds
+    /// @notice Maximum depositors per recordExecution call (bounds
     ///         the O(N^2) dedupe pass and caps gas).
     uint256 public constant MAX_RECORD_EXECUTION_BATCH = 100;
 
-    /// @notice L-52 fix: minimum notice before a newly-set seasonEnd activates,
+    /// @notice Minimum notice before a newly-set seasonEnd activates,
     ///         giving users time to accrue their final points before the cutoff.
     uint256 public constant MIN_SEASON_NOTICE = 24 hours;
 
@@ -235,7 +235,7 @@ contract PointsProgram {
 
     /// @notice Set the season end timestamp
     /// @param timestamp The season end timestamp (must be in the future, or 0 to clear)
-    /// @dev L-52 fix: non-zero timestamps must give users at least
+    /// @dev Non-zero timestamps must give users at least
     ///      MIN_SEASON_NOTICE to accrue their final points before the cutoff.
     function setSeasonEnd(uint256 timestamp) external onlyOwner {
         if (timestamp != 0) {
@@ -262,7 +262,7 @@ contract PointsProgram {
     /// @notice Accrue points for a user in a specific vault based on elapsed time
     /// @param vault The vault address (must be deployed by VaultFactory)
     /// @param user The user address to accrue points for
-    /// @dev L-30 / L-52 fix: removed the hard `seasonActive` revert. Users can
+    /// @dev Removed the hard `seasonActive` revert. Users can
     ///      still call `accruePoints` after the season has ended to collect
     ///      their final pro-rata points up to `seasonEnd`. Once their
     ///      lastAccrualTimestamp reaches seasonEnd, subsequent calls are no-ops.
@@ -369,10 +369,10 @@ contract PointsProgram {
             revert NotAuthorized();
         }
 
-        // L-29 fix: cap batch size
+        // Cap batch size
         require(depositors.length <= MAX_RECORD_EXECUTION_BATCH, "batch too large");
 
-        // L-29 fix: dedupe depositors via a mapping nested in the execution tx.
+        // Dedupe depositors via a mapping nested in the execution tx.
         // We track which depositors have already been rewarded in this call to
         // prevent N×bonus amplification via `[alice, alice, ...]` arrays.
         uint256 rewarded = 0;
@@ -400,10 +400,10 @@ contract PointsProgram {
     /// @notice Set the referrer for a user (can only be set once)
     /// @param user The user being referred
     /// @param referrer The referrer address
-    /// @dev L-14 fix: only the user being referred may designate their own
+    /// @dev Only the user being referred may designate their own
     ///      referrer. Without this check, an attacker could front-run any
     ///      victim's first `setReferrer` call to hijack the referral bonus.
-    /// @dev L-52 fix: block mutual (two-hop) cycles so pairs cannot farm each
+    /// @dev Block mutual (two-hop) cycles so pairs cannot farm each
     ///      other's referral bonuses indefinitely.
     function setReferrer(address user, address referrer) external {
         if (msg.sender != user) revert NotAuthorized();

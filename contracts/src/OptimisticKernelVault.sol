@@ -14,7 +14,7 @@ import { OracleVerifier } from "./libraries/OracleVerifier.sol";
 contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
     // ============ Constants ============
 
-    // M-24 fix: raise minimum from 15 minutes to 30 minutes to give legitimate
+    // Raise minimum from 15 minutes to 30 minutes to give legitimate
     // operators enough margin after RISC Zero proof generation (~10-12 min).
     uint256 public constant MIN_CHALLENGE_WINDOW = 30 minutes;
     uint256 public constant MAX_CHALLENGE_WINDOW = 24 hours;
@@ -48,7 +48,7 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
         uint256 _bondChainId,
         uint256 _challengeWindow
     ) KernelVault(_asset, _verifier, _agentId, _trustedImageId, _owner) {
-        // M-17: honour the caller-specified challenge window. Fall back to the
+        // Honour the caller-specified challenge window. Fall back to the
         // default only if zero is passed so the factory can still deploy with
         // "use default" semantics.
         if (_challengeWindow == 0) {
@@ -91,8 +91,8 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
         uint64 providedNonce =
             _validateParsedJournal(parsed, agentOutputBytes, oracleSignature, oracleTimestamp);
 
-        // 2. Verify oracle signature bound to action commitment (M-09) and the
-        //    L1 bond attestation with timestamp binding (M-10). Extracted to a
+        // 2. Verify oracle signature bound to action commitment and the
+        //    L1 bond attestation with timestamp binding. Extracted to a
         //    helper to keep this function under the stack-depth limit.
         _verifyOptimisticOracleAndBond(
             OptimisticVerifyArgs({
@@ -137,72 +137,13 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
         uint64 bondAttestationTimestamp;
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // [C-01 FIX] Zero-bond optimistic execution blocked at verification time
-    // [C-02 FIX] Bond attestation verified against dedicated `bondSigner`
-    // ─────────────────────────────────────────────────────────────────────
-    // C-01 VULNERABILITY:
-    //   Before this fix, `minBond` defaulted to zero and was not checked
-    //   when enabling optimistic mode. The downstream guard
-    //       if (a.bondAmount < minBond) revert InsufficientBond(...)
-    //   evaluated `0 < 0 = false` — so a forged/empty bond attestation
-    //   passed unconditionally. Any attacker able to forge a bond
-    //   attestation (see C-02) could submit `bondAmount = 0` and drain
-    //   the full TVL with no slash target on L1.
-    //
-    //   This was the DEFAULT state of every newly deployed optimistic
-    //   vault that enabled optimistic mode before calling setMinBond.
-    //
-    // C-02 VULNERABILITY:
-    //   Before this fix, the same `oracleSigner` key was used for BOTH
-    //   the price oracle attestation (Role A, SEMI_TRUSTED) AND the
-    //   bond attestation (Role B, FULLY_TRUSTED). A single key
-    //   compromise escalated from price manipulation to protocol-wide
-    //   unbonded-drain authority across every OptimisticKernelVault
-    //   sharing that key.
-    //
-    // FIX SURFACE:
-    //   This function is the PRIMARY verification site for both
-    //   vulnerabilities. It enforces, in order:
-    //
-    //     1. Role A signature verification (price oracle, optional).
-    //
-    //     2. [C-02] `bondSigner != address(0)` — no fallback to
-    //        oracleSigner. Legacy deployments must explicitly call
-    //        `setBondSigner` before re-enabling optimistic mode,
-    //        forcing operators to make the role separation explicit.
-    //
-    //     3. [C-02] `bondSigner != oracleSigner` — belt-and-braces
-    //        re-check of the setter-time invariant. Protects against
-    //        storage-layout bugs or migration mistakes.
-    //
-    //     4. [C-01] `minBond > 0` — explicit rejection of the
-    //        zero-bond configuration. The setter already prevents new
-    //        vaults from entering this state, but this guard is the
-    //        fail-safe for any legacy deployment that was enabled
-    //        before the fix.
-    //
-    //     5. Bond attestation signature verification — using
-    //        `bondSigner` (Role B), not `oracleSigner`.
-    //
-    //     6. Bond amount floor check — `a.bondAmount < minBond` now
-    //        has semantic meaning because minBond > 0 is enforced above.
-    //
-    // Nothing about this ordering is accidental: Role A is verified
-    // first because it's optional; Role B is verified second because
-    // it's mandatory for optimistic mode. The minBond == 0 check must
-    // come BEFORE the bond attestation verification so that a forged
-    // zero-bond attestation on a legacy vault is rejected even if the
-    // signature happens to be valid.
-    // ─────────────────────────────────────────────────────────────────────
-
-    /// @notice Oracle signature and bond attestation verification (M-09, M-10).
-    /// @dev See block comment above for C-01 and C-02 fix rationale.
+    /// @notice Oracle signature and bond attestation verification.
+    /// @dev Verifies Role A (price oracle, optional) and Role B (bond attestation, mandatory)
+    ///      signatures, enforces bond signer role separation, and checks minimum bond floor.
     function _verifyOptimisticOracleAndBond(OptimisticVerifyArgs memory a) internal view {
-        // ──── M-09: bound oracle signature (Role A — price attestation) ────
+        // ──── Bound oracle signature (Role A — price attestation) ────
         // Optional: only checked when an oracle signer is configured AND
-        // a non-empty signature was supplied. See C-02 for the distinction
-        // between Role A (this check) and Role B (bond attestation below).
+        // a non-empty signature was supplied.
         if (oracleSigner != address(0) && a.oracleSignature.length > 0) {
             OracleVerifier.requireValidOracleSignatureBound(
                 a.inputRoot,
@@ -216,7 +157,7 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
             );
         }
 
-        // ──── [C-02] Bond signer must be set AND distinct from oracle ────
+        // ──── Bond signer must be set AND distinct from oracle ────
         // These two guards are the runtime enforcement of the role
         // separation invariant. They are REDUNDANT with the setter-time
         // checks (setOptimisticEnabled / setBondSigner / setOracleSigner)
@@ -226,18 +167,17 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
         if (bondSigner == address(0)) revert BondSignerNotSet();
         if (bondSigner == oracleSigner) revert BondSignerMustDiffer();
 
-        // ──── [C-01] Zero-minimum-bond fail-safe ────
+        // ──── Zero-minimum-bond fail-safe ────
         // Even if setOptimisticEnabled was called on a legacy deployment
         // with minBond == 0, reject the execution here. Without this
         // check, the later `bondAmount < minBond` comparison evaluates
-        // `0 < 0 = false` and a forged zero-bond attestation would pass.
+        // `0 < 0 = false` and a zero-bond attestation would pass.
         if (minBond == 0) revert InvalidMinBond();
 
-        // ──── M-10 / [C-02]: bond attestation verified with bondSigner ────
-        // The second parameter is `bondSigner`, NOT `oracleSigner`. This
-        // is the core of the C-02 fix — a compromise of the price oracle
-        // key cannot forge a bond attestation because this site reads
-        // from a different storage slot.
+        // ──── Bond attestation verified with bondSigner ────
+        // The second parameter is `bondSigner`, NOT `oracleSigner`. A
+        // compromise of the price oracle key cannot forge a bond
+        // attestation because this site reads from a different storage slot.
         OracleVerifier.requireValidBondAttestation(
             a.bondAttestation,
             bondSigner,
@@ -267,11 +207,11 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
         if (pending.status != STATUS_PENDING) {
             revert ExecutionNotPending(executionNonce, pending.status);
         }
-        // M-11 fix + [M-09 FIX]: proof must be submitted STRICTLY BEFORE the
-        // challenge window deadline. Changed from `>` to `>=` so that at the
-        // exact deadline timestamp, only slashExpired can proceed. This removes
-        // the race condition where the sequencer could choose the bond outcome
-        // by ordering submitProof vs slashExpired in the same block.
+        // Proof must be submitted STRICTLY BEFORE the challenge window
+        // deadline. Uses `>=` so that at the exact deadline timestamp,
+        // only slashExpired can proceed. This removes the race condition
+        // where the sequencer could choose the bond outcome by ordering
+        // submitProof vs slashExpired in the same block.
         if (block.timestamp >= pending.deadline) {
             revert ProofTooLate(executionNonce, pending.deadline, block.timestamp);
         }
@@ -330,7 +270,7 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
         if (window < MIN_CHALLENGE_WINDOW || window > MAX_CHALLENGE_WINDOW) {
             revert InvalidChallengeWindow(window, MIN_CHALLENGE_WINDOW, MAX_CHALLENGE_WINDOW);
         }
-        // L-05: do not shorten the challenge window for ALREADY-PENDING executions.
+        // Do not shorten the challenge window for ALREADY-PENDING executions.
         // We can't cheaply iterate all pendings, but we can require that no
         // pending executions exist when shortening. Lengthening is always safe.
         if (window < challengeWindow && _pendingCount > 0) {
@@ -343,7 +283,7 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
     /// @inheritdoc IOptimisticKernelVault
     function setMinBond(uint256 amount) external {
         if (msg.sender != owner) revert NotOwner();
-        // M-08: setMinBond(0) neutralizes optimistic security; require a non-zero
+        // setMinBond(0) neutralizes optimistic security; require a non-zero
         // vault-level floor. The WSTONBondManager also enforces its own global
         // floor, so the effective minimum is max(vault.minBond, manager.minBondFloor).
         if (amount == 0) revert InvalidMinBond();
@@ -354,14 +294,14 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
     /// @inheritdoc IOptimisticKernelVault
     function setMaxPending(uint256 max) external {
         if (msg.sender != owner) revert NotOwner();
-        // L-06: explicitly reject zero to prevent silent disabling.
+        // Explicitly reject zero to prevent silent disabling.
         if (max == 0) revert InvalidMaxPendingZero();
         if (max > MAX_MAX_PENDING) {
             revert InvalidMaxPending(max, MAX_MAX_PENDING);
         }
-        // L-43 fix: reject reductions below the current pending count,
-        // otherwise executeOptimistic becomes permanently locked until all
-        // pending slots drain (potentially never if any are contested).
+        // Reject reductions below the current pending count, otherwise
+        // executeOptimistic becomes permanently locked until all pending
+        // slots drain (potentially never if any are contested).
         if (max < _pendingCount) {
             revert InvalidMaxPending(max, _pendingCount);
         }
@@ -369,52 +309,27 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
         _emitConfig();
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // [C-01 FIX] Preconditions for enabling optimistic execution
-    // [C-02 FIX] Bond signer role separation enforced at enable time
-    // ─────────────────────────────────────────────────────────────────────
-    // This setter is the PRIMARY GATE — it prevents new deployments from
-    // ever entering a vulnerable state. The runtime fail-safes in
-    // `_verifyOptimisticOracleAndBond` cover legacy deployments that may
-    // have been enabled before these fixes.
-    //
-    // Six preconditions are enforced when enabling (in order):
-    //   1. Only the vault owner may enable.
-    //   2. [M-25] `oracleSigner` must be set — Role A price verification.
-    //   3. [M-25] `bondChainId` must be set — bond attestation binding.
-    //   4. [C-01] `minBond > 0` — prevents the zero-bond drain path.
-    //   5. [C-02] `bondSigner` must be set — Role B bond verification.
-    //   6. [C-02] `bondSigner` must differ from `oracleSigner` — role
-    //      separation invariant.
-    //
-    // DISABLING (enabled == false) has NO preconditions — the owner can
-    // always stop new optimistic executions. Pending executions continue
-    // through their normal challenge window.
-    // ─────────────────────────────────────────────────────────────────────
-
     /// @inheritdoc IOptimisticKernelVault
     function setOptimisticEnabled(bool enabled) external {
         if (msg.sender != owner) revert NotOwner();
         if (enabled) {
-            // [M-25] Both oracleSigner (used by Role A / price verification)
+            // Both oracleSigner (used by Role A / price verification)
             // AND bondChainId (binding for the L1 bond attestation) must
             // be configured before optimistic mode can be enabled.
             if (oracleSigner == address(0)) revert OracleSignerNotSet();
             if (bondChainId == 0) revert BondManagerNotSet();
 
-            // [C-01] Reject enablement with `minBond == 0`. The downstream
+            // Reject enablement with `minBond == 0`. The downstream
             // `bondAmount < minBond` comparison evaluates `0 < 0 = false`,
-            // so a forged zero-bond attestation would bypass the floor and
-            // allow a zero-stake execution with no slash target. This is
-            // the deployment-order vulnerability closed by the C-01 fix.
+            // so a zero-bond attestation would bypass the floor and allow
+            // a zero-stake execution with no slash target.
             if (minBond == 0) revert InvalidMinBond();
 
-            // [C-02] The bond attestation signer MUST be set AND MUST be
-            // distinct from the oracle (price) signer. Without this
-            // separation, a single-key compromise escalates from
-            // semi-trusted (price manipulation) to fully-trusted
-            // (protocol-wide unbonded drain) authority. The enforcement
-            // is ALSO re-checked at every verification in
+            // The bond attestation signer MUST be set AND MUST be distinct
+            // from the oracle (price) signer. Without this separation, a
+            // single-key compromise escalates from semi-trusted (price
+            // manipulation) to fully-trusted (unbonded drain) authority.
+            // Also re-checked at every verification in
             // `_verifyOptimisticOracleAndBond` as defense in depth.
             if (bondSigner == address(0)) revert BondSignerNotSet();
             if (bondSigner == oracleSigner) revert BondSignerMustDiffer();
@@ -424,13 +339,13 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
     }
 
     /// @inheritdoc IOptimisticKernelVault
-    /// @dev L-11 fix: forbid rotating bondChainId while pending optimistic
-    ///      executions exist. Pending oracle attestations are already bound
-    ///      to the previous `bondChainId`; rotating it would invalidate the
+    /// @dev Forbids rotating bondChainId while pending optimistic executions
+    ///      exist. Pending oracle attestations are already bound to the
+    ///      previous `bondChainId`; rotating it would invalidate the
     ///      attestation and break slash finalization for in-flight executions.
     function setBondChainId(uint256 _bondChainId) external {
         if (msg.sender != owner) revert NotOwner();
-        // M-10: reject zero chain id. Further validation (known L1) is a policy
+        // Reject zero chain id. Further validation (known L1) is a policy
         // concern left to the owner.
         if (_bondChainId == 0) revert InvalidBondChainId();
         if (_pendingCount > 0) revert TooManyPending(_pendingCount, 0);
@@ -442,50 +357,8 @@ contract OptimisticKernelVault is KernelVault, IOptimisticKernelVault {
         emit OptimisticConfigUpdated(challengeWindow, minBond, maxPending, optimisticEnabled);
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // [H-01 FIX] Block settlement while optimistic executions are pending
-    // ─────────────────────────────────────────────────────────────────────
-    // VULNERABILITY:
-    //   Before this fix, the vault owner could exploit a settle-race:
-    //     1. Call executeOptimistic() — mints management/performance fee
-    //        shares from the post-action PPS, BEFORE any challenge window.
-    //     2. Call settle() — unconditionally clears
-    //        snapshotTotalAssets/snapshotTotalShares/strategyActive/
-    //        strategyActivatedAt, destroying the slash calculation basis
-    //        for any still-pending execution.
-    //     3. After challenge window passes, challengers who call
-    //        submitProof() find the slash basis is 0 → no actual slash
-    //        occurs, and the owner retains the fee shares minted in (1).
-    //   The audit PoC (Test_CH02_SettleRaceWithFees) minted 1,417,800,000,000
-    //   fee shares post-settle while snapshotTotalAssets was confirmed 0.
-    //
-    // FIX:
-    //   Override `_settle` to reject the call while `_pendingCount > 0`.
-    //   This blocks BOTH entry points — `settle()` (owner) and
-    //   `emergencySettle()` (permissionless after 7 days) — because both
-    //   route through `_settle` in the parent contract.
-    //
-    // LIVENESS:
-    //   - Pending executions have a bounded challenge window (max 24 hours).
-    //   - After the per-execution deadline, ANYONE may call `slashExpired`
-    //     or `submitProof` to resolve the pending execution. Each resolution
-    //     decrements `_pendingCount`.
-    //   - Only once every pending execution has been resolved can
-    //     `settle()` or `emergencySettle()` proceed.
-    //   - The `EMERGENCY_SETTLE_DELAY` (7 days) is much longer than the
-    //     maximum challenge window (24 hours), so legitimate stuck
-    //     scenarios always have time to drain the pending queue before
-    //     emergencySettle becomes callable.
-    //
-    // INTERACTION WITH OTHER FIXES:
-    //   - The `selfSlash` function (owner-triggered voluntary slash)
-    //     decrements `_pendingCount` and is available as a release valve
-    //     if the owner wants to walk away from a pending execution
-    //     without waiting for the challenge window.
-    // ─────────────────────────────────────────────────────────────────────
-
-    /// @notice [H-01] Guarded settlement — rejects settlement while
-    ///         optimistic executions are still pending challenge.
+    /// @notice Guarded settlement — rejects settlement while optimistic
+    ///         executions are still pending challenge.
     /// @dev Overrides the KernelVault implementation to add the pending-
     ///      count guard. Both `settle()` and `emergencySettle()` in
     ///      KernelVault route through `_settle`, so the guard covers both.

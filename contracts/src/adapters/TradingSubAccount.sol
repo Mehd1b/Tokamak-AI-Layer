@@ -276,7 +276,7 @@ contract TradingSubAccount {
         emit OrderSubmitted(perpAsset, isBuy, px, sz, true, TIF_IOC);
     }
 
-    /// @notice DEPRECATED — C-05 fix: this function used MIN_PRICE/MAX_PRICE which
+    /// @notice DEPRECATED — this function used MIN_PRICE/MAX_PRICE which
     ///         lie outside HyperCore's oracle price band and are silently dropped by
     ///         the CoreWriter system contract, leaving the EVM side believing the
     ///         position was closed while HyperCore state is unchanged. Always use

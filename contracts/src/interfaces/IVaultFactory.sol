@@ -49,7 +49,7 @@ interface IVaultFactory {
     /// @param asset The ERC20 asset address (or address(0) for ETH)
     /// @param userSalt A unique salt chosen by the user
     /// @param bondChainId The L1 chain ID where bonds are locked
-    /// @param challengeWindow The challenge window duration (M-17)
+    /// @param challengeWindow The challenge window duration
     /// @return vault The computed vault address
     /// @return salt The CREATE2 salt used for deployment
     function computeOptimisticVaultAddress(

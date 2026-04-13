@@ -52,7 +52,7 @@ contract PolymarketAdapter is ReentrancyGuard {
 
     mapping(address vault => VaultConfig) public vaultConfigs;
 
-    /// @notice Per-vault USDC position (H-02 fix).
+    /// @notice Per-vault USDC position.
     /// @dev The adapter pools USDC across vaults for CTF trades. Without per-vault
     ///      accounting, a single vault could withdraw every vault's USDC via
     ///      `withdrawToVault()`. This mapping enforces isolation.
@@ -120,7 +120,7 @@ contract PolymarketAdapter is ReentrancyGuard {
     ) external {
         if (msg.sender != vaultFactory && msg.sender != owner()) revert NotFactoryOrOwner();
         if (vaultConfigs[vault].registered) revert VaultAlreadyRegistered();
-        // L-39 fix: verify the vault is actually a factory-deployed vault.
+        // Verify the vault is actually a factory-deployed vault.
         // Previously the caller authority check (factory OR deployer) did NOT
         // validate the vault address itself, so the adapter deployer could
         // register arbitrary contracts — bypassing the vault isolation model.
@@ -135,7 +135,7 @@ contract PolymarketAdapter is ReentrancyGuard {
             registered: true
         });
 
-        // NOTE (L-14): the unlimited USDC approval to the CTF Exchange was removed.
+        // NOTE: the unlimited USDC approval to the CTF Exchange was removed.
         // It is not needed while the trading functions are stubs, and would allow a
         // compromised CTF Exchange to drain every vault's pooled USDC.
 
@@ -185,7 +185,7 @@ contract PolymarketAdapter is ReentrancyGuard {
         revert NotImplemented();
     }
 
-    /// @notice Withdraw the calling vault's tracked USDC balance (H-02 fix).
+    /// @notice Withdraw the calling vault's tracked USDC balance.
     /// @dev Only drains the caller's own tracked balance, not the adapter's
     ///      aggregate USDC — this prevents cross-vault theft.
     function withdrawToVault() external onlyRegisteredVault nonReentrant {

@@ -12,7 +12,7 @@ contract ReferralManager {
     /// @notice Contract owner
     address public owner;
 
-    /// @notice Addresses authorized to record referrals (L-11 fix).
+    /// @notice Addresses authorized to record referrals.
     /// @dev Only authorized vaults/factory can call recordReferral — prevents
     ///      self-crediting and arbitrary cap-exhausting calls.
     mapping(address => bool) public authorizedRecorders;
@@ -77,7 +77,7 @@ contract ReferralManager {
     /// @notice Depositor has already been referred
     error AlreadyReferred();
 
-    /// @notice Caller is not an authorized recorder (L-11)
+    /// @notice Caller is not an authorized recorder
     error NotAuthorizedRecorder();
 
     // ============ Constructor ============
@@ -121,15 +121,15 @@ contract ReferralManager {
         emit CodeRegistered(msg.sender, codeHash);
     }
 
-    /// @notice Authorize or revoke a recorder (L-11)
-    /// @dev L-51 fix: emit an event so off-chain monitoring can audit the
+    /// @notice Authorize or revoke a recorder
+    /// @dev Emit an event so off-chain monitoring can audit the
     ///      authorized recorder set.
     function setAuthorizedRecorder(address recorder, bool allowed) external onlyOwner {
         authorizedRecorders[recorder] = allowed;
         emit AuthorizedRecorderSet(recorder, allowed);
     }
 
-    /// @notice Record a referred deposit. L-11: only authorized recorders (vaults,
+    /// @notice Record a referred deposit. Only authorized recorders (vaults,
     ///         factory, trusted backend) may call this to prevent arbitrary self-crediting.
     /// @param depositor The address that made the deposit
     /// @param codeHash The keccak256 hash of the referral code used

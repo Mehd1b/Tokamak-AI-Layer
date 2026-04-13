@@ -343,7 +343,7 @@ contract UniswapV4Adapter is ReentrancyGuard {
     /// @dev Only callable by the vault owner
     /// @param vault The vault to configure
     /// @param fee New default fee tier (e.g., 500, 3000, 10000)
-    /// @dev L-54 fix: reject zero-fee (would silently change routing to an
+    /// @dev Reject zero-fee (would silently change routing to an
     ///      unintended tier) and emit a dedicated event so admin changes are
     ///      observable off-chain.
     function setDefaultFee(address vault, uint24 fee) external nonReentrant {
@@ -687,7 +687,7 @@ contract UniswapV4Adapter is ReentrancyGuard {
 
     // ============ ERC721 Receiver ============
 
-    /// @notice L-06 fix: implement ERC721Receiver so the Uniswap V4 position
+    /// @notice Implement ERC721Receiver so the Uniswap V4 position
     ///         manager can `safeTransferFrom` position NFTs to this adapter.
     ///         Without this selector, any `safeTransferFrom` call reverts and
     ///         the LP NFT becomes permanently unclaimable.

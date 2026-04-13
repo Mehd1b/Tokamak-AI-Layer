@@ -389,7 +389,7 @@ contract BuilderProgram {
         // If builder already has a grant, add to it (keeping earliest startTime)
         Grant storage g = grants[builder];
         if (g.totalAmount > 0) {
-            // L-16 fix: reject top-ups on grants that have already fully vested.
+            // Reject top-ups on grants that have already fully vested.
             // Otherwise the incremental amount would be immediately claimable
             // (getClaimable returns g.totalAmount when elapsed >= duration),
             // bypassing the vesting schedule entirely.
@@ -398,7 +398,7 @@ contract BuilderProgram {
             }
             // Top-up: add amount, keep existing vesting schedule
             g.totalAmount += amount;
-            // L-53 fix: the stored schedule was NOT updated by the top-up, so
+            // The stored schedule was NOT updated by the top-up, so
             // emit the ACTUAL in-effect vestingDuration rather than the caller's
             // parameter that would mislead indexers.
             emit GrantAllocated(builder, amount, g.vestingDuration);

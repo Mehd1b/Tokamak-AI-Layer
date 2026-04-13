@@ -379,7 +379,7 @@ contract AgentRegistry is IAgentRegistry, Initializable, UUPSUpgradeable {
     }
 
     /// @inheritdoc IAgentRegistry
-    /// @dev L-45 fix: walk the successor chain to reject multi-hop cycles.
+    /// @dev Walk the successor chain to reject multi-hop cycles.
     ///      Previously only direct self-loops (`A → A`) were blocked, so
     ///      `setSuccessor(A, B)` followed by `setSuccessor(B, A)` created
     ///      an unbounded traversal for any consumer following successor links.

@@ -74,7 +74,7 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     address public pendingOwner;
 
     // ─────────────────────────────────────────────────────────────────────
-    // [M-07 FIX] Code store swap timelock state
+    // Code store swap timelock state
     // ─────────────────────────────────────────────────────────────────────
     // setVaultCreationCodeStore and setOptimisticVaultCreationCodeStore were
     // simple onlyOwner setters with no timelock. A compromised owner key could
@@ -248,7 +248,7 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // [M-07 FIX] Code store swap with timelock (schedule → wait → activate)
+    // Code store swap with timelock (schedule → wait → activate)
     // ──────────────────��─────────────────────────────────────��────────────
 
     /// @notice Set vault creation code store directly (only works for initial setup when current is zero).
@@ -506,7 +506,7 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
             revert AgentNotRegistered(agentId);
         }
 
-        // Compute CREATE2 address — include challengeWindow (M-17)
+        // Compute CREATE2 address — include challengeWindow
         bytes memory bytecode = _getOptimisticCreationBytecode(
             asset, agentId, agentInfo.imageId, owner_, bondChainId, challengeWindow
         );

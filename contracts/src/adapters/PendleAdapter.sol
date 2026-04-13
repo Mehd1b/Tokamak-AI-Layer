@@ -197,7 +197,7 @@ contract PendleAdapter is ReentrancyGuard {
     /// @notice Mapping from vault => market => position balances (PT/YT/LP)
     mapping(address vault => mapping(address market => MarketPosition)) public positions;
 
-    /// @notice [M-04 FIX] Aggregate position totals per market across all vaults.
+    /// @notice Aggregate position totals per market across all vaults.
     /// @dev Used to compute each vault's pro-rata share of claimed rewards.
     ///      Updated whenever a vault's position changes (mint, redeem, add/remove liquidity).
     mapping(address market => MarketPosition) public totalPositions;
@@ -373,7 +373,7 @@ contract PendleAdapter is ReentrancyGuard {
         if (msg.sender != IKernelVaultOwner(vault).owner()) revert NotVaultOwner();
         if (market == address(0)) revert ZeroAddress();
 
-        // [M-06 FIX] Prevent de-listing markets with active positions. Without
+        // Prevent de-listing markets with active positions. Without
         // this check, all exit paths (withdrawToVault, redeemPtYt, removeLiquidity,
         // swapExactPtForToken) become unreachable because they are gated by
         // onlyWhitelistedMarket, permanently locking PT/YT/LP tokens.
@@ -400,7 +400,7 @@ contract PendleAdapter is ReentrancyGuard {
     function setExpiryBuffer(address vault, uint256 newBuffer) external nonReentrant {
         if (!vaultConfigs[vault].registered) revert VaultNotRegistered();
         if (msg.sender != IKernelVaultOwner(vault).owner()) revert NotVaultOwner();
-        // L-37 fix: enforce a minimum buffer so opening positions seconds
+        // Enforce a minimum buffer so opening positions seconds
         // before market expiry (where PT/YT redemption math is non-standard)
         // remains impossible.
         require(newBuffer >= MIN_EXPIRY_BUFFER, "buffer below min");
@@ -610,7 +610,7 @@ contract PendleAdapter is ReentrancyGuard {
         });
 
         // Default approx params for Pendle's iterative solver.
-        // L-38 fix: bound `guessMax` proportionally to the caller's minPtOut so
+        // Bound `guessMax` proportionally to the caller's minPtOut so
         // Newton-Raphson cannot diverge over the full uint256 range under
         // adversarial pool skew (each iteration operates over the full range ⇒
         // DoS). `minPtOut * 1024` gives the solver 10× search headroom while
@@ -708,7 +708,7 @@ contract PendleAdapter is ReentrancyGuard {
         // Approve market to burn LP tokens
         IERC20(market).forceApprove(pendleRouter, lpAmount);
 
-        // M-02 fix: PT must be received by THIS adapter so the tracked ptBalance
+        // PT must be received by THIS adapter so the tracked ptBalance
         // reflects a real, spendable balance. Previously `receiver = msg.sender`
         // sent PT to the vault but we still credited ptBalance here, producing
         // "phantom" PT that later swaps would fail on.
@@ -779,7 +779,7 @@ contract PendleAdapter is ReentrancyGuard {
             address(this), emptySys, emptyYts, markets
         );
 
-        // [M-04 FIX] Compute the calling vault's pro-rata share of rewards.
+        // Compute the calling vault's pro-rata share of rewards.
         // Rewards accrue based on YT and LP holdings. We compute the vault's
         // share as: (vault YT + LP) / (total YT + LP) across all requested markets.
         uint256 vaultWeight;
@@ -807,7 +807,7 @@ contract PendleAdapter is ReentrancyGuard {
     }
 
     /// @notice Emergency withdraw PT, YT, LP, and any SY the adapter holds for the
-    ///         calling vault back into the vault's custody (M-04 fix).
+    ///         calling vault back into the vault's custody.
     /// @dev Transfers tracked token balances; does NOT unwind positions through the
     ///      router (which could fail under market stress). The vault can subsequently
     ///      redeem/swap the tokens at its discretion. Per-vault tracked balances are
@@ -824,7 +824,7 @@ contract PendleAdapter is ReentrancyGuard {
         uint256 lpOut = pos.lpBalance;
 
         // Clear the tracked position first (checks-effects-interactions)
-        // [M-04 FIX] Also decrement totalPositions aggregate
+        // Also decrement totalPositions aggregate
         if (ptOut > 0) totalPositions[market].ptBalance -= ptOut;
         if (ytOut > 0) totalPositions[market].ytBalance -= ytOut;
         if (lpOut > 0) totalPositions[market].lpBalance -= lpOut;

@@ -15,7 +15,7 @@ interface IKernelVaultLike {
     function totalAssets() external view returns (uint256);
     /// @notice Returns the frozen pre-strategy snapshot during an active strategy, and
     ///         the live totalAssets at other times. MetaVault MUST use this for NAV
-    ///         pricing during an active strategy (H-01).
+    ///         pricing during an active strategy.
     function effectiveTotalAssets() external view returns (uint256);
     function totalShares() external view returns (uint256);
     function shares(address account) external view returns (uint256);
@@ -83,7 +83,7 @@ contract MetaVault is ReentrancyGuard {
     /// @notice Timestamp of the last rebalance
     uint256 public lastRebalanceTimestamp;
 
-    /// @notice Internally-tracked idle balance (M-14 fix).
+    /// @notice Internally-tracked idle balance.
     /// @dev NAV calculations use this value rather than `baseAsset.balanceOf(this)`,
     ///      which prevents a direct ERC20 donation from inflating NAV and diluting
     ///      new depositors. Any balance above `trackedIdle` can be reclaimed via
@@ -101,10 +101,10 @@ contract MetaVault is ReentrancyGuard {
     /// @notice Emitted after a successful rebalance
     event Rebalanced(uint256 timestamp, uint256 navBefore, uint256 navAfter);
 
-    /// @notice L-51: emitted when sweepDonations transfers excess balance to owner
+    /// @notice Emitted when sweepDonations transfers excess balance to owner
     event DonationSwept(address indexed to, uint256 amount);
 
-    /// @notice L-26: emitted when a single vault withdrawal in the multi-vault
+    /// @notice Emitted when a single vault withdrawal in the multi-vault
     ///         path reverts and is skipped (rather than cascading-revert).
     event UnderlyingWithdrawFailed(address indexed vault, uint256 requested);
 
@@ -186,7 +186,7 @@ contract MetaVault is ReentrancyGuard {
         shares[msg.sender] += sharesOut;
         totalShares += sharesOut;
 
-        // M-14 fix: credit the tracked idle balance with the actual received amount.
+        // Credit the tracked idle balance with the actual received amount.
         trackedIdle += actualReceived;
 
         emit Deposit(msg.sender, actualReceived, sharesOut);
@@ -204,18 +204,16 @@ contract MetaVault is ReentrancyGuard {
 
         uint256 nav = getNav();
 
-        // M-01 fix: use the same virtual-offset formula as deposit. Without the
+        // Use the same virtual-offset formula as deposit. Without the
         // DECIMALS_OFFSET term the withdraw path over-pays early-stage withdrawers
         // relative to the offset-protected deposit path.
         assetsOut = (metaShares * (nav + 1)) / (totalShares + DECIMALS_OFFSET);
         if (assetsOut == 0) revert ZeroAssetsOut();
 
-        // L-04 fix: ensure sufficient assets BEFORE burning shares. If the pull
+        // Ensure sufficient assets BEFORE burning shares. If the pull
         // from underlyings reverts, the user keeps their shares.
         //
-        // L-12 fix: previously trackedIdle was OVERWRITTEN with the live balance
-        // here, absorbing any direct donation into the next withdrawer's
-        // proceeds. `_withdrawFromVault` already increments trackedIdle with
+        // `_withdrawFromVault` already increments trackedIdle with
         // the actual delta, so no overwrite is needed — donations remain
         // isolated from NAV until explicitly swept via `sweepDonations`.
         uint256 idle = trackedIdle;
@@ -228,7 +226,7 @@ contract MetaVault is ReentrancyGuard {
         shares[msg.sender] -= metaShares;
         totalShares -= metaShares;
 
-        // Cap to tracked idle (M-14: donations are NOT used to service withdrawals)
+        // Cap to tracked idle (donations are NOT used to service withdrawals)
         uint256 available = trackedIdle;
         if (assetsOut > available) {
             // Allow 1 unit of dust for rounding, revert on material shortfall
@@ -357,11 +355,10 @@ contract MetaVault is ReentrancyGuard {
     }
 
     /// @notice Sweep ERC20 donations above the tracked idle to the owner.
-    /// @dev M-14: prevents donation NAV inflation. Anyone who transfers baseAsset
+    /// @dev Prevents donation NAV inflation. Anyone who transfers baseAsset
     ///      directly to the MetaVault forfeits those funds — the owner can reclaim
     ///      the delta between the true balance and the tracked idle without
-    ///      affecting NAV.
-    /// @dev L-51 fix: emit an event so silent admin outflows are observable.
+    ///      affecting NAV. Emits an event so admin outflows are observable.
     function sweepDonations() external nonReentrant onlyOwner {
         uint256 actual = baseAsset.balanceOf(address(this));
         if (actual > trackedIdle) {
@@ -397,7 +394,7 @@ contract MetaVault is ReentrancyGuard {
             targetWeights[vaults[i]] = newWeightsBps[i];
         }
 
-        // M-06 fix: validate the GLOBAL weight sum across ALL underlying vaults,
+        // Validate the GLOBAL weight sum across ALL underlying vaults,
         // not just the submitted array. Omitted vaults retain their stale weight
         // which can push targets above 100% of NAV.
         uint256 globalSum;
@@ -484,7 +481,7 @@ contract MetaVault is ReentrancyGuard {
             revert VaultAssetMismatch(vault);
         }
 
-        // L-42 fix: ensure the NEW global weight sum does not exceed BPS_DENOMINATOR.
+        // Ensure the NEW global weight sum does not exceed BPS_DENOMINATOR.
         // Over-allocation is what permits the rebalance over-withdraw window.
         uint256 newSum = weightBps;
         for (uint256 i = 0; i < underlyingVaults.length; i++) {
@@ -502,14 +499,14 @@ contract MetaVault is ReentrancyGuard {
     }
 
     /// @notice Remove an underlying vault from the whitelist
-    /// @dev [M-12 FIX] First redeems any remaining shares (including dust from
+    /// @dev First redeems any remaining shares (including dust from
     ///      integer-division rounding). Uses share-based redemption to ensure ALL
     ///      shares are burned, preventing permanent dust stranding.
     /// @param vault Address of the KernelVault to remove
     function removeVault(address vault) external onlyOwner {
         if (!isUnderlyingVault[vault]) revert VaultNotWhitelisted(vault);
 
-        // [M-12 FIX] Redeem any remaining shares (including dust) before removing.
+        // Redeem any remaining shares (including dust) before removing.
         // Integer division in share-to-asset conversion can leave 1-1000 wei of
         // shares that are too small to redeem via asset-based withdrawal. By
         // redeeming ALL remaining shares here, dust is swept cleanly.
@@ -543,7 +540,7 @@ contract MetaVault is ReentrancyGuard {
     /// @notice Calculate the total net asset value of the MetaVault
     /// @return Total NAV = idle base asset balance + sum of underlying vault allocations
     function getNav() public view returns (uint256) {
-        // M-14 fix: use the tracked idle balance (not baseAsset.balanceOf(this))
+        // Use the tracked idle balance (not baseAsset.balanceOf(this))
         // so unsolicited donations cannot inflate NAV.
         uint256 idle = trackedIdle;
         uint256 underlyingValue;
@@ -606,11 +603,11 @@ contract MetaVault is ReentrancyGuard {
         uint256 myShares = kv.shares(address(this));
         if (myShares == 0) return 0;
 
-        // H-01 fix: use effectiveTotalAssets() rather than totalAssets(). During an
+        // Use effectiveTotalAssets() rather than totalAssets(). During an
         // active strategy the vault's live totalAssets() is the depleted balance,
         // but the vault prices withdrawals against the frozen pre-strategy snapshot.
         // Using the snapshot here makes MetaVault deposits/withdrawals consistent
-        // with the KernelVault's own pricing, closing the undervalue-and-grab window.
+        // with the KernelVault's own pricing.
         uint256 vaultTotalAssets = kv.effectiveTotalAssets();
         uint256 vaultTotalShares = kv.totalShares();
 
@@ -621,7 +618,7 @@ contract MetaVault is ReentrancyGuard {
 
     /// @notice Withdraw deficit from underlying vaults in reverse weight order (heaviest last)
     /// @param deficit Amount of base asset needed beyond idle balance
-    /// @dev L-26 fix: wrap each vault withdrawal in try/catch via an
+    /// @dev Wraps each vault withdrawal in try/catch via an
     ///      external wrapper so that a single underlying reverting (e.g.
     ///      because it is strategy-locked) does NOT cascade into a DoS
     ///      for all MetaVault depositors. Failed vaults are skipped and
@@ -657,7 +654,7 @@ contract MetaVault is ReentrancyGuard {
         uint256 myShares = kv.shares(address(this));
         if (myShares == 0) return 0;
 
-        // H-01: price our shares against effectiveTotalAssets (snapshot during
+        // Price our shares against effectiveTotalAssets (snapshot during
         // active strategy) so the computed sharesToBurn is consistent with the
         // vault's own pricing.
         uint256 vaultTotalAssets = kv.effectiveTotalAssets();

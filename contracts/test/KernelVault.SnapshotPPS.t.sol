@@ -396,17 +396,18 @@ contract KernelVaultSnapshotPPSTest is Test {
         vm.prank(userA);
         vault.depositERC20Tokens(100 ether);
 
-        // Build two TRANSFER_ERC20 actions: first sends 30, second sends 20
+        // Build two TRANSFER_ERC20 actions: first sends 25, second sends 15
+        // Total = 40 ether = 40% of initial balance (exactly at cumulative cap)
         bytes memory agentOutput =
-            _buildTwoTransferActions(externalProtocol, 30 ether, externalProtocol, 20 ether);
+            _buildTwoTransferActions(externalProtocol, 25 ether, externalProtocol, 15 ether);
         _executeWithCommitment(vault, agentOutput);
 
         assertTrue(vault.strategyActive());
         // Snapshot should capture state BEFORE first decrease (100 tokens, 100_000 shares)
         assertEq(vault.snapshotTotalAssets(), 100 ether);
         assertEq(vault.snapshotTotalShares(), 100 ether * OFFSET);
-        // Actual balance is 50 (100 - 30 - 20)
-        assertEq(vault.totalAssets(), 50 ether);
+        // Actual balance is 60 (100 - 25 - 15)
+        assertEq(vault.totalAssets(), 60 ether);
     }
 
     // ============ ETH Vault ============

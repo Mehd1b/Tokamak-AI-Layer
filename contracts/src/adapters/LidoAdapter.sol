@@ -210,7 +210,7 @@ contract LidoAdapter is ReentrancyGuard {
         emit ETHStaked(msg.sender, msg.value, stETHReceived);
     }
 
-    /// @notice Sync rebase gains/losses into per-vault stETH balances (M-13).
+    /// @notice Sync rebase gains/losses into per-vault stETH balances.
     /// @dev stETH rebases daily; without syncing, yield accrues to the adapter
     ///      aggregate but is not distributed pro rata to vaults. Anyone can call
     ///      this to reconcile tracked balances with the adapter's actual stETH
@@ -231,7 +231,7 @@ contract LidoAdapter is ReentrancyGuard {
         totalTrackedStETH = actual;
     }
 
-    /// @notice Current pro-rata stETH claim for a vault after rebase (M-13).
+    /// @notice Current pro-rata stETH claim for a vault after rebase.
     /// @param vault The vault address
     /// @return The vault's current stETH claim including accrued rebase
     function vaultStETHShare(address vault) external view returns (uint256) {
@@ -264,7 +264,7 @@ contract LidoAdapter is ReentrancyGuard {
         // Update per-vault tracking
         vaultStETHBalance[msg.sender] -= stethAmount;
         vaultWstETHBalance[msg.sender] += actualReceived;
-        // L-01 fix: symmetric decrement — stETH is leaving the stETH tracking
+        // Symmetric decrement — stETH is leaving the stETH tracking
         // (being converted to wstETH), so the aggregate denominator must shrink.
         if (stethAmount > totalTrackedStETH) {
             totalTrackedStETH = 0;
@@ -294,7 +294,7 @@ contract LidoAdapter is ReentrancyGuard {
         // Update per-vault tracking
         vaultWstETHBalance[msg.sender] -= wstethAmount;
         vaultStETHBalance[msg.sender] += actualReceived;
-        // L-01 fix: symmetric increment — stETH is re-entering the stETH
+        // Symmetric increment — stETH is re-entering the stETH
         // tracking via the unwrap path, so the aggregate denominator must
         // grow by the actual amount received.
         totalTrackedStETH += actualReceived;
@@ -325,7 +325,7 @@ contract LidoAdapter is ReentrancyGuard {
 
         // Update tracking
         vaultStETHBalance[msg.sender] -= totalAmount;
-        // L-01 fix: stETH is leaving the adapter balance at request time (locked
+        // stETH is leaving the adapter balance at request time (locked
         // in the Lido withdrawal queue), so the aggregate denominator must also
         // shrink or subsequent `vaultStETHShare` reads will understate claims.
         if (totalAmount > totalTrackedStETH) {
@@ -366,7 +366,7 @@ contract LidoAdapter is ReentrancyGuard {
         IWithdrawalQueue(withdrawalQueue).claimWithdrawal(requestId);
         uint256 ethReceived = address(this).balance - ethBefore;
 
-        // L-48 fix: if the withdrawal claim returns zero ETH (edge case, e.g.
+        // If the withdrawal claim returns zero ETH (edge case, e.g.
         // the request was never fulfillable), revert so we do not silently
         // leave the vault with neither stETH nor ETH while the request is
         // irretrievably removed from tracking.
@@ -394,12 +394,12 @@ contract LidoAdapter is ReentrancyGuard {
         vaultWstETHBalance[msg.sender] = 0;
 
         // Transfer stETH to vault
-        // L-48 fix: use SafeERC20.safeTransfer instead of raw `transfer` so
+        // Use SafeERC20.safeTransfer instead of raw `transfer` so
         // non-compliant return values (stETH does not always revert on failure)
         // are caught and revert explicitly.
         uint256 stETHReturned;
         if (stETHAmount > 0) {
-            // [M-05 FIX] Use pro-rata share of actual stETH balance instead of
+            // Use pro-rata share of actual stETH balance instead of
             // nominal tracked amount. After a Lido slash (negative rebase), the
             // adapter's actual stETH < totalTrackedStETH. Using nominal amounts
             // would let the first caller get their full nominal amount while the

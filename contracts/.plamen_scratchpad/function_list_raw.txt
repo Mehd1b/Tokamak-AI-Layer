@@ -1,0 +1,455 @@
+src/MockYieldSource.sol:56:    function withdraw(address depositor) external {
+src/MockYieldSource.sol:81:    function getDeposit(address depositor) external view returns (uint256) {
+src/MockYieldSource.sol:88:    function getProjectedWithdrawal(address depositor) external view returns (uint256) {
+src/KernelOutputParser.sol:81:    function parseActions(bytes calldata data) public pure returns (Action[] memory actions) {
+src/KernelOutputParser.sol:187:    function encodeAction(Action memory action) internal pure returns (bytes memory) {
+src/KernelOutputParser.sol:233:    function encodeAgentOutput(Action[] memory actions) internal pure returns (bytes memory) {
+src/KernelOutputParser.sol:266:    function _readU32LE(bytes calldata data, uint256 offset) private pure returns (uint32) {
+src/KernelOutputParser.sol:272:    function _readBytes32(bytes calldata data, uint256 offset)
+src/OptimisticKernelVault.sol:74:    function executeOptimistic(
+src/OptimisticKernelVault.sol:201:    function _verifyOptimisticOracleAndBond(OptimisticVerifyArgs memory a) internal view {
+src/OptimisticKernelVault.sol:265:    function submitProof(uint64 executionNonce, bytes calldata seal) external nonReentrant {
+src/OptimisticKernelVault.sol:293:    function slashExpired(uint64 executionNonce) external nonReentrant {
+src/OptimisticKernelVault.sol:310:    function selfSlash(uint64 executionNonce) external nonReentrant {
+src/OptimisticKernelVault.sol:328:    function setChallengeWindow(uint256 window) external {
+src/OptimisticKernelVault.sol:344:    function setMinBond(uint256 amount) external {
+src/OptimisticKernelVault.sol:355:    function setMaxPending(uint256 max) external {
+src/OptimisticKernelVault.sol:396:    function setOptimisticEnabled(bool enabled) external {
+src/OptimisticKernelVault.sol:431:    function setBondChainId(uint256 _bondChainId) external {
+src/OptimisticKernelVault.sol:441:    function _emitConfig() internal {
+src/OptimisticKernelVault.sol:492:    function _settle() internal override {
+src/OptimisticKernelVault.sol:502:    function getPendingExecution(uint64 nonce) external view returns (PendingExecution memory) {
+src/OptimisticKernelVault.sol:507:    function pendingCount() external view returns (uint256) {
+src/AgentRegistry.sol:11:    function agentId() external view returns (bytes32);
+src/AgentRegistry.sol:12:    function totalAssets() external view returns (uint256);
+src/AgentRegistry.sol:140:    function initialize(address initialOwner) external initializer {
+src/AgentRegistry.sol:149:    function owner() external view returns (address) {
+src/AgentRegistry.sol:157:    function transferOwnership(address newOwner) external onlyOwner {
+src/AgentRegistry.sol:164:    function acceptOwnership() external {
+src/AgentRegistry.sol:175:    function factory() external view returns (address) {
+src/AgentRegistry.sol:181:    function setFactory(address factory_) external onlyOwner {
+src/AgentRegistry.sol:193:    function scheduleImplementation(address newImplementation) external onlyOwner {
+src/AgentRegistry.sol:201:    function cancelImplementation() external onlyOwner {
+src/AgentRegistry.sol:212:    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+src/AgentRegistry.sol:226:    function computeAgentId(address author, bytes32 salt) external pure returns (bytes32) {
+src/AgentRegistry.sol:231:    function register(bytes32 salt, bytes32 imageId, bytes32 agentCodeHash)
+src/AgentRegistry.sol:266:    function update(bytes32 agentId, bytes32 newImageId, bytes32 newAgentCodeHash) external {
+src/AgentRegistry.sol:290:    function unregister(bytes32 agentId) external {
+src/AgentRegistry.sol:332:    function get(bytes32 agentId) external view returns (AgentInfo memory info) {
+src/AgentRegistry.sol:337:    function agentExists(bytes32 agentId) external view returns (bool) {
+src/AgentRegistry.sol:342:    function agentCount() external view returns (uint256) {
+src/AgentRegistry.sol:347:    function agentAt(uint256 index) external view returns (bytes32) {
+src/AgentRegistry.sol:352:    function getAllAgentIds() external view returns (bytes32[] memory) {
+src/AgentRegistry.sol:357:    function deprecate(bytes32 agentId) external {
+src/AgentRegistry.sol:369:    function undeprecate(bytes32 agentId) external {
+src/AgentRegistry.sol:386:    function setSuccessor(bytes32 agentId, bytes32 successorAgentId) external {
+src/AgentRegistry.sol:411:    function isDeprecated(bytes32 agentId) external view returns (bool) {
+src/AgentRegistry.sol:416:    function getSuccessor(bytes32 agentId) external view returns (bytes32) {
+src/AgentRegistry.sol:425:    function setMetadataURI(bytes32 agentId, string calldata uri) external {
+src/AgentRegistry.sol:436:    function getMetadataURI(bytes32 agentId) external view returns (string memory) {
+src/AgentRegistry.sol:446:    function _computeAgentId(address author, bytes32 salt) internal pure returns (bytes32) {
+src/ReferralManager.sol:101:    function transferOwnership(address newOwner) external onlyOwner {
+src/ReferralManager.sol:111:    function registerCode(string calldata code) external {
+src/ReferralManager.sol:127:    function setAuthorizedRecorder(address recorder, bool allowed) external onlyOwner {
+src/ReferralManager.sol:138:    function recordReferral(address depositor, bytes32 codeHash, uint256 amount, uint8 decimals) external {
+src/ReferralManager.sol:162:    function getPoints(address referrer) external view returns (uint256 points) {
+src/ReferralManager.sol:169:    function getReferrer(address depositor) external view returns (address referrer) {
+src/ReferralManager.sol:176:    function resolveCode(string calldata code) external view returns (address referrer) {
+src/ReferralManager.sol:184:    function getReferrals(address referrer) external view returns (address[] memory depositors) {
+src/ReferralManager.sol:191:    function hashCode(string calldata code) external pure returns (bytes32 codeHash) {
+src/BuilderProgram.sol:165:    function transferOwnership(address newOwner) external onlyOwner {
+src/BuilderProgram.sol:174:    function setAuthorizedUpdater(address updater, bool authorized) external onlyOwner {
+src/BuilderProgram.sol:184:    function registerBuilder(string calldata name, string calldata url) external {
+src/BuilderProgram.sol:216:    function updateStats(
+src/BuilderProgram.sol:239:    function updateStatsWithDecimals(
+src/BuilderProgram.sol:256:    function _updateStatsNormalized(
+src/BuilderProgram.sol:286:    function getTier(address builder) external view returns (Tier) {
+src/BuilderProgram.sol:294:    function getFeeSplit(address builder)
+src/BuilderProgram.sol:315:    function getBuilderStats(address builder) external view returns (Builder memory) {
+src/BuilderProgram.sol:323:    function getLeaderboard(uint256 offset, uint256 limit)
+src/BuilderProgram.sol:367:    function builderCount() external view returns (uint256) {
+src/BuilderProgram.sol:378:    function allocateGrant(
+src/BuilderProgram.sol:417:    function claimGrant() external {
+src/BuilderProgram.sol:433:    function getClaimable(address builder) public view returns (uint256) {
+src/BuilderProgram.sol:455:    function _computeTier(uint256 tvl) internal pure returns (Tier) {
+src/MockWSTON.sol:14:    function decimals() public pure override returns (uint8) {
+src/MockWSTON.sol:18:    function mint(address to, uint256 amount) external {
+src/VaultFactory.sol:162:    function initialize(
+src/VaultFactory.sol:182:    function owner() external view returns (address) {
+src/VaultFactory.sol:190:    function transferOwnership(address newOwner) external onlyOwner {
+src/VaultFactory.sol:198:    function acceptOwnership() external {
+src/VaultFactory.sol:219:    function scheduleImplementation(address newImplementation) external onlyOwner {
+src/VaultFactory.sol:227:    function cancelImplementation() external onlyOwner {
+src/VaultFactory.sol:235:    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+src/VaultFactory.sol:256:    function setVaultCreationCodeStore(address newStore) external onlyOwner {
+src/VaultFactory.sol:265:    function setOptimisticVaultCreationCodeStore(address newStore) external onlyOwner {
+src/VaultFactory.sol:274:    function scheduleVaultCreationCodeStore(address newStore) external onlyOwner {
+src/VaultFactory.sol:283:    function activateVaultCreationCodeStore() external onlyOwner {
+src/VaultFactory.sol:293:    function scheduleOptimisticVaultCreationCodeStore(address newStore) external onlyOwner {
+src/VaultFactory.sol:302:    function activateOptimisticVaultCreationCodeStore() external onlyOwner {
+src/VaultFactory.sol:324:    function setProtocolTreasury(address treasury) external onlyOwner {
+src/VaultFactory.sol:332:    function setDefaultProtocolFeeSplitBps(uint256 splitBps) external onlyOwner {
+src/VaultFactory.sol:341:    function registry() external view returns (address) {
+src/VaultFactory.sol:346:    function verifier() external view returns (address) {
+src/VaultFactory.sol:351:    function vaultCreationCodeStore() external view returns (address) {
+src/VaultFactory.sol:356:    function optimisticVaultCreationCodeStore() external view returns (address) {
+src/VaultFactory.sol:361:    function computeVaultAddress(address owner_, bytes32 agentId, address asset, bytes32 userSalt)
+src/VaultFactory.sol:391:    function deployVault(bytes32 agentId, address asset, bytes32 userSalt, bytes32 expectedImageId)
+src/VaultFactory.sol:438:    function deployOptimisticVault(
+src/VaultFactory.sol:492:    function computeOptimisticVaultAddress(
+src/VaultFactory.sol:527:    function vaultProtocolType(address vault) external view returns (uint8) {
+src/VaultFactory.sol:532:    function setVaultProtocolType(address vault, uint8 protocolType) external {
+src/VaultFactory.sol:547:    function registerExternalVault(address vault, bytes32 agentId) external onlyOwner {
+src/VaultFactory.sol:560:    function vaultCount() external view returns (uint256) {
+src/VaultFactory.sol:565:    function vaultAt(uint256 index) external view returns (address) {
+src/VaultFactory.sol:570:    function getAllVaults() external view returns (address[] memory) {
+src/VaultFactory.sol:575:    function getAgentVaults(bytes32 agentIdQuery) external view returns (address[] memory) {
+src/VaultFactory.sol:587:    function _computeSalt(address owner_, bytes32 agentId, address asset, bytes32 userSalt)
+src/VaultFactory.sol:601:    function _getCreationBytecode(
+src/VaultFactory.sol:619:    function _getOptimisticCreationBytecode(
+src/PointsProgram.sol:10:    function asset() external view returns (address);
+src/PointsProgram.sol:14:    function decimals() external view returns (uint8);
+src/PointsProgram.sol:221:    function _accrualNow() internal view returns (uint256) {
+src/PointsProgram.sol:230:    function transferOwnership(address newOwner) external onlyOwner {
+src/PointsProgram.sol:240:    function setSeasonEnd(uint256 timestamp) external onlyOwner {
+src/PointsProgram.sol:255:    function setAuthorizedCaller(address caller, bool authorized) external onlyOwner {
+src/PointsProgram.sol:269:    function accruePoints(address vault, address user)
+src/PointsProgram.sol:325:    function batchAccrue(address[] calldata vaults, address[] calldata users) external {
+src/PointsProgram.sol:337:    function updateDepositBalance(address vault, address user, uint256 newBalance)
+src/PointsProgram.sol:362:    function recordExecution(address vault, address[] calldata depositors)
+src/PointsProgram.sol:408:    function setReferrer(address user, address referrer) external {
+src/PointsProgram.sol:425:    function getPoints(address user) external view returns (uint256) {
+src/PointsProgram.sol:431:    function getMultiplier() public view returns (uint256) {
+src/PointsProgram.sol:444:    function getPointsBreakdown(address user)
+src/PointsProgram.sol:461:    function getPendingPoints(address vault, address user) external view returns (uint256) {
+src/PointsProgram.sol:477:    function getDailyRate(address vault, address user) external view returns (uint256) {
+src/PointsProgram.sol:496:    function _normalizeBalance(address vault, uint256 amount) internal returns (uint256) {
+src/PointsProgram.sol:518:    function _normalizeBalanceView(address vault, uint256 amount) internal view returns (uint256) {
+src/PointsProgram.sol:545:    function _cacheVaultDecimals(address vault) internal {
+src/libraries/OracleVerifier.sol:45:    function verifyOracleSignature(
+src/libraries/OracleVerifier.sol:116:    function requireValidBondAttestation(
+src/libraries/OracleVerifier.sol:179:    function requireValidOracleSignatureBound(
+src/libraries/OracleVerifier.sol:209:    function requireValidOracleSignature(
+src/extensions/VaultAccessControl.sol:10:    function isVerified(address user) external view returns (bool);
+src/extensions/VaultAccessControl.sol:126:    function transferOwnership(address newOwner) external onlyOwner {
+src/extensions/VaultAccessControl.sol:136:    function setWhitelistEnabled(bool enabled) external onlyOwner {
+src/extensions/VaultAccessControl.sol:143:    function addToWhitelist(address[] calldata accounts) external onlyOwner {
+src/extensions/VaultAccessControl.sol:153:    function removeFromWhitelist(address[] calldata accounts) external onlyOwner {
+src/extensions/VaultAccessControl.sol:165:    function setDepositCapEnabled(bool enabled) external onlyOwner {
+src/extensions/VaultAccessControl.sol:173:    function setDepositCap(address account, uint256 maxAssets) external onlyOwner {
+src/extensions/VaultAccessControl.sol:180:    function setDefaultDepositCap(uint256 maxAssets) external onlyOwner {
+src/extensions/VaultAccessControl.sol:194:    function setKycVerifierEnabled(bool enabled) external onlyOwner {
+src/extensions/VaultAccessControl.sol:201:    function setKycVerifier(address verifier) external onlyOwner {
+src/extensions/VaultAccessControl.sol:213:    function recordDeposit(address user, uint256 amount) external {
+src/extensions/VaultAccessControl.sol:227:    function recordWithdrawal(address user, uint256 amount) external {
+src/extensions/VaultAccessControl.sol:244:    function canDeposit(address user, uint256 amount) external view returns (bool) {
+src/extensions/VaultAccessControl.sol:272:    function getEffectiveCap(address user) external view returns (uint256) {
+src/extensions/VaultAccessControl.sol:281:    function getRemainingAllowance(address user) external view returns (uint256) {
+src/adapters/TradingSubAccount.sol:10:    function sendRawAction(bytes calldata data) external;
+src/adapters/TradingSubAccount.sol:16:    function deposit(uint256 amount, uint32 destinationDex) external;
+src/adapters/TradingSubAccount.sol:172:    function bridgeHypeToCore() external onlyAdapter {
+src/adapters/TradingSubAccount.sol:190:    function executeDepositMargin(uint256 amount) external onlyAdapter {
+src/adapters/TradingSubAccount.sol:208:    function executeOpen(bool isBuy, uint64 marginAmount, uint64 orderSize, uint64 px)
+src/adapters/TradingSubAccount.sol:240:    function closePositionAtPrice(uint64 px) external onlyAdapter {
+src/adapters/TradingSubAccount.sol:285:    function executeClose() external view onlyAdapter {
+src/adapters/TradingSubAccount.sol:296:    function readPosition()
+src/adapters/TradingSubAccount.sol:310:    function executeWithdraw(address to) external onlyAdapter {
+src/adapters/TradingSubAccount.sol:331:    function executePerpToSpot(uint64 ntl) external onlyAdapter {
+src/adapters/TradingSubAccount.sol:343:    function executeSpotToEvm(uint64 amount) external onlyAdapter {
+src/adapters/TradingSubAccount.sol:366:    function executeAddApiWallet(address wallet, string calldata name) external onlyAdapter {
+src/adapters/TradingSubAccount.sol:377:    function executeRawCoreWriter(bytes calldata rawData) external onlyAdapter {
+src/adapters/TradingSubAccount.sol:393:    function _packCoreWriterAction(uint24 actionId, bytes memory encodedAction)
+src/adapters/LidoAdapter.sol:14:    function submit(address _referral) external payable returns (uint256);
+src/adapters/LidoAdapter.sol:15:    function balanceOf(address) external view returns (uint256);
+src/adapters/LidoAdapter.sol:16:    function approve(address, uint256) external returns (bool);
+src/adapters/LidoAdapter.sol:17:    function transferFrom(address, address, uint256) external returns (bool);
+src/adapters/LidoAdapter.sol:18:    function transfer(address, uint256) external returns (bool);
+src/adapters/LidoAdapter.sol:22:    function wrap(uint256 _stETHAmount) external returns (uint256);
+src/adapters/LidoAdapter.sol:23:    function unwrap(uint256 _wstETHAmount) external returns (uint256);
+src/adapters/LidoAdapter.sol:24:    function balanceOf(address) external view returns (uint256);
+src/adapters/LidoAdapter.sol:25:    function transfer(address, uint256) external returns (bool);
+src/adapters/LidoAdapter.sol:29:    function requestWithdrawals(uint256[] calldata _amounts, address _owner)
+src/adapters/LidoAdapter.sol:32:    function claimWithdrawal(uint256 _requestId) external;
+src/adapters/LidoAdapter.sol:38:    function owner() external view returns (address);
+src/adapters/LidoAdapter.sol:165:    function registerVault(address vault) external nonReentrant {
+src/adapters/LidoAdapter.sol:195:    function stakeETH() external payable nonReentrant onlyRegisteredVault {
+src/adapters/LidoAdapter.sol:219:    function syncRebase() external nonReentrant {
+src/adapters/LidoAdapter.sol:237:    function vaultStETHShare(address vault) external view returns (uint256) {
+src/adapters/LidoAdapter.sol:247:    function wrapToWstETH(uint256 stethAmount) external nonReentrant onlyRegisteredVault {
+src/adapters/LidoAdapter.sol:280:    function unwrapFromWstETH(uint256 wstethAmount) external nonReentrant onlyRegisteredVault {
+src/adapters/LidoAdapter.sol:307:    function requestWithdrawal(uint256[] calldata amounts) external nonReentrant onlyRegisteredVault {
+src/adapters/LidoAdapter.sol:346:    function claimWithdrawal(uint256 requestId) external nonReentrant onlyRegisteredVault {
+src/adapters/LidoAdapter.sol:384:    function withdrawToVault() external nonReentrant onlyRegisteredVault {
+src/adapters/LidoAdapter.sol:446:    function getWithdrawalRequestIds(address vault) external view returns (uint256[] memory) {
+src/adapters/LidoAdapter.sol:453:    function getWithdrawalRequestCount(address vault) external view returns (uint256) {
+src/adapters/LidoAdapter.sol:473:    function rescueETH(address payable to, uint256 amount) external nonReentrant {
+src/adapters/MorphoAdapter.sol:12:    function owner() external view returns (address);
+src/adapters/MorphoAdapter.sol:29:    function price() external view returns (uint256);
+src/adapters/MorphoAdapter.sol:34:    function decimals() external view returns (uint8);
+src/adapters/MorphoAdapter.sol:39:    function supply(
+src/adapters/MorphoAdapter.sol:47:    function withdraw(
+src/adapters/MorphoAdapter.sol:55:    function borrow(
+src/adapters/MorphoAdapter.sol:63:    function repay(
+src/adapters/MorphoAdapter.sol:71:    function supplyCollateral(
+src/adapters/MorphoAdapter.sol:78:    function withdrawCollateral(
+src/adapters/MorphoAdapter.sol:85:    function idToMarketParams(bytes32 id) external view returns (MarketParams memory);
+src/adapters/MorphoAdapter.sol:87:    function position(bytes32 id, address user)
+src/adapters/MorphoAdapter.sol:285:    function registerVault(address vault) external nonReentrant {
+src/adapters/MorphoAdapter.sol:309:    function unregisterVault(address vault) external nonReentrant {
+src/adapters/MorphoAdapter.sol:336:    function whitelistMarket(address vault, MarketParams calldata params) external nonReentrant {
+src/adapters/MorphoAdapter.sol:358:    function delistMarket(address vault, MarketParams calldata params) external nonReentrant {
+src/adapters/MorphoAdapter.sol:374:    function supply(MarketParams calldata params, uint256 assets)
+src/adapters/MorphoAdapter.sol:404:    function withdraw(MarketParams calldata params, uint256 assets)
+src/adapters/MorphoAdapter.sol:431:    function borrow(MarketParams calldata params, uint256 assets)
+src/adapters/MorphoAdapter.sol:461:    function repay(MarketParams calldata params, uint256 assets)
+src/adapters/MorphoAdapter.sol:495:    function supplyCollateral(MarketParams calldata params, uint256 assets)
+src/adapters/MorphoAdapter.sol:525:    function withdrawCollateral(MarketParams calldata params, uint256 assets)
+src/adapters/MorphoAdapter.sol:558:    function reallocate(MarketParams calldata from, MarketParams calldata to, uint256 assets)
+src/adapters/MorphoAdapter.sol:599:    function withdrawToVault() external nonReentrant onlyRegisteredVault {
+src/adapters/MorphoAdapter.sol:651:    function getVaultMarketIds(address vault) external view returns (bytes32[] memory) {
+src/adapters/MorphoAdapter.sol:658:    function getVaultMarketCount(address vault) external view returns (uint256) {
+src/adapters/MorphoAdapter.sol:667:    function getPosition(bytes32 marketId)
+src/adapters/MorphoAdapter.sol:679:    function _marketId(MarketParams calldata params) internal pure returns (bytes32) {
+src/adapters/MorphoAdapter.sol:685:    function _trackMarket(address vault, bytes32 marketId) internal {
+src/adapters/MorphoAdapter.sol:712:    function _checkVaultHealth(
+src/adapters/MorphoAdapter.sol:745:    function vaultSupplied(address vault, bytes32 marketId) external view returns (uint256) {
+src/adapters/MorphoAdapter.sol:750:    function vaultBorrowed(address vault, bytes32 marketId) external view returns (uint256) {
+src/adapters/MorphoAdapter.sol:755:    function vaultCollateral(address vault, bytes32 marketId) external view returns (uint256) {
+src/adapters/AaveV3Adapter.sol:13:    function owner() external view returns (address);
+src/adapters/AaveV3Adapter.sol:19:    function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external;
+src/adapters/AaveV3Adapter.sol:20:    function withdraw(address asset, uint256 amount, address to) external returns (uint256);
+src/adapters/AaveV3Adapter.sol:21:    function borrow(
+src/adapters/AaveV3Adapter.sol:28:    function repay(address asset, uint256 amount, uint256 interestRateMode, address onBehalfOf)
+src/adapters/AaveV3Adapter.sol:31:    function getUserAccountData(address user)
+src/adapters/AaveV3Adapter.sol:42:    function ADDRESSES_PROVIDER() external view returns (address);
+src/adapters/AaveV3Adapter.sol:48:    function getPriceOracle() external view returns (address);
+src/adapters/AaveV3Adapter.sol:54:    function getAssetPrice(address asset) external view returns (uint256);
+src/adapters/AaveV3Adapter.sol:55:    function BASE_CURRENCY() external view returns (address);
+src/adapters/AaveV3Adapter.sol:56:    function BASE_CURRENCY_UNIT() external view returns (uint256);
+src/adapters/AaveV3Adapter.sol:62:    function decimals() external view returns (uint8);
+src/adapters/AaveV3Adapter.sol:68:    function claimAllRewards(address[] calldata assets, address to)
+src/adapters/AaveV3Adapter.sol:212:    function registerVault(address vault) external override nonReentrant {
+src/adapters/AaveV3Adapter.sol:239:    function unregisterVault(address vault) external nonReentrant {
+src/adapters/AaveV3Adapter.sol:260:    function setAllowedAsset(address vault, address asset, bool allowed)
+src/adapters/AaveV3Adapter.sol:284:    function supply(address asset, uint256 amount) external override nonReentrant onlyRegisteredVault {
+src/adapters/AaveV3Adapter.sol:310:    function withdraw(address asset, uint256 amount)
+src/adapters/AaveV3Adapter.sol:346:    function _removeSuppliedAsset(address vault, address asset) internal {
+src/adapters/AaveV3Adapter.sol:360:    function borrow(address asset, uint256 amount, uint256 rateMode)
+src/adapters/AaveV3Adapter.sol:399:    function repay(address asset, uint256 amount, uint256 rateMode)
+src/adapters/AaveV3Adapter.sol:435:    function _removeBorrowedAsset(address vault, address asset) internal {
+src/adapters/AaveV3Adapter.sol:449:    function claimRewards(address[] calldata assets)
+src/adapters/AaveV3Adapter.sol:476:    function withdrawToVault() external override nonReentrant onlyRegisteredVault {
+src/adapters/AaveV3Adapter.sol:528:    function setMinHealthFactor(uint256 newMinHealthFactor) external override onlyAdapterOwner {
+src/adapters/AaveV3Adapter.sol:538:    function isRegistered(address vault) external view override returns (bool) {
+src/adapters/AaveV3Adapter.sol:543:    function isAssetAllowed(address vault, address asset) external view override returns (bool) {
+src/adapters/AaveV3Adapter.sol:548:    function getHealthFactor() external view override returns (uint256) {
+src/adapters/AaveV3Adapter.sol:556:    function getSuppliedAssets(address vault) external view returns (address[] memory) {
+src/adapters/AaveV3Adapter.sol:574:    function _checkVaultHealth(address /* vault */) internal view {
+src/adapters/AaveV3Adapter.sol:597:    function vaultSupplied(address vault, address asset) external view returns (uint256) {
+src/adapters/AaveV3Adapter.sol:602:    function vaultBorrowed(address vault, address asset) external view returns (uint256) {
+src/adapters/HyperliquidAdapter.sol:14:    function owner() external view returns (address);
+src/adapters/HyperliquidAdapter.sol:116:    function disableRawCoreWriter() external {
+src/adapters/HyperliquidAdapter.sol:125:    function registerVault(address vault, uint32 perpAsset, uint8 szDecimals)
+src/adapters/HyperliquidAdapter.sol:171:    function depositMargin(uint256 amount) external override nonReentrant {
+src/adapters/HyperliquidAdapter.sol:187:    function openPosition(bool isBuy, uint256 marginAmount, uint256 orderSize, uint256 limitPrice)
+src/adapters/HyperliquidAdapter.sol:235:    function closePositionAtPrice(uint64 px) external override nonReentrant onlyRegisteredVault {
+src/adapters/HyperliquidAdapter.sol:245:    function closePosition() external override {
+src/adapters/HyperliquidAdapter.sol:250:    function withdrawToVault() external override nonReentrant onlyRegisteredVault {
+src/adapters/HyperliquidAdapter.sol:258:    function depositMarginAdmin(address vault, uint256 amount) external nonReentrant {
+src/adapters/HyperliquidAdapter.sol:277:    function fundSubAccountHype(address vault) external payable nonReentrant {
+src/adapters/HyperliquidAdapter.sol:298:    function closePositionAtPriceAdmin(address vault, uint64 px) external nonReentrant {
+src/adapters/HyperliquidAdapter.sol:312:    function closePositionAdmin(address vault) external view {
+src/adapters/HyperliquidAdapter.sol:320:    function readSubAccountPosition(address vault)
+src/adapters/HyperliquidAdapter.sol:344:    function transferPerpToSpot(address vault, uint64 usdcAmount) external nonReentrant {
+src/adapters/HyperliquidAdapter.sol:360:    function transferSpotToEvm(address vault, uint64 usdcAmount) external nonReentrant {
+src/adapters/HyperliquidAdapter.sol:373:    function withdrawToVaultAdmin(address vault) external nonReentrant {
+src/adapters/HyperliquidAdapter.sol:390:    function addApiWalletAdmin(address vault, address wallet, string calldata name)
+src/adapters/HyperliquidAdapter.sol:404:    function rawCoreWriterAdmin(address vault, bytes calldata rawData) external nonReentrant {
+src/adapters/HyperliquidAdapter.sol:421:    function depositMarginFromVaultAdmin(address vault, uint256 amount) external nonReentrant {
+src/adapters/HyperliquidAdapter.sol:435:    function depositSubBalanceAdmin(address vault) external nonReentrant {
+src/adapters/HyperliquidAdapter.sol:447:    function getSubAccount(address vault) external view override returns (address) {
+src/adapters/HyperliquidAdapter.sol:452:    function isRegistered(address vault) external view override returns (bool) {
+src/adapters/HyperliquidAdapter.sol:457:    function getVaultConfig(address vault) external view override returns (VaultConfig memory) {
+src/adapters/UniswapV4Adapter.sol:12:    function owner() external view returns (address);
+src/adapters/UniswapV4Adapter.sol:28:    function exactInputSingle(ExactInputSingleParams calldata params)
+src/adapters/UniswapV4Adapter.sol:66:    function mint(MintParams calldata params)
+src/adapters/UniswapV4Adapter.sol:71:    function decreaseLiquidity(DecreaseLiquidityParams calldata params)
+src/adapters/UniswapV4Adapter.sol:76:    function collect(CollectParams calldata params)
+src/adapters/UniswapV4Adapter.sol:82:    function positions(uint256 tokenId)
+src/adapters/UniswapV4Adapter.sol:100:    function transferFrom(address from, address to, uint256 tokenId) external;
+src/adapters/UniswapV4Adapter.sol:297:    function registerVault(address vault) external nonReentrant {
+src/adapters/UniswapV4Adapter.sol:333:    function setSlippage(address vault, uint256 slippageBps) external nonReentrant {
+src/adapters/UniswapV4Adapter.sol:349:    function setDefaultFee(address vault, uint24 fee) external nonReentrant {
+src/adapters/UniswapV4Adapter.sol:368:    function swap(address tokenIn, address tokenOut, uint256 amountIn, uint256 minAmountOut)
+src/adapters/UniswapV4Adapter.sol:421:    function addLiquidity(
+src/adapters/UniswapV4Adapter.sol:483:    function removeLiquidity(
+src/adapters/UniswapV4Adapter.sol:536:    function collectFees(uint256 positionId)
+src/adapters/UniswapV4Adapter.sol:563:    function withdrawToVault() external nonReentrant onlyRegisteredVault {
+src/adapters/UniswapV4Adapter.sol:613:    function isRegistered(address vault) external view returns (bool) {
+src/adapters/UniswapV4Adapter.sol:620:    function getVaultPositions(address vault) external view returns (uint256[] memory) {
+src/adapters/UniswapV4Adapter.sol:627:    function getPositionCount(address vault) external view returns (uint256) {
+src/adapters/UniswapV4Adapter.sol:634:    function getSlippage(address vault) external view returns (uint256 slippageBps) {
+src/adapters/UniswapV4Adapter.sol:643:    function _removePositionFromVault(address vault, uint256 positionId) internal {
+src/adapters/UniswapV4Adapter.sol:660:    function _mintPosition(
+src/adapters/UniswapV4Adapter.sol:694:    function onERC721Received(
+src/adapters/PolymarketAdapter.sol:103:    function owner() public view returns (address) {
+src/adapters/PolymarketAdapter.sol:115:    function registerVault(
+src/adapters/PolymarketAdapter.sol:151:    function depositUSDC(uint256 usdcAmount) external onlyRegisteredVault nonReentrant {
+src/adapters/PolymarketAdapter.sol:164:    function buyOutcome(
+src/adapters/PolymarketAdapter.sol:174:    function sellOutcome(
+src/adapters/PolymarketAdapter.sol:184:    function redeemResolved() external view onlyRegisteredVault {
+src/adapters/PolymarketAdapter.sol:191:    function withdrawToVault() external onlyRegisteredVault nonReentrant {
+src/adapters/PolymarketAdapter.sol:203:    function isRegistered(address vault) external view returns (bool) {
+src/adapters/PendleAdapter.sol:46:    function mintPyFromToken(
+src/adapters/PendleAdapter.sol:53:    function redeemPyToToken(
+src/adapters/PendleAdapter.sol:60:    function swapExactPtForToken(
+src/adapters/PendleAdapter.sol:67:    function swapExactTokenForPt(
+src/adapters/PendleAdapter.sol:75:    function addLiquidityDualSyAndPt(
+src/adapters/PendleAdapter.sol:83:    function removeLiquidityDualSyAndPt(
+src/adapters/PendleAdapter.sol:91:    function redeemDueInterestAndRewards(
+src/adapters/PendleAdapter.sol:110:    function expiry() external view returns (uint256);
+src/adapters/PendleAdapter.sol:111:    function readTokens() external view returns (address _SY, address _PT, address _YT);
+src/adapters/PendleAdapter.sol:117:    function owner() external view returns (address);
+src/adapters/PendleAdapter.sol:332:    function registerVault(address vault) external nonReentrant {
+src/adapters/PendleAdapter.sol:368:    function setMarketWhitelist(address vault, address market, bool whitelisted)
+src/adapters/PendleAdapter.sol:400:    function setExpiryBuffer(address vault, uint256 newBuffer) external nonReentrant {
+src/adapters/PendleAdapter.sol:422:    function mintPtYt(address market, address tokenIn, uint256 amount, uint256 minPyOut)
+src/adapters/PendleAdapter.sol:474:    function redeemPtYt(address market, uint256 amount, uint256 minTokenOut)
+src/adapters/PendleAdapter.sol:531:    function swapExactPtForToken(address market, uint256 ptAmount, uint256 minTokenOut)
+src/adapters/PendleAdapter.sol:580:    function swapExactTokenForPt(address market, uint256 tokenAmount, uint256 minPtOut)
+src/adapters/PendleAdapter.sol:646:    function addLiquidity(address market, uint256 syAmount, uint256 ptAmount, uint256 minLpOut)
+src/adapters/PendleAdapter.sol:695:    function removeLiquidity(address market, uint256 lpAmount, uint256 minSyOut, uint256 minPtOut)
+src/adapters/PendleAdapter.sol:749:    function claimRewards(address[] calldata markets, address[] calldata rewardTokens)
+src/adapters/PendleAdapter.sol:815:    function withdrawToVault(address market)
+src/adapters/PendleAdapter.sol:856:    function isRegistered(address vault) external view returns (bool) {
+src/adapters/PendleAdapter.sol:864:    function isMarketWhitelisted(address vault, address market) external view returns (bool) {
+src/adapters/PendleAdapter.sol:874:    function getPosition(address vault, address market)
+src/adapters/PendleAdapter.sol:886:    function getExpiryBuffer(address vault) external view returns (uint256) {
+src/MetaVault.sol:12:    function asset() external view returns (IERC20);
+src/MetaVault.sol:13:    function depositERC20Tokens(uint256 assets) external returns (uint256 sharesMinted);
+src/MetaVault.sol:14:    function withdraw(uint256 shareAmount) external returns (uint256 assetsOut);
+src/MetaVault.sol:15:    function totalAssets() external view returns (uint256);
+src/MetaVault.sol:19:    function effectiveTotalAssets() external view returns (uint256);
+src/MetaVault.sol:20:    function totalShares() external view returns (uint256);
+src/MetaVault.sol:21:    function shares(address account) external view returns (uint256);
+src/MetaVault.sol:24:    function emergencyWithdraw(uint256 shareAmount) external returns (uint256 assetsOut);
+src/MetaVault.sol:26:    function paused() external view returns (bool);
+src/MetaVault.sol:172:    function deposit(uint256 assets) external nonReentrant returns (uint256 sharesOut) {
+src/MetaVault.sol:199:    function withdraw(uint256 metaShares) external nonReentrant returns (uint256 assetsOut) {
+src/MetaVault.sol:281:    function emergencyWithdraw(uint256 metaShares)
+src/MetaVault.sol:354:    function _emergencyWithdrawExternal(address vault, uint256 shareAmount) external {
+src/MetaVault.sol:365:    function sweepDonations() external nonReentrant onlyOwner {
+src/MetaVault.sol:379:    function rebalance(address[] calldata vaults, uint256[] calldata newWeightsBps)
+src/MetaVault.sol:475:    function addVault(address vault, uint256 weightBps) external onlyOwner {
+src/MetaVault.sol:509:    function removeVault(address vault) external onlyOwner {
+src/MetaVault.sol:545:    function getNav() public view returns (uint256) {
+src/MetaVault.sol:561:    function getUnderlyingAllocations()
+src/MetaVault.sol:578:    function getUnderlyingVaultCount() external view returns (uint256) {
+src/MetaVault.sol:586:    function depositToVaultExternal(address vault, uint256 assets) external {
+src/MetaVault.sol:593:    function withdrawFromVaultExternal(address vault, uint256 targetAssets) external returns (uint256) {
+src/MetaVault.sol:604:    function _vaultAllocation(address vault) internal view returns (uint256 value) {
+src/MetaVault.sol:629:    function _withdrawFromUnderlyings(uint256 deficit) internal {
+src/MetaVault.sol:652:    function _withdrawFromVault(address vault, uint256 targetAssets)
+src/MetaVault.sol:688:    function _depositToVault(address vault, uint256 assets) internal {
+src/KernelVault.sol:14:    function recordWithdrawal(address user, uint256 amount) external;
+src/KernelVault.sol:565:    function rescueTokens(address token, address to, uint256 amount) external {
+src/KernelVault.sol:581:    function setOracleSigner(address _signer, uint64 _maxAge) external {
+src/KernelVault.sol:606:    function setBondSigner(address _signer) external {
+src/KernelVault.sol:620:    function setRequireOracle(bool _required) external {
+src/KernelVault.sol:629:    function setAccessControl(address _accessControl) external {
+src/KernelVault.sol:684:    function setFees(uint256 mgmtBps, uint256 perfBps) external {
+src/KernelVault.sol:743:    function setFeeRecipient(address recipient) external {
+src/KernelVault.sol:775:    function setProtocolTreasury(address treasury, uint256 splitBps) external {
+src/KernelVault.sol:798:    function collectManagementFee() external nonReentrant returns (uint256 feeShares) {
+src/KernelVault.sol:804:    function collectPerformanceFee() external nonReentrant returns (uint256 feeShares) {
+src/KernelVault.sol:815:    function depositERC20Tokens(uint256 assets)
+src/KernelVault.sol:871:    function depositETH()
+src/KernelVault.sol:922:    function withdraw(uint256 shareAmount)
+src/KernelVault.sol:935:    function withdrawTo(uint256 shareAmount, address to)
+src/KernelVault.sol:951:    function execute(bytes calldata journal, bytes calldata seal, bytes calldata agentOutputBytes)
+src/KernelVault.sol:965:    function executeWithOracle(
+src/KernelVault.sol:977:    function _validateParsedJournal(
+src/KernelVault.sol:1036:    function _executeActions(
+src/KernelVault.sol:1072:    function _updatePerformanceMetrics(uint256 ppsBefore) internal {
+src/KernelVault.sol:1102:    function _execute(
+src/KernelVault.sol:1123:    function _processWithdraw(uint256 shareAmount, address to)
+src/KernelVault.sol:1225:    function _resetFeeEpochIfEmpty() internal {
+src/KernelVault.sol:1237:    function _executeAction(uint256 index, KernelOutputParser.Action memory action) internal {
+src/KernelVault.sol:1264:    function _executeTransferERC20(uint256 index, KernelOutputParser.Action memory action)
+src/KernelVault.sol:1364:    function _executeCall(uint256 index, KernelOutputParser.Action memory action) internal {
+src/KernelVault.sol:1444:    function settle() external {
+src/KernelVault.sol:1452:    function emergencySettle() external {
+src/KernelVault.sol:1464:    function pause() external {
+src/KernelVault.sol:1470:    function unpause() external {
+src/KernelVault.sol:1526:    function _pause() internal override {
+src/KernelVault.sol:1542:    function _unpause() internal override {
+src/KernelVault.sol:1552:    function emergencyWithdraw(uint256 shareAmount)
+src/KernelVault.sol:1564:    function emergencyWithdrawTo(uint256 shareAmount, address to)
+src/KernelVault.sol:1574:    function _processEmergencyWithdraw(uint256 shareAmount, address to)
+src/KernelVault.sol:1690:    function _settle() internal virtual {
+src/KernelVault.sol:1718:    function effectiveTotalAssets() public view returns (uint256) {
+src/KernelVault.sol:1725:    function totalAssets() public view returns (uint256) {
+src/KernelVault.sol:1734:    function totalValueLocked() public view returns (uint256) {
+src/KernelVault.sol:1748:    function currentPps() public view returns (uint256) {
+src/KernelVault.sol:1755:    function getPerformanceMetrics()
+src/KernelVault.sol:1782:    function getPpsCheckpoints()
+src/KernelVault.sol:1791:    function getFeeInfo()
+src/KernelVault.sol:1820:    function convertToShares(uint256 assets) public view returns (uint256) {
+src/KernelVault.sol:1830:    function convertToAssets(uint256 _shares) public view returns (uint256) {
+src/KernelVault.sol:1839:    function _collectManagementFee() internal returns (uint256 feeShares) {
+src/KernelVault.sol:1879:    function _collectPerformanceFee() internal returns (uint256 feeShares) {
+src/KernelVault.sol:1911:    function _distributeFeeShares(uint256 feeShares) internal {
+src/KernelVault.sol:1939:    function _collectFeesAfterExecution() internal {
+src/KernelExecutionVerifier.sol:300:    function initialize(address _verifier, address initialOwner) external initializer {
+src/KernelExecutionVerifier.sol:316:    function owner() external view returns (address) {
+src/KernelExecutionVerifier.sol:325:    function transferOwnership(address newOwner) external onlyOwner {
+src/KernelExecutionVerifier.sol:332:    function acceptOwnership() external {
+src/KernelExecutionVerifier.sol:350:    function setVerificationPaused(bool paused) external onlyOwner {
+src/KernelExecutionVerifier.sol:371:    function approveVerifier(address candidate) external onlyOwner {
+src/KernelExecutionVerifier.sol:384:    function revokeVerifier(address candidate) external onlyOwner {
+src/KernelExecutionVerifier.sol:403:    function proposeVerifier(address candidate) external onlyOwner {
+src/KernelExecutionVerifier.sol:417:    function cancelVerifierProposal() external onlyOwner {
+src/KernelExecutionVerifier.sol:435:    function activateVerifier() external {
+src/KernelExecutionVerifier.sol:471:    function scheduleImplementation(address newImplementation) external onlyOwner {
+src/KernelExecutionVerifier.sol:479:    function cancelImplementation() external onlyOwner {
+src/KernelExecutionVerifier.sol:492:    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+src/KernelExecutionVerifier.sol:554:    function verifyAndParseWithImageId(
+src/KernelExecutionVerifier.sol:589:    function verify(bytes calldata seal, bytes32 imageId, bytes32 journalDigest) external view {
+src/KernelExecutionVerifier.sol:602:    function parseJournal(bytes calldata journal) external pure returns (ParsedJournal memory) {
+src/KernelExecutionVerifier.sol:620:    function _parseJournal(bytes calldata journal) internal pure returns (ParsedJournal memory) {
+src/KernelExecutionVerifier.sol:660:    function _readU32LE(bytes calldata data, uint256 offset) internal pure returns (uint32) {
+src/KernelExecutionVerifier.sol:669:    function _readU64LE(bytes calldata data, uint256 offset) internal pure returns (uint64) {
+src/WSTONBondManager.sol:214:    function lockBond(address operator, address vault, uint64 nonce, uint256 amount)
+src/WSTONBondManager.sol:244:    function releaseBond(address operator, address vault, uint64 nonce)
+src/WSTONBondManager.sol:267:    function slashBond(address operator, address vault, uint64 nonce, address slasher)
+src/WSTONBondManager.sol:321:    function lockBondDirect(address vault, uint64 nonce, uint256 amount) external nonReentrant {
+src/WSTONBondManager.sol:349:    function releaseBondByRelayer(address operator, address vault, uint64 nonce)
+src/WSTONBondManager.sol:376:    function markSlashPending(address operator, address vault, uint64 nonce) external {
+src/WSTONBondManager.sol:392:    function slashBondByRelayer(address operator, address vault, uint64 nonce, address slasher)
+src/WSTONBondManager.sol:444:    function lockBondBatch(
+src/WSTONBondManager.sol:487:    function reclaimExpiredBond(address vault, uint64 nonce) external nonReentrant {
+src/WSTONBondManager.sol:520:    function getMinBond(address /* vault */ ) external view override returns (uint256) {
+src/WSTONBondManager.sol:525:    function getBondedAmount(address operator) external view override returns (uint256) {
+src/WSTONBondManager.sol:530:    function getBondInfo(address operator, address vault, uint64 nonce)
+src/WSTONBondManager.sol:544:    function getOperatorBondCount(address operator, address vault, uint64 fromNonce, uint64 toNonce)
+src/WSTONBondManager.sol:565:    function bondToken() external view override returns (address) {
+src/WSTONBondManager.sol:571:    function setTreasury(address _treasury) external onlyOwner {
+src/WSTONBondManager.sol:580:    function setMinBondFloor(uint256 _minBondFloor) external onlyOwner {
+src/WSTONBondManager.sol:586:    function authorizeVault(address vault) external onlyOwner {
+src/WSTONBondManager.sol:591:    function revokeVault(address vault) external onlyOwner {
+src/WSTONBondManager.sol:657:    function setTrustedRelayer(address relayer) external onlyOwner {
+src/WSTONBondManager.sol:698:    function activateTrustedRelayer() external {
+src/WSTONBondManager.sol:707:    function transferOwnership(address newOwner) external onlyOwner {
+src/WSTONBondManager.sol:721:    function rescueTokens(address token, address to, uint256 amount) external onlyOwner {
+src/StakingRouter.sol:12:    function swapFromTON(uint256 tonAmount) external returns (bool);
+src/StakingRouter.sol:13:    function balanceOf(address account) external view returns (uint256);
+src/StakingRouter.sol:14:    function approve(address spender, uint256 amount) external returns (bool);
+src/StakingRouter.sol:15:    function transfer(address to, uint256 amount) external returns (bool);
+src/StakingRouter.sol:20:    function depositWTONAndGetWSTON(uint256 _amount) external;
+src/StakingRouter.sol:21:    function requestWithdrawal(uint256 _wstonAmount) external;
+src/StakingRouter.sol:22:    function balanceOf(address owner) external view returns (uint256);
+src/StakingRouter.sol:23:    function transfer(address to, uint256 amount) external returns (bool);
+src/StakingRouter.sol:77:    function stakeFromTON(uint256 tonAmount) external nonReentrant {
+src/StakingRouter.sol:119:    function stakeFromWTON(uint256 wtonAmount) external nonReentrant {
+src/StakingRouter.sol:152:    function unstake(uint256 wstonAmount) external nonReentrant {
+src/StakingRouter.sol:165:    function _sweepDust(address recipient) internal {

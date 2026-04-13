@@ -72,10 +72,10 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
     mapping(address vault => VaultConfig) public vaultConfigs;
 
     /// @notice Adapter deployer — can permanently disable the raw CoreWriter
-    ///         escape hatch (L-35 kill switch).
+    ///         escape hatch (kill switch).
     address public immutable adapterDeployer;
 
-    /// @notice L-35 fix: once set to true, `rawCoreWriterAdmin` and
+    /// @notice Once set to true, `rawCoreWriterAdmin` and
     ///         `addApiWalletAdmin` will revert unconditionally. The flag is
     ///         IRREVERSIBLE so the defense-in-depth guarantee cannot be
     ///         silently undone by a compromised key.
@@ -109,7 +109,7 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
         adapterDeployer = msg.sender;
     }
 
-    /// @notice L-35 fix: irreversibly kill the raw CoreWriter backdoor.
+    /// @notice Irreversibly kill the raw CoreWriter backdoor.
     ///         After calling this, `rawCoreWriterAdmin` always reverts and
     ///         all CoreWriter actions must flow through the typed wrappers.
     ///         Only callable by the adapter deployer.
@@ -238,7 +238,7 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
     }
 
     /// @inheritdoc IHyperliquidAdapter
-    /// @dev DEPRECATED — C-05 fix: this function used MIN_PRICE/MAX_PRICE which
+    /// @dev DEPRECATED — this function used MIN_PRICE/MAX_PRICE which
     ///      fall outside HyperCore's oracle price band and are silently dropped.
     ///      Vaults must call `closePositionAtPrice(px)` with a price inside the
     ///      oracle band instead.
@@ -302,7 +302,7 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
         TradingSubAccount(payable(config.subAccount)).closePositionAtPrice(px);
     }
 
-    /// @notice DEPRECATED — C-05 fix: this path invoked `executeClose` which
+    /// @notice DEPRECATED — this path invoked `executeClose` which
     ///         uses MIN_PRICE/MAX_PRICE extreme values that HyperCore silently
     ///         drops (oracle band violation), producing EVM/HC state drift.
     ///         The underlying function now reverts; this wrapper is kept only
@@ -354,14 +354,14 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
     ///      After this settles, call withdrawToVaultAdmin to move USDC to the vault.
     /// @param vault The vault whose sub-account to recover margin from
     /// @param usdcAmount Amount in USDC native 1e6 decimals (e.g., 10000000 = 10 USDC).
-    /// @dev L-34 fix: validate `usdcAmount * 100` does not overflow uint64 before
+    /// @dev Validate `usdcAmount * 100` does not overflow uint64 before
     ///      passing to the spotSend wei-format (1e8) encoding. Otherwise large
     ///      amounts silently wrap and transmit an unintended value.
     function transferSpotToEvm(address vault, uint64 usdcAmount) external nonReentrant {
         VaultConfig memory config = vaultConfigs[vault];
         if (config.subAccount == address(0)) revert VaultNotRegistered();
         if (msg.sender != IKernelVaultOwner(vault).owner()) revert NotVaultOwner();
-        // L-34: overflow guard for the 100× scaling
+        // Overflow guard for the 100× scaling
         require(usdcAmount <= type(uint64).max / 100, "amount overflow");
         // spotSend uses 1e8 "wei" format — multiply USDC amount by 100
         TradingSubAccount(payable(config.subAccount)).executeSpotToEvm(usdcAmount * 100);
@@ -402,7 +402,7 @@ contract HyperliquidAdapter is IHyperliquidAdapter, ReentrancyGuard {
     /// @param vault The vault whose sub-account to send the action from
     /// @param rawData The complete CoreWriter payload (version + actionId + abi.encode(...))
     function rawCoreWriterAdmin(address vault, bytes calldata rawData) external nonReentrant {
-        // L-35 fix: once `disableRawCoreWriter()` has been called the backdoor
+        // Once `disableRawCoreWriter()` has been called the backdoor
         // is permanently disabled and all CoreWriter actions must flow through
         // the typed wrappers above.
         require(!rawCoreWriterDisabled, "raw core writer disabled");
