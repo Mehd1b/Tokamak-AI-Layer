@@ -117,6 +117,8 @@ contract BA_MockProvider {
 
 contract BA_MockAavePool {
     mapping(address => mapping(address => uint256)) public aTokenBalance;
+    mapping(address => uint256) public totalCollateral;
+    mapping(address => uint256) public totalDebt;
     address public _addressesProvider;
 
     function setAddressesProvider(address p) external { _addressesProvider = p; }
@@ -125,31 +127,32 @@ contract BA_MockAavePool {
     function supply(address asset, uint256 amount, address onBehalfOf, uint16) external {
         MockERC20(asset).transferFrom(msg.sender, address(this), amount);
         aTokenBalance[onBehalfOf][asset] += amount;
+        totalCollateral[onBehalfOf] += amount;
     }
 
     function withdraw(address asset, uint256 amount, address to) external returns (uint256) {
         uint256 toWithdraw =
             amount == type(uint256).max ? aTokenBalance[msg.sender][asset] : amount;
         aTokenBalance[msg.sender][asset] -= toWithdraw;
+        totalCollateral[msg.sender] -= toWithdraw;
         MockERC20(asset).transfer(to, toWithdraw);
         return toWithdraw;
     }
 
-    function borrow(address asset, uint256 amount, uint256, uint16, address) external {
-        // Pool is permissive - real Aave would price internally, but here we
-        // simply require the pool has enough balance. The adapter's naive
-        // health check should be the gate for the PoC.
+    function borrow(address asset, uint256 amount, uint256, uint16, address onBehalfOf) external {
+        totalDebt[onBehalfOf] += amount;
         MockERC20(asset).transfer(msg.sender, amount);
     }
 
-    function repay(address asset, uint256 amount, uint256, address) external returns (uint256) {
+    function repay(address asset, uint256 amount, uint256, address onBehalfOf) external returns (uint256) {
         MockERC20(asset).transferFrom(msg.sender, address(this), amount);
+        totalDebt[onBehalfOf] -= amount;
         return amount;
     }
 
-    function getUserAccountData(address)
+    function getUserAccountData(address user)
         external
-        pure
+        view
         returns (
             uint256 totalCollateralBase,
             uint256 totalDebtBase,
@@ -159,7 +162,16 @@ contract BA_MockAavePool {
             uint256 healthFactor
         )
     {
-        return (0, 0, 0, 8000, 7500, type(uint256).max);
+        totalCollateralBase = totalCollateral[user];
+        totalDebtBase = totalDebt[user];
+        availableBorrowsBase = 0;
+        currentLiquidationThreshold = 8000;
+        ltv = 7500;
+        if (totalDebtBase == 0) {
+            healthFactor = type(uint256).max;
+        } else {
+            healthFactor = (totalCollateralBase * 1e18) / totalDebtBase;
+        }
     }
 }
 
@@ -901,40 +913,44 @@ contract Test_H02_AaveDecimalMismatch is Test {
         // For the PoC we use EXACTLY that pattern:
     }
 
-    /// @notice C-03 FIX: the decimal-mismatch exploit is now blocked.
-    /// Supplying $1 of JUNK18 and trying to borrow $500k of WBTC reverts
-    /// with HealthFactorTooLow because the oracle-normalized check sees
-    /// the real value ratio, not the raw-sum ratio.
+    /// @notice M-08 FIX: the adapter now delegates health checking to Aave's own
+    /// getUserAccountData() instead of computing a naive raw-unit ratio. This test
+    /// verifies that an undercollateralized borrow is rejected by the Aave-level HF.
+    ///
+    /// The old test verified the adapter's oracle-normalized check blocked the
+    /// decimal mismatch exploit. With the M-08 fix, the adapter no longer has its
+    /// own math — it trusts Aave's HF. We verify the delegation works: supply a
+    /// small amount and borrow enough to push the aggregate HF below minHealthFactor.
     function test_H02_aave_decimal_mismatch_false_positive() public {
-        MockERC20 junk = new MockERC20("JUNK18", "JUNK18", 18);
-        // Price JUNK at $1 per whole token (1e18 raw)
-        oracle.setPrice(address(junk), 1e8);
-
+        // Supply 100 USDC (1e8 raw in pool collateral tracking)
+        usdc.mint(address(vaultB), 100e6);
         vm.prank(ownerB);
-        adapter.setAllowedAsset(address(vaultB), address(junk), true);
-
-        junk.mint(address(vaultB), 1 ether);
-        wbtc.mint(address(pool), 10e8);
-        vm.prank(ownerB);
-        vaultB.approveToken(address(junk), address(adapter), type(uint256).max);
-
+        vaultB.approveToken(address(usdc), address(adapter), type(uint256).max);
         vm.prank(address(vaultB));
-        adapter.supply(address(junk), 1 ether);
+        adapter.supply(address(usdc), 100e6);
 
-        // Attempt to borrow 10 WBTC against only 1 JUNK ($1) — the adapter
-        // now converts both sides through the oracle:
-        //   suppliedBase = 1e18 * 1e8 / 1e18 = 1e8 (= $1)
-        //   borrowedBase = 10e8 * 50000e8 / 1e8 = 5e13 (= $500k)
-        //   health = 1e8 * 1e18 / 5e13 = 2e12 << 1.5e18 → reverts.
+        // Fund pool with WBTC for borrowing
+        wbtc.mint(address(pool), 100e8);
+
+        // Borrow 90 WBTC raw (9e9) against 100e6 collateral:
+        //   Mock pool HF = (100e6 * 1e18) / 9e9 = 1.11e14 << 1.5e18 → reverts.
+        //   This proves the adapter delegates the check to Aave's HF.
+        uint256 borrowAmount = 90e8; // 90 WBTC raw = 9e9
+        uint256 expectedHF = (100e6 * 1e18) / (borrowAmount);
         vm.prank(address(vaultB));
         vm.expectRevert(
             abi.encodeWithSelector(
                 IAaveV3Adapter.HealthFactorTooLow.selector,
-                uint256(2e12),
+                expectedHF,
                 uint256(1.5e18)
             )
         );
-        adapter.borrow(address(wbtc), 10e8, 2);
+        adapter.borrow(address(wbtc), borrowAmount, 2);
+
+        // A safe borrow passes: borrow 1 WBTC satoshi (1e0 raw).
+        //   HF = (100e6 * 1e18) / 1 = 1e26 >> 1.5e18 → passes.
+        vm.prank(address(vaultB));
+        adapter.borrow(address(wbtc), 1, 2);
     }
 }
 
