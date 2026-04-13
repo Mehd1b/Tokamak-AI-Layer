@@ -12,6 +12,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'getting-started/prerequisites',
         'getting-started/run-an-example',
+        'getting-started/annotated-walkthrough',
         'getting-started/defi-yield-farmer',
         'getting-started/build-a-rebalancer',
         'getting-started/faq',
