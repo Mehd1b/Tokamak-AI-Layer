@@ -16,10 +16,14 @@ library KernelOutputParser {
     // ============ Constants ============
 
     /// @notice Maximum number of actions per output (aligned with Rust MAX_ACTIONS_PER_OUTPUT)
-    uint256 public constant MAX_ACTIONS_PER_OUTPUT = 64;
+    /// @dev Reduced from 64 to 10 for HyperEVM 3M block gas limit compatibility (H-10).
+    ///      At 10 actions × 1KB payloads, parsing alone consumes ~400K gas with assembly
+    ///      bulk copy, leaving headroom for action execution.
+    uint256 public constant MAX_ACTIONS_PER_OUTPUT = 10;
 
     /// @notice Maximum payload size per action (aligned with Rust MAX_ACTION_PAYLOAD_BYTES)
-    uint256 public constant MAX_ACTION_PAYLOAD_BYTES = 16_384;
+    /// @dev Reduced from 16,384 to 2,048 for HyperEVM 3M block gas limit compatibility (H-10).
+    uint256 public constant MAX_ACTION_PAYLOAD_BYTES = 2_048;
 
     /// @notice Maximum encoded size of a single ActionV1 structure.
     /// @dev This bounds the `action_len` value (the u32 LE prefix for each action), NOT the
@@ -33,7 +37,7 @@ library KernelOutputParser {
     ///          payload_len: u32 LE   (4 bytes)
     ///          payload: bytes        (up to MAX_ACTION_PAYLOAD_BYTES)
     ///
-    ///      Calculation: 4 + 32 + 4 + 16384 = 16424 bytes
+    ///      Calculation: 4 + 32 + 4 + 2048 = 2088 bytes
     ///
     ///      IMPORTANT: This constant is intentionally byte-for-byte aligned with the Rust
     ///      implementation in kernel-core/src/types.rs (MAX_SINGLE_ACTION_BYTES).
@@ -160,10 +164,14 @@ library KernelOutputParser {
                 revert MalformedOutput(offset, payloadLen, data.length - offset);
             }
 
-            // Read payload
+            // Read payload using assembly bulk copy instead of byte-by-byte loop.
+            // The byte-by-byte loop consumed ~40 gas/byte, exceeding HyperEVM's
+            // 3M block gas limit at scale (H-10). Assembly calldatacopy is ~3 gas/byte.
             bytes memory payload = new bytes(payloadLen);
-            for (uint256 j = 0; j < payloadLen; j++) {
-                payload[j] = data[offset + j];
+            if (payloadLen > 0) {
+                assembly {
+                    calldatacopy(add(payload, 32), add(data.offset, offset), payloadLen)
+                }
             }
             offset += payloadLen;
 

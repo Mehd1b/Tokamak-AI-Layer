@@ -36,25 +36,9 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
     address private _owner;
 
     // ─────────────────────────────────────────────────────────────────────
-    // [C-03 FIX] RISC Zero verifier rotation with allowlist + timelock
+    // RISC Zero verifier rotation with allowlist + timelock
     // ─────────────────────────────────────────────────────────────────────
-    // VULNERABILITY:
-    //   Before this fix, the RISC Zero verifier address was pinned in
-    //   `initialize()` with no on-chain upgrade path. If the pinned verifier
-    //   contained a known CVE (e.g. CVE-2025-52484: underconstrained
-    //   `remu`/`divu` opcodes in the STARK circuit), there was no way for
-    //   the protocol owner to rotate to a patched verifier. A malicious
-    //   prover could generate a valid SNARK seal for an attacker-chosen
-    //   journal digest, bypassing the entire ZK trust model. Combined with
-    //   the shared-oracleSigner vulnerability (C-02), this created a
-    //   dual-forgery compound attack: forged proof + forged bond
-    //   attestation = total protocol compromise with no slash target.
-    //
-    //   The audit's Skeptic-Judge explicitly noted that the CVE exploit
-    //   toolchain was not reproducible in the test environment, but the
-    //   structural "no upgrade path" condition was [CODE-TRACE] confirmed.
-    //
-    // FIX — three-step governance-controlled rotation:
+    // Three-step governance-controlled rotation:
     //   Step 1: Governance calls `approveVerifier(candidate)` to add a
     //           vetted verifier contract to the allowlist. This is the
     //           off-chain-vetted "pre-flight" step — candidates should be
@@ -92,18 +76,18 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
     //   unchanged. `verifier` and `_owner` slot positions are preserved.
     // ─────────────────────────────────────────────────────────────────────
 
-    /// @notice [C-03] Allowlist of verifier addresses approved by governance.
+    /// @notice Allowlist of verifier addresses approved by governance.
     ///         Only addresses on this list may be proposed / activated.
     mapping(address => bool) public approvedVerifiers;
 
-    /// @notice [C-03] Currently proposed (pending) verifier awaiting timelock expiry.
+    /// @notice Currently proposed (pending) verifier awaiting timelock expiry.
     ///         address(0) means no rotation is pending.
     address public pendingVerifier;
 
-    /// @notice [C-03] Timestamp at which `pendingVerifier` may be activated.
+    /// @notice Timestamp at which `pendingVerifier` may be activated.
     uint256 public pendingVerifierActivatesAt;
 
-    /// @notice [C-03] Timelock delay between proposing and activating a
+    /// @notice Timelock delay between proposing and activating a
     ///         verifier rotation. 48 hours gives depositors time to react
     ///         to a governance decision they disagree with.
     uint256 public constant VERIFIER_ROTATION_DELAY = 48 hours;
@@ -152,13 +136,13 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
     ///         verify() and verifyAndParseWithImageId() both revert.
     bool public verificationPaused;
 
-    /// @notice [M-11 FIX] Timestamp when verification was paused. Used to
+    /// @notice Timestamp when verification was paused. Used to
     ///         auto-expire the pause after MAX_PAUSE_DURATION so a single
     ///         compromised/absent owner key cannot permanently halt all
     ///         vault executions across the ecosystem.
     uint256 public pausedSince;
 
-    /// @notice [M-11 FIX] Maximum pause duration (7 days). After this,
+    /// @notice Maximum pause duration (7 days). After this,
     ///         verification automatically resumes without owner action.
     uint256 public constant MAX_PAUSE_DURATION = 7 days;
 
@@ -202,16 +186,16 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
     /// @notice Caller is not the owner
     error OwnableUnauthorizedAccount(address account);
 
-    /// @notice C-03: zero address passed where a verifier contract is required
+    /// @notice Zero address passed where a verifier contract is required
     error ZeroVerifier();
 
-    /// @notice C-03: verifier candidate is not on the governance allowlist
+    /// @notice Verifier candidate is not on the governance allowlist
     error VerifierNotApproved(address candidate);
 
-    /// @notice C-03: no verifier rotation is pending
+    /// @notice No verifier rotation is pending
     error NoPendingVerifier();
 
-    /// @notice C-03: timelock has not elapsed
+    /// @notice Timelock has not elapsed
     error VerifierTimelockNotElapsed(uint256 currentTime, uint256 activatesAt);
 
     /// @notice UUPS upgrade attempted without a matching scheduled proposal
@@ -237,19 +221,19 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
     /// @notice Emitted when ownership is transferred
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
-    /// @notice C-03: emitted when a verifier is added to the governance allowlist
+    /// @notice Emitted when a verifier is added to the governance allowlist
     event VerifierApproved(address indexed verifier);
 
-    /// @notice C-03: emitted when a verifier is removed from the allowlist
+    /// @notice Emitted when a verifier is removed from the allowlist
     event VerifierRevoked(address indexed verifier);
 
-    /// @notice C-03: emitted when a verifier rotation is proposed (timelock started)
+    /// @notice Emitted when a verifier rotation is proposed (timelock started)
     event VerifierProposed(address indexed verifier, uint256 activatesAt);
 
-    /// @notice C-03: emitted when a verifier rotation is cancelled
+    /// @notice Emitted when a verifier rotation is cancelled
     event VerifierProposalCancelled(address indexed verifier);
 
-    /// @notice C-03: emitted when a new verifier is committed
+    /// @notice Emitted when a new verifier is committed
     event VerifierActivated(address indexed oldVerifier, address indexed newVerifier);
 
     /// @notice Emitted when a UUPS implementation upgrade is scheduled.
@@ -302,7 +286,7 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
         require(initialOwner != address(0), "zero owner");
         verifier = IRiscZeroVerifier(_verifier);
         _owner = initialOwner;
-        // C-03: seed the allowlist with the initial verifier so introspection
+        // Seed the allowlist with the initial verifier so introspection
         // tooling can confirm it is on the approved set. Does NOT make the
         // initial verifier special — it is still the one currently in use.
         approvedVerifiers[_verifier] = true;
@@ -349,19 +333,25 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
     /// @param paused New pause state
     function setVerificationPaused(bool paused) external onlyOwner {
         verificationPaused = paused;
-        // [M-11 FIX] Record pause start time for auto-expiry.
-        pausedSince = paused ? block.timestamp : 0;
+        // Record pause start time for auto-expiry. Only set pausedSince
+        // on the FIRST pause; subsequent calls while already paused do NOT
+        // refresh the timer — this prevents the owner from cycling
+        // setVerificationPaused(true) every 6.9 days to indefinitely
+        // extend the pause beyond MAX_PAUSE_DURATION (H-05).
+        if (paused && pausedSince == 0) {
+            pausedSince = block.timestamp;
+        } else if (!paused) {
+            pausedSince = 0;
+        }
         emit VerificationPauseSet(paused);
     }
 
-    // ============ [C-03] Verifier Rotation (governance-timelocked) ============
+    // ============ Verifier Rotation (governance-timelocked) ============
     //
     // Full rationale in the block comment next to `approvedVerifiers` above.
     // The rotation flow is: approve → propose → (wait timelock) → activate.
-    //
-    // All four entry points below are labelled [C-03] for greppability.
 
-    /// @notice [C-03] STEP 1 — add a RISC Zero verifier address to the
+    /// @notice STEP 1 — add a RISC Zero verifier address to the
     ///         governance allowlist. Only allowlisted addresses may be
     ///         proposed for rotation.
     /// @dev Intended to be called ahead of any planned rotation so that the
@@ -374,7 +364,7 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
         emit VerifierApproved(candidate);
     }
 
-    /// @notice [C-03] Remove a verifier from the governance allowlist.
+    /// @notice Remove a verifier from the governance allowlist.
     /// @dev Does NOT affect the currently-active `verifier` — it only
     ///      prevents future rotations TO this address. If the revoked
     ///      candidate is ALSO the currently-pending verifier, the pending
@@ -394,7 +384,7 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
         emit VerifierRevoked(candidate);
     }
 
-    /// @notice [C-03] STEP 2 — propose rotating to a new verifier. Starts a
+    /// @notice STEP 2 — propose rotating to a new verifier. Starts a
     ///         `VERIFIER_ROTATION_DELAY` timelock before the rotation can
     ///         take effect. The candidate must already be on the allowlist.
     /// @dev Overwrites any previous pending proposal. Useful if governance
@@ -402,7 +392,7 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
     /// @param candidate The approved verifier to promote to pending
     function proposeVerifier(address candidate) external onlyOwner {
         if (candidate == address(0)) revert ZeroVerifier();
-        // [C-03] Allowlist gate: only vetted candidates may become pending.
+        // Allowlist gate: only vetted candidates may become pending.
         // This is the primary defense against a compromised owner key
         // flash-rotating to a malicious verifier in one block.
         if (!approvedVerifiers[candidate]) revert VerifierNotApproved(candidate);
@@ -411,7 +401,7 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
         emit VerifierProposed(candidate, pendingVerifierActivatesAt);
     }
 
-    /// @notice [C-03] Cancel a pending verifier rotation before activation.
+    /// @notice Cancel a pending verifier rotation before activation.
     /// @dev Only the owner can cancel. After cancellation the pending slot
     ///      is cleared and the previously-active verifier remains active.
     function cancelVerifierProposal() external onlyOwner {
@@ -421,7 +411,7 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
         pendingVerifierActivatesAt = 0;
     }
 
-    /// @notice [C-03] STEP 3 — commit a pending verifier rotation once the
+    /// @notice STEP 3 — commit a pending verifier rotation once the
     ///         timelock has elapsed.
     /// @dev PERMISSIONLESS by design — anyone may call once the timelock
     ///      has expired, so an absent or compromised owner cannot
@@ -439,7 +429,7 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
         if (block.timestamp < pendingVerifierActivatesAt) {
             revert VerifierTimelockNotElapsed(block.timestamp, pendingVerifierActivatesAt);
         }
-        // [C-03] Re-check the allowlist in case governance revoked the
+        // Re-check the allowlist in case governance revoked the
         // candidate during the timelock (see `revokeVerifier`).
         if (!approvedVerifiers[candidate]) revert VerifierNotApproved(candidate);
 
@@ -537,6 +527,17 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
             "upgrade: incompatible kernel version"
         );
 
+        // Ensure the current active verifier is on the approved list.
+        // After a UUPS upgrade, storage is preserved but if the new
+        // implementation changes layout or the upgrade process neglects
+        // to re-populate approvedVerifiers, the mapping could be empty.
+        // This check ensures the active verifier remains approved (H-06).
+        address activeVerifier = address(verifier);
+        require(
+            activeVerifier != address(0) && approvedVerifiers[activeVerifier],
+            "upgrade: active verifier must be approved"
+        );
+
         // Clear the pending slot once the activation has been authorised.
         // Any subsequent upgrade requires a fresh schedule + wait.
         pendingImplementation = address(0);
@@ -561,8 +562,8 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
         // immediately stop accepting any proof. This does NOT require
         // the UUPS upgrade timelock; it provides an instantaneous
         // circuit breaker while a scheduled upgrade proceeds separately.
-        // [M-11 FIX] Auto-expire after MAX_PAUSE_DURATION to prevent
-        // indefinite execution halt from a single key.
+        // Auto-expire after MAX_PAUSE_DURATION to prevent indefinite
+        // execution halt from a single key.
         if (verificationPaused && block.timestamp < pausedSince + MAX_PAUSE_DURATION) {
             revert VerificationPaused();
         }
@@ -588,7 +589,7 @@ contract KernelExecutionVerifier is Initializable, UUPSUpgradeable {
     /// @param journalDigest The SHA256 digest of the journal
     function verify(bytes calldata seal, bytes32 imageId, bytes32 journalDigest) external view {
         // Emergency halt — see `verifyAndParseWithImageId` for rationale.
-        // [M-11 FIX] Auto-expire after MAX_PAUSE_DURATION.
+        // Auto-expire after MAX_PAUSE_DURATION.
         if (verificationPaused && block.timestamp < pausedSince + MAX_PAUSE_DURATION) {
             revert VerificationPaused();
         }

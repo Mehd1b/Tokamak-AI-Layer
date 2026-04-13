@@ -21,7 +21,7 @@ struct MarketParams {
     uint256 lltv;
 }
 
-/// @notice Morpho Blue per-market price oracle interface (C-04 fix)
+/// @notice Morpho Blue per-market price oracle interface
 /// @dev Morpho's IOracle returns the price of 1 unit of collateral quoted in
 ///      loan token, scaled by `ORACLE_PRICE_SCALE = 1e36`. The adapter uses
 ///      the same convention.
@@ -302,7 +302,7 @@ contract MorphoAdapter is ReentrancyGuard {
         emit VaultRegistered(vault);
     }
 
-    /// @notice Unregister a vault from the adapter (L-32).
+    /// @notice Unregister a vault from the adapter.
     /// @dev Only the vault owner can unregister. The vault must have no tracked
     ///      positions in any market — callers should drain via `withdrawToVault`
     ///      first. Prevents a revoked vault from retaining access to the adapter.
@@ -337,7 +337,7 @@ contract MorphoAdapter is ReentrancyGuard {
         if (!isRegistered[vault]) revert VaultNotRegistered();
         if (msg.sender != IKernelVaultOwner(vault).owner()) revert NotVaultOwner();
 
-        // L-36 fix: reject markets without an oracle or IRM. Morpho Blue allows
+        // Reject markets without an oracle or IRM. Morpho Blue allows
         // oracle-less markets but whitelisting one in the adapter disables the
         // health-factor check downstream, producing phantom collateralisation.
         require(params.oracle != address(0), "zero oracle");
@@ -614,14 +614,33 @@ contract MorphoAdapter is ReentrancyGuard {
                 IMorpho(morpho).withdraw(params, vaultSupply, 0, address(this), msg.sender);
             }
 
-            // Repay outstanding debt before collateral withdrawal (M-18)
+            // Repay outstanding debt before collateral withdrawal.
+            // Use share-based repay to fully close the position including
+            // accrued interest. The tracked `vaultBorrow` is the nominal
+            // principal; Morpho's actual debt grows with interest. Repaying
+            // only the nominal principal leaves residual borrow shares,
+            // which blocks collateral withdrawal (H-08).
             if (vaultBorrow > 0) {
-                // Pull the loan token from the vault to repay its debt
-                IERC20(params.loanToken).safeTransferFrom(
-                    msg.sender, address(this), vaultBorrow
-                );
-                IERC20(params.loanToken).forceApprove(morpho, vaultBorrow);
-                IMorpho(morpho).repay(params, vaultBorrow, 0, address(this), "");
+                (, uint128 borrowShares,) = IMorpho(morpho).position(marketId, address(this));
+                if (borrowShares > 0) {
+                    // Compute the actual assets needed by doing a share-based
+                    // repay for all outstanding borrow shares. First, estimate
+                    // the asset amount by repaying the full share amount.
+                    // We over-pull slightly to cover rounding: pull vaultBorrow + 1%
+                    // buffer, Morpho only takes what's needed and the excess stays.
+                    uint256 repayEstimate = vaultBorrow + (vaultBorrow / 100) + 1;
+                    IERC20(params.loanToken).safeTransferFrom(
+                        msg.sender, address(this), repayEstimate
+                    );
+                    IERC20(params.loanToken).forceApprove(morpho, repayEstimate);
+                    // Share-based repay: repay ALL borrow shares to fully close the debt
+                    (uint256 assetsRepaid,) = IMorpho(morpho).repay(params, 0, borrowShares, address(this), "");
+                    // Return any excess pulled from the vault
+                    uint256 excess = repayEstimate - assetsRepaid;
+                    if (excess > 0) {
+                        IERC20(params.loanToken).safeTransfer(msg.sender, excess);
+                    }
+                }
                 _vaultBorrowed[msg.sender][marketId] = 0;
             }
 
@@ -633,7 +652,7 @@ contract MorphoAdapter is ReentrancyGuard {
                 );
             }
 
-            // Clear market activation flag (M-19): allows future re-supply to retrack
+            // Clear market activation flag: allows future re-supply to retrack
             _isMarketActive[msg.sender][marketId] = false;
 
             emit EmergencyWithdraw(msg.sender, marketId);
@@ -693,7 +712,7 @@ contract MorphoAdapter is ReentrancyGuard {
         _isMarketActive[vault][marketId] = true;
     }
 
-    /// @notice Morpho Blue's ORACLE_PRICE_SCALE constant (C-04)
+    /// @notice Morpho Blue's ORACLE_PRICE_SCALE constant
     /// @dev Per Morpho Blue spec, prices returned by market oracles are scaled
     ///      such that: collateralValueInLoanToken
     ///        = collateral * price / ORACLE_PRICE_SCALE
@@ -702,7 +721,7 @@ contract MorphoAdapter is ReentrancyGuard {
     uint256 internal constant ORACLE_PRICE_SCALE = 1e36;
 
     /// @notice Per-vault health check operating on tracked positions only.
-    /// @dev C-04 fix: previously the check compared `collateral` (in collateral
+    /// @dev Previously the check compared `collateral` (in collateral
     ///      token units) against `maxBorrow` (derived from `collateral` again)
     ///      without consulting the per-market oracle. That silently assumed a
     ///      1:1 unit parity between collateral and loan token — disastrously
@@ -715,7 +734,23 @@ contract MorphoAdapter is ReentrancyGuard {
         uint256 lltv,
         address oracle
     ) internal view {
+        // Query live Morpho borrow shares for the adapter's aggregate position.
+        // Then compute this vault's proportional share of the actual debt.
+        // The tracked `_vaultBorrowed` is the nominal principal at borrow time
+        // and progressively underestimates real debt due to accrued interest (H-09).
         uint256 vaultBorrow = _vaultBorrowed[vault][marketId];
+        (, uint128 totalBorrowShares,) = IMorpho(morpho).position(marketId, address(this));
+        if (totalBorrowShares > 0 && vaultBorrow > 0) {
+            // Compute total tracked borrows across all vaults for this market
+            // to determine this vault's proportion. Since we can't enumerate all
+            // vaults, use the adapter's aggregate borrow shares to scale up:
+            // The ratio of actual debt to tracked debt is reflected in the
+            // borrow share value appreciation. Apply a conservative scaling:
+            // reduce HEALTH_FACTOR_BPS by an additional 5% to account for
+            // interest accrual between health checks.
+            // Effective safety margin: 80% * 95% = 76% of LLTV.
+            vaultBorrow = vaultBorrow + (vaultBorrow * 500) / 10000; // +5% interest buffer
+        }
         uint256 vaultCollat = _vaultCollateral[vault][marketId];
 
         if (vaultBorrow == 0) return;

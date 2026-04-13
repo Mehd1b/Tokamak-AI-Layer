@@ -165,15 +165,17 @@ pub struct ActionV1 {
     pub payload: Vec<u8>,
 }
 
-/// Maximum payload size per action (16KB)
-pub const MAX_ACTION_PAYLOAD_BYTES: usize = 16_384;
+/// Maximum payload size per action (2KB).
+/// Reduced from 16,384 to 2,048 for HyperEVM 3M block gas limit compatibility.
+pub const MAX_ACTION_PAYLOAD_BYTES: usize = 2_048;
 
-/// Maximum number of actions per output
-pub const MAX_ACTIONS_PER_OUTPUT: usize = 64;
+/// Maximum number of actions per output.
+/// Reduced from 64 to 10 for HyperEVM 3M block gas limit compatibility.
+pub const MAX_ACTIONS_PER_OUTPUT: usize = 10;
 
 /// Maximum encoded size of a single ActionV1.
 /// Computed as: action_type (4) + target (32) + payload_len (4) + MAX_ACTION_PAYLOAD_BYTES
-/// = 40 + 16384 = 16424 bytes
+/// = 40 + 2048 = 2088 bytes
 pub const MAX_SINGLE_ACTION_BYTES: usize = 40 + MAX_ACTION_PAYLOAD_BYTES;
 
 /// Structured agent output containing ordered actions.

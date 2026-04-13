@@ -466,14 +466,13 @@ contract Test_H3_AaveV3Adapter_CrossVaultBorrow is Test {
     }
 
     function test_H3_aave_cross_vault_borrow() public {
-        // C-02 regression: the adapter now delegates health checking to Aave's
-        // own getUserAccountData(), which returns the aggregate health factor
-        // across all positions held by the adapter. The old per-vault nominal
-        // check is gone. This test verifies:
-        //   1. A borrow that would make the aggregate HF < minHealthFactor reverts.
-        //   2. A safe borrow passes.
+        // H-07 fix: the adapter now computes per-vault health factor from
+        // tracked positions and oracle prices, not from the aggregate
+        // pool.getUserAccountData(). This test verifies:
+        //   1. A borrow exceeding Vault B's OWN supply is caught by per-vault HF.
+        //   2. A safe borrow within Vault B's own supply passes.
         //   3. withdrawToVault still isolates per-vault tracked supply.
-        console.log("=== C-02 regression: Aave aggregate health check ===");
+        console.log("=== H-07 fix: Per-vault health check ===");
 
         vm.prank(address(vaultA));
         adapter.supply(address(tokenUSDC), 100_000e6);
@@ -481,20 +480,23 @@ contract Test_H3_AaveV3Adapter_CrossVaultBorrow is Test {
         vm.prank(address(vaultB));
         adapter.supply(address(tokenUSDC), 10_000e6);
 
-        // The mock pool's getUserAccountData computes:
-        //   HF = (totalCollateral * 1e18) / totalDebt
-        // After supplying 110k total, a borrow of 100k would give:
-        //   HF = (110_000e6 * 1e18) / 100_000e6 = 1.1e18 < 1.5e18 → revert
+        // Per-vault HF for Vault B borrowing 100k:
+        //   supplyValue = 10,000e6 * 1e8 / 1e6 = 1e9
+        //   borrowValue = 100,000e6 * 1e8 / 1e6 = 1e10
+        //   HF = 1e9 * 1e18 / 1e10 = 1e17 << 1.5e18 → revert
+        uint256 bSupplyVal = uint256(10_000e6) * uint256(1e8) / uint256(1e6);
+        uint256 bBorrowVal = uint256(100_000e6) * uint256(1e8) / uint256(1e6);
+        uint256 expectedHF = bSupplyVal * 1e18 / bBorrowVal;
         vm.prank(address(vaultB));
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAaveV3Adapter.HealthFactorTooLow.selector, 1.1e18, 1.5e18
+                IAaveV3Adapter.HealthFactorTooLow.selector, expectedHF, 1.5e18
             )
         );
         adapter.borrow(address(tokenUSDC), 100_000e6, 2);
 
-        // Vault B can still borrow a safe amount. 6k borrow on 110k collateral:
-        //   HF = 110_000e6 * 1e18 / 6_000e6 ≈ 18.3e18 >> 1.5e18 → passes
+        // Vault B can still borrow a safe amount within its own supply.
+        // 6k borrow on 10k supply: HF = 10k/6k * 1e18 ≈ 1.666e18 > 1.5e18 → passes
         vm.prank(address(vaultB));
         adapter.borrow(address(tokenUSDC), 6_000e6, 2);
         assertGe(tokenUSDC.balanceOf(address(vaultB)), 6_000e6);

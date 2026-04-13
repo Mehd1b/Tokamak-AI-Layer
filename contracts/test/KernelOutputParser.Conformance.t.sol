@@ -252,10 +252,10 @@ contract KernelOutputParserConformanceTest is Test {
 
     /// @notice Test that too many actions reverts
     function test_too_many_actions() public {
-        // action_count = 100 (exceeds MAX_ACTIONS_PER_OUTPUT = 64)
+        // action_count = 100 (exceeds MAX_ACTIONS_PER_OUTPUT = 10)
         bytes memory tooMany = hex"64000000";
 
-        vm.expectRevert(abi.encodeWithSelector(KernelOutputParser.TooManyActions.selector, 100, 64));
+        vm.expectRevert(abi.encodeWithSelector(KernelOutputParser.TooManyActions.selector, 100, 10));
         _parseActions(tooMany);
     }
 

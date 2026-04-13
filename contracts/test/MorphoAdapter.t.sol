@@ -678,11 +678,12 @@ contract MorphoAdapterTest is Test {
 
         // Try to borrow way more than collateral allows
         // maxBorrow = 10 * 0.8e18 * 8000 / (1e18 * 10000) = 6 (integer math)
-        // Trying to borrow 100 should fail
+        // Trying to borrow 100 should fail.
+        // H-09 fix: health check adds 5% interest buffer to borrow: 100 + 5 = 105
         uint256 borrowAmount = 100;
 
         vm.expectRevert(
-            abi.encodeWithSelector(MorphoAdapter.UnhealthyPosition.selector, 100, 6)
+            abi.encodeWithSelector(MorphoAdapter.UnhealthyPosition.selector, 105, 6)
         );
         vaultA.callBorrow(address(adapter), market1, borrowAmount);
     }
@@ -786,11 +787,12 @@ contract MorphoAdapterTest is Test {
         vaultA.callBorrow(address(adapter), market1, 60);
 
         // Try to withdraw 95 collateral, leaving only 5
-        // After withdraw: collateral=5, borrowShares=60
+        // After withdraw: collateral=5, borrow=60
         // maxBorrow = 5 * 0.8e18 * 8000 / (1e18*10000) = 3
-        // 60 > 3 => unhealthy
+        // H-09 fix: health check adds 5% buffer: 60 + 3 = 63
+        // 63 > 3 => unhealthy
         vm.expectRevert(
-            abi.encodeWithSelector(MorphoAdapter.UnhealthyPosition.selector, 60, 3)
+            abi.encodeWithSelector(MorphoAdapter.UnhealthyPosition.selector, 63, 3)
         );
         vaultA.callWithdrawCollateral(address(adapter), market1, 95);
     }

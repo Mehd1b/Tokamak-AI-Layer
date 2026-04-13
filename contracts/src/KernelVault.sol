@@ -9,8 +9,10 @@ import { OracleVerifier } from "./libraries/OracleVerifier.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
-/// @notice [M-10 FIX] Minimal interface for VaultAccessControl withdrawal recording
+/// @notice Minimal interface for VaultAccessControl deposit/withdrawal recording
 interface IVaultAccessControl {
+    function canDeposit(address user, uint256 amount) external view returns (bool);
+    function recordDeposit(address user, uint256 amount) external;
     function recordWithdrawal(address user, uint256 amount) external;
 }
 
@@ -38,7 +40,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
     /// @notice Virtual offset for share/asset math (prevents inflation/donation attacks)
     /// @dev Equivalent to OpenZeppelin ERC4626's _decimalsOffset() = 3 → 10**3 = 1000
-    /// @notice Virtual offset for share/asset math (I-08: public to match MetaVault)
+    /// @notice Virtual offset for share/asset math (public to match MetaVault)
     uint256 public constant DECIMALS_OFFSET = 1e3;
     uint256 internal constant _DECIMALS_OFFSET = DECIMALS_OFFSET;
 
@@ -46,7 +48,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @dev Allows operators to skip intermediate executions if needed (e.g., if nonce N is lost/stuck,
     ///      executions N+1 through N+MAX_NONCE_GAP can still proceed). This weakens strict ordering
     ///      but improves liveness. Document: skipped nonces are permanently lost.
-    /// @dev L-03 fix: reduced from 100 to 10. A gap of 100 was over-permissive
+    /// @dev Reduced from 100 to 10. A gap of 100 was over-permissive
     ///      and made nonce-squatting DoS cheaper. Ten covers legitimate
     ///      short-term failures and retries.
     uint64 public constant MAX_NONCE_GAP = 10;
@@ -60,51 +62,11 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @notice Delay after which depositors can emergency-withdraw while paused
     uint256 public constant EMERGENCY_WITHDRAW_DELAY = 14 days;
 
-    // ─────────────────────────────────────────────────────────────────────
-    // [C-04 FIX] Per-action CALL-value cap and post-call asset delta cap
-    // ─────────────────────────────────────────────────────────────────────
-    // VULNERABILITY:
-    //   Before this fix, `_executeCall` performed
-    //       target.call{ value: value }(callData)
-    //   with no upper bound on `value` and no post-call sanity check on the
-    //   vault's asset balance. A malicious or buggy RISC Zero guest program
-    //   (or a proof forgery via CVE-2025-52484 — see C-03) could mint a
-    //   single CALL action with `value = address(this).balance`, draining
-    //   the entire ETH balance in ONE transaction. The audit's PoC
-    //   `test_HYPCRIT04_FullVaultDrainViaCallAction` confirmed 20 ETH (100%
-    //   of the vault's ETH from two depositors) transferred to an attacker
-    //   address in a single `execute()` call.
-    //
-    // FIX:
-    //   (1) On ETH vaults, cap the per-action `value` at MAX_CALL_VALUE_BPS
-    //       (40%) of `trackedETHBalance` BEFORE dispatching the external call.
-    //   (2) On BOTH ETH and ERC20 vaults, enforce a post-call asset delta cap
-    //       at MAX_CALL_ASSET_DELTA_BPS (40%): if `balanceBefore - balanceAfter`
-    //       exceeds the cap, the whole execution reverts. This protects
-    //       against re-entrant drains and callData-driven asset pulls that
-    //       bypass the value cap (e.g., via prior approvals).
-    //
-    // WHY 40%:
-    //   A 40% cap means draining the vault requires at least 3 separate
-    //   CALL actions across 3 separate blocks — giving off-chain monitoring
-    //   and emergency-pause automation a window to detect and react. It is
-    //   NOT a replacement for the proof system (the primary trust gate); it
-    //   is strictly a defense-in-depth cap that limits the catastrophic
-    //   single-block drain scenario.
-    //
-    // INTERACTION WITH OTHER FIXES:
-    //   This cap is the last line of defense WHEN the proof system has been
-    //   bypassed (C-03 CVE-2025-52484) OR when a guest image is malicious.
-    //   In concert with the verifier-rotation allowlist (C-03), a vault
-    //   owner can rotate to a patched verifier within the 48-hour timelock
-    //   while the cap limits ongoing losses.
-    // ─────────────────────────────────────────────────────────────────────
-
-    /// @notice [C-04] Per-CALL ETH value cap, expressed in basis points of
+    /// @notice Per-CALL ETH value cap, expressed in basis points of
     ///         the vault's `trackedETHBalance`. Applied to ETH vaults only.
     uint256 public constant MAX_CALL_VALUE_BPS = 4000;
 
-    /// @notice [C-04] Per-CALL asset outflow delta cap, expressed in basis
+    /// @notice Per-CALL asset outflow delta cap, expressed in basis
     ///         points of the vault's `totalAssets()` at the start of the call.
     /// @dev Applied as a post-call balance delta check on BOTH ETH and ERC20
     ///      vaults. Bounds the blast radius of a malicious callData that
@@ -163,64 +125,13 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @notice Timestamp when strategy was activated (for emergency settlement)
     uint256 public strategyActivatedAt;
 
-    // ─────────────────────────────────────────────────────────────────────
-    // [C-02 FIX] Dual-role oracle signer separation
-    // ─────────────────────────────────────────────────────────────────────
-    // VULNERABILITY:
-    //   Before this fix, a single storage slot (`oracleSigner`) served BOTH
-    //   of the protocol's oracle roles:
-    //     Role A — PRICE attestation (SEMI_TRUSTED)
-    //       Used by KernelVault._validateParsedJournal to verify that an
-    //       execution's claimed input root was signed by the oracle at a
-    //       recent timestamp. A compromise of this key allows an attacker
-    //       to replay stale prices, but the blast radius is bounded by the
-    //       vault's existing risk controls (slippage, LTV, etc.).
-    //     Role B — BOND attestation (FULLY_TRUSTED)
-    //       Used by OptimisticKernelVault._verifyOptimisticOracleAndBond to
-    //       verify that an L1 bond exists before an optimistic execution.
-    //       A compromise of this key lets the attacker forge bond existence,
-    //       submit zero-bond optimistic executions, and drain vault TVL with
-    //       no slash target — i.e., full protocol-wide fund loss.
-    //   Because the same key signed both roles, a single private-key
-    //   compromise ESCALATED from semi-trusted to fully-trusted authority
-    //   and silently invalidated every operator's key-handling policy that
-    //   assumed Role A and Role B were distinct key domains. Production
-    //   state verification confirmed the deployed `oracleSigner`
-    //   (0x90D475b8D81dfEc6432278Ac47a5D6c153F54bf0) served both sites.
-    //
-    // FIX:
-    //   Introduce a dedicated `bondSigner` storage slot for Role B. The
-    //   invariant `bondSigner != address(0) && bondSigner != oracleSigner`
-    //   is enforced at FOUR independent sites:
-    //     1. `setBondSigner(_signer)` rejects _signer == oracleSigner.
-    //     2. `setOracleSigner(_signer, _maxAge)` rejects _signer == bondSigner.
-    //     3. `OptimisticKernelVault.setOptimisticEnabled(true)` requires
-    //        both signers to be set AND distinct.
-    //     4. `OptimisticKernelVault._verifyOptimisticOracleAndBond` re-checks
-    //        the invariant at every execution as a belt-and-braces guard.
-    //   There is deliberately NO FALLBACK to `oracleSigner` when `bondSigner`
-    //   is unset. Legacy deployments must explicitly call `setBondSigner`
-    //   before re-enabling optimistic mode, forcing an operator decision.
-    //
-    // WHY NO FALLBACK:
-    //   A fallback would recreate the vulnerability for any operator that
-    //   neglected the migration. An explicit revert forces operators to
-    //   confront the role separation requirement during upgrade.
-    //
-    // STORAGE LAYOUT:
-    //   `bondSigner` is appended to the storage layout. KernelVault is
-    //   deployed directly (not via proxy), so appending a new state
-    //   variable is safe — existing deployments are immutable and new
-    //   deployments pick up the new layout at construction.
-    // ─────────────────────────────────────────────────────────────────────
-
-    /// @notice [C-02] Trusted oracle signer for PRICE attestations (Role A,
+    /// @notice Trusted oracle signer for PRICE attestations (Role A,
     ///         SEMI_TRUSTED). Used exclusively by
     ///         `KernelVault._validateParsedJournal` for the bound oracle
     ///         signature check. See block comment above for full rationale.
     address public oracleSigner;
 
-    /// @notice [C-02] Dedicated BOND attestation signer for optimistic
+    /// @notice Dedicated BOND attestation signer for optimistic
     ///         execution (Role B, FULLY_TRUSTED). Used exclusively by
     ///         `OptimisticKernelVault._verifyOptimisticOracleAndBond`.
     /// @dev Defaults to address(0). OptimisticKernelVault refuses to enable
@@ -241,14 +152,14 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @dev Only meaningful when asset == address(0). Updated in depositETH, withdraw, execute, receive.
     uint256 public trackedETHBalance;
 
-    /// @notice [H-03 FIX] Initial vault balance captured at the start of _executeActions.
+    /// @notice Initial vault balance captured at the start of _executeActions.
     /// @dev Used by _executeCall to cap the per-action asset delta against the INITIAL
     ///      balance rather than the current (diminishing) balance. Without this, N actions
     ///      compound: 1-(0.6)^N drain (3 actions = 78.4%, 10 = 99.4%). With this fix,
     ///      cumulative drain across ALL actions is hard-capped at 40%.
     uint256 internal _executionInitialBalance;
 
-    /// @notice [M-10 FIX] Optional VaultAccessControl address. When set, _processWithdraw
+    /// @notice Optional VaultAccessControl address. When set, _processWithdraw
     ///         calls recordWithdrawal() to decrement the deposit counter, allowing users
     ///         who withdraw to re-deposit up to their cap.
     address public accessControl;
@@ -278,7 +189,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
     // ============ Fee Constants ============
 
-    /// @notice Basis points denominator (I-07)
+    /// @notice Basis points denominator
     uint256 public constant BPS_DENOMINATOR = 10_000;
 
     /// @notice Maximum management fee: 500 bps = 5% annual
@@ -290,22 +201,22 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @notice Maximum protocol fee split: 5000 bps = 50% of fees
     uint256 public constant MAX_PROTOCOL_FEE_SPLIT_BPS = 5000;
 
-    /// @notice Cooldown between fee rate changes (M-07 fix).
+    /// @notice Cooldown between fee rate changes.
     /// @dev Prevents the owner from atomically raising fees before a profitable
     ///      execution (cycle attack). Depositors have at least this much time to
     ///      observe fee changes and exit before new rates apply.
     uint256 public constant FEE_CHANGE_COOLDOWN = 7 days;
 
     /// @notice Hard cap on the combined maximum (management + performance) fee
-    ///         extraction (M-23 fix). Sum of mgmtBps+perfBps may not exceed this.
+    ///         extraction. Sum of mgmtBps+perfBps may not exceed this.
     /// @dev 5000 bps = 50%. Prevents setting MAX both which would allow 75% of
     ///      gross profit to be extracted as fees at max settings.
     uint256 public constant MAX_COMBINED_FEE_BPS = 5000;
 
-    /// @notice Timestamp of the last fee-rate change (M-07)
+    /// @notice Timestamp of the last fee-rate change
     uint256 public lastFeeRateChange;
 
-    /// @notice L-10: separate cooldown tracker for fee recipient rotations so
+    /// @notice Separate cooldown tracker for fee recipient rotations so
     ///         it does not interfere with the setFees rate-change cooldown.
     uint256 public lastFeeRecipientChange;
 
@@ -345,6 +256,9 @@ contract KernelVault is ReentrancyGuard, Pausable {
     uint256 public ppsCheckpointIndex;
 
     // ============ Events ============
+
+    /// @notice Emitted when the access control contract is updated
+    event AccessControlUpdated(address indexed previousAccessControl, address indexed newAccessControl);
 
     /// @notice Emitted when tokens are deposited
     event Deposit(address indexed sender, uint256 amount, uint256 shares);
@@ -386,7 +300,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @notice Emitted when oracle signer configuration is updated
     event OracleSignerUpdated(address indexed signer, uint64 maxAge);
 
-    /// @notice C-02: emitted when the bond signer (Role B) is updated
+    /// @notice Emitted when the bond signer (Role B) is updated
     event BondSignerUpdated(address indexed signer);
 
     /// @notice Emitted when requireOracle flag is updated
@@ -484,10 +398,10 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @notice CALL action targets the vault itself (blocked)
     error InvalidCallTarget(address target);
 
-    /// @notice C-04: CALL action's `value` exceeds the per-call ETH cap
+    /// @notice CALL action's `value` exceeds the per-call ETH cap
     error CallValueExceedsLimit(uint256 requested, uint256 maxAllowed);
 
-    /// @notice C-04: CALL action caused the vault's ERC20 asset balance to
+    /// @notice CALL action caused the vault's ERC20 asset balance to
     ///         drop by more than MAX_CALL_ASSET_DELTA_BPS in a single action
     error CallAssetDeltaExceedsLimit(uint256 actualDelta, uint256 maxAllowed);
 
@@ -521,10 +435,10 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @notice Oracle age exceeds maximum allowed
     error OracleAgeTooHigh(uint64 provided, uint64 maximum);
 
-    /// @notice C-02: bond signer (Role B) is not set
+    /// @notice Bond signer (Role B) is not set
     error BondSignerNotSet();
 
-    /// @notice C-02: bond signer (Role B) must differ from oracle signer (Role A)
+    /// @notice Bond signer (Role B) must differ from oracle signer (Role A)
     error BondSignerMustDiffer();
 
     // ============ Constructor ============
@@ -572,19 +486,19 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
     /// @notice Configure the trusted oracle signer and maximum data age
     /// @param _signer Oracle signer address (address(0) disables oracle verification)
-    /// @param _maxAge Maximum age of oracle data in seconds. L-16 fix: must be
+    /// @param _maxAge Maximum age of oracle data in seconds. Must be
     ///        non-zero when a signer is set, otherwise the freshness check is
     ///        silently disabled.
-    /// @dev L-22 fix: when `requireOracle` is true, the signer MUST remain non-zero,
+    /// @dev When `requireOracle` is true, the signer MUST remain non-zero,
     ///      otherwise the compound AND in _validateParsedJournal silently skips the
     ///      oracle check even though the mandatory-oracle flag is set.
     function setOracleSigner(address _signer, uint64 _maxAge) external {
         if (msg.sender != owner) revert NotOwner();
         if (_maxAge > MAX_ORACLE_AGE_LIMIT) revert OracleAgeTooHigh(_maxAge, MAX_ORACLE_AGE_LIMIT);
         if (_signer != address(0) && _maxAge == 0) revert OracleAgeRequired();
-        // L-22: reject rotating signer to zero while mandatory oracle is enabled
+        // Reject rotating signer to zero while mandatory oracle is enabled
         if (requireOracle && _signer == address(0)) revert OracleSignatureRequired();
-        // C-02: enforce role separation — oracleSigner (Role A) must not
+        // Enforce role separation — oracleSigner (Role A) must not
         // collide with bondSigner (Role B). We allow both to simultaneously
         // be the zero address (fully unset) but reject any non-zero overlap.
         if (_signer != address(0) && _signer == bondSigner) revert BondSignerMustDiffer();
@@ -593,7 +507,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
         emit OracleSignerUpdated(_signer, _maxAge);
     }
 
-    /// @notice C-02 fix: Configure the dedicated BOND attestation signer
+    /// @notice Configure the dedicated BOND attestation signer
     ///         (Role B, FULLY_TRUSTED). This key is used exclusively by
     ///         `OptimisticKernelVault._verifyOptimisticOracleAndBond` to
     ///         verify L1 bond attestations. It MUST be distinct from
@@ -615,7 +529,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
     /// @notice Enable/disable mandatory oracle verification
     /// @param _required If true, all executions must include a valid oracle signature
-    /// @dev L-22 fix: cannot enable mandatory oracle when signer is unset; otherwise
+    /// @dev Cannot enable mandatory oracle when signer is unset; otherwise
     ///      the `oracleSigner != address(0)` clause silently bypasses the check.
     function setRequireOracle(bool _required) external {
         if (msg.sender != owner) revert NotOwner();
@@ -624,59 +538,16 @@ contract KernelVault is ReentrancyGuard, Pausable {
         emit RequireOracleUpdated(_required);
     }
 
-    /// @notice [M-10 FIX] Set the VaultAccessControl contract for automatic
+    /// @notice Set the VaultAccessControl contract for automatic
     ///         deposit counter management. Pass address(0) to disable.
     function setAccessControl(address _accessControl) external {
         if (msg.sender != owner) revert NotOwner();
+        address previous = accessControl;
         accessControl = _accessControl;
+        emit AccessControlUpdated(previous, _accessControl);
     }
 
     // ============ Fee Configuration ============
-
-    // ─────────────────────────────────────────────────────────────────────
-    // [C-05 FIX] High-water mark is anchored ONCE and never reset
-    // ─────────────────────────────────────────────────────────────────────
-    // VULNERABILITY:
-    //   Before this fix, `setFees` unconditionally reset
-    //       highWaterMark = currentPps()
-    //   on every call where `perfBps > 0 && totalShares > 0`. This fired
-    //   even when `setFees` was called with IDENTICAL parameters. A vault
-    //   owner could therefore:
-    //     1. Wait for a drawdown (PPS drops below the prior HWM).
-    //     2. Call `setFees(0, 2000)` with the SAME rates to re-anchor the
-    //        HWM at the drawdown PPS.
-    //     3. Let the vault recover to the prior peak and collect a
-    //        performance fee on the ENTIRE RECOVERY — even though
-    //        depositors had gained zero net value.
-    //   The audit's 3-cycle PoC confirmed ~13% ownership dilution per cycle
-    //   (~21 days with the 7-day rate-change cooldown), annualising to
-    //   ~87% ownership loss while depositors perceived zero profit. This
-    //   is an extraction mechanism, not a fee.
-    //
-    // FIX:
-    //   The `highWaterMark` is anchored ONCE — on the very first time
-    //   performance fees are enabled for the vault's lifetime — and is
-    //   NEVER reset thereafter by `setFees`. The anchor gate is
-    //   `highWaterMark == 0`, which is true only before any HWM has been
-    //   recorded. After the first anchoring, the HWM may only advance
-    //   UPWARD via `_collectPerformanceFee` when PPS actually exceeds it;
-    //   it cannot move downward under any owner action.
-    //
-    // ATTACK VECTORS CLOSED:
-    //   - Cycle attack: owner cannot re-anchor HWM by calling setFees with
-    //     identical rates after a drawdown.
-    //   - Disable/re-enable cycling: owner cannot wait for drawdown,
-    //     disable perf fee, wait, then re-enable to force HWM downward.
-    //     The `highWaterMark == 0` check fires only once and never again.
-    //
-    // REMAINING TRADE-OFF:
-    //   If the owner disables perf fee AND PPS appreciates during the
-    //   zero-fee window, re-enabling will collect a fee on that
-    //   appreciation (since HWM is below current PPS). This is mildly
-    //   unfair to depositors in that specific window, but the magnitude
-    //   is CAPPED by the original HWM anchor — it cannot be amplified by
-    //   cycling, which was the C-05 attack vector.
-    // ─────────────────────────────────────────────────────────────────────
 
     /// @notice Set management and performance fee rates (owner only)
     /// @param mgmtBps Annual management fee in basis points (max 500 = 5%)
@@ -685,11 +556,11 @@ contract KernelVault is ReentrancyGuard, Pausable {
         if (msg.sender != owner) revert NotOwner();
         if (mgmtBps > MAX_MANAGEMENT_FEE_BPS) revert ManagementFeeTooHigh(mgmtBps, MAX_MANAGEMENT_FEE_BPS);
         if (perfBps > MAX_PERFORMANCE_FEE_BPS) revert PerformanceFeeTooHigh(perfBps, MAX_PERFORMANCE_FEE_BPS);
-        // M-23: aggregate fee extraction cap
+        // Aggregate fee extraction cap
         if (mgmtBps + perfBps > MAX_COMBINED_FEE_BPS) {
             revert CombinedFeeTooHigh(mgmtBps + perfBps, MAX_COMBINED_FEE_BPS);
         }
-        // M-07: cooldown between rate changes
+        // Cooldown between rate changes
         if (lastFeeRateChange != 0
             && block.timestamp < lastFeeRateChange + FEE_CHANGE_COOLDOWN)
         {
@@ -710,7 +581,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
         performanceFeeBps = perfBps;
         lastFeeRateChange = block.timestamp;
 
-        // L-20 fix: do NOT initialize lastFeeTimestamp here.
+        // Do NOT initialize lastFeeTimestamp here.
         //   - If fees are being enabled before any deposit, there is no AUM to charge
         //     against, so charging the first depositor for the pre-deposit dead period
         //     would be unfair. lastFeeTimestamp is now initialized at first deposit only.
@@ -721,7 +592,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
             lastFeeTimestamp = block.timestamp;
         }
 
-        // [C-05] First-time HWM anchor gate — see block comment above setFees.
+        // First-time HWM anchor gate.
         //   - Fires only when `highWaterMark == 0` (has never been set).
         //   - Subsequent setFees calls preserve the existing HWM.
         //   - The HWM can only advance upward via _collectPerformanceFee.
@@ -734,7 +605,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
 
     /// @notice Set the fee recipient address (owner only)
     /// @param recipient Address that receives the agent author's share of fees
-    /// @dev L-10 fix: cooldown between recipient rotations + pre-collect
+    /// @dev Cooldown between recipient rotations + pre-collect
     ///      accrued fees so the OUTGOING recipient gets its share. Without
     ///      this, owner could rotate the recipient and immediately call
     ///      collectPerformanceFee in the same block to divert accumulated fees.
@@ -744,7 +615,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
         if (msg.sender != owner) revert NotOwner();
         if (recipient == address(0)) revert ZeroFeeRecipient();
 
-        // L-10: pre-collect accrued fees so the existing recipient is settled first
+        // Pre-collect accrued fees so the existing recipient is settled first
         if (managementFeeBps > 0 && totalShares > 0 && lastFeeTimestamp > 0 && !strategyActive) {
             _collectManagementFee();
         }
@@ -752,7 +623,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
             _collectPerformanceFee();
         }
 
-        // L-10: cooldown between recipient changes (separate tracker).
+        // Cooldown between recipient changes (separate tracker).
         //   If feeRecipient was previously unset, allow the initial assignment
         //   to take effect immediately — the cooldown only applies to ROTATIONS.
         if (feeRecipient != address(0)
@@ -775,11 +646,11 @@ contract KernelVault is ReentrancyGuard, Pausable {
     function setProtocolTreasury(address treasury, uint256 splitBps) external {
         if (msg.sender != owner) revert NotOwner();
         if (splitBps > MAX_PROTOCOL_FEE_SPLIT_BPS) revert ProtocolFeeSplitTooHigh(splitBps, MAX_PROTOCOL_FEE_SPLIT_BPS);
-        // L-13: reject zero address when a non-zero split is configured; otherwise
+        // Reject zero address when a non-zero split is configured; otherwise
         // fee shares would be minted to address(0) and permanently burned.
         if (splitBps > 0 && treasury == address(0)) revert ZeroFeeRecipient();
 
-        // L-10: pre-collect accrued fees before switching treasuries so the
+        // Pre-collect accrued fees before switching treasuries so the
         // outgoing treasury gets its share.
         if (managementFeeBps > 0 && totalShares > 0 && lastFeeTimestamp > 0 && !strategyActive) {
             _collectManagementFee();
@@ -822,6 +693,14 @@ contract KernelVault is ReentrancyGuard, Pausable {
         if (address(asset) == address(0)) revert WrongDepositFunction();
         if (assets == 0) revert ZeroDeposit();
 
+        // Enforce access control gates (whitelist, deposit cap, KYC)
+        if (accessControl != address(0)) {
+            require(
+                IVaultAccessControl(accessControl).canDeposit(msg.sender, assets),
+                "deposit blocked by access control"
+            );
+        }
+
         // Capture effectiveAssets BEFORE transfer for share calculation
         uint256 effectiveAssets = effectiveTotalAssets();
 
@@ -860,6 +739,11 @@ contract KernelVault is ReentrancyGuard, Pausable {
             highWaterMark = currentPps();
         }
 
+        // Record deposit for cap tracking in access control
+        if (accessControl != address(0)) {
+            IVaultAccessControl(accessControl).recordDeposit(msg.sender, actualReceived);
+        }
+
         emit Deposit(msg.sender, actualReceived, sharesMinted);
     }
 
@@ -878,6 +762,14 @@ contract KernelVault is ReentrancyGuard, Pausable {
         if (strategyActive) revert DepositsLockedDuringStrategy();
         if (address(asset) != address(0)) revert WrongDepositFunction();
         if (msg.value == 0) revert ZeroDeposit();
+
+        // Enforce access control gates (whitelist, deposit cap, KYC)
+        if (accessControl != address(0)) {
+            require(
+                IVaultAccessControl(accessControl).canDeposit(msg.sender, msg.value),
+                "deposit blocked by access control"
+            );
+        }
 
         // Calculate shares using virtual offset formula (ERC4626)
         // Use tracked balance (pre-deposit) for PPS calculation
@@ -911,6 +803,11 @@ contract KernelVault is ReentrancyGuard, Pausable {
         }
         if (performanceFeeBps > 0 && highWaterMark == 0) {
             highWaterMark = currentPps();
+        }
+
+        // Record deposit for cap tracking in access control
+        if (accessControl != address(0)) {
+            IVaultAccessControl(accessControl).recordDeposit(msg.sender, msg.value);
         }
 
         emit Deposit(msg.sender, msg.value, sharesMinted);
@@ -984,7 +881,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
             revert AgentIdMismatch(agentId, parsed.agentId);
         }
 
-        // C-02 fix: enforce `requireOracle` BEFORE any bypass opportunity.
+        // Enforce `requireOracle` BEFORE any bypass opportunity.
         // Previously the compound AND (`oracleSigner != address(0)`) silently
         // skipped the check when signer was rotated to zero even with the
         // mandatory flag set.
@@ -992,7 +889,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
             revert OracleSignatureRequired();
         }
 
-        // C-02 fix: use the BOUND variant (inputRoot || actionCommitment) so
+        // Use the BOUND variant (inputRoot || actionCommitment) so
         // the same signature format satisfies BOTH this path and the optimistic
         // `_verifyOptimisticOracleAndBond` path. Previously these two sites
         // expected signatures over DIFFERENT payloads, creating a structural
@@ -1041,7 +938,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
     ) internal {
         lastExecutionNonce = providedNonce;
 
-        // [H-03 FIX] Capture the initial balance BEFORE any actions execute.
+        // Capture the initial balance BEFORE any actions execute.
         // _executeCall uses this to cap each action's delta against the initial
         // balance, preventing compound drain: N actions each draining 40% of the
         // *current* balance would compound to 1-(0.6)^N. With this fix, the
@@ -1130,7 +1027,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
         }
 
         // Calculate assets using virtual offset formula (ERC4626).
-        // M-05 fix: during an active strategy, price against `snapshotTotalShares`
+        // During an active strategy, price against `snapshotTotalShares`
         // instead of live `totalShares`. Live totalShares can be inflated by fee
         // share minting after the snapshot was taken, which would otherwise
         // dilute depositor PPS.
@@ -1141,7 +1038,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
             (shareAmount * (effectiveAssets + 1)) / (denomShares + _DECIMALS_OFFSET);
         if (assetsOut == 0) revert ZeroAssetsOut();
 
-        // [M-02 FIX] Cap to actual available balance during active strategy.
+        // Cap to actual available balance during active strategy.
         // Previously, this hard-reverted, locking depositors out of withdrawals
         // when most funds are deployed externally. Now uses a partial-withdrawal
         // fallback matching _processEmergencyWithdraw: scale share burn
@@ -1159,12 +1056,14 @@ contract KernelVault is ReentrancyGuard, Pausable {
         totalShares -= shareAmount;
         totalWithdrawn += assetsOut;
 
-        // [M-10 FIX] Decrement the deposit counter in VaultAccessControl so
+        // Decrement the deposit counter in VaultAccessControl so
         // users who withdraw can re-deposit up to their cap. Without this,
         // the deposited[user] counter monotonically increases and users who
         // reach their cap are permanently locked out after withdrawal.
+        // Wrapped in try-catch so a reverting or malicious accessControl
+        // contract cannot permanently trap depositor funds (H-04).
         if (accessControl != address(0)) {
-            IVaultAccessControl(accessControl).recordWithdrawal(msg.sender, assetsOut);
+            try IVaultAccessControl(accessControl).recordWithdrawal(msg.sender, assetsOut) {} catch {}
         }
 
         // If the vault has emptied completely, reset the fee epoch so the
@@ -1253,14 +1152,14 @@ contract KernelVault is ReentrancyGuard, Pausable {
     ///      MVP: only allows transfers of the vault's single asset.
     ///      Snapshots PPS on first balance-reducing transfer to prevent yield dilution.
     ///
-    ///      Per-action blast-radius cap: a TRANSFER_ERC20 action may not
-    ///      remove more than `MAX_CALL_VALUE_BPS` (40%) of the vault's
-    ///      asset balance in a single call. This mirrors the cap on CALL
-    ///      actions and prevents a forged or malicious proof from moving
-    ///      the entire vault balance out in one transaction. Legitimate
-    ///      strategies that need to move more than 40% must split the
-    ///      movement across multiple proofs so monitoring systems have
-    ///      time to observe and react between blocks.
+    ///      Cumulative blast-radius cap: the total amount drained by ALL
+    ///      TRANSFER_ERC20 actions in a single execute() call may not
+    ///      exceed `MAX_CALL_VALUE_BPS` (40%) of the vault's initial
+    ///      balance (captured at the start of _executeActions). This
+    ///      mirrors the cumulative cap on CALL actions and prevents a
+    ///      forged or malicious proof from compounding multiple 40%
+    ///      transfers to drain the vault. Legitimate strategies that
+    ///      need to move more than 40% must split across multiple proofs.
     function _executeTransferERC20(uint256 index, KernelOutputParser.Action memory action)
         internal
     {
@@ -1280,16 +1179,22 @@ contract KernelVault is ReentrancyGuard, Pausable {
         // Capture balance before transfer for strategy snapshot detection
         uint256 balanceBefore = totalAssets();
 
-        // Per-action cap: reject any TRANSFER_ERC20 whose amount exceeds
-        // MAX_CALL_VALUE_BPS of the current balance. Using `balanceBefore`
-        // (pre-transfer) as the denominator means the cap is computed on
-        // the value the vault holds at the moment the action fires, not
-        // the post-transfer balance, so the ratio is well-defined even
-        // when the first action in a batch drains the vault close to 0.
-        if (balanceBefore > 0) {
-            uint256 maxAmount = (balanceBefore * MAX_CALL_VALUE_BPS) / BPS_DENOMINATOR;
-            if (amount > maxAmount) {
-                revert CallValueExceedsLimit(amount, maxAmount);
+        // Cumulative drain cap using _executionInitialBalance.
+        // Previous code used balanceBefore (recalculated per action), allowing
+        // compound drain: 3 actions × 40% of *current* balance = 78.4% total.
+        // Now we compute cumulative drain from the initial balance set once at
+        // the start of _executeActions, matching _executeCall's approach.
+        if (_executionInitialBalance > 0) {
+            if (amount > balanceBefore) {
+                revert CallValueExceedsLimit(amount, balanceBefore);
+            }
+            uint256 balanceAfterTransfer = balanceBefore - amount;
+            uint256 cumulativeDrain = _executionInitialBalance > balanceAfterTransfer
+                ? _executionInitialBalance - balanceAfterTransfer
+                : 0;
+            uint256 maxDelta = (_executionInitialBalance * MAX_CALL_VALUE_BPS) / BPS_DENOMINATOR;
+            if (cumulativeDrain > maxDelta) {
+                revert CallValueExceedsLimit(cumulativeDrain, maxDelta);
             }
         } else if (amount > 0) {
             // If the vault has zero balance, any non-zero transfer is a
@@ -1323,41 +1228,6 @@ contract KernelVault is ReentrancyGuard, Pausable {
         emit TransferExecuted(index, token, to, amount);
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // [C-04 FIX] Per-action CALL value cap + post-call asset delta cap
-    // ─────────────────────────────────────────────────────────────────────
-    // See the block comment at the MAX_CALL_VALUE_BPS / MAX_CALL_ASSET_DELTA_BPS
-    // constant declarations for the full vulnerability background.
-    //
-    // This function enforces two independent caps on every CALL action:
-    //
-    //   (1) VALUE CAP (pre-call, ETH vaults only):
-    //       `value <= trackedETHBalance * MAX_CALL_VALUE_BPS / BPS_DENOMINATOR`
-    //       Rejects forged or malicious proofs that try to dispatch a
-    //       single ETH outflow greater than 40% of the vault's tracked
-    //       balance. ERC20 vaults are unaffected by this cap because they
-    //       have no inbound ETH source under normal operation.
-    //
-    //   (2) ASSET DELTA CAP (post-call, both vault types):
-    //       `(balanceBefore - balanceAfter) <= balanceBefore * MAX_CALL_ASSET_DELTA_BPS / BPS_DENOMINATOR`
-    //       Rejects any CALL whose net effect reduces the vault's own asset
-    //       balance by more than 40% in a single action. This protects:
-    //         - ERC20 vaults against a callData that uses prior approvals
-    //           to pull tokens out of the vault.
-    //         - ETH vaults against a re-entrant target that drains more
-    //           than the per-call `value` cap via receive/fallback tricks.
-    //
-    // Both caps use 40% of the INITIAL balance (captured at the start of
-    // _executeActions). This means cumulative drain across ALL actions in a
-    // single execute() call is hard-capped at 40%, requiring multiple
-    // separate execute() calls (each needing a fresh ZK proof) to fully
-    // drain the vault — giving monitoring systems a window to detect and pause.
-    //
-    // Nothing here changes the pre-existing trust assumption that the
-    // primary gate is the ZK proof + pinned trustedImageId. The caps are
-    // strictly defense-in-depth for catastrophic single-block drain scenarios.
-    // ─────────────────────────────────────────────────────────────────────
-
     /// @notice Execute a CALL action
     /// @dev Payload format: abi.encode(uint256 value, bytes callData)
     ///      Snapshots PPS on first balance-reducing call to prevent yield dilution.
@@ -1380,10 +1250,10 @@ contract KernelVault is ReentrancyGuard, Pausable {
         // Block CALL to self (prevents agent from calling vault functions like pause/settle)
         if (target == address(this)) revert InvalidCallTarget(target);
 
-        // Capture balance before call for (a) snapshot detection and (b) [C-04] delta cap
+        // Capture balance before call for (a) snapshot detection and (b) delta cap
         uint256 balanceBefore = totalAssets();
 
-        // [C-04] VALUE CAP — ETH vaults only. See block comment above.
+        // VALUE CAP — ETH vaults only.
         // An ETH vault refuses any CALL whose `value` exceeds 40% of the
         // current tracked balance. ERC20 vaults pass through because
         // `value > 0` is unusual for ERC20 strategies and no tracking
@@ -1407,7 +1277,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
             revert CallFailed(action.target, returnData);
         }
 
-        // [C-04 + H-03 FIX] ASSET DELTA CAP — both vault types.
+        // ASSET DELTA CAP — both vault types.
         // Cap is now computed against _executionInitialBalance (set once at the
         // start of _executeActions) instead of the per-action balanceBefore.
         // This prevents compound drain: with the old code, 3 actions each draining
@@ -1472,56 +1342,11 @@ contract KernelVault is ReentrancyGuard, Pausable {
         _unpause();
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // [H-02 FIX] Pause timestamp is permanent once set — unpause does NOT
-    //            reset the emergency-withdraw countdown.
-    // ─────────────────────────────────────────────────────────────────────
-    // VULNERABILITY:
-    //   Before this fix, `_unpause()` cleared `pausedAt = 0`, and a
-    //   subsequent `_pause()` re-stamped it to the new `block.timestamp`.
-    //   An earlier fix had already guarded `_pause()` with
-    //       if (pausedAt == 0) pausedAt = block.timestamp;
-    //   to prevent re-stamping during an UNINTERRUPTED pause, but the
-    //   `_unpause()` clear still allowed a clean pause → unpause → pause
-    //   cycle to reset the countdown. A malicious owner could:
-    //     - Day 0: pause (pausedAt = T, unlock at T + 14d)
-    //     - Day 13: unpause (pausedAt = 0)
-    //     - Day 13 + 1s: re-pause (pausedAt = T + 13d, unlock pushed 14d)
-    //     - Repeat indefinitely — depositors never reach the emergency
-    //       withdrawal window.
-    //   The audit PoC confirmed 1,000,000 USDC (in shares) trapped after
-    //   two such cycles with emergency withdraw reverting at the original
-    //   T+14d deadline.
-    //
-    // FIX:
-    //   `_unpause()` no longer clears `pausedAt`. The timestamp is ANCHORED
-    //   to the FIRST pause and never modified thereafter (the `_pause()`
-    //   guard already prevents re-stamping). The 14-day emergency
-    //   withdrawal countdown therefore runs inexorably from the first
-    //   pause and cannot be pushed forward by any owner action.
-    //
-    // BEHAVIOUR AFTER FIX:
-    //   - If the vault has NEVER been paused, `pausedAt == 0` and
-    //     emergency withdraw is blocked (normal operation).
-    //   - After the first pause, `pausedAt` is fixed forever. Even if
-    //     the owner unpauses and the vault operates normally for months,
-    //     a subsequent pause will have the original `pausedAt` value.
-    //     When `block.timestamp >= pausedAt + 14 days`, depositors can
-    //     exit during any subsequent pause with no additional delay.
-    //   - This is the INTENDED behaviour: once a vault has been paused
-    //     even briefly, depositors have been granted a perpetual right to
-    //     exit during any future pause. A malicious owner cannot revoke
-    //     that right by cycling.
-    //   - `_processEmergencyWithdraw` additionally requires `paused() == true`,
-    //     so the fix only enables emergency exits during actual pauses —
-    //     it does not allow withdrawals during normal unpaused operation.
-    // ─────────────────────────────────────────────────────────────────────
-
     /// @notice Override _pause to track pause timestamp
-    /// @dev [L-24 / H-02] Only STAMPS the pause timestamp on the very first
+    /// @dev Only STAMPS the pause timestamp on the very first
     ///      pause (when `pausedAt == 0`). Once set, the timestamp is
-    ///      permanent: subsequent pauses do NOT re-stamp. Combined with the
-    ///      H-02 fix in `_unpause` (no clear), the 14-day emergency
+    ///      permanent: subsequent pauses do NOT re-stamp. Combined with
+    ///      the `_unpause` override (no clear), the 14-day emergency
     ///      countdown is anchored once and cannot be reset by cycling.
     function _pause() internal override {
         super._pause();
@@ -1530,7 +1355,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
         }
     }
 
-    /// @notice Override _unpause — [H-02 FIX] does NOT clear `pausedAt`.
+    /// @notice Override _unpause — does NOT clear `pausedAt`.
     /// @dev Previously this cleared `pausedAt = 0`, which — combined with
     ///      the _pause guard that stamps only when pausedAt == 0 — allowed
     ///      a pause/unpause/pause cycle to push the emergency withdrawal
@@ -1541,8 +1366,8 @@ contract KernelVault is ReentrancyGuard, Pausable {
     ///      pauses — the non-zero `pausedAt` is just the countdown anchor.
     function _unpause() internal override {
         super._unpause();
-        // [H-02] Deliberately do NOT clear `pausedAt` — see block comment
-        // above. The countdown must stay anchored to the first pause.
+        // Deliberately do NOT clear `pausedAt`.
+        // The countdown must stay anchored to the first pause.
     }
 
     /// @notice Emergency withdraw bypassing pause after EMERGENCY_WITHDRAW_DELAY
@@ -1584,7 +1409,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
             revert InsufficientShares(shareAmount, shares[msg.sender]);
         }
 
-        // C-01 fix: during an active strategy, price against `snapshotTotalShares`
+        // During an active strategy, price against `snapshotTotalShares`
         // so that phantom fee mints (perf fee minted while snapshot is frozen) do not
         // dilute the emergency-exit pro-rata share. Mirrors the _processWithdraw fix.
         uint256 effectiveAssets = effectiveTotalAssets();
@@ -1594,7 +1419,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
             (shareAmount * (effectiveAssets + 1)) / (denomShares + _DECIMALS_OFFSET);
         if (assetsOut == 0) revert ZeroAssetsOut();
 
-        // H-03 fix: during an active strategy the live balance may be smaller than
+        // During an active strategy the live balance may be smaller than
         // the fair share (assets deployed externally). Rather than reverting and
         // permanently locking depositors, we perform a PARTIAL emergency withdraw:
         // pay out what is liquidly available and burn shares proportionally so the
@@ -1658,34 +1483,8 @@ contract KernelVault is ReentrancyGuard, Pausable {
         emit Withdraw(msg.sender, assetsOut, shareAmount);
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // [H-01 FIX] Make _settle overridable so OptimisticKernelVault can guard
-    //            against the settle-with-pending-executions attack.
-    // ─────────────────────────────────────────────────────────────────────
-    // VULNERABILITY:
-    //   Before this fix, `_settle` unconditionally cleared the strategy
-    //   snapshot (`snapshotTotalAssets = 0`, `snapshotTotalShares = 0`,
-    //   `strategyActive = false`). An owner of an OptimisticKernelVault
-    //   could call executeOptimistic (minting fee shares as a side-effect),
-    //   then call settle() before the challenge window expired — erasing
-    //   the basis any challenger would need to slash a fraudulent execution
-    //   while keeping the pre-extracted fee shares.
-    //
-    // FIX:
-    //   `_settle` is now declared `virtual` so OptimisticKernelVault can
-    //   override it to require `_pendingCount == 0` before proceeding.
-    //   Both `settle()` (owner) and `emergencySettle()` (permissionless
-    //   after 7 days) route through `_settle`, so the override covers both
-    //   entry points.
-    //
-    //   Liveness: if the owner disappears with pending optimistic
-    //   executions still open, anyone can call `slashExpired` after the
-    //   per-execution challenge deadline to drain the pending queue.
-    //   Only AFTER `_pendingCount == 0` can emergencySettle proceed.
-    // ─────────────────────────────────────────────────────────────────────
-
     /// @notice Internal settlement logic (used by settle() and auto-settlement in _executeCall)
-    /// @dev [H-01] declared virtual so OptimisticKernelVault can override to
+    /// @dev Declared virtual so OptimisticKernelVault can override to
     ///      block settle while optimistic executions are pending.
     function _settle() internal virtual {
         uint256 settledAssets = snapshotTotalAssets;
@@ -1696,7 +1495,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
         snapshotTotalShares = 0;
         strategyActivatedAt = 0;
 
-        // [M-01 FIX] Advance lastFeeTimestamp to prevent retroactive lump-sum
+        // Advance lastFeeTimestamp to prevent retroactive lump-sum
         // fee accumulation. Without this, _collectManagementFee() returns 0
         // during strategy (correct) but does NOT advance the timestamp. On
         // settlement, the next fee collection computes timeElapsed spanning
@@ -1737,10 +1536,10 @@ contract KernelVault is ReentrancyGuard, Pausable {
     }
 
     /// @notice Returns current PPS scaled by 1e18
-    /// @dev L-32 fix: during active strategy, divide by `snapshotTotalShares`
+    /// @dev During active strategy, divide by `snapshotTotalShares`
     ///      (not live `totalShares`) so view/HWM tracking is not distorted
-    ///      by fee share mints (though C-01 also bans such mints).
-    /// @dev L-31 was initially addressed by adding the virtual-offset formula
+    ///      by fee share mints.
+    /// @dev The virtual-offset formula was initially added
     ///      here but that broke the PPS*totalShares ≈ effectiveAssets invariant
     ///      for small vaults. The virtual offset divergence is documented in
     ///      code comments and users should always use `convertToAssets` for
@@ -1815,7 +1614,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @notice Convert assets to shares using current exchange rate (virtual offset)
     /// @param assets Amount of assets to convert
     /// @return Amount of shares that would be minted
-    /// @dev L-32 fix: use `snapshotTotalShares` during active strategy to match the
+    /// @dev Use `snapshotTotalShares` during active strategy to match the
     ///      denominator used by _processWithdraw/_processEmergencyWithdraw.
     function convertToShares(uint256 assets) public view returns (uint256) {
         uint256 denomShares = strategyActive ? snapshotTotalShares : totalShares;
@@ -1825,7 +1624,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @notice Convert shares to assets using current exchange rate (virtual offset)
     /// @param _shares Amount of shares to convert
     /// @return Amount of assets that would be returned
-    /// @dev L-32 fix: use `snapshotTotalShares` during active strategy to match the
+    /// @dev Use `snapshotTotalShares` during active strategy to match the
     ///      denominator used by _processWithdraw/_processEmergencyWithdraw.
     function convertToAssets(uint256 _shares) public view returns (uint256) {
         uint256 denomShares = strategyActive ? snapshotTotalShares : totalShares;
@@ -1839,7 +1638,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
     function _collectManagementFee() internal returns (uint256 feeShares) {
         if (managementFeeBps == 0 || totalShares == 0 || lastFeeTimestamp == 0) return 0;
 
-        // M-21 fix: do NOT accrue management fees while a strategy is active.
+        // Do NOT accrue management fees while a strategy is active.
         // The snapshot is frozen at pre-strategy assets, which the fee formula
         // would charge against regardless of the strategy's true P&L (potentially
         // taxing depositors on capital they cannot access because emergency
@@ -1852,7 +1651,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
         // feeShares = totalShares * mgmtFeeBps * timeElapsed / (365 days * 10000)
         feeShares = (totalShares * managementFeeBps * timeElapsed) / (365 days * 10000);
 
-        // L-19 fix: advance lastFeeTimestamp UNCONDITIONALLY regardless of whether
+        // Advance lastFeeTimestamp UNCONDITIONALLY regardless of whether
         // the computed fee rounded to zero. Otherwise zero-round periods accumulate
         // and are batched as a single lump charge when TVL eventually grows — hitting
         // late depositors with retroactive fees for a time window when no AUM existed.
@@ -1868,7 +1667,7 @@ contract KernelVault is ReentrancyGuard, Pausable {
     /// @notice Internal performance fee collection
     /// @dev Only collects if current PPS > highWaterMark
     ///      feeShares = totalShares * profitBps * perfFeeBps / (10000 * 10000)
-    /// @dev C-01 / L-09 fix: do NOT mint performance fee shares while a strategy
+    /// @dev Do NOT mint performance fee shares while a strategy
     ///      is active. During strategy:
     ///        - snapshotTotalShares is frozen at strategy activation
     ///        - totalShares is LIVE

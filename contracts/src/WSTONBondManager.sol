@@ -50,18 +50,18 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
 
     /// @notice Bond expiry: operators can reclaim bonds after this duration if not released/slashed
     /// @dev Safety valve against stuck bonds (revoked vaults, lost relayer keys, etc.).
-    ///      M-16: extended from 30 to 90 days to give relayers a larger window to
+    ///      Extended from 30 to 90 days to give relayers a larger window to
     ///      resolve pending slashes before the expiry valve opens.
     uint256 public constant BOND_EXPIRY = 90 days;
 
     /// @notice Maximum number of bonds that can be locked in a single batch
     uint256 public constant MAX_BATCH_SIZE = 20;
 
-    /// @notice L-27: maximum range for getOperatorBondCount queries
+    /// @notice Maximum range for getOperatorBondCount queries
     /// @dev Prevents eth_call DoS via toNonce = type(uint64).max spinning the node.
     uint256 public constant MAX_BOND_QUERY_RANGE = 10_000;
 
-    /// @notice L-11: delay enforced before a newly-set trusted relayer becomes active.
+    /// @notice Delay enforced before a newly-set trusted relayer becomes active.
     /// @dev Rotating the relayer instantly would invalidate in-flight cross-chain
     ///      slash messages signed by the previous relayer. A queued rotation gives
     ///      pending slashes time to land before the old relayer's signature becomes
@@ -97,11 +97,11 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     /// @notice Trusted relayer address for cross-chain bond operations
     address public trustedRelayer;
 
-    /// @notice L-11: queued relayer rotation - proposed new relayer waits this long before activation
+    /// @notice Queued relayer rotation - proposed new relayer waits this long before activation
     address public pendingRelayer;
     uint256 public pendingRelayerActivatesAt;
 
-    /// @notice [H-03 FIX] Flag tracking whether the first trusted relayer
+    /// @notice Flag tracking whether the first trusted relayer
     ///         has ever been set. Only the very first assignment (before
     ///         this flag flips to true) bypasses the rotation timelock.
     ///         All subsequent assignments — including from address(0)
@@ -113,7 +113,7 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     ///         delay.
     bool public relayerInitialized;
 
-    /// @notice [H-02 FIX] Tracks bonds that have been slashed on the vault
+    /// @notice Tracks bonds that have been slashed on the vault
     ///         chain (HyperEVM) but not yet resolved on L1. Prevents operators
     ///         from reclaiming bonds via the 90-day expiry safety valve while
     ///         a slash is pending cross-chain relay.
@@ -147,9 +147,9 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         address indexed operator, address indexed vault, uint64 indexed nonce, uint256 amount
     );
     event TokensRescued(address indexed token, address indexed to, uint256 amount);
-    /// @notice L-11: emitted when a new trusted relayer is proposed and queued
+    /// @notice Emitted when a new trusted relayer is proposed and queued
     event TrustedRelayerProposed(address indexed newRelayer, uint256 activatesAt);
-    /// @notice [H-02 FIX] emitted when a bond is flagged as slash-pending
+    /// @notice Emitted when a bond is flagged as slash-pending
     event SlashPendingMarked(address indexed operator, address indexed vault, uint64 indexed nonce);
 
     // ============ Errors ============
@@ -218,7 +218,7 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         onlyAuthorizedVault
     {
         if (amount == 0) revert ZeroBondAmount();
-        // M-08: enforce minBondFloor at the bond manager level — prevents dust
+        // Enforce minBondFloor at the bond manager level — prevents dust
         // bonds that neutralize slashing economics.
         if (amount < minBondFloor) revert BondBelowFloor(amount, minBondFloor);
 
@@ -366,15 +366,16 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         emit BondReleased(operator, vault, nonce, amount);
     }
 
-    /// @notice [H-02 FIX] Mark a bond as having a pending slash from the vault chain.
-    ///         Called by the relayer (or owner as backup) when an ExecutionSlashed event
-    ///         is observed on HyperEVM but before the L1 slash is executed. This prevents
-    ///         the operator from racing the relayer via reclaimExpiredBond().
+    /// @notice Mark a bond as having a pending slash from the vault chain.
+    ///         Callable by the relayer, owner, OR permissionlessly by anyone.
+    ///         The permissionless path eliminates the relayer as a single point
+    ///         of failure: if the relayer is offline, any observer of the
+    ///         HyperEVM `ExecutionSlashed` event can flag the bond on L1 to
+    ///         prevent the operator from reclaiming via the 90-day expiry valve.
     /// @param operator The operator whose bond is being flagged
     /// @param vault The vault address
     /// @param nonce The execution nonce
     function markSlashPending(address operator, address vault, uint64 nonce) external {
-        require(msg.sender == trustedRelayer || msg.sender == owner, "not relayer or owner");
         BondInfo storage bond = bonds[operator][vault][nonce];
         if (bond.status != BondStatus.Locked) {
             revert InvalidBondStatus(operator, vault, nonce, bond.status);
@@ -399,7 +400,7 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
             revert InvalidBondStatus(operator, vault, nonce, bond.status);
         }
 
-        // [H-02 FIX] Clear the slash-pending flag (if set) now that the slash is being executed.
+        // Clear the slash-pending flag (if set) now that the slash is being executed.
         slashPending[operator][vault][nonce] = false;
 
         uint256 amount = bond.amount;
@@ -407,13 +408,11 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         totalBonded[operator] -= amount;
         totalLockedGlobal -= amount;
 
-        // L-49 fix: cross-chain slash now honours the TREASURY_SHARE_BPS split
-        // explicitly. The treasury receives its fixed 10% share, the finder gets
-        // its 10% (or 0 for self-slash), and the remaining 80% depositor share
-        // is forwarded to the treasury as escrow (cross-chain depositor transfer
-        // is out of scope for this contract). Previously the function computed
-        // `treasuryShare` as dead code and sent `amount - finderShare` to the
-        // treasury, over-allocating the treasury when a finder was present.
+        // Cross-chain slash honours the TREASURY_SHARE_BPS split explicitly.
+        // The treasury receives its fixed 10% share, the finder gets its 10%
+        // (or 0 for self-slash), and the remaining 80% depositor share is
+        // forwarded to the treasury as escrow (cross-chain depositor transfer
+        // is out of scope for this contract).
         uint256 treasuryShare = (amount * TREASURY_SHARE_BPS) / BPS_DENOMINATOR;
         uint256 finderShare;
         uint256 depositorShare;
@@ -490,7 +489,7 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
             revert InvalidBondStatus(msg.sender, vault, nonce, bond.status);
         }
 
-        // [H-02 FIX] Block reclamation if a cross-chain slash is pending.
+        // Block reclamation if a cross-chain slash is pending.
         // Without this check, an operator could drain a vault via malicious
         // optimistic execution, wait 90 days for the relayer to fail, and
         // reclaim the full bond — zero economic penalty.
@@ -538,7 +537,7 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
     }
 
     /// @notice Get operator's total active bond count for a vault across all nonces
-    /// @dev L-27 fix: cap range to MAX_BOND_QUERY_RANGE and guard against a
+    /// @dev Range capped to MAX_BOND_QUERY_RANGE to guard against a
     ///      toNonce of type(uint64).max that would otherwise cause `i <= toNonce`
     ///      to loop forever and exhaust the node's gas budget on eth_call.
     function getOperatorBondCount(address operator, address vault, uint64 fromNonce, uint64 toNonce)
@@ -574,7 +573,7 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         emit TreasuryUpdated(_treasury);
     }
 
-    /// @dev L-43 fix: reject `_minBondFloor == 0`. A zero floor silently
+    /// @dev Rejects `_minBondFloor == 0`. A zero floor silently
     ///      eliminates the global slash economics and lets operators submit
     ///      executions with zero stake, undermining the entire bond system.
     function setMinBondFloor(uint256 _minBondFloor) external onlyOwner {
@@ -593,67 +592,15 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
         emit VaultRevoked(vault);
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // [H-03 FIX] Close the clear-then-set bypass of RELAYER_ROTATION_DELAY
-    // ─────────────────────────────────────────────────────────────────────
-    // VULNERABILITY:
-    //   The previous implementation enforced RELAYER_ROTATION_DELAY only on
-    //   the non-zero → non-zero transition. A "first assignment" short-
-    //   circuit (if trustedRelayer == address(0)) took effect immediately,
-    //   intended to make initial deployment ergonomic. But the clear path
-    //   (setTrustedRelayer(0)) ALSO set trustedRelayer to address(0) —
-    //   meaning a sequence of
-    //       setTrustedRelayer(0); setTrustedRelayer(evilRelayer);
-    //   inside the SAME transaction bypassed the entire timelock: the
-    //   first call cleared the state, and the second call hit the "first
-    //   assignment" path and installed `evilRelayer` with zero delay.
-    //
-    //   The audit PoC (Test_HIGH12_RelayerRotationBypass) confirmed
-    //   appliedDelay == 0 vs expectedDelay == 3600, with pendingRelayer
-    //   never populated — the queue was bypassed entirely in a single
-    //   block. Within that 1-hour unprotected window, an attacker relayer
-    //   could execute up to 200 bond state transitions (10 lockBondBatch
-    //   calls × 20 bonds each), releasing bonds that should be slashed
-    //   or slashing legitimate bonds.
-    //
-    // FIX:
-    //   Introduce a `relayerInitialized` flag that tracks the LIFETIME
-    //   state of "has this contract ever had a relayer set, even briefly".
-    //   - On the very first non-zero assignment, set `relayerInitialized = true`
-    //     and take the immediate path. This only happens once per deployment.
-    //   - Every subsequent assignment — INCLUDING transitioning from
-    //     address(0) back to a non-zero relayer — must go through the
-    //     queued `pendingRelayer` + `RELAYER_ROTATION_DELAY` path.
-    //   - Clearing to address(0) is still allowed immediately (it only
-    //     stops new cross-chain bonds; there is no signature replay
-    //     concern when the relayer is unset), but the `relayerInitialized`
-    //     flag remains true, so the next non-zero assignment is queued.
-    //
-    // WHY NOT USE `trustedRelayer == address(0)`:
-    //   The old check conflated "never initialized" with "currently cleared".
-    //   The flag disambiguates: `relayerInitialized` is a one-way door
-    //   that closes after the first set and never reopens, while
-    //   `trustedRelayer` can still be cleared to stop new bonds.
-    //
-    // LIVENESS:
-    //   - First-time deployments work exactly as before — immediate set.
-    //   - Legitimate rotations work via propose → wait 1h → activate.
-    //   - Emergency relayer replacement (e.g., after a compromise) still
-    //     takes 1 hour, which is the intentional trade-off: give time
-    //     for in-flight slash messages to land, prevent flash-rotation.
-    //   - Clearing to zero is still immediate — operators can halt new
-    //     bonds without waiting.
-    // ─────────────────────────────────────────────────────────────────────
-
-    /// @notice Update the trusted relayer (L-31: allow clearing to zero to revoke).
+    /// @notice Update the trusted relayer (clearing to zero revokes the relayer).
     /// @dev Cross-chain functions (lockBondDirect, lockBondBatch) require a
     ///      non-zero relayer, so clearing it cleanly stops new cross-chain
     ///      bonds without breaking the existing bonds.
-    /// @dev [L-11 / H-03] Non-zero assignments are queued for
-    ///      RELAYER_ROTATION_DELAY so in-flight cross-chain slash messages
-    ///      signed by the old relayer can still land. ONLY the very first
-    ///      deployment-time assignment (tracked by the `relayerInitialized`
-    ///      flag) bypasses the delay. Clearing to zero is immediate.
+    /// @dev Non-zero assignments are queued for RELAYER_ROTATION_DELAY so
+    ///      in-flight cross-chain slash messages signed by the old relayer can
+    ///      still land. ONLY the very first deployment-time assignment (tracked
+    ///      by the `relayerInitialized` flag) bypasses the delay. Clearing to
+    ///      zero is immediate.
     function setTrustedRelayer(address relayer) external onlyOwner {
         if (relayer == address(0)) {
             // Clearing is always immediate — there is no signature replay
@@ -663,13 +610,13 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
             trustedRelayer = address(0);
             pendingRelayer = address(0);
             pendingRelayerActivatesAt = 0;
-            // Note: `relayerInitialized` deliberately NOT reset here — see
-            // the block comment above for the H-03 fix rationale.
+            // Note: `relayerInitialized` deliberately NOT reset here — the
+            // flag is a one-way door that prevents the clear-then-set bypass.
             emit TrustedRelayerUpdated(address(0));
             return;
         }
 
-        // [H-03] Very first lifetime assignment — take effect immediately.
+        // Very first lifetime assignment — take effect immediately.
         // This path can only be hit ONCE per contract deployment because
         // `relayerInitialized` is a one-way flag. After the first call
         // with a non-zero relayer, this branch is permanently closed and
@@ -681,17 +628,17 @@ contract WSTONBondManager is IBondManager, ReentrancyGuard {
             return;
         }
 
-        // [H-03] All subsequent assignments — INCLUDING transitioning from
+        // All subsequent assignments — INCLUDING transitioning from
         // a cleared address(0) state back to a non-zero relayer — are
         // queued through the full RELAYER_ROTATION_DELAY. This closes the
-        // clear-then-set bypass described in the audit's H-03 finding.
+        // clear-then-set bypass of the rotation timelock.
         pendingRelayer = relayer;
         pendingRelayerActivatesAt = block.timestamp + RELAYER_ROTATION_DELAY;
         emit TrustedRelayerProposed(relayer, pendingRelayerActivatesAt);
     }
 
-    /// @notice L-11 fix: activate a queued relayer rotation after the delay elapses
-    /// @dev [H-03] Permissionless — anyone can call once the timelock has
+    /// @notice Activate a queued relayer rotation after the delay elapses
+    /// @dev Permissionless — anyone can call once the timelock has
     ///      elapsed, so an absent owner cannot indefinitely stall a queued
     ///      rotation. The `activateTrustedRelayer` call is the ONLY way
     ///      (post-initialization) to install a non-zero relayer address.

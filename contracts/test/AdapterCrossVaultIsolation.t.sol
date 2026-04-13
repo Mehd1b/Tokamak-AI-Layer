@@ -515,10 +515,12 @@ contract AdapterCrossVaultIsolationTest is Test {
 
         // B attempts to borrow 50 loan token (5x B's collateral, 50% of A's)
         // Per-vault: collat=1, lltv=0.8, 80% safety → maxBorrow = 1 * 0.8 * 0.8 = 0.64
+        // H-09 fix: health check adds 5% buffer to borrow: 50e18 + 2.5e18 = 52.5e18
+        uint256 bufferedBorrow = 50e18 + (50e18 * 500) / 10000;
         vm.expectRevert(
             abi.encodeWithSelector(
                 MorphoAdapter.UnhealthyPosition.selector,
-                50e18,
+                bufferedBorrow,
                 (uint256(1e18) * 0.8e18 * 8000) / (1e18 * 10000)
             )
         );

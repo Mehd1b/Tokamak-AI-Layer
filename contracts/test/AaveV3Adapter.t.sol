@@ -863,16 +863,21 @@ contract AaveV3AdapterTest is Test {
     }
 
     function test_borrow_healthFactorEnforcement_justBelowThreshold() public {
-        // [M-08 FIX] Now uses Aave's real health factor. Set mock to just below threshold.
-        uint256 justBelowHF = 1.4985e18;
-        mockPool.setMockHealthFactor(justBelowHF);
+        // Per-vault health check: supplies 1500 USDC, borrows 1001 USDC.
+        // Both at $1 price (1e8 in oracle base), 6 decimals.
+        // supplyValue = 1500e6 * 1e8 / 1e6 = 1.5e8
+        // borrowValue = 1001e6 * 1e8 / 1e6 = 1.001e8
+        // HF = supplyValue * 1e18 / borrowValue
+        uint256 supplyValue = uint256(1500e6) * uint256(1e8) / uint256(1e6);
+        uint256 borrowValue = uint256(1001e6) * uint256(1e8) / uint256(1e6);
+        uint256 expectedHF = supplyValue * 1e18 / borrowValue;
 
         vm.prank(address(vault));
         adapter.supply(address(usdc), 1500e6);
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAaveV3Adapter.HealthFactorTooLow.selector, justBelowHF, DEFAULT_MIN_HF
+                IAaveV3Adapter.HealthFactorTooLow.selector, expectedHF, DEFAULT_MIN_HF
             )
         );
         vm.prank(address(vault));
