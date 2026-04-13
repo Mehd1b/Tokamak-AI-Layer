@@ -52,6 +52,7 @@ const MORE_LINKS: MoreLink[] = [
   { label: 'Points', href: '/points' },
   { label: 'Leaderboard', href: '/leaderboard' },
   { label: 'Marketplace', href: '/marketplace' },
+  { label: 'Developers', href: '/developers' },
   { label: 'Whitepaper', href: '/whitepaper' },
   { label: 'Docs', href: 'https://docs.tokagent.network', external: true },
 ];

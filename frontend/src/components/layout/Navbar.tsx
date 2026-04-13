@@ -48,6 +48,7 @@ const DASHBOARD_LINKS: DropdownLink[] = [
 
 // Resources dropdown links
 const RESOURCES_LINKS: DropdownLink[] = [
+  { title: 'Developers', description: 'Build verifiable DeFi agents', href: '/developers', internal: true },
   { title: 'Whitepaper', description: 'Technical architecture overview', href: '/whitepaper', internal: true },
   { title: 'Institutional', description: 'Enterprise solutions', href: '/institutional', internal: true },
   { title: 'Docs', description: 'Developer documentation', href: 'https://docs.tokagent.network' },
