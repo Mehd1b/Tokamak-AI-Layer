@@ -29,6 +29,7 @@ import { BondStatusCard } from '@/components/BondStatusCard';
 import { useAgentMetadata } from '@/hooks/useAgentMetadata';
 import { useAgent } from '@/hooks/useKernelAgent';
 import { useVaultFees } from '@/hooks/useVaultFees';
+import { FeeConfigForm } from '@/components/FeeConfigForm';
 import { useStoredReferralCode, useRecordReferral, hashReferralCode, clearStoredReferralCode, useReferralAvailable } from '@/hooks/useReferral';
 import Link from 'next/link';
 
@@ -384,64 +385,122 @@ export default function VaultDetailPage() {
           {/* Performance Dashboard */}
           <PerformanceCard vaultAddress={vaultAddress} />
 
-          {/* Fee Structure (only shown if fees are configured) */}
-          {fees && (fees.managementFeeBps > 0n || fees.performanceFeeBps > 0n) && (
-            <div className="card mb-8">
-              <div className="flex items-center gap-3 mb-4">
-                <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center"
-                  style={{
-                    background: 'rgba(234, 179, 8, 0.08)',
-                    border: '1px solid rgba(234, 179, 8, 0.15)',
-                  }}
-                >
-                  <svg viewBox="0 0 24 24" className="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
-                  </svg>
+          {/* Fee Structure (always shown for transparency) */}
+          {fees && (() => {
+            const hasFees = fees.managementFeeBps > 0n || fees.performanceFeeBps > 0n;
+            const cooldownSeconds = 7 * 24 * 60 * 60;
+            const cooldownEnd = fees.lastFeeRateChange > 0n
+              ? Number(fees.lastFeeRateChange) + cooldownSeconds
+              : 0;
+            const nowSec = Math.floor(Date.now() / 1000);
+            const isCooldownLocked = cooldownEnd > 0 && nowSec < cooldownEnd;
+            return (
+              <div className="card mb-8">
+                <div className="flex items-center gap-3 mb-4">
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center"
+                    style={{
+                      background: 'rgba(234, 179, 8, 0.08)',
+                      border: '1px solid rgba(234, 179, 8, 0.15)',
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" className="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-lg font-light text-white" style={{ fontFamily: 'var(--font-serif), serif' }}>
+                    Fee Structure
+                  </h2>
                 </div>
-                <h2 className="text-lg font-light text-white" style={{ fontFamily: 'var(--font-serif), serif' }}>
-                  Fee Structure
-                </h2>
+                {!hasFees ? (
+                  <div className="text-center py-6">
+                    <span className="text-emerald-400 text-sm font-mono">No management or performance fees configured</span>
+                    <p className="text-gray-600 text-xs font-mono mt-1">
+                      The vault owner has not set any fees. Depositors keep 100% of returns.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4" style={{ fontFamily: 'var(--font-mono), monospace' }}>
+                    <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
+                      <span className="text-gray-500 text-sm">Management Fee (Annual)</span>
+                      <span className="text-yellow-400 text-sm font-medium">
+                        {(Number(fees.managementFeeBps) / 100).toFixed(2)}%
+                      </span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
+                      <span className="text-gray-500 text-sm">Performance Fee (on Profits)</span>
+                      <span className="text-yellow-400 text-sm font-medium">
+                        {(Number(fees.performanceFeeBps) / 100).toFixed(2)}%
+                      </span>
+                    </div>
+                    {fees.feeRecipient && fees.feeRecipient !== '0x0000000000000000000000000000000000000000' && (
+                      <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
+                        <span className="text-gray-500 text-sm">Fee Recipient</span>
+                        <a
+                          href={`${explorerUrl}/address/${fees.feeRecipient}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#A855F7] text-sm hover:underline break-all"
+                        >
+                          {truncateAddress(fees.feeRecipient, 6)}
+                        </a>
+                      </div>
+                    )}
+                    {fees.highWaterMark > 0n && (
+                      <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
+                        <span className="text-gray-500 text-sm">High Water Mark (PPS)</span>
+                        <span className="text-gray-300 text-sm">
+                          {(Number(fees.highWaterMark) / 1e18).toFixed(6)}
+                        </span>
+                      </div>
+                    )}
+                    {fees.protocolFeeSplitBps > 0n && fees.protocolTreasury
+                      && fees.protocolTreasury !== '0x0000000000000000000000000000000000000000' && (
+                      <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
+                        <span className="text-gray-500 text-sm">Protocol Fee Split</span>
+                        <span className="text-gray-300 text-sm">
+                          {(Number(fees.protocolFeeSplitBps) / 100).toFixed(2)}% to{' '}
+                          <a
+                            href={`${explorerUrl}/address/${fees.protocolTreasury}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#A855F7] hover:underline"
+                          >
+                            {truncateAddress(fees.protocolTreasury, 6)}
+                          </a>
+                        </span>
+                      </div>
+                    )}
+                    {fees.lastFeeTimestamp > 0n && (
+                      <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
+                        <span className="text-gray-500 text-sm">Last Fee Collection</span>
+                        <span className="text-gray-300 text-sm">{timestampToDate(fees.lastFeeTimestamp)}</span>
+                      </div>
+                    )}
+                    {fees.lastFeeRateChange > 0n && (
+                      <div className="flex flex-col sm:flex-row sm:justify-between py-3">
+                        <span className="text-gray-500 text-sm">Fee Rate Lock</span>
+                        <span className={`text-sm font-mono ${isCooldownLocked ? 'text-amber-400' : 'text-gray-500'}`}>
+                          {isCooldownLocked
+                            ? `Locked until ${new Date(cooldownEnd * 1000).toLocaleDateString()}`
+                            : 'Unlocked'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <div className="space-y-4" style={{ fontFamily: 'var(--font-mono), monospace' }}>
-                {fees.managementFeeBps > 0n && (
-                  <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
-                    <span className="text-gray-500 text-sm">Management Fee (Annual)</span>
-                    <span className="text-yellow-400 text-sm font-medium">
-                      {(Number(fees.managementFeeBps) / 100).toFixed(2)}%
-                    </span>
-                  </div>
-                )}
-                {fees.performanceFeeBps > 0n && (
-                  <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
-                    <span className="text-gray-500 text-sm">Performance Fee (on Profits)</span>
-                    <span className="text-yellow-400 text-sm font-medium">
-                      {(Number(fees.performanceFeeBps) / 100).toFixed(2)}%
-                    </span>
-                  </div>
-                )}
-                {fees.feeRecipient && fees.feeRecipient !== '0x0000000000000000000000000000000000000000' && (
-                  <div className="flex flex-col sm:flex-row sm:justify-between py-3 border-b border-white/5">
-                    <span className="text-gray-500 text-sm">Fee Recipient</span>
-                    <a
-                      href={`${explorerUrl}/address/${fees.feeRecipient}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[#A855F7] text-sm hover:underline break-all"
-                    >
-                      {truncateAddress(fees.feeRecipient, 6)}
-                    </a>
-                  </div>
-                )}
-                {fees.highWaterMark > 0n && (
-                  <div className="flex flex-col sm:flex-row sm:justify-between py-3">
-                    <span className="text-gray-500 text-sm">High Water Mark (PPS)</span>
-                    <span className="text-gray-300 text-sm">
-                      {(Number(fees.highWaterMark) / 1e18).toFixed(6)}
-                    </span>
-                  </div>
-                )}
-              </div>
+            );
+          })()}
+
+          {/* Owner-only fee configuration panel */}
+          {fees && userAddress && vault.owner
+            && userAddress.toLowerCase() === String(vault.owner).toLowerCase() && (
+            <div className="card mb-8">
+              <h2 className="text-lg font-light text-white mb-4" style={{ fontFamily: 'var(--font-serif), serif' }}>
+                Configure Fees
+              </h2>
+              <FeeConfigForm vaultAddress={vaultAddress} currentFees={fees} />
             </div>
           )}
 

@@ -4,54 +4,85 @@ import { useReadContract } from 'wagmi';
 import { KernelVaultABI } from '@/lib/contracts';
 import { useNetwork } from '@/lib/NetworkContext';
 
-/**
- * Hook to read vault fee configuration from on-chain.
- * Returns null if no fees are configured or data is still loading.
+/*
+ * `lastFeeRateChange` isn't in the SDK ABI export. It's a public state variable
+ * on KernelVault (cooldown tracker for setFees()), so Solidity auto-generates a
+ * getter. Inline minimal ABI here to read it without modifying the SDK.
  */
-export function useVaultFees(vaultAddress: `0x${string}` | undefined) {
+const LastFeeRateChangeABI = [
+  {
+    type: 'function',
+    name: 'lastFeeRateChange',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+] as const;
+
+export interface VaultFees {
+  managementFeeBps: bigint;
+  performanceFeeBps: bigint;
+  feeRecipient: `0x${string}` | undefined;
+  protocolTreasury: `0x${string}` | undefined;
+  protocolFeeSplitBps: bigint;
+  lastFeeTimestamp: bigint;
+  highWaterMark: bigint;
+  lastFeeRateChange: bigint;
+  isLoading: boolean;
+}
+
+/**
+ * Hook to read vault fee configuration from on-chain. Uses `getFeeInfo()` for a
+ * single aggregated view read (7 fields) plus one extra `lastFeeRateChange`
+ * read for cooldown display — 2 RPC calls total, down from 4.
+ */
+export function useVaultFees(vaultAddress: `0x${string}` | undefined): VaultFees | null {
   const { selectedChainId } = useNetwork();
 
-  const managementFeeBps = useReadContract({
+  const feeInfo = useReadContract({
     address: vaultAddress,
     abi: KernelVaultABI,
-    functionName: 'managementFeeBps',
+    functionName: 'getFeeInfo',
     chainId: selectedChainId,
     query: { enabled: !!vaultAddress },
   });
 
-  const performanceFeeBps = useReadContract({
+  const lastFeeRateChange = useReadContract({
     address: vaultAddress,
-    abi: KernelVaultABI,
-    functionName: 'performanceFeeBps',
+    abi: LastFeeRateChangeABI,
+    functionName: 'lastFeeRateChange',
     chainId: selectedChainId,
     query: { enabled: !!vaultAddress },
   });
 
-  const feeRecipient = useReadContract({
-    address: vaultAddress,
-    abi: KernelVaultABI,
-    functionName: 'feeRecipient',
-    chainId: selectedChainId,
-    query: { enabled: !!vaultAddress },
-  });
+  if (feeInfo.isLoading) return null;
+  if (feeInfo.isError) return null;
 
-  const highWaterMark = useReadContract({
-    address: vaultAddress,
-    abi: KernelVaultABI,
-    functionName: 'highWaterMark',
-    chainId: selectedChainId,
-    query: { enabled: !!vaultAddress },
-  });
+  const info = feeInfo.data as
+    | readonly [bigint, bigint, `0x${string}`, `0x${string}`, bigint, bigint, bigint]
+    | undefined;
 
-  // If still loading or errored, return null
-  if (managementFeeBps.isLoading || performanceFeeBps.isLoading) return null;
-  if (managementFeeBps.isError && performanceFeeBps.isError) return null;
+  if (!info) return null;
+
+  const [
+    managementFeeBps,
+    performanceFeeBps,
+    feeRecipient,
+    protocolTreasury,
+    protocolFeeSplitBps,
+    lastFeeTimestamp,
+    highWaterMark,
+  ] = info;
 
   return {
-    managementFeeBps: (managementFeeBps.data as bigint) ?? 0n,
-    performanceFeeBps: (performanceFeeBps.data as bigint) ?? 0n,
-    feeRecipient: feeRecipient.data as `0x${string}` | undefined,
-    highWaterMark: (highWaterMark.data as bigint) ?? 0n,
-    isLoading: managementFeeBps.isLoading || performanceFeeBps.isLoading,
+    managementFeeBps,
+    performanceFeeBps,
+    feeRecipient,
+    protocolTreasury,
+    protocolFeeSplitBps,
+    lastFeeTimestamp,
+    highWaterMark,
+    lastFeeRateChange: (lastFeeRateChange.data as bigint) ?? 0n,
+    isLoading: feeInfo.isLoading || lastFeeRateChange.isLoading,
   };
 }

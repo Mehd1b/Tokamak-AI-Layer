@@ -5,6 +5,7 @@ import { usePublicClient } from 'wagmi';
 import { useQuery } from '@tanstack/react-query';
 import { useIsDeployedVault, useDeployedVaultsList } from '@/hooks/useVaultFactory';
 import { useCommentCounts } from '@/hooks/useCommentCounts';
+import { useBatchFees } from '@/hooks/useBatchFees';
 import { useNetwork } from '@/lib/NetworkContext';
 import { VaultCard, VaultRow } from '@/components/VaultCard';
 import { VaultExplainer } from '@/components/VaultExplainer';
@@ -302,6 +303,9 @@ export default function VaultsPage() {
 
   // Batch performance data for sorting
   const { data: batchPerf } = useBatchPerformance(vaultAddresses);
+
+  // Batch fee data (mgmt + perf bps) for card/row display
+  const { data: batchFees } = useBatchFees(vaultAddresses);
 
   // Batch agent metadata for strategy filtering
   const agentIds = useMemo(
@@ -661,6 +665,8 @@ export default function VaultsPage() {
                       pendingCount={v.pendingCount}
                       protocolType={v.protocolType}
                       index={i}
+                      managementFeeBps={batchFees?.[v.address.toLowerCase()]?.managementFeeBps}
+                      performanceFeeBps={batchFees?.[v.address.toLowerCase()]?.performanceFeeBps}
                     />
                   ))}
                 </div>
@@ -676,6 +682,7 @@ export default function VaultsPage() {
                     <div className="w-24 shrink-0">Type</div>
                     <div className="flex-1 text-right">TVL</div>
                     <div className="w-24 text-right shrink-0 hidden md:block">30d</div>
+                    <div className="w-28 text-right shrink-0 hidden md:block">Fees</div>
                     <div className="w-32 text-right hidden lg:block">Balance</div>
                     <div className="w-20 text-right shrink-0">Info</div>
                     <div className="w-5 shrink-0" />
@@ -697,6 +704,8 @@ export default function VaultsPage() {
                         pendingCount={v.pendingCount}
                         protocolType={v.protocolType}
                         index={i}
+                        managementFeeBps={batchFees?.[v.address.toLowerCase()]?.managementFeeBps}
+                        performanceFeeBps={batchFees?.[v.address.toLowerCase()]?.performanceFeeBps}
                       />
                     ))}
                   </div>

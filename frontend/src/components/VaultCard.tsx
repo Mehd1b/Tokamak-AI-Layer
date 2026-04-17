@@ -21,6 +21,22 @@ interface VaultCardProps {
   pendingCount?: number;
   protocolType?: number;
   index?: number;
+  managementFeeBps?: number;
+  performanceFeeBps?: number;
+}
+
+/* Compact fee summary rendered on card and row (listing view). */
+function FeeSummary({ mgmt, perf }: { mgmt: number; perf: number }) {
+  if ((mgmt || 0) <= 0 && (perf || 0) <= 0) {
+    return <span className="text-[10px] font-mono text-emerald-500/60">No Fees</span>;
+  }
+  return (
+    <span className="text-[10px] font-mono text-yellow-500/80">
+      {mgmt > 0 ? `Mgmt ${(mgmt / 100).toFixed(1)}%` : ''}
+      {mgmt > 0 && perf > 0 ? ' · ' : ''}
+      {perf > 0 ? `Perf ${(perf / 100).toFixed(1)}%` : ''}
+    </span>
+  );
 }
 
 /* Strip trailing zeros and decimal point: "20.0000" → "20", "3.5000" → "3.5" */
@@ -168,6 +184,8 @@ export function VaultCard({
   pendingCount,
   protocolType = 0,
   index = 0,
+  managementFeeBps = 0,
+  performanceFeeBps = 0,
 }: VaultCardProps) {
   const accent = protocolAccent(protocolType);
   const tvl = formatClean(totalValueLocked ?? totalAssets, assetDecimals);
@@ -240,7 +258,7 @@ export function VaultCard({
         </div>
 
         {/* Row 3: Balance + Returns */}
-        <div className="mb-4 flex flex-col sm:flex-row items-stretch gap-2">
+        <div className="mb-2 flex flex-col sm:flex-row items-stretch gap-2">
           <div className="flex-1 rounded-lg bg-white/[0.03] px-3 py-2">
             <p className="text-[10px] text-gray-500 font-mono uppercase tracking-wider mb-0.5">Balance</p>
             <p className="text-xs md:text-sm text-gray-300 font-mono truncate">{balance} <span className="text-gray-500">{assetSymbol}</span></p>
@@ -248,6 +266,11 @@ export function VaultCard({
           <div className="flex items-center">
             <ReturnsBadge address={address} />
           </div>
+        </div>
+
+        {/* Fee summary */}
+        <div className="mb-3 px-1">
+          <FeeSummary mgmt={managementFeeBps} perf={performanceFeeBps} />
         </div>
 
         {/* Row 4: Agent profile */}
@@ -309,6 +332,8 @@ export function VaultRow({
   pendingCount,
   protocolType = 0,
   index = 0,
+  managementFeeBps = 0,
+  performanceFeeBps = 0,
 }: VaultCardProps) {
   const accent = protocolAccent(protocolType);
   const tvl = formatClean(totalValueLocked ?? totalAssets, assetDecimals);
@@ -371,6 +396,11 @@ export function VaultRow({
         {/* 30d Return */}
         <div className="w-24 text-right shrink-0 hidden md:block">
           <RowReturnsBadge address={address} />
+        </div>
+
+        {/* Fees */}
+        <div className="w-28 text-right shrink-0 hidden md:block">
+          <FeeSummary mgmt={managementFeeBps} perf={performanceFeeBps} />
         </div>
 
         {/* Balance */}
