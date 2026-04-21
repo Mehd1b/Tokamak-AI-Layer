@@ -1,0 +1,74 @@
+{
+  "name": "@tokagent/tokagentos",
+  "version": "2.0.0-alpha.227",
+  "description": "tokagentOS CLI - Create and upgrade tokagentOS project templates",
+  "type": "module",
+  "bin": {
+    "tokagentos": "dist/cli.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "templates",
+    "templates-manifest.json",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "bun run build.ts",
+    "dev": "bun run build.ts --watch",
+    "lint": "bunx @biomejs/biome check --write .",
+    "lint:check": "bunx @biomejs/biome check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:packaged": "node ./scripts/packaged-smoke.mjs",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.0.0",
+    "chalk": "^5",
+    "commander": "^12.1.0",
+    "gradient-string": "^3",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/figlet": "^1.7.0",
+    "@types/gradient-string": "^1.1.6",
+    "@types/node": "^25.0.3",
+    "figlet": "^1.11.0",
+    "typescript": "^6.0.0",
+    "vitest": "^4.0.17"
+  },
+  "keywords": [
+    "tokagentos",
+    "cli",
+    "ai",
+    "agent"
+  ],
+  "author": {
+    "name": "Tokamak Network",
+    "email": "mehdi@tokamak.network"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tokamak-network/Tokamak-AI-Layer.git",
+    "directory": "tokagentos"
+  },
+  "homepage": "https://tokagentos.ai",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "gitHead": "cb192f7b21c441e9463d1af2f890c145814baad2"
+}

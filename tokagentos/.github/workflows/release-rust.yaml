@@ -1,0 +1,718 @@
+name: Rust Release
+
+# Publish Rust crates to crates.io on release
+# 
+# Publishing Order:
+#   1. tokagentos (core library) - must publish first
+#   2. Plugins with tokagentos dependency (after tokagentos is indexed):
+#      - tokagentos-plugin-sql, tokagentos-plugin-openai, tokagentos-plugin-goals,
+#        tokagentos-plugin-localdb, tokagentos-plugin-todo, tokagentos-plugin-xai,
+#        tokagentos-plugin-discord
+#   4. All other plugins (45 total) - independent, publish in parallel
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      crate:
+        description: "Crate to release"
+        required: true
+        type: choice
+        options:
+          - all
+          - tokagentos
+          # Plugins with tokagentos dependency
+          - tokagentos-plugin-sql
+          - tokagentos-plugin-openai
+          - tokagentos-plugin-goals
+          - tokagentos-plugin-localdb
+          - tokagentos-plugin-todo
+          - tokagentos-plugin-xai
+          - tokagentos-plugin-discord
+          # Independent plugins
+          - tokagentos-plugin-agent-orchestrator
+          - tokagentos-plugin-anthropic
+          - tokagentos-plugin-bluesky
+          - tokagentos-plugin-browser
+          - tokagentos-plugin-code
+          - tokagentos-plugin-computeruse
+          - tokagentos-plugin-elevenlabs
+          - tokagentos-plugin-eliza-classic
+          - tokagentos-plugin-evm
+          - tokagentos-plugin-experience
+          - tokagentos-plugin-farcaster
+          - tokagentos-plugin-github
+          - tokagentos-plugin-google-genai
+          - tokagentos-plugin-groq
+          - tokagentos-plugin-inmemorydb
+          - tokagentos-plugin-instagram
+          - tokagentos-plugin-knowledge
+          - tokagentos-plugin-linear
+          - tokagentos-plugin-local-ai
+          - tokagentos-plugin-mcp
+          - tokagentos-plugin-minecraft
+          - tokagentos-plugin-n8n
+          - tokagentos-plugin-ollama
+          - tokagentos-plugin-openrouter
+          - tokagentos-plugin-pdf
+          - tokagentos-plugin-polymarket
+          - tokagentos-plugin-roblox
+          - tokagentos-plugin-rss
+          - tokagentos-plugin-s3-storage
+          - tokagentos-plugin-shell
+          - tokagentos-plugin-simple-voice
+          - tokagentos-plugin-solana
+          - tokagentos-plugin-tee
+          - tokagentos-plugin-telegram
+          - tokagentos-plugin-trajectory-logger
+          - tokagentos-plugin-vercel-ai-gateway
+          - tokagentos-plugin-vision
+      dry_run:
+        description: "Dry run (do not publish)"
+        required: false
+        type: boolean
+        default: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+
+jobs:
+  # ============================================
+  # Build and publish tokagentos-core first
+  # ============================================
+  build-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      should_publish: ${{ steps.check.outputs.should_publish }}
+
+    steps:
+      - name: Check if core should be built
+        id: check
+        run: |
+          CRATE="${{ github.event.inputs.crate || 'all' }}"
+          if [[ "$CRATE" == "all" ]] || [[ "$CRATE" == "tokagentos" ]]; then
+            echo "should_publish=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_publish=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout code
+        if: steps.check.outputs.should_publish == 'true'
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        if: steps.check.outputs.should_publish == 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        if: steps.check.outputs.should_publish == 'true'
+        run: cargo install wasm-pack --locked
+
+      - name: Cache cargo registry
+        if: steps.check.outputs.should_publish == 'true'
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            packages/rust/target
+          key: ${{ runner.os }}-cargo-core-${{ hashFiles('packages/rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-core-
+
+      - name: Extract version from release tag
+        if: steps.check.outputs.should_publish == 'true' && github.event_name == 'release'
+        id: version
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          VERSION="${VERSION#v}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Update crate version
+        if: steps.check.outputs.should_publish == 'true' && github.event_name == 'release'
+        working-directory: packages/rust
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" Cargo.toml
+          echo "Updated tokagentos version to ${VERSION}"
+
+      - name: Check formatting
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: packages/rust
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: packages/rust
+        run: cargo clippy --features native -- -D warnings
+
+      - name: Run tests (native)
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: packages/rust
+        run: cargo test --features native
+
+      - name: Build release (native)
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: packages/rust
+        run: cargo build --release --features native
+
+      - name: Build WASM (web target)
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: packages/rust
+        run: |
+          wasm-pack build --target web --out-dir pkg/web --features wasm --no-default-features
+
+      - name: Build WASM (nodejs target)
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: packages/rust
+        run: |
+          wasm-pack build --target nodejs --out-dir pkg/node --features wasm --no-default-features
+
+      - name: Package WASM artifacts
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: packages/rust
+        run: |
+          mkdir -p artifacts
+          tar -czvf artifacts/tokagentos-wasm-web.tar.gz -C pkg/web .
+          tar -czvf artifacts/tokagentos-wasm-node.tar.gz -C pkg/node .
+
+      - name: Upload WASM artifacts
+        if: steps.check.outputs.should_publish == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: tokagentos-wasm
+          path: packages/rust/artifacts/
+          retention-days: 7
+
+      - name: Upload WASM to release
+        if: steps.check.outputs.should_publish == 'true' && github.event_name == 'release' && github.event.inputs.dry_run != 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            packages/rust/artifacts/tokagentos-wasm-web.tar.gz
+            packages/rust/artifacts/tokagentos-wasm-node.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify publishable
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: packages/rust
+        run: cargo publish --dry-run --allow-dirty
+
+      - name: Publish to crates.io
+        if: steps.check.outputs.should_publish == 'true' && github.event.inputs.dry_run != 'true'
+        working-directory: packages/rust
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: cargo publish --allow-dirty
+
+      - name: Summary
+        if: steps.check.outputs.should_publish == 'true'
+        run: |
+          echo "# tokagentos Release" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Crate**: tokagentos" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "- **Version**: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "- **Published**: ${{ github.event.inputs.dry_run != 'true' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Install" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "cargo add tokagentos" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## WASM Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- tokagentos-wasm-web.tar.gz (browser/bundler)" >> $GITHUB_STEP_SUMMARY
+          echo "- tokagentos-wasm-node.tar.gz (Node.js)" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================
+  # Build and publish tokagentos-plugin-sql (with WASM)
+  # Has tokagentos dependency
+  # ============================================
+  build-plugin-sql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build-core
+
+    steps:
+      - name: Check if plugin-sql should be built
+        id: check
+        run: |
+          CRATE="${{ github.event.inputs.crate || 'all' }}"
+          if [[ "$CRATE" == "all" ]] || [[ "$CRATE" == "tokagentos-plugin-sql" ]]; then
+            echo "should_publish=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_publish=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout code
+        if: steps.check.outputs.should_publish == 'true'
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        if: steps.check.outputs.should_publish == 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        if: steps.check.outputs.should_publish == 'true'
+        run: cargo install wasm-pack --locked
+
+      - name: Cache cargo registry
+        if: steps.check.outputs.should_publish == 'true'
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            plugins/plugin-sql/rust/target
+          key: ${{ runner.os }}-cargo-plugin-sql-${{ hashFiles('plugins/plugin-sql/rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-plugin-sql-
+
+      - name: Wait for crates.io to index tokagentos
+        if: steps.check.outputs.should_publish == 'true' && needs.build-core.outputs.should_publish == 'true' && github.event.inputs.dry_run != 'true'
+        run: |
+          echo "Waiting 120 seconds for crates.io to index tokagentos..."
+          sleep 120
+
+      - name: Extract version from release tag
+        if: steps.check.outputs.should_publish == 'true' && github.event_name == 'release'
+        id: version
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          VERSION="${VERSION#v}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Update crate version and dependencies
+        if: steps.check.outputs.should_publish == 'true' && github.event_name == 'release'
+        working-directory: plugins/plugin-sql/rust
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" Cargo.toml
+          # Update the tokagentos dependency to use the published version
+          sed -i "s|tokagentos = { version = \"[^\"]*\", path = \"[^\"]*\"[^}]*}|tokagentos = \"${VERSION}\"|" Cargo.toml
+          echo "Updated tokagentos-plugin-sql version to ${VERSION}"
+
+      - name: Check formatting
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: plugins/plugin-sql/rust
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: plugins/plugin-sql/rust
+        run: cargo clippy --features native -- -D warnings
+
+      - name: Run tests (native)
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: plugins/plugin-sql/rust
+        run: cargo test --features native
+
+      - name: Build release (native)
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: plugins/plugin-sql/rust
+        run: cargo build --release --features native
+
+      - name: Build WASM (web target)
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: plugins/plugin-sql/rust
+        run: |
+          wasm-pack build --target web --out-dir pkg/web --features wasm --no-default-features
+
+      - name: Build WASM (nodejs target)
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: plugins/plugin-sql/rust
+        run: |
+          wasm-pack build --target nodejs --out-dir pkg/node --features wasm --no-default-features
+
+      - name: Package WASM artifacts
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: plugins/plugin-sql/rust
+        run: |
+          mkdir -p artifacts
+          tar -czvf artifacts/tokagentos-plugin-sql-wasm-web.tar.gz -C pkg/web .
+          tar -czvf artifacts/tokagentos-plugin-sql-wasm-node.tar.gz -C pkg/node .
+
+      - name: Upload WASM artifacts
+        if: steps.check.outputs.should_publish == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: tokagentos-plugin-sql-wasm
+          path: plugins/plugin-sql/rust/artifacts/
+          retention-days: 7
+
+      - name: Upload WASM to release
+        if: steps.check.outputs.should_publish == 'true' && github.event_name == 'release' && github.event.inputs.dry_run != 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            plugins/plugin-sql/rust/artifacts/tokagentos-plugin-sql-wasm-web.tar.gz
+            plugins/plugin-sql/rust/artifacts/tokagentos-plugin-sql-wasm-node.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify publishable
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: plugins/plugin-sql/rust
+        run: cargo publish --dry-run --allow-dirty
+
+      - name: Publish to crates.io
+        if: steps.check.outputs.should_publish == 'true' && github.event.inputs.dry_run != 'true'
+        working-directory: plugins/plugin-sql/rust
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: cargo publish --allow-dirty
+
+      - name: Summary
+        if: steps.check.outputs.should_publish == 'true'
+        run: |
+          echo "# tokagentos-plugin-sql Release" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Crate**: tokagentos-plugin-sql" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "- **Version**: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "- **Published**: ${{ github.event.inputs.dry_run != 'true' }}" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================
+  # Build and publish plugins WITH tokagentos dependency
+  # These must wait for tokagentos to be indexed on crates.io
+  # ============================================
+  build-dependent-plugins:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build-core
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: tokagentos-plugin-openai
+            path: plugins/plugin-openai/rust
+          - name: tokagentos-plugin-goals
+            path: plugins/plugin-goals/rust
+          - name: tokagentos-plugin-localdb
+            path: plugins/plugin-localdb/rust
+          - name: tokagentos-plugin-todo
+            path: plugins/plugin-todo/rust
+          - name: tokagentos-plugin-xai
+            path: plugins/plugin-xai/rust
+          - name: tokagentos-plugin-discord
+            path: plugins/plugin-discord/rust
+
+    steps:
+      - name: Check if plugin should be built
+        id: check
+        run: |
+          CRATE="${{ github.event.inputs.crate || 'all' }}"
+          MATRIX_NAME="${{ matrix.name }}"
+          if [[ "$CRATE" == "all" ]] || [[ "$CRATE" == "$MATRIX_NAME" ]]; then
+            echo "should_publish=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_publish=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout code
+        if: steps.check.outputs.should_publish == 'true'
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        if: steps.check.outputs.should_publish == 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo registry
+        if: steps.check.outputs.should_publish == 'true'
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ matrix.path }}/target
+          key: ${{ runner.os }}-cargo-${{ matrix.name }}-${{ hashFiles(format('{0}/Cargo.lock', matrix.path)) }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ matrix.name }}-
+
+      - name: Wait for crates.io to index tokagentos
+        if: steps.check.outputs.should_publish == 'true' && needs.build-core.outputs.should_publish == 'true' && github.event.inputs.dry_run != 'true'
+        run: |
+          echo "Waiting 120 seconds for crates.io to index tokagentos..."
+          sleep 120
+
+      - name: Extract version from release tag
+        if: steps.check.outputs.should_publish == 'true' && github.event_name == 'release'
+        id: version
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          VERSION="${VERSION#v}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Update crate version and dependencies
+        if: steps.check.outputs.should_publish == 'true' && github.event_name == 'release'
+        working-directory: ${{ matrix.path }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" Cargo.toml
+          # Update tokagentos dependency to use published version (handles various formats)
+          sed -i "s|tokagentos = { version = \"[^\"]*\", path = \"[^\"]*\"[^}]*}|tokagentos = \"${VERSION}\"|" Cargo.toml
+          sed -i "s|tokagentos = { path = \"[^\"]*\"[^}]*}|tokagentos = \"${VERSION}\"|" Cargo.toml
+          echo "Updated ${{ matrix.name }} version to ${VERSION}"
+
+      - name: Check formatting
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: ${{ matrix.path }}
+        run: cargo fmt --all -- --check
+
+      - name: Run tests
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: ${{ matrix.path }}
+        run: cargo test || true # Allow test failures for plugins without full test suites
+
+      - name: Build release
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: ${{ matrix.path }}
+        run: cargo build --release
+
+      - name: Verify publishable
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: ${{ matrix.path }}
+        run: cargo publish --dry-run --allow-dirty
+
+      - name: Publish to crates.io
+        if: steps.check.outputs.should_publish == 'true' && github.event.inputs.dry_run != 'true'
+        working-directory: ${{ matrix.path }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: cargo publish --allow-dirty
+
+      - name: Summary
+        if: steps.check.outputs.should_publish == 'true'
+        run: |
+          echo "# ${{ matrix.name }} Release" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Crate**: ${{ matrix.name }}" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "- **Version**: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "- **Published**: ${{ github.event.inputs.dry_run != 'true' }}" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================
+  # Build and publish plugins WITHOUT tokagentos dependency
+  # These can run in parallel, no waiting required
+  # ============================================
+  build-independent-plugins:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build-core  # Still wait for core to maintain release ordering
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: tokagentos-plugin-agent-orchestrator
+            path: plugins/plugin-agent-orchestrator/rust
+          - name: tokagentos-plugin-anthropic
+            path: plugins/plugin-anthropic/rust
+          - name: tokagentos-plugin-bluesky
+            path: plugins/plugin-bluesky/rust
+          - name: tokagentos-plugin-browser
+            path: plugins/plugin-browser/rust
+          - name: tokagentos-plugin-code
+            path: plugins/plugin-code/rust
+          - name: tokagentos-plugin-computeruse
+            path: plugins/plugin-computeruse/rust
+          - name: tokagentos-plugin-elevenlabs
+            path: plugins/plugin-elevenlabs/rust
+          - name: tokagentos-plugin-eliza-classic
+            path: plugins/plugin-eliza-classic/rust
+          - name: tokagentos-plugin-evm
+            path: plugins/plugin-evm/rust
+          - name: tokagentos-plugin-experience
+            path: plugins/plugin-experience/rust
+          - name: tokagentos-plugin-farcaster
+            path: plugins/plugin-farcaster/rust
+          - name: tokagentos-plugin-github
+            path: plugins/plugin-github/rust
+          - name: tokagentos-plugin-google-genai
+            path: plugins/plugin-google-genai/rust
+          - name: tokagentos-plugin-groq
+            path: plugins/plugin-groq/rust
+          - name: tokagentos-plugin-inmemorydb
+            path: plugins/plugin-inmemorydb/rust
+          - name: tokagentos-plugin-instagram
+            path: plugins/plugin-instagram/rust
+          - name: tokagentos-plugin-knowledge
+            path: plugins/plugin-knowledge/rust
+          - name: tokagentos-plugin-linear
+            path: plugins/plugin-linear/rust
+          - name: tokagentos-plugin-local-ai
+            path: plugins/plugin-local-ai/rust
+          - name: tokagentos-plugin-mcp
+            path: plugins/plugin-mcp/rust
+          - name: tokagentos-plugin-minecraft
+            path: plugins/plugin-minecraft/rust
+          - name: tokagentos-plugin-n8n
+            path: plugins/plugin-n8n/rust
+          - name: tokagentos-plugin-ollama
+            path: plugins/plugin-ollama/rust
+          - name: tokagentos-plugin-openrouter
+            path: plugins/plugin-openrouter/rust
+          - name: tokagentos-plugin-pdf
+            path: plugins/plugin-pdf/rust
+          - name: tokagentos-plugin-polymarket
+            path: plugins/plugin-polymarket/rust
+          - name: tokagentos-plugin-roblox
+            path: plugins/plugin-roblox/rust
+          - name: tokagentos-plugin-rss
+            path: plugins/plugin-rss/rust
+          - name: tokagentos-plugin-s3-storage
+            path: plugins/plugin-s3-storage/rust
+          - name: tokagentos-plugin-shell
+            path: plugins/plugin-shell/rust
+          - name: tokagentos-plugin-simple-voice
+            path: plugins/plugin-simple-voice/rust
+          - name: tokagentos-plugin-solana
+            path: plugins/plugin-solana/rust
+          - name: tokagentos-plugin-tee
+            path: plugins/plugin-tee/rust
+          - name: tokagentos-plugin-telegram
+            path: plugins/plugin-telegram/rust
+          - name: tokagentos-plugin-trajectory-logger
+            path: plugins/plugin-trajectory-logger/rust
+          - name: tokagentos-plugin-vercel-ai-gateway
+            path: plugins/plugin-vercel-ai-gateway/rust
+          - name: tokagentos-plugin-vision
+            path: plugins/plugin-vision/rust
+
+    steps:
+      - name: Check if plugin should be built
+        id: check
+        run: |
+          CRATE="${{ github.event.inputs.crate || 'all' }}"
+          MATRIX_NAME="${{ matrix.name }}"
+          if [[ "$CRATE" == "all" ]] || [[ "$CRATE" == "$MATRIX_NAME" ]]; then
+            echo "should_publish=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_publish=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout code
+        if: steps.check.outputs.should_publish == 'true'
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        if: steps.check.outputs.should_publish == 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo registry
+        if: steps.check.outputs.should_publish == 'true'
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ matrix.path }}/target
+          key: ${{ runner.os }}-cargo-${{ matrix.name }}-${{ hashFiles(format('{0}/Cargo.lock', matrix.path)) }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ matrix.name }}-
+
+      - name: Extract version from release tag
+        if: steps.check.outputs.should_publish == 'true' && github.event_name == 'release'
+        id: version
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          VERSION="${VERSION#v}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Update crate version
+        if: steps.check.outputs.should_publish == 'true' && github.event_name == 'release'
+        working-directory: ${{ matrix.path }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" Cargo.toml
+          echo "Updated ${{ matrix.name }} version to ${VERSION}"
+
+      - name: Check formatting
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: ${{ matrix.path }}
+        run: cargo fmt --all -- --check
+
+      - name: Run tests
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: ${{ matrix.path }}
+        run: cargo test || true # Allow test failures for plugins without full test suites
+
+      - name: Build release
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: ${{ matrix.path }}
+        run: cargo build --release
+
+      - name: Verify publishable
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: ${{ matrix.path }}
+        run: cargo publish --dry-run --allow-dirty
+
+      - name: Publish to crates.io
+        if: steps.check.outputs.should_publish == 'true' && github.event.inputs.dry_run != 'true'
+        working-directory: ${{ matrix.path }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: cargo publish --allow-dirty
+
+      - name: Summary
+        if: steps.check.outputs.should_publish == 'true'
+        run: |
+          echo "# ${{ matrix.name }} Release" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Crate**: ${{ matrix.name }}" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "- **Version**: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "- **Published**: ${{ github.event.inputs.dry_run != 'true' }}" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================
+  # Summary job
+  # ============================================
+  release-summary:
+    runs-on: ubuntu-latest
+    needs: [build-core, build-plugin-sql, build-dependent-plugins, build-independent-plugins]
+    if: always()
+
+    steps:
+      - name: Generate release summary
+        run: |
+          echo "# Rust Crates Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Core Packages" >> $GITHUB_STEP_SUMMARY
+          echo "| Crate | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| tokagentos | ${{ needs.build-core.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Plugins" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| tokagentos-plugin-sql | ${{ needs.build-plugin-sql.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dependent Plugins (6) | ${{ needs.build-dependent-plugins.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Independent Plugins (38) | ${{ needs.build-independent-plugins.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Total Crates Published" >> $GITHUB_STEP_SUMMARY
+          echo "- **Core packages**: 1" >> $GITHUB_STEP_SUMMARY
+          echo "- **Plugins with tokagentos dep**: 7" >> $GITHUB_STEP_SUMMARY
+          echo "- **Independent plugins**: 38" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total**: 46" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,33 @@
+{
+  "name": "@tokagentos/example-app-electron",
+  "version": "2.0.0-alpha",
+  "private": true,
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "copy-renderer": "node -e \"import('node:fs/promises').then(async fs=>{const {cp,rm,mkdir}=fs;await rm('renderer',{recursive:true,force:true});await mkdir('renderer',{recursive:true});await cp('../frontend/dist','renderer',{recursive:true});})\"",
+    "start": "bun run build && bun run copy-renderer && electron .",
+    "dev": "bun run build && ELECTRON_RENDERER_URL=http://localhost:5177 electron .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tokagentos/core": "alpha",
+    "@tokagentos/plugin-anthropic": "alpha",
+    "@tokagentos/plugin-eliza-classic": "alpha",
+    "@tokagentos/plugin-google-genai": "alpha",
+    "@tokagentos/plugin-groq": "alpha",
+    "@tokagentos/plugin-localdb": "alpha",
+    "@tokagentos/plugin-ollama": "alpha",
+    "@tokagentos/plugin-openai": "alpha",
+    "@tokagentos/plugin-openrouter": "alpha",
+    "electron": "^41.2.0",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "@types/uuid": "^11.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.17"
+  }
+}

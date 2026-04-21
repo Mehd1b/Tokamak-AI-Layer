@@ -1,0 +1,799 @@
+import type { Plugin } from "@tokagentos/core";
+import { SUBSCRIPTION_PROVIDER_MAP } from "../auth/types.js";
+import type { TokagentConfig } from "./types.js";
+
+export interface ApplyPluginAutoEnableResult {
+  config: TokagentConfig;
+  changes: string[];
+}
+
+export interface ApplyPluginAutoEnableParams {
+  config: Partial<TokagentConfig>;
+  env: NodeJS.ProcessEnv;
+  /**
+   * Already-loaded plugin instances. When provided, the function checks each
+   * plugin's `autoEnable` declaration BEFORE falling back to the hardcoded maps.
+   * This enables a gradual migration: plugins that self-declare their enable
+   * conditions no longer need entries in the central map.
+   */
+  loadedPlugins?: Plugin[];
+  /**
+   * True when the runtime is hosted inside a Capacitor native shell
+   * (iOS / Android). Mobile cannot spawn a local n8n sidecar via
+   * `node:child_process`, so the n8n plugin is only auto-enabled when the
+   * Tokagent Cloud gateway is authenticated. Desktop / server / web leave this
+   * undefined.
+   */
+  isNativePlatform?: boolean;
+}
+
+export const CONNECTOR_PLUGINS: Record<string, string> = {
+  bluebubbles: "@tokagentos/plugin-bluebubbles",
+  telegram: "@tokagentos/plugin-telegram",
+  discord: "@tokagentos/plugin-discord",
+  discordLocal: "@tokagentos/plugin-discord-local",
+  slack: "@tokagentos/plugin-slack",
+  twitter: "@tokagentos/plugin-twitter",
+  // Internal connector built from src/plugins/whatsapp (not an npm package).
+  whatsapp: "@tokagentos/plugin-whatsapp",
+  // Internal connector built from src/plugins/signal (not an npm package).
+  signal: "@tokagentos/plugin-signal",
+  imessage: "@tokagentos/plugin-imessage",
+  farcaster: "@tokagentos/plugin-farcaster",
+  lens: "@tokagentos/plugin-lens",
+  msteams: "@tokagentos/plugin-msteams",
+  feishu: "@tokagentos/plugin-feishu",
+  matrix: "@tokagentos/plugin-matrix",
+  nostr: "@tokagentos/plugin-nostr",
+  blooio: "@tokagentos/plugin-blooio",
+  twitch: "@tokagentos/plugin-twitch",
+  mattermost: "@tokagentos/plugin-mattermost",
+  googlechat: "@tokagentos/plugin-google-chat",
+};
+
+export const STREAMING_PLUGINS: Record<string, string> = {
+  twitch: "@tokagentos/plugin-twitch-streaming",
+  youtube: "@tokagentos/plugin-youtube-streaming",
+  customRtmp: "@tokagentos/plugin-custom-rtmp",
+  pumpfun: "@tokagentos/plugin-pumpfun-streaming",
+  x: "@tokagentos/plugin-x-streaming",
+};
+
+const PROVIDER_PLUGINS: Record<string, string> = {
+  "google-antigravity": "@tokagentos/plugin-google-antigravity",
+  "google-genai": "@tokagentos/plugin-google-genai",
+  "vercel-ai-gateway": "@tokagentos/plugin-vercel-ai-gateway",
+  openai: "@tokagentos/plugin-openai",
+  anthropic: "@tokagentos/plugin-anthropic",
+  qwen: "@tokagentos/plugin-qwen",
+  minimax: "@tokagentos/plugin-minimax",
+  groq: "@tokagentos/plugin-groq",
+  xai: "@tokagentos/plugin-xai",
+  openrouter: "@tokagentos/plugin-openrouter",
+  ollama: "@tokagentos/plugin-ollama",
+  zai: "@homunculuslabs/plugin-zai",
+  deepseek: "@tokagentos/plugin-deepseek",
+  together: "@tokagentos/plugin-together",
+  mistral: "@tokagentos/plugin-mistral",
+  cohere: "@tokagentos/plugin-cohere",
+  perplexity: "@tokagentos/plugin-perplexity",
+};
+
+export const AUTH_PROVIDER_PLUGINS: Record<string, string> = {
+  ANTHROPIC_API_KEY: "@tokagentos/plugin-anthropic",
+  CLAUDE_API_KEY: "@tokagentos/plugin-anthropic",
+  OPENAI_API_KEY: "@tokagentos/plugin-openai",
+  AI_GATEWAY_API_KEY: "@tokagentos/plugin-vercel-ai-gateway",
+  AIGATEWAY_API_KEY: "@tokagentos/plugin-vercel-ai-gateway",
+  GOOGLE_API_KEY: "@tokagentos/plugin-google-genai",
+  GOOGLE_GENERATIVE_AI_API_KEY: "@tokagentos/plugin-google-genai",
+  GOOGLE_CLOUD_API_KEY: "@tokagentos/plugin-google-antigravity",
+  GROQ_API_KEY: "@tokagentos/plugin-groq",
+  XAI_API_KEY: "@tokagentos/plugin-xai",
+  GROK_API_KEY: "@tokagentos/plugin-xai",
+  OPENROUTER_API_KEY: "@tokagentos/plugin-openrouter",
+  OLLAMA_BASE_URL: "@tokagentos/plugin-ollama",
+  ZAI_API_KEY: "@homunculuslabs/plugin-zai",
+  DEEPSEEK_API_KEY: "@tokagentos/plugin-deepseek",
+  TOGETHER_API_KEY: "@tokagentos/plugin-together",
+  MISTRAL_API_KEY: "@tokagentos/plugin-mistral",
+  COHERE_API_KEY: "@tokagentos/plugin-cohere",
+  PERPLEXITY_API_KEY: "@tokagentos/plugin-perplexity",
+  TOKAGENTOS_CLOUD_API_KEY: "@tokagentos/plugin-elizacloud",
+  TOKAGENTOS_CLOUD_ENABLED: "@tokagentos/plugin-elizacloud",
+  CUA_API_KEY: "@tokagentos/plugin-cua",
+  CUA_HOST: "@tokagentos/plugin-cua",
+  OBSIDIAN_VAULT_PATH: "@tokagentos/plugin-obsidian",
+  OBSIDAN_VAULT_PATH: "@tokagentos/plugin-obsidian",
+  REPOPROMPT_CLI_PATH: "@tokagentos/plugin-repoprompt",
+  CLAUDE_CODE_WORKBENCH_ENABLED: "@tokagentos/plugin-claude-code-workbench",
+  // EVM plugin gated behind explicit opt-in flag instead of EVM_PRIVATE_KEY.
+  // plugin-evm's CROSS_CHAIN_TRANSFER action has a 'BRIDGE' simile that
+  // crashes with 'Action spec not found: BRIDGE' during startup.
+  // Gate behind ENABLE_EVM_PLUGIN=1 until the spec registration is fixed.
+  ENABLE_EVM_PLUGIN: "@tokagentos/plugin-evm",
+  SOLANA_PRIVATE_KEY: "@tokagentos/plugin-solana",
+  LASTFM_API_KEY: "@tokagentos/plugin-music-library",
+  GENIUS_API_KEY: "@tokagentos/plugin-music-library",
+  THEAUDIODB_API_KEY: "@tokagentos/plugin-music-library",
+  SPOTIFY_CLIENT_ID: "@tokagentos/plugin-music-library",
+  SPOTIFY_CLIENT_SECRET: "@tokagentos/plugin-music-library",
+  RS_SDK_BOT_NAME: "@tokagentos/app-2004scape",
+  SHOPIFY_ACCESS_TOKEN: "@tokagentos/plugin-shopify",
+};
+
+const FEATURE_PLUGINS: Record<string, string> = {
+  browser: "@tokagentos/plugin-browser",
+  cua: "@tokagentos/plugin-cua",
+  obsidian: "@tokagentos/plugin-obsidian",
+  cron: "@tokagentos/plugin-cron",
+  shell: "@tokagentos/plugin-shell",
+  executeCode: "@tokagentos/plugin-executecode",
+  imageGen: "@tokagentos/plugin-image-generation",
+  tts: "@tokagentos/plugin-edge-tts",
+  stt: "@tokagentos/plugin-stt",
+  agentSkills: "@tokagentos/plugin-agent-skills",
+  // directives: "@tokagentos/plugin-directives", // not yet ready — package doesn't exist
+  commands: "@tokagentos/plugin-commands",
+  diagnosticsOtel: "@tokagentos/plugin-diagnostics-otel",
+  webhooks: "@tokagentos/plugin-webhooks",
+  gmailWatch: "@tokagentos/plugin-gmail-watch",
+  // personality and form are now built-in advanced capabilities
+  x402: "@tokagentos/plugin-x402",
+  // Media generation plugins
+  fal: "@tokagentos/plugin-fal",
+  suno: "@tokagentos/plugin-suno",
+  musicLibrary: "@tokagentos/plugin-music-library",
+  musicPlayer: "@tokagentos/plugin-music-player",
+  vision: "@tokagentos/plugin-vision",
+  computeruse: "@tokagentos/plugin-computeruse",
+  repoprompt: "@tokagentos/plugin-repoprompt",
+  claudeCodeWorkbench: "@tokagentos/plugin-claude-code-workbench",
+  rs2004scape: "@tokagentos/app-2004scape",
+};
+
+const EVM_PLUGIN_PACKAGE = "@tokagentos/plugin-evm";
+const EVM_PLUGIN_SHORT_ID = "evm";
+
+const STEWARD_TOKAGENT_PLUGIN_PACKAGE = "@stwd/tokagent-plugin";
+const STEWARD_TOKAGENT_PLUGIN_SHORT_ID = "stwd-tokagent-plugin";
+
+function resolveEvmAutoEnableReason(env: NodeJS.ProcessEnv): string | null {
+  if (env.EVM_PRIVATE_KEY?.trim()) {
+    return "env: EVM_PRIVATE_KEY";
+  }
+
+  const cloudProvisioned = env.TOKAGENT_CLOUD_PROVISIONED === "1";
+
+  if (cloudProvisioned && env.STEWARD_AGENT_TOKEN?.trim()) {
+    return "cloud-provisioned Steward wallet";
+  }
+
+  return null;
+}
+
+export function isConnectorConfigured(
+  connectorName: string,
+  connectorConfig: unknown,
+): boolean {
+  if (!connectorConfig || typeof connectorConfig !== "object") {
+    return false;
+  }
+  const config = connectorConfig as Record<string, unknown>;
+  if (config.enabled === false) {
+    return false;
+  }
+  if (config.botToken || config.token || config.apiKey) {
+    return true;
+  }
+
+  const hasEnabledSignalAccount =
+    connectorName === "signal" &&
+    typeof config.accounts === "object" &&
+    config.accounts !== null &&
+    Object.values(config.accounts as Record<string, unknown>).some(
+      (account) => {
+        if (!account || typeof account !== "object") return false;
+        const accountConfig = account as Record<string, unknown>;
+        if (accountConfig.enabled === false) return false;
+        return Boolean(
+          accountConfig.authDir ||
+            accountConfig.account ||
+            accountConfig.httpUrl ||
+            accountConfig.httpHost ||
+            accountConfig.httpPort ||
+            accountConfig.cliPath,
+        );
+      },
+    );
+
+  if (hasEnabledSignalAccount) {
+    return true;
+  }
+
+  switch (connectorName) {
+    case "bluebubbles":
+      return Boolean(config.serverUrl && config.password);
+    case "discordLocal":
+      return Boolean(config.clientId && config.clientSecret);
+    case "imessage":
+      return Boolean(config.cliPath);
+    case "signal":
+      return Boolean(
+        config.authDir ||
+          config.account ||
+          config.httpUrl ||
+          config.httpHost ||
+          config.httpPort ||
+          config.cliPath,
+      );
+    case "whatsapp":
+      // authState/sessionPath: legacy field names
+      // authDir: Baileys multi-file auth state directory (WhatsAppAccountSchema)
+      // accounts: at least one account with authDir set and not explicitly disabled
+      return Boolean(
+        config.authState ||
+          config.sessionPath ||
+          config.authDir ||
+          (config.accounts &&
+            typeof config.accounts === "object" &&
+            Object.values(config.accounts as Record<string, unknown>).some(
+              (account) => {
+                if (!account || typeof account !== "object") return false;
+                const acc = account as Record<string, unknown>;
+                if (acc.enabled === false) return false;
+                return Boolean(acc.authDir);
+              },
+            )),
+      );
+    case "twitch":
+      return Boolean(
+        config.accessToken || config.clientId || config.enabled === true,
+      );
+    default:
+      return false;
+  }
+}
+
+export function isStreamingDestinationConfigured(
+  destName: string,
+  destConfig: unknown,
+): boolean {
+  if (!destConfig || typeof destConfig !== "object") return false;
+  const config = destConfig as Record<string, unknown>;
+  if (config.enabled === false) return false;
+
+  switch (destName) {
+    case "twitch":
+      return Boolean(config.streamKey || config.enabled === true);
+    case "youtube":
+      return Boolean(config.streamKey || config.enabled === true);
+    case "customRtmp":
+      return Boolean(config.rtmpUrl && config.rtmpKey);
+    case "pumpfun":
+      return Boolean(config.streamKey && config.rtmpUrl);
+    case "x":
+      return Boolean(config.streamKey && config.rtmpUrl);
+    default:
+      return false;
+  }
+}
+
+function addToAllowlist(
+  allow: string[],
+  pluginName: string,
+  shortId: string,
+  changes: string[],
+  reason: string,
+): void {
+  let added = false;
+  if (!allow.includes(shortId)) {
+    allow.push(shortId);
+    added = true;
+  }
+  if (pluginName !== shortId && !allow.includes(pluginName)) {
+    // Keep the fully qualified package too so older collector paths and
+    // external config consumers still work when they expect package names.
+    allow.push(pluginName);
+    added = true;
+  }
+  if (added) {
+    changes.push(`Auto-enabled plugin: ${pluginName} (${reason})`);
+  }
+}
+
+/** Safely extract `agents.defaults.subscriptionProvider` from an untyped config. */
+function getSubscriptionProvider(config: unknown): string | undefined {
+  if (typeof config !== "object" || config === null) return undefined;
+  const agents = (config as Record<string, unknown>).agents;
+  if (typeof agents !== "object" || agents === null) return undefined;
+  const defaults = (agents as Record<string, unknown>).defaults;
+  if (typeof defaults !== "object" || defaults === null) return undefined;
+  const provider = (defaults as Record<string, unknown>).subscriptionProvider;
+  return typeof provider === "string" ? provider : undefined;
+}
+
+export function applyPluginAutoEnable(
+  params: ApplyPluginAutoEnableParams,
+): ApplyPluginAutoEnableResult {
+  const { config, env } = params;
+  const changes: string[] = [];
+  const updatedConfig = structuredClone(config) as TokagentConfig;
+
+  if (updatedConfig.plugins?.enabled === false) {
+    return { config: updatedConfig, changes };
+  }
+
+  updatedConfig.plugins = updatedConfig.plugins ?? {};
+  const pluginsConfig = updatedConfig.plugins;
+  pluginsConfig.allow = pluginsConfig.allow ?? [];
+  pluginsConfig.entries = pluginsConfig.entries ?? {};
+
+  const connectors = (updatedConfig.connectors ??
+    (updatedConfig as Record<string, unknown>).channels ??
+    {}) as Record<string, unknown>;
+  if (connectors) {
+    for (const [connectorName, connectorConfig] of Object.entries(connectors)) {
+      const pluginName = CONNECTOR_PLUGINS[connectorName];
+      if (!pluginName) continue;
+      if (!isConnectorConfigured(connectorName, connectorConfig)) continue;
+      if (pluginsConfig.entries[connectorName]?.enabled === false) continue;
+      addToAllowlist(
+        pluginsConfig.allow,
+        pluginName,
+        connectorName,
+        changes,
+        `connector: ${connectorName}`,
+      );
+    }
+  }
+
+  // Streaming destinations
+  const streaming = (updatedConfig as Record<string, unknown>).streaming as
+    | Record<string, unknown>
+    | undefined;
+  if (streaming) {
+    for (const [destName, destConfig] of Object.entries(streaming)) {
+      if (destName === "activeDestination") continue; // skip meta field
+      const pluginName = STREAMING_PLUGINS[destName];
+      if (!pluginName) continue;
+      if (!isStreamingDestinationConfigured(destName, destConfig)) continue;
+      // Derive short ID from the package name (e.g. "@tokagentos/plugin-twitch-streaming" → "twitch-streaming")
+      const shortId = pluginName.includes("/plugin-")
+        ? pluginName.slice(
+            pluginName.lastIndexOf("/plugin-") + "/plugin-".length,
+          )
+        : destName;
+      if (pluginsConfig.entries[shortId]?.enabled === false) continue;
+      addToAllowlist(
+        pluginsConfig.allow,
+        pluginName,
+        shortId,
+        changes,
+        `streaming: ${destName}`,
+      );
+    }
+  }
+
+  // Auth profiles
+  if (updatedConfig.auth?.profiles) {
+    for (const [profileKey, profile] of Object.entries(
+      updatedConfig.auth.profiles,
+    )) {
+      const provider = profile.provider;
+      if (!provider) continue;
+      const pluginName = PROVIDER_PLUGINS[provider];
+      if (!pluginName) continue;
+      addToAllowlist(
+        pluginsConfig.allow,
+        pluginName,
+        provider,
+        changes,
+        `auth profile: ${profileKey}`,
+      );
+    }
+  }
+
+  // Subscription provider — when a subscription is configured, force-enable
+  // the corresponding provider plugin so the user doesn't need to manually
+  // toggle entries.  This takes priority over explicit `enabled: false` for
+  // the subscription's own plugin because the user deliberately connected
+  // the subscription.
+  //
+  // Exception: Anthropic subscriptions are restricted to the Claude Code
+  // CLI by TOS.  Their tokens cannot be used by the runtime, so we must
+  // NOT force-enable @tokagentos/plugin-anthropic based on subscription alone.
+  // A direct ANTHROPIC_API_KEY (set below via env-var detection) will still
+  // enable the plugin if available.
+  const subscriptionProvider = getSubscriptionProvider(updatedConfig);
+  const subscriptionIsRuntimeApplicable =
+    typeof subscriptionProvider === "string" &&
+    subscriptionProvider !== "anthropic-subscription";
+  const subscriptionPluginId = subscriptionIsRuntimeApplicable
+    ? SUBSCRIPTION_PROVIDER_MAP[
+        subscriptionProvider as keyof typeof SUBSCRIPTION_PROVIDER_MAP
+      ]
+    : undefined;
+  if (subscriptionPluginId) {
+    const pluginName = PROVIDER_PLUGINS[subscriptionPluginId];
+    if (pluginName) {
+      // Force-enable the subscription plugin (override enabled: false)
+      pluginsConfig.entries[subscriptionPluginId] = {
+        ...pluginsConfig.entries[subscriptionPluginId],
+        enabled: true,
+      };
+      addToAllowlist(
+        pluginsConfig.allow,
+        pluginName,
+        subscriptionPluginId,
+        changes,
+        `subscription: ${subscriptionProvider}`,
+      );
+    }
+  }
+
+  // Env var API keys
+  for (const [envKey, pluginName] of Object.entries(AUTH_PROVIDER_PLUGINS)) {
+    const envValue = env[envKey];
+    if (!envValue || typeof envValue !== "string" || envValue.trim() === "")
+      continue;
+    const pluginId = pluginName.includes("/plugin-")
+      ? pluginName.slice(pluginName.lastIndexOf("/plugin-") + "/plugin-".length)
+      : pluginName;
+    if (pluginsConfig.entries[pluginId]?.enabled === false) continue;
+    addToAllowlist(
+      pluginsConfig.allow,
+      pluginName,
+      pluginId,
+      changes,
+      `env: ${envKey}`,
+    );
+  }
+
+  const evmAutoEnableReason = resolveEvmAutoEnableReason(env);
+  if (
+    evmAutoEnableReason &&
+    pluginsConfig.entries[EVM_PLUGIN_SHORT_ID]?.enabled !== false
+  ) {
+    addToAllowlist(
+      pluginsConfig.allow,
+      EVM_PLUGIN_PACKAGE,
+      EVM_PLUGIN_SHORT_ID,
+      changes,
+      evmAutoEnableReason,
+    );
+  }
+
+  // Auto-enable @stwd/tokagent-plugin when Steward API is configured.
+  // This mirrors the desktop (app-core) path and ensures cloud containers get
+  // StewardService + STEWARD_TRANSFER action registered with the runtime.
+  if (
+    env.STEWARD_API_URL?.trim() &&
+    pluginsConfig.entries[STEWARD_TOKAGENT_PLUGIN_SHORT_ID]?.enabled !== false
+  ) {
+    addToAllowlist(
+      pluginsConfig.allow,
+      STEWARD_TOKAGENT_PLUGIN_PACKAGE,
+      STEWARD_TOKAGENT_PLUGIN_SHORT_ID,
+      changes,
+      "env: STEWARD_API_URL",
+    );
+  }
+
+  const cloudProvisioned = env.TOKAGENT_CLOUD_PROVISIONED === "1";
+  if (
+    cloudProvisioned &&
+    pluginsConfig.entries["edge-tts"]?.enabled !== false
+  ) {
+    addToAllowlist(
+      pluginsConfig.allow,
+      "@tokagentos/plugin-edge-tts",
+      "edge-tts",
+      changes,
+      "cloud-provisioned voice output",
+    );
+  }
+
+  // Feature flags
+  if (updatedConfig.features) {
+    for (const [featureName, featureConfig] of Object.entries(
+      updatedConfig.features,
+    )) {
+      const pluginName = FEATURE_PLUGINS[featureName];
+      if (!pluginName) continue;
+      const isEnabled =
+        featureConfig === true ||
+        (typeof featureConfig === "object" &&
+          featureConfig !== null &&
+          featureConfig.enabled !== false);
+      if (!isEnabled) continue;
+      const pluginId = pluginName.includes("/plugin-")
+        ? pluginName.slice(
+            pluginName.lastIndexOf("/plugin-") + "/plugin-".length,
+          )
+        : pluginName;
+      if (pluginsConfig.entries[pluginId]?.enabled === false) continue;
+      addToAllowlist(
+        pluginsConfig.allow,
+        pluginName,
+        pluginId,
+        changes,
+        `feature: ${featureName}`,
+      );
+    }
+  }
+
+  // Heal entries→allow drift: anything user-enabled via plugins.entries should
+  // also appear in the allowlist. Covers plugins that were toggled on via the
+  // API before the entries↔allow sync existed, so the persisted config
+  // stabilises after one boot instead of warning forever.
+  for (const [entryId, entry] of Object.entries(pluginsConfig.entries)) {
+    if (!entry || entry.enabled !== true) continue;
+    const connectorPackage = CONNECTOR_PLUGINS[entryId];
+    const featurePackage = FEATURE_PLUGINS[entryId];
+    const pluginName =
+      connectorPackage ?? featurePackage ?? `@tokagentos/plugin-${entryId}`;
+    addToAllowlist(
+      pluginsConfig.allow,
+      pluginName,
+      entryId,
+      changes,
+      `entries: ${entryId}`,
+    );
+  }
+
+  // Hooks: webhooks + gmail
+  const hooksConfig = updatedConfig.hooks;
+  if (hooksConfig && hooksConfig.enabled !== false && hooksConfig.token) {
+    const webhooksPlugin = FEATURE_PLUGINS.webhooks;
+    if (webhooksPlugin) {
+      addToAllowlist(
+        pluginsConfig.allow,
+        webhooksPlugin,
+        webhooksPlugin.replace("@tokagentos/plugin-", ""),
+        changes,
+        "hooks.token",
+      );
+    }
+  }
+  if (hooksConfig) {
+    const gmailConfig = hooksConfig.gmail;
+    if (gmailConfig?.account?.trim()) {
+      const gmailPlugin = FEATURE_PLUGINS.gmailWatch;
+      if (gmailPlugin) {
+        addToAllowlist(
+          pluginsConfig.allow,
+          gmailPlugin,
+          gmailPlugin.replace("@tokagentos/plugin-", ""),
+          changes,
+          "hooks.gmail.account",
+        );
+      }
+    }
+  }
+
+  // Media generation plugins
+  const mediaConfig = updatedConfig.media;
+  if (mediaConfig) {
+    // Image generation - FAL provider
+    if (
+      mediaConfig.image?.enabled !== false &&
+      mediaConfig.image?.mode === "own-key" &&
+      mediaConfig.image?.provider === "fal"
+    ) {
+      const falPlugin = FEATURE_PLUGINS.fal;
+      if (falPlugin) {
+        addToAllowlist(
+          pluginsConfig.allow,
+          falPlugin,
+          "fal",
+          changes,
+          "media.image.provider=fal",
+        );
+      }
+    }
+
+    // Video generation - FAL provider
+    if (
+      mediaConfig.video?.enabled !== false &&
+      mediaConfig.video?.mode === "own-key" &&
+      mediaConfig.video?.provider === "fal"
+    ) {
+      const falPlugin = FEATURE_PLUGINS.fal;
+      if (falPlugin) {
+        addToAllowlist(
+          pluginsConfig.allow,
+          falPlugin,
+          "fal",
+          changes,
+          "media.video.provider=fal",
+        );
+      }
+    }
+
+    // Audio/Music generation - Suno provider
+    if (
+      mediaConfig.audio?.enabled !== false &&
+      mediaConfig.audio?.mode === "own-key" &&
+      mediaConfig.audio?.provider === "suno"
+    ) {
+      const sunoPlugin = FEATURE_PLUGINS.suno;
+      if (sunoPlugin) {
+        addToAllowlist(
+          pluginsConfig.allow,
+          sunoPlugin,
+          "suno",
+          changes,
+          "media.audio.provider=suno",
+        );
+      }
+    }
+
+    // Vision - enable vision plugin when configured
+    if (mediaConfig.vision?.enabled !== false && mediaConfig.vision?.provider) {
+      const visionPlugin = FEATURE_PLUGINS.vision;
+      if (visionPlugin) {
+        addToAllowlist(
+          pluginsConfig.allow,
+          visionPlugin,
+          "vision",
+          changes,
+          `media.vision.provider=${mediaConfig.vision.provider}`,
+        );
+      }
+    }
+  }
+
+  // n8n workflow plugin — auto-enable when EITHER Tokagent Cloud is authenticated
+  // (cloud supplies N8N_HOST + N8N_API_KEY via its gateway) OR the local n8n
+  // sidecar is permitted (config.n8n.localEnabled !== false, default true).
+  // The authoritative boot-config shape is `config.n8n` (N8nConfig in
+  // types.tokagent.ts); the sidecar lifecycle writes `config.n8n.host` and
+  // `config.n8n.apiKey` once ready. The plugin's init() refuses to activate
+  // when neither is resolved, so this is safe to auto-enable eagerly.
+  //
+  // On mobile (iOS / Android), the local sidecar cannot spawn a child
+  // process, so auto-enable is gated on `cloudAuthed` alone regardless of
+  // `localEnabled`.
+  {
+    const n8nPluginName = "@tokagentos/plugin-n8n-workflow";
+    const n8nPluginId = "n8n-workflow";
+    const n8nConfig = updatedConfig.n8n;
+    const n8nMasterEnabled = n8nConfig?.enabled !== false;
+    const cloudAuthed = Boolean(
+      updatedConfig.cloud?.apiKey && updatedConfig.cloud?.enabled !== false,
+    );
+    // Default is "local sidecar allowed" — only disable if explicitly set to
+    // false. Mobile forces this to false regardless of user setting.
+    const localN8nEnabled =
+      params.isNativePlatform === true ? false : n8nConfig?.localEnabled !== false;
+    const n8nExplicitlyDisabled =
+      pluginsConfig.entries[n8nPluginId]?.enabled === false;
+    if (
+      n8nMasterEnabled &&
+      !n8nExplicitlyDisabled &&
+      (cloudAuthed || localN8nEnabled)
+    ) {
+      addToAllowlist(
+        pluginsConfig.allow,
+        n8nPluginName,
+        n8nPluginId,
+        changes,
+        cloudAuthed ? "cloud: n8n gateway" : "n8n.localEnabled",
+      );
+    }
+  }
+
+  // ── Self-declared autoEnable on loaded plugins ────────────────────────
+  // When loadedPlugins are provided, check each plugin's autoEnable field.
+  // This runs after the hardcoded maps so self-declared plugins can add to
+  // the allow list without needing a central map entry.
+  if (params.loadedPlugins) {
+    applyPluginSelfDeclaredAutoEnable(
+      params.loadedPlugins,
+      updatedConfig,
+      env,
+      changes,
+    );
+  }
+
+  return { config: updatedConfig, changes };
+}
+
+/**
+ * Check loaded plugins for self-declared `autoEnable` conditions and add
+ * matching ones to the config allow list.
+ *
+ * This is the data-driven counterpart to the hardcoded maps above. Plugins
+ * that declare `autoEnable` on their Plugin object can be auto-enabled
+ * without any central map entry.
+ *
+ * Can be called standalone (e.g., after a second-pass plugin resolution)
+ * or implicitly via `applyPluginAutoEnable({ loadedPlugins })`.
+ */
+export function applyPluginSelfDeclaredAutoEnable(
+  loadedPlugins: Plugin[],
+  config: TokagentConfig,
+  env: NodeJS.ProcessEnv,
+  changes: string[],
+): void {
+  config.plugins = config.plugins ?? {};
+  const pluginsConfig = config.plugins;
+  pluginsConfig.allow = pluginsConfig.allow ?? [];
+
+  const connectors = (config.connectors ??
+    (config as Record<string, unknown>).channels ??
+    {}) as Record<string, unknown>;
+
+  for (const plugin of loadedPlugins) {
+    if (!plugin.autoEnable) continue;
+    const { envKeys, connectorKeys, shouldEnable } = plugin.autoEnable;
+
+    // Derive a short ID from the plugin name for allow-list and entries lookup.
+    // e.g. "@tokagentos/plugin-telegram" → "telegram", "shopify" → "shopify"
+    const pluginName = plugin.name;
+    const shortId = pluginName.includes("/plugin-")
+      ? pluginName.slice(pluginName.lastIndexOf("/plugin-") + "/plugin-".length)
+      : pluginName;
+
+    // Skip if explicitly disabled in config entries
+    if (pluginsConfig.entries?.[shortId]?.enabled === false) continue;
+
+    // Skip if already in the allow list (already enabled by hardcoded map or earlier pass)
+    if (
+      pluginsConfig.allow.includes(shortId) ||
+      pluginsConfig.allow.includes(pluginName)
+    ) {
+      continue;
+    }
+
+    let enableReason: string | null = null;
+
+    // Check env keys (OR — any match enables)
+    if (envKeys?.length) {
+      for (const key of envKeys) {
+        const val = env[key];
+        if (val && typeof val === "string" && val.trim() !== "") {
+          enableReason = `self-declared env: ${key}`;
+          break;
+        }
+      }
+    }
+
+    // Check connector keys (OR — any match enables)
+    if (!enableReason && connectorKeys?.length) {
+      for (const connectorName of connectorKeys) {
+        const connectorConfig = connectors[connectorName];
+        if (
+          connectorConfig &&
+          isConnectorConfigured(connectorName, connectorConfig)
+        ) {
+          enableReason = `self-declared connector: ${connectorName}`;
+          break;
+        }
+      }
+    }
+
+    // Check custom predicate
+    if (!enableReason && shouldEnable) {
+      if (
+        shouldEnable(
+          env as Record<string, string | undefined>,
+          config as Record<string, unknown>,
+        )
+      ) {
+        enableReason = "self-declared shouldEnable predicate";
+      }
+    }
+
+    if (enableReason) {
+      addToAllowlist(
+        pluginsConfig.allow,
+        pluginName,
+        shortId,
+        changes,
+        enableReason,
+      );
+    }
+  }
+}

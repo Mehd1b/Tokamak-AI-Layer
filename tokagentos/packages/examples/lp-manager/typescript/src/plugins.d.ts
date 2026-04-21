@@ -1,0 +1,17 @@
+/**
+ * Type declarations for workspace plugins
+ * These declarations allow TypeScript to resolve the module imports
+ * during type checking, while Bun handles the actual runtime resolution.
+ */
+
+declare module "@tokagentos/plugin-lp-manager" {
+  import type { Plugin } from "@tokagentos/core";
+  const plugin: Plugin;
+  export default plugin;
+}
+
+declare module "@tokagentos/plugin-sql" {
+  import type { Plugin } from "@tokagentos/core";
+  const plugin: Plugin;
+  export default plugin;
+}

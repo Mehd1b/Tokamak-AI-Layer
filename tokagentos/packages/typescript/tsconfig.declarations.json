@@ -1,0 +1,28 @@
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"moduleResolution": "bundler",
+		"ignoreDeprecations": "5.0",
+		"types": ["node", "bun-types"],
+		"noEmit": false,
+		"emitDeclarationOnly": true,
+		"composite": false,
+		"incremental": false,
+		"skipLibCheck": true,
+		"paths": {
+			"@tokagentos/core": ["./index.node.ts"],
+			"@tokagentos/core/*": ["./*"],
+			"@tokagentos/shared": ["../../shared/src/index.ts"],
+			"@tokagentos/shared/*": ["../../shared/src/*"]
+		}
+	},
+	"include": ["src/index.ts", "src/index.node.ts", "src/index.browser.ts"],
+	"exclude": [
+		"src/**/*.test.ts",
+		"src/**/*.spec.ts",
+		"src/__tests__/**/*",
+		"src/testing/**/*"
+	]
+}

@@ -1,0 +1,81 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["node", "bun-types"],
+    "allowImportingTsExtensions": true,
+    "declaration": false,
+    "noEmit": true,
+    "baseUrl": "../../",
+    "paths": {
+      "@tokagentos/app-lifeops": ["./apps/app-lifeops/src/index.ts"],
+      "@tokagentos/app-lifeops/*": ["./apps/app-lifeops/src/*"],
+      "@tokagentos/app-lifeops/types": ["./apps/app-lifeops/src/types/index.ts"],
+      "@tokagentos/app-task-coordinator": [
+        "./apps/app-task-coordinator/src/index.ts"
+      ],
+      "@tokagentos/app-task-coordinator/*": [
+        "./apps/app-task-coordinator/src/*"
+      ],
+      "@tokagentos/app-steward": ["./apps/app-steward/src/index.ts"],
+      "@tokagentos/app-steward/*": ["./apps/app-steward/src/*"],
+      "@tokagentos/app-shopify": ["./apps/app-shopify/src/index.ts"],
+      "@tokagentos/app-shopify/*": ["./apps/app-shopify/src/*"],
+      "@tokagentos/app-training": ["./apps/app-training/src/index.ts"],
+      "@tokagentos/app-training/*": ["./apps/app-training/src/*"],
+      "@tokagentos/app-vincent": ["./apps/app-vincent/src/index.ts"],
+      "@tokagentos/app-vincent/*": ["./apps/app-vincent/src/*"],
+      "@tokagentos/plugin-lifeops-browser": [
+        "./plugins/plugin-lifeops-browser/src/index.ts"
+      ],
+      "@tokagentos/plugin-lifeops-browser/*": [
+        "./plugins/plugin-lifeops-browser/src/*"
+      ],
+      "@tokagentos/app-core": ["./packages/app-core/src/index.ts"],
+      "@tokagentos/app-core/*": ["./packages/app-core/src/*"],
+      "@tokagentos/agent": ["./packages/agent/src/index.ts"],
+      "@tokagentos/agent/*": ["./packages/agent/src/*"],
+      "@tokagentos/app-companion": ["./apps/app-companion/src/index.ts"],
+      "@tokagentos/app-companion/*": ["./apps/app-companion/src/*"],
+      "@tokagentos/app-tokagentmaker": ["./apps/app-tokagentmaker/src/index.ts"],
+      "@tokagentos/app-tokagentmaker/*": ["./apps/app-tokagentmaker/src/*"],
+      "@tokagentos/shared": ["./packages/shared/src/index.ts"],
+      "@tokagentos/shared/*": ["./packages/shared/src/*"],
+      "@tokagentos/skills": ["./packages/skills/src/index.ts"],
+      "@tokagentos/skills/*": ["./packages/skills/src/*"],
+      "@tokagentos/core": ["./packages/typescript/src/index.ts"],
+      "@tokagentos/core/*": ["./packages/typescript/src/*"],
+      "@tokagentos/ui": ["./packages/ui/src/index.ts"],
+      "@tokagentos/ui/*": ["./packages/ui/src/*"],
+      "react": ["./packages/app-core/node_modules/@types/react/index.d.ts"],
+      "react/jsx-runtime": [
+        "./packages/app-core/node_modules/@types/react/jsx-runtime.d.ts"
+      ],
+      "react/jsx-dev-runtime": [
+        "./packages/app-core/node_modules/@types/react/jsx-dev-runtime.d.ts"
+      ],
+      "react-dom": [
+        "./packages/app-core/node_modules/@types/react-dom/index.d.ts"
+      ],
+      "@tokagentos/*": ["./node_modules/@tokagentos/*"]
+    }
+  },
+  "exclude": [
+    "src/**/*.stories.ts",
+    "src/**/*.stories.tsx",
+    "../../apps/app-companion/src/**/*.stories.tsx",
+    "../../apps/app-companion/src/**/*.stories.ts",
+    "../../apps/app-companion/src/**/*.test.ts",
+    "../../apps/app-companion/src/**/*.test.tsx"
+  ],
+  "include": [
+    "src",
+    "../app-core/src/ambient-modules.d.ts",
+    "../agent/src/external-modules.d.ts",
+    "../../apps/app-companion/src"
+  ]
+}

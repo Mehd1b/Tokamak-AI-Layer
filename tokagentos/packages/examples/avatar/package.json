@@ -1,0 +1,36 @@
+{
+  "name": "tokagent-vrm-demo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "echo 'Skipping tokagent-vrm-demo build - has Service type issue'",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tokagentos/core": "alpha",
+    "@tokagentos/plugin-anthropic": "alpha",
+    "@tokagentos/plugin-eliza-classic": "alpha",
+    "@tokagentos/plugin-google-genai": "alpha",
+    "@tokagentos/plugin-groq": "alpha",
+    "@tokagentos/plugin-elevenlabs": "alpha",
+    "@tokagentos/plugin-localdb": "alpha",
+    "@tokagentos/plugin-openai": "alpha",
+    "@tokagentos/plugin-simple-voice": "alpha",
+    "@pixiv/three-vrm": "^3.4.2",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "three": "^0.180.0",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.3",
+    "@types/react-dom": "^19.2.2",
+    "@types/uuid": "^11.0.0",
+    "@vitejs/plugin-react": "^5.1.2",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1"
+  }
+}

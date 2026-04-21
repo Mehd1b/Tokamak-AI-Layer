@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="console-application">
+  <id>ai.tokagentos.App</id>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <name>tokagentOS App</name>
+  <summary>Personal AI assistant built on tokagentOS</summary>
+
+  <developer id="ai.tokagentos">
+    <name>tokagentOS</name>
+  </developer>
+
+  <description>
+    <p>
+      tokagentOS App is a personal AI assistant that runs on your own devices, built on
+      tokagentOS. It provides zero-config onboarding, multi-provider AI support,
+      a web dashboard, and a plugin system for extensibility.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Interactive setup on first run — pick a name, personality, and AI provider</li>
+      <li>Support for Anthropic (Claude), OpenAI, Google Gemini, Ollama, and more</li>
+      <li>Web dashboard at localhost for agent management</li>
+      <li>Plugin system with 100+ official plugins</li>
+      <li>Connects to Telegram, Discord, Slack, and other platforms</li>
+      <li>Web3 wallet integration (EVM and Solana)</li>
+    </ul>
+  </description>
+
+  <url type="homepage">https://app.tokagentos.ai</url>
+  <url type="bugtracker">https://github.com/elizaos/elizaos-app/issues</url>
+  <url type="vcs-browser">https://github.com/elizaos/elizaos-app</url>
+  <url type="help">https://docs.app.tokagentos.ai</url>
+
+  <provides>
+    <binary>tokagentos-app</binary>
+  </provides>
+
+  <categories>
+    <category>Development</category>
+    <category>Utility</category>
+  </categories>
+
+  <launchable type="desktop-id">ai.tokagentos.App.desktop</launchable>
+
+  <!--
+  Screenshots are required by Flathub but not by `appstream-util
+  validate-relax`, which is what CI runs. An empty <screenshots/>
+  tag trips `tag-invalid : Expected children for tag`, so omit the
+  block entirely until real screenshot URLs are ready. Add something
+  like this before Flathub submission:
+
+    <screenshots>
+      <screenshot type="default">
+        <caption>tokagentOS App web dashboard showing agent management</caption>
+        <image type="source">https://app.tokagentos.ai/screenshots/dashboard.png</image>
+      </screenshot>
+    </screenshots>
+  -->
+
+  <releases>
+    <release version="2.0.0-alpha.7" date="2026-02-07">
+      <description>
+        <p>Initial Flatpak release of tokagentOS App.</p>
+      </description>
+    </release>
+  </releases>
+
+  <content_rating type="oars-1.1">
+    <content_attribute id="social-chat">moderate</content_attribute>
+  </content_rating>
+
+  <keywords>
+    <keyword>ai</keyword>
+    <keyword>assistant</keyword>
+    <keyword>agent</keyword>
+    <keyword>tokagentos</keyword>
+    <keyword>llm</keyword>
+    <keyword>chatbot</keyword>
+  </keywords>
+</component>

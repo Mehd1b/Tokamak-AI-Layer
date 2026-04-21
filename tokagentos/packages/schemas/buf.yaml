@@ -1,0 +1,16 @@
+# buf.yaml - Buf configuration for tokagentOS proto schemas
+version: v2
+modules:
+  - path: .
+    name: buf.build/tokagentos/tokagent
+lint:
+  use:
+    - STANDARD
+  except:
+    - FIELD_NOT_REQUIRED
+    - PACKAGE_NO_IMPORT_CYCLE
+breaking:
+  use:
+    - FILE
+deps:
+  - buf.build/googleapis/googleapis

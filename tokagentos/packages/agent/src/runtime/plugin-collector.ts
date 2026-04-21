@@ -1,0 +1,480 @@
+/**
+ * Plugin name collection and validation.
+ *
+ * Determines which plugin packages should be loaded based on config,
+ * environment variables, feature flags, and provider precedence rules.
+ *
+ * When callers pass a {@link PluginLoadReasons} map, the first source that
+ * added each package is recorded so `resolvePlugins` (`plugin-resolver.ts`)
+ * can explain optional load failures (config vs env vs feature flag).
+ *
+ * Extracted from tokagent.ts to reduce file size.
+ *
+ * @module plugin-collector
+ */
+import {
+  type ResolvedTokagentCloudTopology,
+  resolveTokagentCloudTopology,
+} from "@tokagentos/shared/contracts";
+import {
+  hasExplicitCanonicalRuntimeConfig,
+  migrateLegacyRuntimeConfig,
+} from "@tokagentos/shared/contracts/onboarding";
+import type { TokagentConfig } from "../config/config.js";
+import { CORE_PLUGINS, OPTIONAL_CORE_PLUGINS } from "./core-plugins.js";
+
+const OPTIONAL_CORE_PLUGIN_NAMES = new Set<string>(OPTIONAL_CORE_PLUGINS);
+
+/**
+ * Agent orchestrator ships as the standalone @tokagentos/plugin-agent-orchestrator package;
+ * Tokagent loads it via STATIC_TOKAGENT_PLUGINS["agent-orchestrator"].
+ */
+function orchestratorCompatPluginRequested(config: TokagentConfig): boolean {
+  const agentEntry = config.agents?.list?.[0];
+  const fromEntry = agentEntry?.agentOrchestrator;
+  const fromDefaults = config.agents?.defaults?.agentOrchestrator;
+  if (typeof fromEntry === "boolean") {
+    return fromEntry;
+  }
+  if (typeof fromDefaults === "boolean") {
+    return fromDefaults;
+  }
+  const raw = process.env.TOKAGENT_AGENT_ORCHESTRATOR?.trim().toLowerCase();
+  if (raw === "0" || raw === "false" || raw === "no") {
+    return false;
+  }
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/**
+ * Legacy package names that were merged or renamed. Config allow-lists and
+ * `plugins.installs` may still reference the old id.
+ */
+export function resolvePluginPackageAlias(packageName: string): string {
+  if (packageName === "@tokagentos/plugin-selfcontrol") {
+    return "@tokagentos/app-lifeops";
+  }
+  return packageName;
+}
+
+function isTruthyCloudEnvValue(raw: string | undefined): boolean {
+  if (!raw) return false;
+  const value = raw.trim().toLowerCase();
+  return value === "1" || value === "true" || value === "yes";
+}
+
+/** Maps Tokagent channel names to plugin package names. */
+export const CHANNEL_PLUGIN_MAP: Readonly<Record<string, string>> = {
+  bluebubbles: "@tokagentos/plugin-bluebubbles",
+  discord: "@tokagentos/plugin-discord",
+  discordLocal: "@tokagentos/plugin-discord-local",
+  telegram: "@tokagentos/plugin-telegram",
+  slack: "@tokagentos/plugin-slack",
+  twitter: "@tokagentos/plugin-twitter",
+  // Internal connector built from src/plugins/whatsapp (not an npm package).
+  whatsapp: "@tokagentos/plugin-whatsapp",
+  // Internal connector built from src/plugins/signal (not an npm package).
+  signal: "@tokagentos/plugin-signal",
+  imessage: "@tokagentos/plugin-imessage",
+  farcaster: "@tokagentos/plugin-farcaster",
+  lens: "@tokagentos/plugin-lens",
+  msteams: "@tokagentos/plugin-msteams",
+  feishu: "@tokagentos/plugin-feishu",
+  matrix: "@tokagentos/plugin-matrix",
+  nostr: "@tokagentos/plugin-nostr",
+  blooio: "@tokagentos/plugin-blooio",
+  twitch: "@tokagentos/plugin-twitch",
+  mattermost: "@tokagentos/plugin-mattermost",
+  googlechat: "@tokagentos/plugin-google-chat",
+};
+
+/** Maps environment variable names to model-provider plugin packages. */
+export const PROVIDER_PLUGIN_MAP: Readonly<Record<string, string>> = {
+  ANTHROPIC_API_KEY: "@tokagentos/plugin-anthropic",
+  OPENAI_API_KEY: "@tokagentos/plugin-openai",
+  GEMINI_API_KEY: "@tokagentos/plugin-google-genai",
+  GOOGLE_API_KEY: "@tokagentos/plugin-google-genai",
+  GOOGLE_GENERATIVE_AI_API_KEY: "@tokagentos/plugin-google-genai",
+  GROQ_API_KEY: "@tokagentos/plugin-groq",
+  XAI_API_KEY: "@tokagentos/plugin-xai",
+  OPENROUTER_API_KEY: "@tokagentos/plugin-openrouter",
+  DEEPSEEK_API_KEY: "@tokagentos/plugin-deepseek",
+  MISTRAL_API_KEY: "@tokagentos/plugin-mistral",
+  TOGETHER_API_KEY: "@tokagentos/plugin-together",
+  AI_GATEWAY_API_KEY: "@tokagentos/plugin-vercel-ai-gateway",
+  AIGATEWAY_API_KEY: "@tokagentos/plugin-vercel-ai-gateway",
+  OLLAMA_BASE_URL: "@tokagentos/plugin-ollama",
+  ZAI_API_KEY: "@homunculuslabs/plugin-zai",
+  // TokagentCloud — loaded when API key is present OR cloud is explicitly enabled
+  TOKAGENTOS_CLOUD_API_KEY: "@tokagentos/plugin-elizacloud",
+  TOKAGENTOS_CLOUD_ENABLED: "@tokagentos/plugin-elizacloud",
+};
+
+/**
+ * Optional feature plugins keyed by feature name.
+ *
+ * Mappings here support short IDs in allow-lists and feature toggles.
+ * Keep this map in sync with optional plugin registration and tests.
+ */
+export const OPTIONAL_PLUGIN_MAP: Readonly<Record<string, string>> = {
+  // ── Wallet plugins ─────────────────────────────────────────────────
+  // These short ids are what plugin-auto-enable.ts writes into
+  // `plugins.allow` when EVM_PRIVATE_KEY / SOLANA_PRIVATE_KEY are
+  // present in process.env. Without entries here, collectPluginNames()
+  // would fall through to loading the short id as a literal package
+  // name (`import("evm")`), which silently fails inside the loader's
+  // error boundary — plugin-evm / plugin-solana never load even when
+  // the keys are set and the wallet page shows addresses. This was a
+  // multi-hour landmine. Keep these in sync with AUTH_PROVIDER_PLUGINS
+  // in packages/agent/src/config/plugin-auto-enable.ts.
+  evm: "@tokagentos/plugin-evm",
+  solana: "@tokagentos/plugin-solana",
+  browser: "@tokagentos/plugin-browser",
+  /** Tokagent desktop browser workspace + Steward; package is `@tokagentos/app-browser`. */
+  "app-browser": "@tokagentos/app-browser",
+  appBrowser: "@tokagentos/app-browser",
+  "tokagent-browser": "@tokagentos/app-browser",
+  tokagentBrowser: "@tokagentos/app-browser",
+  /** Legacy LifeOps browser entry (separate package from `@tokagentos/app-lifeops`). */
+  "lifeops-browser": "@tokagentos/plugin-lifeops-browser",
+  lifeopsBrowser: "@tokagentos/plugin-lifeops-browser",
+  vision: "@tokagentos/plugin-vision",
+  tokagentcloud: "@tokagentos/plugin-elizacloud",
+  selfcontrol: "@tokagentos/app-lifeops",
+  cron: "@tokagentos/plugin-cron",
+  cua: "@tokagentos/plugin-cua",
+  computeruse: "@tokagentos/plugin-computeruse",
+  obsidian: "@tokagentos/plugin-obsidian",
+  repoprompt: "@tokagentos/plugin-repoprompt",
+  repoPrompt: "@tokagentos/plugin-repoprompt",
+  bluebubbles: "@tokagentos/plugin-bluebubbles",
+  discordLocal: "@tokagentos/plugin-discord-local",
+  x402: "@tokagentos/plugin-x402",
+  // plugin-manager, secrets-manager, trust: now built-in core capabilities
+  // Enable via ENABLE_PLUGIN_MANAGER, ENABLE_SECRETS_MANAGER, ENABLE_TRUST
+  "streaming-base": "@tokagentos/plugin-streaming-base",
+  "twitch-streaming": "@tokagentos/plugin-twitch-streaming",
+  "youtube-streaming": "@tokagentos/plugin-youtube-streaming",
+  "custom-rtmp": "@tokagentos/plugin-custom-rtmp",
+  "pumpfun-streaming": "@tokagentos/plugin-pumpfun-streaming",
+  "x-streaming": "@tokagentos/plugin-x-streaming",
+  // Steward wallet plugin — short ID used by auto-enable
+  "stwd-tokagent-plugin": "@stwd/tokagent-plugin",
+};
+
+// ---------------------------------------------------------------------------
+// Main function
+// ---------------------------------------------------------------------------
+
+/**
+ * First-winning provenance for each package name in the load set — e.g.
+ * `plugins.allow[...]`, `env: SOLANA_PRIVATE_KEY`, `CORE_PLUGINS`.
+ * {@link collectPluginNames} fills this when the optional `reasons` map is passed.
+ *
+ * **Why:** Optional plugins often fail with "Cannot find module"; without the
+ * source, operators assume the framework is broken instead of fixing config/env.
+ */
+export type PluginLoadReasons = Map<string, string>;
+
+/**
+ * Collect plugin package names to load from config, env, feature flags, and
+ * connector-derived allow-list mutations.
+ *
+ * @param reasons - When set, records the **first** reason each name was added
+ *   (subsequent adds for the same name are ignored). Used by `resolvePlugins`
+ *   to annotate benign optional load failures.
+ *
+ * @internal Exported for testing.
+ */
+export function collectPluginNames(
+  config: TokagentConfig,
+  reasons?: PluginLoadReasons,
+): Set<string> {
+  migrateLegacyRuntimeConfig(config as Record<string, unknown>);
+  const shellPluginDisabled = config.features?.shellEnabled === false;
+  const localEmbeddingsExplicitlyDisabled = (() => {
+    const raw = process.env.TOKAGENT_DISABLE_LOCAL_EMBEDDINGS;
+    if (!raw) return false;
+    const normalized = raw.trim().toLowerCase();
+    return normalized === "1" || normalized === "true" || normalized === "yes";
+  })();
+  const cloudTopology = resolveTokagentCloudTopology(
+    config as Record<string, unknown>,
+  );
+  const hasCanonicalRuntimeConfig = hasExplicitCanonicalRuntimeConfig(
+    config as Record<string, unknown>,
+  );
+  const isCloudContainer = process.env.TOKAGENT_CLOUD_PROVISIONED === "1";
+  const cloudExplicitlyDisabled = config.cloud?.enabled === false;
+  const cloudPluginRequestedByEnv =
+    !hasCanonicalRuntimeConfig &&
+    !cloudExplicitlyDisabled &&
+    (Boolean(process.env.TOKAGENTOS_CLOUD_API_KEY?.trim()) ||
+      isTruthyCloudEnvValue(process.env.TOKAGENTOS_CLOUD_ENABLED));
+  const cloudEffectivelyEnabled =
+    resolveCloudPluginRequirement(cloudTopology, cloudPluginRequestedByEnv) ||
+    isCloudContainer;
+  // cloudHandlesInference gates whether the cloud plugin *replaces* direct
+  // provider plugins for model calls.  Cloud containers that go through the
+  // steward proxy (OPENAI_BASE_URL → host.docker.internal) need plugin-openai
+  // to stay loaded, so only claim inference when the topology explicitly says
+  // so OR the container has a direct cloud API key for tokagentcloud inference.
+  const cloudHandlesInference =
+    cloudTopology.services.inference ||
+    (isCloudContainer && Boolean(process.env.TOKAGENTOS_CLOUD_API_KEY?.trim()));
+  const _configEnv = config.env as
+    | (Record<string, unknown> & { vars?: Record<string, unknown> })
+    | undefined;
+  const pluginEntries = (config.plugins as Record<string, unknown> | undefined)
+    ?.entries as Record<string, { enabled?: boolean }> | undefined;
+
+  const isPluginExplicitlyDisabled = (pluginPackageName: string): boolean => {
+    const marker = "/plugin-";
+    const markerIndex = pluginPackageName.lastIndexOf(marker);
+    const pluginId =
+      markerIndex >= 0
+        ? pluginPackageName.slice(markerIndex + marker.length)
+        : pluginPackageName;
+    return pluginEntries?.[pluginId]?.enabled === false;
+  };
+
+  const providerPluginIdSet = new Set(
+    Object.values(PROVIDER_PLUGIN_MAP).map((pluginPackageName) => {
+      const marker = "/plugin-";
+      const markerIndex = pluginPackageName.lastIndexOf(marker);
+      return markerIndex >= 0
+        ? pluginPackageName.slice(markerIndex + marker.length)
+        : pluginPackageName;
+    }),
+  );
+  const explicitProviderEntries = Object.entries(pluginEntries ?? {}).filter(
+    ([pluginId]) => providerPluginIdSet.has(pluginId),
+  );
+  const hasExplicitEnabledProvider = explicitProviderEntries.some(
+    ([, entry]) => entry?.enabled === true,
+  );
+
+  // Allow-list entries are additive (extra plugins), not exclusive.
+  const allowList = config.plugins?.allow;
+  const pluginsToLoad = new Set<string>(CORE_PLUGINS);
+  const track = (name: string, reason: string) => {
+    if (reasons && !reasons.has(name)) reasons.set(name, reason);
+  };
+  for (const core of CORE_PLUGINS) track(core, "CORE_PLUGINS");
+  if (orchestratorCompatPluginRequested(config)) {
+    pluginsToLoad.add("agent-orchestrator");
+    track(
+      "agent-orchestrator",
+      "agent-orchestrator (@tokagentos/plugin-agent-orchestrator)",
+    );
+  }
+  if (localEmbeddingsExplicitlyDisabled) {
+    pluginsToLoad.delete("@tokagentos/plugin-local-embedding");
+  }
+
+  // Allow list is additive — extra plugins on top of auto-detection,
+  // not an exclusive whitelist that blocks everything else.
+  if (allowList && allowList.length > 0) {
+    for (const item of allowList) {
+      // Normalize short IDs (e.g. "openai" → "@tokagentos/plugin-openai") the
+      // same way plugins.entries does — addToAllowlist() pushes both the
+      // short ID and the full package name, so bare short IDs must be
+      // expanded to avoid importing the raw SDK package (e.g. "openai").
+      const pluginName = resolvePluginPackageAlias(
+        CHANNEL_PLUGIN_MAP[item] ??
+          OPTIONAL_PLUGIN_MAP[item] ??
+          (item.includes("/") ? item : `@tokagentos/plugin-${item}`),
+      );
+      pluginsToLoad.add(pluginName);
+      track(pluginName, `plugins.allow[${JSON.stringify(item)}]`);
+    }
+  }
+
+  // Connector plugins — load when connector has config entries
+  // Prefer config.connectors, fall back to config.channels for backward compatibility
+  const connectors =
+    config.connectors ??
+    ((config as Record<string, unknown>).channels as Record<string, unknown>) ??
+    {};
+  for (const [channelName, channelConfig] of Object.entries(connectors)) {
+    if (
+      !channelConfig ||
+      typeof channelConfig !== "object" ||
+      Array.isArray(channelConfig)
+    ) {
+      continue;
+    }
+    if ((channelConfig as Record<string, unknown>).enabled === false) {
+      continue;
+    }
+    const pluginName = CHANNEL_PLUGIN_MAP[channelName];
+    if (pluginName) {
+      pluginsToLoad.add(pluginName);
+      track(pluginName, `connectors.${channelName}`);
+    }
+  }
+
+  // Model-provider plugins — load when env key is present
+  for (const [envKey, pluginName] of Object.entries(PROVIDER_PLUGIN_MAP)) {
+    if (
+      envKey === "TOKAGENTOS_CLOUD_API_KEY" ||
+      envKey === "TOKAGENTOS_CLOUD_ENABLED"
+    ) {
+      continue;
+    }
+    if (isPluginExplicitlyDisabled(pluginName)) {
+      continue;
+    }
+    if (hasExplicitEnabledProvider) {
+      const marker = "/plugin-";
+      const markerIndex = pluginName.lastIndexOf(marker);
+      const pluginId =
+        markerIndex >= 0
+          ? pluginName.slice(markerIndex + marker.length)
+          : pluginName;
+      if (pluginEntries?.[pluginId]?.enabled !== true) {
+        continue;
+      }
+    }
+    if (process.env[envKey]?.trim()) {
+      pluginsToLoad.add(pluginName);
+      track(pluginName, `env: ${envKey}`);
+    }
+  }
+
+  const applyProviderPrecedence = (): void => {
+    // Provider precedence:
+    // 1) TokagentCloud for inference (when enabled AND inferenceMode is "cloud")
+    // 2) direct provider plugins (api-key/env based)
+    //
+    // When inferenceMode is "byok" or "local", cloud stays loaded for
+    // RPC/services but direct AI provider plugins are preserved so the
+    // user's own API keys (e.g. Anthropic) handle model inference.
+    if (cloudEffectivelyEnabled) {
+      pluginsToLoad.add("@tokagentos/plugin-elizacloud");
+
+      if (cloudHandlesInference) {
+        // Cloud handles ALL model calls — remove direct AI provider plugins.
+        const directProviders = new Set(Object.values(PROVIDER_PLUGIN_MAP));
+        directProviders.delete("@tokagentos/plugin-elizacloud");
+        for (const p of directProviders) {
+          pluginsToLoad.delete(p);
+        }
+        return;
+      }
+      // inferenceMode is "byok" or "local" — keep direct provider plugins.
+      // Cloud plugin stays loaded for non-inference cloud services (RPC, media, etc.)
+      return;
+    }
+
+    // Cloud is not part of the resolved topology — remove it even though
+    // it is listed in CORE_PLUGINS so stale env/config does not hijack
+    // provider selection after the user switches away.
+    pluginsToLoad.delete("@tokagentos/plugin-elizacloud");
+  };
+
+  // Apply once before additive plugin-entry/feature paths.
+  applyProviderPrecedence();
+
+  // Optional feature plugins from config.plugins.entries
+  const pluginsConfig = config.plugins as
+    | Record<string, Record<string, unknown>>
+    | undefined;
+  if (pluginsConfig?.entries) {
+    for (const [key, entry] of Object.entries(pluginsConfig.entries)) {
+      if (!entry || typeof entry !== "object") continue;
+      // Connector keys (telegram, discord, etc.) must use CHANNEL_PLUGIN_MAP
+      // so the correct variant loads.
+      const pluginName = resolvePluginPackageAlias(
+        CHANNEL_PLUGIN_MAP[key] ??
+          OPTIONAL_PLUGIN_MAP[key] ??
+          (key.includes("/") ? key : `@tokagentos/plugin-${key}`),
+      );
+      const isOptionalCore = OPTIONAL_CORE_PLUGIN_NAMES.has(pluginName);
+      const entryEnabled = (entry as Record<string, unknown>).enabled;
+      const shouldAdd = isOptionalCore
+        ? entryEnabled === true
+        : entryEnabled !== false;
+      if (shouldAdd) {
+        pluginsToLoad.add(pluginName);
+        track(pluginName, `plugins.entries["${key}"]`);
+      }
+    }
+  }
+
+  // Feature flags (config.features)
+  const features = config.features;
+  if (features && typeof features === "object") {
+    for (const [featureName, featureValue] of Object.entries(features)) {
+      const isEnabled =
+        featureValue === true ||
+        (typeof featureValue === "object" &&
+          featureValue !== null &&
+          (featureValue as Record<string, unknown>).enabled !== false);
+      if (isEnabled) {
+        const pluginName = OPTIONAL_PLUGIN_MAP[featureName];
+        if (pluginName) {
+          const resolved = resolvePluginPackageAlias(pluginName);
+          pluginsToLoad.add(resolved);
+          track(resolved, `features.${featureName}`);
+        }
+      }
+    }
+  }
+
+  // x402 plugin — auto-load when config section enabled
+  if (config.x402?.enabled) {
+    pluginsToLoad.add("@tokagentos/plugin-x402");
+    track("@tokagentos/plugin-x402", "config.x402.enabled");
+  }
+
+  // Opinion plugin — auto-load when API key is present.
+  // NOT in PROVIDER_PLUGIN_MAP because it is a feature plugin, not a model
+  // provider, and would be incorrectly removed during provider precedence.
+  if (process.env.OPINION_API_KEY?.trim()) {
+    pluginsToLoad.add("@tokagentos/plugin-opinion");
+    track("@tokagentos/plugin-opinion", "env: OPINION_API_KEY");
+  }
+
+  // These are plugins that were installed via the plugin-manager at runtime
+  // and tracked in tokagent.json so they persist across restarts.
+  const installs = config.plugins?.installs;
+  if (installs && typeof installs === "object") {
+    for (const [packageName, record] of Object.entries(installs)) {
+      if (record && typeof record === "object") {
+        const resolved = resolvePluginPackageAlias(packageName);
+        pluginsToLoad.add(resolved);
+        track(resolved, "plugins.installs");
+      }
+    }
+  }
+
+  // Re-apply provider precedence so later additive paths (entries, features,
+  // installs) cannot accidentally re-introduce suppressed providers.
+  applyProviderPrecedence();
+
+  // Enforce feature gating last so allow-list entries cannot bypass it.
+  if (shellPluginDisabled) {
+    pluginsToLoad.delete("@tokagentos/plugin-shell");
+  }
+
+  for (const optionalCore of OPTIONAL_CORE_PLUGINS) {
+    const resolved = resolvePluginPackageAlias(optionalCore);
+    if (isPluginExplicitlyDisabled(resolved)) {
+      pluginsToLoad.delete(resolved);
+    }
+  }
+
+  return pluginsToLoad;
+}
+
+function resolveCloudPluginRequirement(
+  topology: ResolvedTokagentCloudTopology,
+  requestedByEnv: boolean,
+): boolean {
+  return topology.shouldLoadPlugin || requestedByEnv;
+}

@@ -1,0 +1,157 @@
+{
+  "$schema": "https://turborepo.org/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["@tokagentos/core#build", "^build"],
+      "env": ["LOG_LEVEL"],
+      "outputs": ["dist/**"]
+    },
+    "@tokagentos/agent#build": {
+      "dependsOn": ["@tokagentos/core#build", "@tokagentos/shared#build"],
+      "env": ["LOG_LEVEL"],
+      "outputs": ["dist/**"]
+    },
+    "@tokagentos/app-core#build": {
+      "dependsOn": ["@tokagentos/core#build", "@tokagentos/agent#build", "@tokagentos/shared#build"],
+      "env": ["LOG_LEVEL"],
+      "outputs": ["dist/**"]
+    },
+    "@tokagentos/core#build": {
+      "dependsOn": [],
+      "env": ["LOG_LEVEL"],
+      "outputs": ["dist/**"],
+      "inputs": ["src/**", "build.ts", "tsconfig.declarations.json"]
+    },
+    "@tokagentos/rust#build": {
+      "dependsOn": [],
+      "outputs": ["pkg/**", "target/release/**"],
+      "inputs": ["src/**", "Cargo.toml", "build.sh"]
+    },
+    "@tokagentos/python#build": {
+      "dependsOn": [],
+      "outputs": ["tokagentos.egg-info/**"],
+      "inputs": ["tokagentos/**", "pyproject.toml"],
+      "cache": false
+    },
+    "@tokagentos/client#build": {
+      "dependsOn": ["^build"],
+      "env": ["LOG_LEVEL"],
+      "outputs": ["dist/**"]
+    },
+    "@tokagentos/server#build": {
+      "dependsOn": ["@tokagentos/client#build", "^build"],
+      "env": ["LOG_LEVEL"],
+      "outputs": ["dist/**"]
+    },
+    "@tokagentos/plugin-cli-root#build": {
+      "outputs": []
+    },
+    "@tokagentos/plugin-commands-root#build": {
+      "outputs": []
+    },
+    "@tokagentos/plugin-cron-root#build": {
+      "outputs": []
+    },
+    "@tokagentos/plugin-discord-root#build": {
+      "outputs": []
+    },
+    "@tokagentos/plugin-elizacloud-root#build": {
+      "outputs": []
+    },
+    "@tokagentos/plugin-groq-root#build": {
+      "outputs": []
+    },
+    "@tokagentos/plugin-imessage-root#build": {
+      "outputs": []
+    },
+    "@tokagentos/plugin-local-ai-root#build": {
+      "outputs": []
+    },
+    "@tokagentos/plugin-ollama-root#build": {
+      "outputs": []
+    },
+    "@tokagentos/plugin-openai-root#build": {
+      "outputs": []
+    },
+    "@tokagentos/plugin-openrouter-root#build": {
+      "outputs": []
+    },
+    "@tokagentos/plugin-shell-root#build": {
+      "outputs": []
+    },
+    "@tokagentos/plugin-solana-root#build": {
+      "outputs": []
+    },
+    "@tokagentos/plugin-sql-root#build": {
+      "outputs": []
+    },
+    "@tokagentos/schemas#build": {
+      "outputs": []
+    },
+    "lint": {
+      "outputs": []
+    },
+    "@tokagentos/interop#lint": {
+      "outputs": []
+    },
+    "lint:check": {
+      "outputs": []
+    },
+    "lint:rust": {
+      "outputs": []
+    },
+    "typecheck": {
+      "dependsOn": ["@tokagentos/core#build"],
+      "outputs": []
+    },
+    "typecheck:rust": {
+      "outputs": []
+    },
+    "lint:python": {
+      "outputs": []
+    },
+    "typecheck:python": {
+      "outputs": []
+    },
+    "format": {
+      "outputs": []
+    },
+    "format:check": {
+      "outputs": []
+    },
+    "start": {
+      "dependsOn": ["@tokagentos/core#build"],
+      "env": ["LOG_LEVEL"],
+      "persistent": true
+    },
+    "dev": {
+      "dependsOn": ["@tokagentos/core#build"],
+      "persistent": true
+    },
+    "test": {
+      "dependsOn": [],
+      "outputs": ["coverage/**"],
+      "inputs": ["src/**/*.ts", "src/**/*.js", "__tests__/**/*", "*.test.*", "package.json", "tests/**/*", "python/tests/**/*"],
+      "cache": false
+    },
+    "@tokagentos/rust#test": {
+      "outputs": [],
+      "inputs": ["src/**", "tests/**"]
+    },
+    "@tokagentos/python#test": {
+      "outputs": [],
+      "inputs": ["tokagentos/**", "tests/**"]
+    },
+    "migrate": {
+      "dependsOn": ["@tokagentos/core#build"],
+      "cache": false
+    },
+    "migrate:generate": {
+      "dependsOn": ["@tokagentos/core#build"],
+      "cache": false
+    },
+    "clean": {
+      "cache": false
+    }
+  }
+}

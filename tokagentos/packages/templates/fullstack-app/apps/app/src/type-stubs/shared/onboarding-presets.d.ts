@@ -1,0 +1,9 @@
+export function buildTokagentCharacterCatalog(): {
+  assets: unknown[];
+  injectedCharacters: unknown[];
+};
+
+export function getStylePresets(): Array<{
+  avatarIndex: number;
+  name: string;
+}>;
