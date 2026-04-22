@@ -632,4 +632,33 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
             )
         );
     }
+
+    // ============ Tokagent vault stubs (filled by task B4) ============
+
+    function deployTokagentVault(
+        address,
+        IVaultFactory.TokagentEntry[] calldata,
+        IVaultFactory.TokagentApprovalSpec[] calldata,
+        bytes32
+    ) external returns (address) {
+        revert("not implemented");
+    }
+
+    function computeTokagentVaultAddress(
+        address,
+        address,
+        IVaultFactory.TokagentEntry[] calldata,
+        IVaultFactory.TokagentApprovalSpec[] calldata,
+        bytes32
+    ) external view returns (address, bytes32) {
+        revert("not implemented");
+    }
+
+    function setTokagentVaultCreationCodeStoreOnce(address) external {
+        revert("not implemented");
+    }
+
+    function tokagentVaultCreationCodeStore() external view returns (address) {
+        revert("not implemented");
+    }
 }
