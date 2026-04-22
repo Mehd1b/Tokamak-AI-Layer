@@ -640,25 +640,89 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         );
     }
 
-    // ============ Tokagent vault stubs (filled by task B4) ============
-
-    function deployTokagentVault(
-        address,
-        IVaultFactory.TokagentEntry[] calldata,
-        IVaultFactory.TokagentApprovalSpec[] calldata,
-        bytes32
-    ) external returns (address) {
-        revert("not implemented");
+    /// @notice Get the creation bytecode for TokagentVault with constructor arguments.
+    function _getTokagentCreationBytecode(
+        address owner_,
+        address operator,
+        IVaultFactory.TokagentEntry[] calldata initialAllowlist,
+        IVaultFactory.TokagentApprovalSpec[] calldata initialApprovals
+    ) internal view returns (bytes memory) {
+        require(_tokagentVaultCreationCodeStore != address(0), "tokagent code store not set");
+        return abi.encodePacked(
+            _tokagentVaultCreationCodeStore.code,
+            abi.encode(owner_, operator, initialAllowlist, initialApprovals)
+        );
     }
 
+    /// @notice Compute CREATE2 salt specifically for Tokagent vaults.
+    /// @dev Distinct salt derivation from zkp vaults so the same (owner, userSalt)
+    ///      can coexist as a Tokagent vault and a KernelVault without address collision.
+    function _computeTokagentSalt(
+        address owner_,
+        address operator,
+        bytes32 userSalt
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked("TOKAGENT", owner_, operator, userSalt));
+    }
+
+    // ============ Tokagent vault stubs (filled by task B4) ============
+
+    /// @inheritdoc IVaultFactory
+    function deployTokagentVault(
+        address operator,
+        IVaultFactory.TokagentEntry[] calldata initialAllowlist,
+        IVaultFactory.TokagentApprovalSpec[] calldata initialApprovals,
+        bytes32 userSalt
+    ) external returns (address vault) {
+        require(operator != address(0), "zero operator");
+
+        bytes32 salt = _computeTokagentSalt(msg.sender, operator, userSalt);
+        bytes memory bytecode = _getTokagentCreationBytecode(
+            msg.sender, operator, initialAllowlist, initialApprovals
+        );
+
+        assembly {
+            vault := create2(0, add(bytecode, 0x20), mload(bytecode), salt)
+        }
+
+        if (vault == address(0)) {
+            revert Create2DeploymentFailed();
+        }
+
+        isDeployedVault[vault] = true;
+        _deployedVaults.push(vault);
+
+        emit TokagentVaultDeployed(
+            vault,
+            msg.sender,
+            operator,
+            uint256(userSalt),
+            keccak256("TokagentVault:v1")
+        );
+
+        return vault;
+    }
+
+    /// @inheritdoc IVaultFactory
     function computeTokagentVaultAddress(
-        address,
-        address,
-        IVaultFactory.TokagentEntry[] calldata,
-        IVaultFactory.TokagentApprovalSpec[] calldata,
-        bytes32
-    ) external view returns (address, bytes32) {
-        revert("not implemented");
+        address owner_,
+        address operator,
+        IVaultFactory.TokagentEntry[] calldata initialAllowlist,
+        IVaultFactory.TokagentApprovalSpec[] calldata initialApprovals,
+        bytes32 userSalt
+    ) external view returns (address vault, bytes32 salt) {
+        salt = _computeTokagentSalt(owner_, operator, userSalt);
+        bytes memory bytecode = _getTokagentCreationBytecode(
+            owner_, operator, initialAllowlist, initialApprovals
+        );
+        bytes32 bytecodeHash = keccak256(bytecode);
+        vault = address(
+            uint160(
+                uint256(
+                    keccak256(abi.encodePacked(bytes1(0xff), address(this), salt, bytecodeHash))
+                )
+            )
+        );
     }
 
     /// @inheritdoc IVaultFactory
