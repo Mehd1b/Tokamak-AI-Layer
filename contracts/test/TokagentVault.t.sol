@@ -261,4 +261,46 @@ contract TokagentVaultTest is Test {
         vm.expectPartialRevert(TokagentVault.CallFailed.selector);
         vault.executeBatch(calls);
     }
+
+    // ============ approveToken tests ============
+
+    function test_approveToken_succeedsWhenSpenderAllowlisted() public {
+        vault = _deployWithTargetAllowlisted();
+        vm.prank(operator);
+        vault.approveToken(address(token), address(target), 1e18);
+        assertEq(token.allowance(address(vault), address(target)), 1e18);
+    }
+
+    function test_approveToken_revertsWhenSpenderNotAllowlisted() public {
+        vault = _deployEmptyVault();
+        vm.prank(operator);
+        vm.expectRevert(
+            abi.encodeWithSelector(TokagentVault.SpenderNotAllowlisted.selector, address(target))
+        );
+        vault.approveToken(address(token), address(target), 1e18);
+    }
+
+    function test_approveToken_notOperatorReverts() public {
+        vault = _deployWithTargetAllowlisted();
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(TokagentVault.NotOperator.selector, bob));
+        vault.approveToken(address(token), address(target), 1e18);
+    }
+
+    function test_approveToken_revertsAfterAllowlistRevoked() public {
+        vault = _deployWithTargetAllowlisted();
+        vm.prank(operator);
+        vault.approveToken(address(token), address(target), 1e18);
+
+        vm.startPrank(owner);
+        vault.ownerSetAllowlist(address(target), SET_VALUE, false);
+        vault.ownerSetAllowlist(address(target), PAYABLE_NOOP, false);
+        vm.stopPrank();
+
+        vm.prank(operator);
+        vm.expectRevert(
+            abi.encodeWithSelector(TokagentVault.SpenderNotAllowlisted.selector, address(target))
+        );
+        vault.approveToken(address(token), address(target), 2e18);
+    }
 }
