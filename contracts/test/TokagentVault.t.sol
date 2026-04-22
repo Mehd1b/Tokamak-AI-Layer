@@ -39,6 +39,39 @@ contract MockERC20 {
     }
 }
 
+// Minimal ERC721 for vault tests
+contract MockERC721 {
+    mapping(uint256 => address) public ownerOf;
+    mapping(address => uint256) public balanceOf;
+
+    function mint(address to, uint256 tokenId) external {
+        ownerOf[tokenId] = to;
+        balanceOf[to] += 1;
+    }
+
+    function safeTransferFrom(address from, address to, uint256 tokenId) external {
+        require(ownerOf[tokenId] == from, "not owner");
+        ownerOf[tokenId] = to;
+        balanceOf[from] -= 1;
+        balanceOf[to] += 1;
+    }
+}
+
+// Minimal ERC1155 for vault tests
+contract MockERC1155 {
+    mapping(address => mapping(uint256 => uint256)) public balanceOf;
+
+    function mint(address to, uint256 id, uint256 amount) external {
+        balanceOf[to][id] += amount;
+    }
+
+    function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes calldata) external {
+        require(balanceOf[from][id] >= amount, "insufficient");
+        balanceOf[from][id] -= amount;
+        balanceOf[to][id] += amount;
+    }
+}
+
 // Minimal target contract for allowlist tests
 contract MockTarget {
     uint256 public value;
@@ -424,5 +457,91 @@ contract TokagentVaultTest is Test {
         vm.prank(bob);
         vm.expectRevert(TokagentVault.NoPendingOwner.selector);
         vault.acceptOwnership();
+    }
+
+    // ============ Owner withdraw tests ============
+
+    function test_ownerWithdrawERC20_movesFunds() public {
+        vault = _deployEmptyVault();
+        token.mint(address(vault), 100e18);
+        vm.prank(owner);
+        vault.ownerWithdrawERC20(address(token), 100e18, bob);
+        assertEq(token.balanceOf(bob), 100e18);
+    }
+
+    function test_ownerWithdrawERC20_notOwnerReverts() public {
+        vault = _deployEmptyVault();
+        token.mint(address(vault), 100e18);
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(TokagentVault.NotOwner.selector, bob));
+        vault.ownerWithdrawERC20(address(token), 100e18, bob);
+    }
+
+    function test_ownerWithdrawERC20_zeroToReverts() public {
+        vault = _deployEmptyVault();
+        vm.prank(owner);
+        vm.expectRevert(TokagentVault.ZeroAddress.selector);
+        vault.ownerWithdrawERC20(address(token), 0, address(0));
+    }
+
+    function test_ownerWithdrawERC721_movesNft() public {
+        vault = _deployEmptyVault();
+        MockERC721 nft = new MockERC721();
+        nft.mint(address(vault), 42);
+        vm.prank(owner);
+        vault.ownerWithdrawERC721(address(nft), 42, bob);
+        assertEq(nft.ownerOf(42), bob);
+    }
+
+    function test_ownerWithdrawERC1155_movesTokens() public {
+        vault = _deployEmptyVault();
+        MockERC1155 multi = new MockERC1155();
+        multi.mint(address(vault), 7, 1000);
+        vm.prank(owner);
+        vault.ownerWithdrawERC1155(address(multi), 7, 400, bob);
+        assertEq(multi.balanceOf(bob, 7), 400);
+        assertEq(multi.balanceOf(address(vault), 7), 600);
+    }
+
+    function test_ownerWithdrawNative_movesEth() public {
+        vault = _deployEmptyVault();
+        vm.deal(address(vault), 5 ether);
+        vm.prank(owner);
+        vault.ownerWithdrawNative(3 ether, payable(bob));
+        assertEq(bob.balance, 3 ether);
+        assertEq(address(vault).balance, 2 ether);
+    }
+
+    // ============ Receiver hook tests ============
+
+    function test_receiveERC721() public {
+        vault = _deployEmptyVault();
+        MockERC721 nft = new MockERC721();
+        nft.mint(address(vault), 99);
+        assertEq(nft.ownerOf(99), address(vault));
+    }
+
+    function test_receiveERC1155() public {
+        vault = _deployEmptyVault();
+        MockERC1155 multi = new MockERC1155();
+        multi.mint(address(vault), 1, 42);
+        assertEq(multi.balanceOf(address(vault), 1), 42);
+    }
+
+    function test_receiveNative() public {
+        vault = _deployEmptyVault();
+        vm.deal(bob, 1 ether);
+        vm.prank(bob);
+        (bool ok,) = address(vault).call{ value: 1 ether }("");
+        assertTrue(ok);
+        assertEq(address(vault).balance, 1 ether);
+    }
+
+    function test_supportsInterface() public {
+        vault = _deployEmptyVault();
+        assertTrue(vault.supportsInterface(0x01ffc9a7));
+        assertTrue(vault.supportsInterface(0x150b7a02));
+        assertTrue(vault.supportsInterface(0x4e2312e0));
+        assertFalse(vault.supportsInterface(0xdeadbeef));
     }
 }
