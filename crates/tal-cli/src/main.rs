@@ -17,6 +17,7 @@ mod monitor;
 mod onchain;
 mod sim;
 mod test_cmd;
+mod tokagent_packs;
 
 use clap::{Parser, Subcommand};
 
