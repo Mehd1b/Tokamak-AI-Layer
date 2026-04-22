@@ -90,9 +90,13 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     address public pendingOptimisticVaultCodeStore;
     uint256 public pendingOptimisticVaultCodeStoreActivatesAt;
 
-    /// @notice Storage gap for future upgrades. Reduced from 40 → 33 slots
-    ///         to accommodate the new state above.
-    uint256[33] private __gap;
+    /// @notice Contract whose runtime bytecode is TokagentVault creation code.
+    ///         One-time settable via setTokagentVaultCreationCodeStoreOnce.
+    address public _tokagentVaultCreationCodeStore;
+
+    /// @notice Storage gap for future upgrades. Reduced from 33 → 32 slots
+    ///         to accommodate the _tokagentVaultCreationCodeStore field.
+    uint256[32] private __gap;
 
     // ============ Errors ============
 
@@ -136,6 +140,9 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
 
     /// @notice Emitted when an ownership transfer is proposed.
     event OwnershipTransferProposed(address indexed currentOwner, address indexed proposedOwner);
+
+    /// @notice Emitted when the Tokagent vault creation code store is set.
+    event TokagentVaultCodeStoreSet(address indexed store);
 
     // ============ Modifiers ============
 
@@ -654,11 +661,17 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
         revert("not implemented");
     }
 
-    function setTokagentVaultCreationCodeStoreOnce(address) external {
-        revert("not implemented");
+    /// @inheritdoc IVaultFactory
+    function setTokagentVaultCreationCodeStoreOnce(address store) external onlyOwner {
+        require(store != address(0), "zero store");
+        require(_tokagentVaultCreationCodeStore == address(0), "already set");
+        require(store.code.length > 0, "no code at store");
+        _tokagentVaultCreationCodeStore = store;
+        emit TokagentVaultCodeStoreSet(store);
     }
 
+    /// @inheritdoc IVaultFactory
     function tokagentVaultCreationCodeStore() external view returns (address) {
-        revert("not implemented");
+        return _tokagentVaultCreationCodeStore;
     }
 }
