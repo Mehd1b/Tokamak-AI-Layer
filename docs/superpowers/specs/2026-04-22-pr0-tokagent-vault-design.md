@@ -31,6 +31,7 @@ This gives the user a cryptographic cap on what a compromised agent can do, with
 - UUPS upgrade of `VaultFactory` to v4: add `deployTokagentVault`, `computeTokagentVaultAddress`, `TokagentVaultDeployed` event
 - Test suite: `test/TokagentVault.t.sol`, `test/VaultFactoryTokagent.t.sol`, `test/TokagentVaultFuzz.t.sol`, `test/TokagentVaultFork.t.sol`
 - Deploy scripts: `script/deploy/DeployTokagentFactoryUpgrade.s.sol`, `script/deploy/DeployTokagentVaultTest.s.sol`
+- `tal-cli` extension: new `--kind tokagent` branch of the `Deploy` command that drives `deployTokagentVault` from the CLI
 - Factory upgrade executed on Ethereum, Polygon, HyperEVM mainnets
 - Test-deployed Tokagent vault on each chain verifying end-to-end
 
@@ -195,10 +196,10 @@ Three chains, same procedure (HyperEVM has extra gas constraints):
    - HyperEVM: `FOUNDRY_PROFILE=small`, link `OracleVerifier` + `KernelOutputParser` libraries
 3. Deploy v4 impl via `forge create`
    - HyperEVM: `--legacy --gas-limit 3000000`
-4. Call `upgradeToAndCall(v4_impl, "")` on the existing factory proxy
-   - Ethereum: `0x9cF9828Fd6253Df7C9497fd06Fa531E0CCc1d822`
-   - HyperEVM: `0xc7Fc0dD5f1B03E3De0C313eE0D3b06Cb2Dc017BB`
-   - Polygon: deploy fresh factory proxy if not already present (memory doesn't record one)
+4. Call `upgradeToAndCall(v4_impl, "")` on the existing factory proxy. Authoritative addresses from `sdk/src/addresses.ts`:
+   - Ethereum: `0x47E6EfFf516E8b899092ebEEF92fddCE579e9d39`
+   - HyperEVM (chain 999): `0xd27A7470a34903b7e215EA8d07d9cd2d21238F83`
+   - Polygon (chain 137): `0x0eDa0bCFBFc51Ab245F078AEFa3ee42cB384c865`
 5. Post-upgrade verification:
    - Read `factory.vaultCount()` before and after a test `deployTokagentVault` — should increment by 1
    - Read `factory.isDeployedVault(addr)` on the new vault — must be `true`
@@ -207,11 +208,13 @@ Three chains, same procedure (HyperEVM has extra gas constraints):
 
 Deploy scripts: `contracts/script/deploy/DeployTokagentFactoryUpgrade.s.sol` (parameterized by `CHAIN_ID`), `contracts/script/deploy/DeployTokagentVaultTest.s.sol`.
 
-PR 0 ships contract code + factory upgrade + test deploys only. No real user vaults until PR D (UI support).
+**CLI integration.** The existing `tal-cli` (`crates/tal-cli/`) already has a `Deploy` subcommand with `--optimistic` to deploy `OptimisticKernelVault` instead of `KernelVault`. PR 0 extends the same command with a `--kind tokagent` flag (or `--tokagent` shorthand) that calls `deployTokagentVault(operator, initialAllowlist, initialApprovals, salt)` against the upgraded factory. `--operator` / `--allowlist-pack` / `--salt` flags round out the CLI. Initial protocol pack IDs (e.g., `aave-v3-polygon`) resolve against a registry shipped alongside the CLI, avoiding hand-specified selectors.
+
+PR 0 ships contract code + factory upgrade + CLI extension + test deploys only. No real user vaults until PR D (UI support).
 
 ## Open questions (non-blocking)
 
-- **Polygon factory proxy:** memory records Ethereum and HyperEVM factory proxy addresses but not Polygon. Confirm whether one exists or PR 0 deploys a fresh proxy on Polygon.
+- **Arbitrum / Optimism support:** factories already exist on both (addresses in `sdk/src/addresses.ts`). Extending the upgrade to include them costs one extra `forge script` invocation per chain. Decision deferred to implementation — include if trivial, skip if it complicates the rollout.
 - **Operator rotation UX:** `ownerSetOperator` is a one-tx rotation. No timelock. Acceptable given the owner has already-more-powerful `ownerWithdraw*` — a compromised owner can drain funds regardless.
 - **Protocol pack versioning:** plugins may ship pack updates over time (e.g., Aave deploys new `Pool` after v3.1). Design assumes users re-curate their allowlist manually when a plugin updates a pack. UI hints this, but no on-chain versioning.
 
