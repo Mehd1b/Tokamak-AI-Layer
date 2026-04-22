@@ -303,4 +303,126 @@ contract TokagentVaultTest is Test {
         );
         vault.approveToken(address(token), address(target), 2e18);
     }
+
+    // ============ Owner function tests ============
+
+    function test_ownerSetOperator_rotates() public {
+        vault = _deployEmptyVault();
+        address newOp = makeAddr("newOp");
+        vm.prank(owner);
+        vault.ownerSetOperator(newOp);
+        assertEq(vault.operator(), newOp);
+        TokagentVault.Call[] memory calls = new TokagentVault.Call[](0);
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(TokagentVault.NotOperator.selector, operator));
+        vault.executeBatch(calls);
+    }
+
+    function test_ownerSetOperator_rejectsZero() public {
+        vault = _deployEmptyVault();
+        vm.prank(owner);
+        vm.expectRevert(TokagentVault.ZeroAddress.selector);
+        vault.ownerSetOperator(address(0));
+    }
+
+    function test_ownerSetOperator_notOwnerReverts() public {
+        vault = _deployEmptyVault();
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(TokagentVault.NotOwner.selector, bob));
+        vault.ownerSetOperator(bob);
+    }
+
+    function test_ownerSetAllowlist_addsEntry() public {
+        vault = _deployEmptyVault();
+        vm.prank(owner);
+        vault.ownerSetAllowlist(address(target), SET_VALUE, true);
+        assertTrue(vault.isAllowlisted(address(target), SET_VALUE));
+        assertEq(vault.allowlistedSelectorCount(address(target)), 1);
+    }
+
+    function test_ownerSetAllowlist_removesEntry() public {
+        vault = _deployWithTargetAllowlisted();
+        vm.prank(owner);
+        vault.ownerSetAllowlist(address(target), SET_VALUE, false);
+        assertFalse(vault.isAllowlisted(address(target), SET_VALUE));
+        assertEq(vault.allowlistedSelectorCount(address(target)), 1);
+    }
+
+    function test_ownerSetAllowlist_idempotent() public {
+        vault = _deployEmptyVault();
+        vm.startPrank(owner);
+        vault.ownerSetAllowlist(address(target), SET_VALUE, true);
+        vault.ownerSetAllowlist(address(target), SET_VALUE, true);
+        vault.ownerSetAllowlist(address(target), SET_VALUE, true);
+        vm.stopPrank();
+        assertEq(vault.allowlistedSelectorCount(address(target)), 1);
+    }
+
+    function test_ownerSetAllowlistBatch_multipleEntries() public {
+        vault = _deployEmptyVault();
+        TokagentVault.Entry[] memory entries = new TokagentVault.Entry[](3);
+        entries[0] = TokagentVault.Entry({ target: address(target), selector: SET_VALUE });
+        entries[1] = TokagentVault.Entry({ target: address(target), selector: PAYABLE_NOOP });
+        entries[2] = TokagentVault.Entry({ target: address(token), selector: IERC20.transfer.selector });
+        bool[] memory allowed = new bool[](3);
+        allowed[0] = true;
+        allowed[1] = true;
+        allowed[2] = true;
+        vm.prank(owner);
+        vault.ownerSetAllowlistBatch(entries, allowed);
+        assertTrue(vault.isAllowlisted(address(target), SET_VALUE));
+        assertTrue(vault.isAllowlisted(address(target), PAYABLE_NOOP));
+        assertTrue(vault.isAllowlisted(address(token), IERC20.transfer.selector));
+        assertEq(vault.allowlistedSelectorCount(address(target)), 2);
+        assertEq(vault.allowlistedSelectorCount(address(token)), 1);
+    }
+
+    function test_ownerSetAllowlistBatch_lengthMismatchReverts() public {
+        vault = _deployEmptyVault();
+        TokagentVault.Entry[] memory entries = new TokagentVault.Entry[](2);
+        entries[0] = TokagentVault.Entry({ target: address(target), selector: SET_VALUE });
+        entries[1] = TokagentVault.Entry({ target: address(target), selector: PAYABLE_NOOP });
+        bool[] memory allowed = new bool[](1);
+        allowed[0] = true;
+        vm.prank(owner);
+        vm.expectRevert("length mismatch");
+        vault.ownerSetAllowlistBatch(entries, allowed);
+    }
+
+    // ============ Ownership two-step tests ============
+
+    function test_transferOwnership_proposesButDoesNotChange() public {
+        vault = _deployEmptyVault();
+        vm.prank(owner);
+        vault.transferOwnership(bob);
+        assertEq(vault.owner(), owner);
+        assertEq(vault.pendingOwner(), bob);
+    }
+
+    function test_acceptOwnership_completesTransfer() public {
+        vault = _deployEmptyVault();
+        vm.prank(owner);
+        vault.transferOwnership(bob);
+        vm.prank(bob);
+        vault.acceptOwnership();
+        assertEq(vault.owner(), bob);
+        assertEq(vault.pendingOwner(), address(0));
+    }
+
+    function test_acceptOwnership_notPendingOwnerReverts() public {
+        vault = _deployEmptyVault();
+        vm.prank(owner);
+        vault.transferOwnership(bob);
+        address carol = makeAddr("carol");
+        vm.prank(carol);
+        vm.expectRevert(abi.encodeWithSelector(TokagentVault.NotPendingOwner.selector, carol, bob));
+        vault.acceptOwnership();
+    }
+
+    function test_acceptOwnership_noProposalReverts() public {
+        vault = _deployEmptyVault();
+        vm.prank(bob);
+        vm.expectRevert(TokagentVault.NoPendingOwner.selector);
+        vault.acceptOwnership();
+    }
 }
