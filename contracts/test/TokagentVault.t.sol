@@ -145,4 +145,120 @@ contract TokagentVaultTest is Test {
         vault = new TokagentVault(owner, operator, entries, approvals);
         assertEq(vault.allowlistedSelectorCount(address(target)), 1);
     }
+
+    // ============ executeBatch allowlist tests ============
+
+    function test_executeBatch_allowlistedCallSucceeds() public {
+        vault = _deployWithTargetAllowlisted();
+        TokagentVault.Call[] memory calls = new TokagentVault.Call[](1);
+        calls[0] = TokagentVault.Call({
+            target: address(target),
+            data: abi.encodeWithSelector(SET_VALUE, 42),
+            value: 0
+        });
+        vm.prank(operator);
+        vault.executeBatch(calls);
+        assertEq(target.value(), 42);
+    }
+
+    function test_executeBatch_unallowlistedCallReverts() public {
+        vault = _deployWithTargetAllowlisted();
+        TokagentVault.Call[] memory calls = new TokagentVault.Call[](1);
+        calls[0] = TokagentVault.Call({
+            target: address(target),
+            data: abi.encodeWithSelector(WILL_REVERT),
+            value: 0
+        });
+        vm.prank(operator);
+        vm.expectRevert(
+            abi.encodeWithSelector(TokagentVault.CallNotAllowlisted.selector, address(target), WILL_REVERT)
+        );
+        vault.executeBatch(calls);
+    }
+
+    function test_executeBatch_notOperatorReverts() public {
+        vault = _deployWithTargetAllowlisted();
+        TokagentVault.Call[] memory calls = new TokagentVault.Call[](1);
+        calls[0] = TokagentVault.Call({
+            target: address(target),
+            data: abi.encodeWithSelector(SET_VALUE, 42),
+            value: 0
+        });
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(TokagentVault.NotOperator.selector, bob));
+        vault.executeBatch(calls);
+    }
+
+    function test_executeBatch_ownerCannotCallAsOperator() public {
+        vault = _deployWithTargetAllowlisted();
+        TokagentVault.Call[] memory calls = new TokagentVault.Call[](1);
+        calls[0] = TokagentVault.Call({
+            target: address(target),
+            data: abi.encodeWithSelector(SET_VALUE, 42),
+            value: 0
+        });
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(TokagentVault.NotOperator.selector, owner));
+        vault.executeBatch(calls);
+    }
+
+    function test_executeBatch_oneCallRevertsWholeBatch() public {
+        vault = _deployWithTargetAllowlisted();
+        TokagentVault.Call[] memory calls = new TokagentVault.Call[](2);
+        calls[0] = TokagentVault.Call({
+            target: address(target),
+            data: abi.encodeWithSelector(SET_VALUE, 1),
+            value: 0
+        });
+        calls[1] = TokagentVault.Call({
+            target: address(target),
+            data: abi.encodeWithSelector(WILL_REVERT),
+            value: 0
+        });
+        vm.prank(operator);
+        vm.expectRevert(
+            abi.encodeWithSelector(TokagentVault.CallNotAllowlisted.selector, address(target), WILL_REVERT)
+        );
+        vault.executeBatch(calls);
+        assertEq(target.value(), 0);
+    }
+
+    function test_executeBatch_passesValueToCall() public {
+        vault = _deployWithTargetAllowlisted();
+        vm.deal(address(vault), 1 ether);
+        TokagentVault.Call[] memory calls = new TokagentVault.Call[](1);
+        calls[0] = TokagentVault.Call({
+            target: address(target),
+            data: abi.encodeWithSelector(PAYABLE_NOOP),
+            value: 0.5 ether
+        });
+        vm.prank(operator);
+        vault.executeBatch(calls);
+        assertEq(address(target).balance, 0.5 ether);
+    }
+
+    function test_executeBatch_rejectsShortData() public {
+        vault = _deployWithTargetAllowlisted();
+        TokagentVault.Call[] memory calls = new TokagentVault.Call[](1);
+        calls[0] = TokagentVault.Call({ target: address(target), data: hex"010203", value: 0 });
+        vm.prank(operator);
+        vm.expectRevert(TokagentVault.DataTooShort.selector);
+        vault.executeBatch(calls);
+    }
+
+    function test_executeBatch_targetRevertBubbles() public {
+        TokagentVault.Entry[] memory entries = new TokagentVault.Entry[](1);
+        entries[0] = TokagentVault.Entry({ target: address(target), selector: WILL_REVERT });
+        TokagentVault.ApprovalSpec[] memory approvals = new TokagentVault.ApprovalSpec[](0);
+        vault = new TokagentVault(owner, operator, entries, approvals);
+        TokagentVault.Call[] memory calls = new TokagentVault.Call[](1);
+        calls[0] = TokagentVault.Call({
+            target: address(target),
+            data: abi.encodeWithSelector(WILL_REVERT),
+            value: 0
+        });
+        vm.prank(operator);
+        vm.expectPartialRevert(TokagentVault.CallFailed.selector);
+        vault.executeBatch(calls);
+    }
 }
