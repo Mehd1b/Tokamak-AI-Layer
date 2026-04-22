@@ -544,4 +544,38 @@ contract TokagentVaultTest is Test {
         assertTrue(vault.supportsInterface(0x4e2312e0));
         assertFalse(vault.supportsInterface(0xdeadbeef));
     }
+
+    // ============ Emergency-exit scenario test ============
+
+    function test_emergencyExit_ownerRecoversAfterOperatorCompromise() public {
+        vault = _deployWithTargetAllowlisted();
+        token.mint(address(vault), 500e18);
+        vm.deal(address(vault), 2 ether);
+
+        TokagentVault.Call[] memory benign = new TokagentVault.Call[](1);
+        benign[0] = TokagentVault.Call({
+            target: address(target),
+            data: abi.encodeWithSelector(SET_VALUE, 123),
+            value: 0
+        });
+        vm.prank(operator);
+        vault.executeBatch(benign);
+        assertEq(token.balanceOf(address(vault)), 500e18);
+        assertEq(address(vault).balance, 2 ether);
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(TokagentVault.NotOwner.selector, operator));
+        vault.ownerSetAllowlist(address(token), IERC20.transfer.selector, true);
+
+        vm.startPrank(owner);
+        vault.ownerSetOperator(bob);
+        vault.ownerWithdrawERC20(address(token), 500e18, owner);
+        vault.ownerWithdrawNative(2 ether, payable(owner));
+        vm.stopPrank();
+
+        assertEq(token.balanceOf(owner), 500e18);
+        assertEq(owner.balance, 2 ether);
+        assertEq(token.balanceOf(address(vault)), 0);
+        assertEq(address(vault).balance, 0);
+    }
 }
