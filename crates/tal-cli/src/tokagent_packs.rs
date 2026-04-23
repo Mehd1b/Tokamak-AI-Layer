@@ -67,9 +67,44 @@ static POLYGON_AAVE_V3: ProtocolPack = ProtocolPack {
     approvals: POLYGON_AAVE_V3_APPROVALS,
 };
 
-/// All packs registered in the CLI. PR 0 ships only the Aave pack; Polymarket and Hyperliquid
-/// packs are added in PR E (real SDK wiring per plugin).
-pub static PACKS: &[&ProtocolPack] = &[&POLYGON_AAVE_V3];
+// ─── Hyperliquid Perps on HyperEVM (chain 999) ──────────────────────────────
+//
+// Allowlisted functions on TokagentHyperEvmHelper:
+//   bridgeHype(uint256)       => 0xf4e0b185
+//   dispatchCoreWriter(bytes) => 0xa62c829a
+//
+// NOTE: HYPERLIQUID_HELPER_HYPEREVM is a placeholder (zero address). Deploy
+// TokagentHyperEvmHelper.s.sol on HyperEVM, then update this address and
+// re-publish the CLI. Until updated, the pack is valid for pack-listing
+// but the zero target cannot be called.
+//
+// Selectors verified against: cast sig "bridgeHype(uint256)" => 0xf4e0b185
+//                             cast sig "dispatchCoreWriter(bytes)" => 0xa62c829a
+const HYPERLIQUID_HELPER_HYPEREVM: Address = address!("0000000000000000000000000000000000000000");
+
+static HYPEREVM_HL_PERPS_ENTRIES: &[PackEntry] = &[
+    PackEntry {
+        target: HYPERLIQUID_HELPER_HYPEREVM,
+        selector: fixed_bytes!("f4e0b185"),
+        label: "Helper.bridgeHype",
+    },
+    PackEntry {
+        target: HYPERLIQUID_HELPER_HYPEREVM,
+        selector: fixed_bytes!("a62c829a"),
+        label: "Helper.dispatchCoreWriter",
+    },
+];
+
+static HYPEREVM_HL_PERPS: ProtocolPack = ProtocolPack {
+    id: "hyperliquid-perps-hyperevm",
+    chain_id: 999,
+    display_name: "Hyperliquid Perps (HyperEVM)",
+    entries: HYPEREVM_HL_PERPS_ENTRIES,
+    approvals: &[],
+};
+
+/// All packs registered in the CLI.
+pub static PACKS: &[&ProtocolPack] = &[&POLYGON_AAVE_V3, &HYPEREVM_HL_PERPS];
 
 pub fn find_pack(id: &str, chain_id: u64) -> Option<&'static ProtocolPack> {
     PACKS.iter().copied().find(|p| p.id == id && p.chain_id == chain_id)
