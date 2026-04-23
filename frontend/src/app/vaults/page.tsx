@@ -51,7 +51,7 @@ function filterChipColors(key: ProtocolFilter, active: boolean): string {
     case 'generic':
       return 'bg-gray-500/15 text-gray-300 shadow-sm';
     default:
-      return 'bg-[#A855F7]/15 text-[#C084FC] shadow-sm';
+      return 'bg-[#c4f547]/15 text-[#d5f972] shadow-sm';
   }
 }
 
@@ -407,9 +407,9 @@ export default function VaultsPage() {
       {/* Header — editorial layout */}
       <div className="mb-10">
         <div className="flex items-center gap-3 mb-5">
-          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#A855F7] to-transparent" />
+          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#c4f547] to-transparent" />
           <span
-            className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C084FC] font-mono"
+            className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d5f972] font-mono"
           >
             Vault Factory
           </span>
@@ -418,7 +418,7 @@ export default function VaultsPage() {
           className="text-4xl md:text-5xl font-light mb-3 tracking-tight"
           style={{ fontFamily: 'var(--font-serif), serif' }}
         >
-          <span className="italic text-[#A855F7]">Execution</span>{' '}
+          <span className="italic text-[#c4f547]">Execution</span>{' '}
           <span className="text-white">Vaults</span>
         </h1>
         <p className="text-gray-500 max-w-lg text-sm leading-relaxed font-mono">
@@ -604,7 +604,7 @@ export default function VaultsPage() {
                         onClick={() => setSortBy(opt.key)}
                         className={`px-2.5 py-1.5 min-h-[44px] sm:min-h-0 sm:py-1 rounded-md text-[11px] font-mono transition-all duration-200 whitespace-nowrap ${
                           sortBy === opt.key
-                            ? 'bg-[#A855F7]/15 text-[#C084FC] shadow-sm'
+                            ? 'bg-[#c4f547]/15 text-[#d5f972] shadow-sm'
                             : 'text-gray-500 hover:text-gray-300'
                         }`}
                       >
@@ -728,7 +728,7 @@ export default function VaultsPage() {
               <p className="text-gray-600 text-xs font-mono mb-4">Try adjusting the protocol type or strategy filter.</p>
               <button
                 onClick={() => { setProtocolFilter('all'); setStrategyFilter(null); }}
-                className="text-[11px] font-mono text-[#C084FC] hover:text-[#A855F7] transition-colors"
+                className="text-[11px] font-mono text-[#d5f972] hover:text-[#c4f547] transition-colors"
               >
                 Clear all filters
               </button>
@@ -739,8 +739,8 @@ export default function VaultsPage() {
           {filteredAndSorted && filteredAndSorted.length === 0 && (!deployedVaults || deployedVaults.length === 0) && !isLoadingVaults && (
             <div className="rounded-2xl border border-white/5 bg-[#12121a]/80 text-center py-20">
               <div className="mb-6">
-                <div className="w-16 h-16 mx-auto rounded-2xl bg-[#A855F7]/5 border border-[#A855F7]/10 flex items-center justify-center">
-                  <svg viewBox="0 0 24 24" className="w-7 h-7 text-[#A855F7]/40" fill="none" stroke="currentColor" strokeWidth="1">
+                <div className="w-16 h-16 mx-auto rounded-2xl bg-[#c4f547]/5 border border-[#c4f547]/10 flex items-center justify-center">
+                  <svg viewBox="0 0 24 24" className="w-7 h-7 text-[#c4f547]/40" fill="none" stroke="currentColor" strokeWidth="1">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375" />
                   </svg>
                 </div>

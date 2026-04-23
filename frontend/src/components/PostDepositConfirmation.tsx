@@ -47,7 +47,7 @@ export function PostDepositConfirmation({
           href={`${explorerUrl}/tx/${txHash}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+          className="text-xs text-lime-400 hover:text-lime-300 transition-colors"
         >
           View transaction
         </a>

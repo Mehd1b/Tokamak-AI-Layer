@@ -26,7 +26,7 @@ export function AgentCard({ agentId, author, imageId, exists, index = 0 }: Agent
           transition-all duration-500 ease-out
           hover:-translate-y-1
           ${exists
-            ? 'border-white/10 hover:border-[#A855F7]/30 group-hover:shadow-[0_0_30px_rgba(168,85,247,0.12)]'
+            ? 'border-white/10 hover:border-[#c4f547]/30 group-hover:shadow-[0_0_30px_rgba(196,245,71,0.12)]'
             : 'border-white/5 hover:border-white/15 opacity-60'
           }
           vault-card-enter
@@ -36,7 +36,7 @@ export function AgentCard({ agentId, author, imageId, exists, index = 0 }: Agent
         {/* Subtle top-edge gradient */}
         <div
           className="absolute top-0 left-0 right-0 h-px opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-          style={{ background: 'linear-gradient(90deg, transparent, #A855F7, transparent)' }}
+          style={{ background: 'linear-gradient(90deg, transparent, #c4f547, transparent)' }}
         />
 
         {/* Row 1: Visual identity + badges */}
@@ -69,7 +69,7 @@ export function AgentCard({ agentId, author, imageId, exists, index = 0 }: Agent
             Agent ID
           </p>
           <p
-            className="text-sm font-medium text-[#C084FC] font-mono truncate group-hover:text-white transition-colors duration-300"
+            className="text-sm font-medium text-[#d5f972] font-mono truncate group-hover:text-white transition-colors duration-300"
           >
             {truncateBytes32(agentId, 10)}
           </p>

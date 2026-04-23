@@ -133,9 +133,9 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-mono font-medium transition-all duration-300 ${
                 isActive
-                  ? 'bg-[#A855F7]/20 text-[#C084FC] border border-[#A855F7]/40'
+                  ? 'bg-[#c4f547]/20 text-[#d5f972] border border-[#c4f547]/40'
                   : isCompleted
-                    ? 'bg-[#A855F7]/10 text-[#C084FC]/60 border border-[#A855F7]/20'
+                    ? 'bg-[#c4f547]/10 text-[#d5f972]/60 border border-[#c4f547]/20'
                     : 'bg-white/[0.02] text-gray-600 border border-white/5'
               }`}
             >
@@ -149,7 +149,7 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
             </div>
             {stepNum < total && (
               <div className={`w-8 h-px transition-colors duration-300 ${
-                isCompleted ? 'bg-[#A855F7]/30' : 'bg-white/5'
+                isCompleted ? 'bg-[#c4f547]/30' : 'bg-white/5'
               }`} />
             )}
           </div>
@@ -178,7 +178,7 @@ function StepAsset({
         className="text-2xl md:text-3xl font-light mb-2 tracking-tight"
         style={{ fontFamily: 'var(--font-serif), serif' }}
       >
-        What asset do you want to <span className="italic text-[#A855F7]">deposit</span>?
+        What asset do you want to <span className="italic text-[#c4f547]">deposit</span>?
       </h2>
       <p className="text-gray-500 text-sm font-mono mb-8">
         Choose the asset you want to put to work.
@@ -193,11 +193,11 @@ function StepAsset({
               onClick={() => onSelect(asset.key)}
               className={`relative rounded-xl border p-5 text-left transition-all duration-300 group ${
                 isSelected
-                  ? 'border-[#A855F7]/40 bg-[#A855F7]/5'
+                  ? 'border-[#c4f547]/40 bg-[#c4f547]/5'
                   : 'border-white/5 bg-[#12121a]/80 hover:border-white/10 hover:bg-white/[0.02]'
               }`}
             >
-              <div className={`text-2xl mb-3 ${isSelected ? 'text-[#C084FC]' : 'text-gray-500 group-hover:text-gray-400'} transition-colors`}>
+              <div className={`text-2xl mb-3 ${isSelected ? 'text-[#d5f972]' : 'text-gray-500 group-hover:text-gray-400'} transition-colors`}>
                 {asset.icon}
               </div>
               <p className={`text-sm font-mono font-medium ${isSelected ? 'text-white' : 'text-gray-400'} transition-colors`}>
@@ -205,7 +205,7 @@ function StepAsset({
               </p>
               {isSelected && (
                 <div className="absolute top-3 right-3">
-                  <svg className="w-4 h-4 text-[#A855F7]" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="w-4 h-4 text-[#c4f547]" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
                 </div>
@@ -217,7 +217,7 @@ function StepAsset({
 
       <button
         onClick={onNext}
-        className="px-6 py-2.5 rounded-lg bg-[#A855F7]/10 border border-[#A855F7]/20 text-sm font-mono text-[#C084FC] hover:bg-[#A855F7]/20 hover:border-[#A855F7]/40 transition-all"
+        className="px-6 py-2.5 rounded-lg bg-[#c4f547]/10 border border-[#c4f547]/20 text-sm font-mono text-[#d5f972] hover:bg-[#c4f547]/20 hover:border-[#c4f547]/40 transition-all"
       >
         Continue
       </button>
@@ -250,7 +250,7 @@ function StepApy({
         className="text-2xl md:text-3xl font-light mb-2 tracking-tight"
         style={{ fontFamily: 'var(--font-serif), serif' }}
       >
-        What&apos;s your <span className="italic text-[#A855F7]">target return</span>?
+        What&apos;s your <span className="italic text-[#c4f547]">target return</span>?
       </h2>
       <p className="text-gray-500 text-sm font-mono mb-8">
         Set your desired annualized yield. Higher targets come with higher risk.
@@ -285,17 +285,17 @@ function StepApy({
               [&::-webkit-slider-thumb]:w-5
               [&::-webkit-slider-thumb]:h-5
               [&::-webkit-slider-thumb]:rounded-full
-              [&::-webkit-slider-thumb]:bg-[#A855F7]
+              [&::-webkit-slider-thumb]:bg-[#c4f547]
               [&::-webkit-slider-thumb]:border-2
-              [&::-webkit-slider-thumb]:border-[#C084FC]
-              [&::-webkit-slider-thumb]:shadow-[0_0_10px_rgba(168,85,247,0.4)]
+              [&::-webkit-slider-thumb]:border-[#d5f972]
+              [&::-webkit-slider-thumb]:shadow-[0_0_10px_rgba(196,245,71,0.4)]
               [&::-webkit-slider-thumb]:cursor-pointer
               [&::-moz-range-thumb]:w-5
               [&::-moz-range-thumb]:h-5
               [&::-moz-range-thumb]:rounded-full
-              [&::-moz-range-thumb]:bg-[#A855F7]
+              [&::-moz-range-thumb]:bg-[#c4f547]
               [&::-moz-range-thumb]:border-2
-              [&::-moz-range-thumb]:border-[#C084FC]
+              [&::-moz-range-thumb]:border-[#d5f972]
               [&::-moz-range-thumb]:cursor-pointer"
           />
           <div className="flex justify-between text-[10px] font-mono text-gray-600 mt-2">
@@ -326,7 +326,7 @@ function StepApy({
         </button>
         <button
           onClick={onNext}
-          className="px-6 py-2.5 rounded-lg bg-[#A855F7]/10 border border-[#A855F7]/20 text-sm font-mono text-[#C084FC] hover:bg-[#A855F7]/20 hover:border-[#A855F7]/40 transition-all"
+          className="px-6 py-2.5 rounded-lg bg-[#c4f547]/10 border border-[#c4f547]/20 text-sm font-mono text-[#d5f972] hover:bg-[#c4f547]/20 hover:border-[#c4f547]/40 transition-all"
         >
           Continue
         </button>
@@ -356,7 +356,7 @@ function StepRisk({
         className="text-2xl md:text-3xl font-light mb-2 tracking-tight"
         style={{ fontFamily: 'var(--font-serif), serif' }}
       >
-        What&apos;s your <span className="italic text-[#A855F7]">risk tolerance</span>?
+        What&apos;s your <span className="italic text-[#c4f547]">risk tolerance</span>?
       </h2>
       <p className="text-gray-500 text-sm font-mono mb-8">
         This determines how we filter vaults by drawdown history.
@@ -402,7 +402,7 @@ function StepRisk({
         </button>
         <button
           onClick={onNext}
-          className="px-6 py-2.5 rounded-lg bg-[#A855F7]/10 border border-[#A855F7]/20 text-sm font-mono text-[#C084FC] hover:bg-[#A855F7]/20 hover:border-[#A855F7]/40 transition-all"
+          className="px-6 py-2.5 rounded-lg bg-[#c4f547]/10 border border-[#c4f547]/20 text-sm font-mono text-[#d5f972] hover:bg-[#c4f547]/20 hover:border-[#c4f547]/40 transition-all"
         >
           Continue
         </button>
@@ -434,7 +434,7 @@ function StepStrategy({
         className="text-2xl md:text-3xl font-light mb-2 tracking-tight"
         style={{ fontFamily: 'var(--font-serif), serif' }}
       >
-        Strategy <span className="italic text-[#A855F7]">preference</span>?
+        Strategy <span className="italic text-[#c4f547]">preference</span>?
       </h2>
       <p className="text-gray-500 text-sm font-mono mb-8">
         Optional — select the types of strategies you are interested in, or choose &quot;Any&quot;.
@@ -453,7 +453,7 @@ function StepStrategy({
               onClick={() => onToggle(strategy.key)}
               className={`relative rounded-xl border p-5 text-left transition-all duration-300 ${
                 isSelected
-                  ? 'border-[#A855F7]/40 bg-[#A855F7]/5'
+                  ? 'border-[#c4f547]/40 bg-[#c4f547]/5'
                   : dimmed
                     ? 'border-white/5 bg-[#12121a]/40 opacity-50'
                     : 'border-white/5 bg-[#12121a]/80 hover:border-white/10 hover:bg-white/[0.02]'
@@ -464,7 +464,7 @@ function StepStrategy({
               </p>
               {isSelected && (
                 <div className="absolute top-3 right-3">
-                  <svg className="w-4 h-4 text-[#A855F7]" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="w-4 h-4 text-[#c4f547]" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
                 </div>
@@ -484,7 +484,7 @@ function StepStrategy({
         <button
           onClick={onSearch}
           disabled={isLoading}
-          className="px-6 py-2.5 rounded-lg bg-[#A855F7]/15 border border-[#A855F7]/30 text-sm font-mono text-[#C084FC] hover:bg-[#A855F7]/25 hover:border-[#A855F7]/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className="px-6 py-2.5 rounded-lg bg-[#c4f547]/15 border border-[#c4f547]/30 text-sm font-mono text-[#d5f972] hover:bg-[#c4f547]/25 hover:border-[#c4f547]/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
           {isLoading ? (
             <>
@@ -551,7 +551,7 @@ function StepResults({
           <p className="text-red-400 text-sm font-mono mb-4">{error}</p>
           <button
             onClick={onScanAgain}
-            className="text-[11px] font-mono text-[#C084FC] hover:text-[#A855F7] transition-colors"
+            className="text-[11px] font-mono text-[#d5f972] hover:text-[#c4f547] transition-colors"
           >
             Try again
           </button>
@@ -568,7 +568,7 @@ function StepResults({
             className="text-2xl md:text-3xl font-light mb-1 tracking-tight"
             style={{ fontFamily: 'var(--font-serif), serif' }}
           >
-            <span className="italic text-[#A855F7]">Matched</span>{' '}
+            <span className="italic text-[#c4f547]">Matched</span>{' '}
             <span className="text-white">Vaults</span>
           </h2>
           <p className="text-xs font-mono text-gray-500">
@@ -609,7 +609,7 @@ function StepResults({
           </p>
           <button
             onClick={onScanAgain}
-            className="text-[11px] font-mono text-[#C084FC] hover:text-[#A855F7] transition-colors"
+            className="text-[11px] font-mono text-[#d5f972] hover:text-[#c4f547] transition-colors"
           >
             Adjust preferences
           </button>
@@ -619,7 +619,7 @@ function StepResults({
           {matches.map((match, i) => (
             <div
               key={`${match.vaultAddress}-${match.chainId}`}
-              className="relative overflow-hidden rounded-2xl border border-white/5 bg-[#12121a]/80 backdrop-blur-sm p-5 group transition-all duration-500 ease-out hover:border-[#A855F7]/20 vault-card-enter"
+              className="relative overflow-hidden rounded-2xl border border-white/5 bg-[#12121a]/80 backdrop-blur-sm p-5 group transition-all duration-500 ease-out hover:border-[#c4f547]/20 vault-card-enter"
               style={{ animationDelay: `${i * 80}ms` }}
             >
               <div className="flex items-start gap-5">
@@ -694,7 +694,7 @@ function StepResults({
                 <div className="shrink-0 self-center">
                   <Link
                     href={`/vaults/${match.vaultAddress}`}
-                    className="px-5 py-2.5 rounded-lg bg-[#A855F7]/10 border border-[#A855F7]/20 text-xs font-mono text-[#C084FC] hover:bg-[#A855F7]/20 hover:border-[#A855F7]/40 transition-all inline-flex items-center gap-2"
+                    className="px-5 py-2.5 rounded-lg bg-[#c4f547]/10 border border-[#c4f547]/20 text-xs font-mono text-[#d5f972] hover:bg-[#c4f547]/20 hover:border-[#c4f547]/40 transition-all inline-flex items-center gap-2"
                   >
                     Deposit
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -762,8 +762,8 @@ export default function MarketplacePage() {
       {/* Header */}
       <div className="mb-10">
         <div className="flex items-center gap-3 mb-5">
-          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#A855F7] to-transparent" />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C084FC] font-mono">
+          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#c4f547] to-transparent" />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d5f972] font-mono">
             Intent Matching
           </span>
         </div>
@@ -771,7 +771,7 @@ export default function MarketplacePage() {
           className="text-4xl md:text-5xl font-light mb-3 tracking-tight"
           style={{ fontFamily: 'var(--font-serif), serif' }}
         >
-          <span className="italic text-[#A855F7]">Find</span>{' '}
+          <span className="italic text-[#c4f547]">Find</span>{' '}
           <span className="text-white">Your Vault</span>
         </h1>
         <p className="text-gray-500 max-w-lg text-sm leading-relaxed font-mono">
@@ -833,7 +833,7 @@ export default function MarketplacePage() {
       {/* Loading overlay on results step */}
       {isLoading && step === 5 && (
         <div className="flex flex-col items-center justify-center py-20">
-          <svg className="w-10 h-10 animate-spin text-[#A855F7]/40 mb-4" viewBox="0 0 24 24" fill="none">
+          <svg className="w-10 h-10 animate-spin text-[#c4f547]/40 mb-4" viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" className="opacity-20" />
             <path d="M12 2a10 10 0 019.95 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>

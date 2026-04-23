@@ -32,10 +32,10 @@ export function ConnectWalletButton() {
                 return (
                   <button
                     onClick={openConnectModal}
-                    className="group relative overflow-hidden rounded-full px-5 py-2.5 text-sm font-medium text-[#A855F7] transition-all duration-300 hover:shadow-[0_0_20px_rgba(168,85,247,0.3)]"
+                    className="group relative overflow-hidden rounded-full px-5 py-2.5 text-sm font-medium text-[#c4f547] transition-all duration-300 hover:shadow-[0_0_20px_rgba(196,245,71,0.3)]"
                     style={{
                       fontFamily: 'var(--font-mono), monospace',
-                      background: 'linear-gradient(#0a0a0f, #0a0a0f) padding-box, linear-gradient(135deg, #A855F7, #7C3AED, transparent, #A855F7) border-box',
+                      background: 'linear-gradient(#0a0a0f, #0a0a0f) padding-box, linear-gradient(135deg, #c4f547, #8ab81d, transparent, #c4f547) border-box',
                       border: '1px solid transparent',
                     }}
                   >
@@ -44,7 +44,7 @@ export function ConnectWalletButton() {
                       className="absolute inset-[1px] rounded-full opacity-40 pointer-events-none"
                       style={{
                         backgroundImage:
-                          'linear-gradient(to right, rgba(168,85,247,0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(168,85,247,0.1) 1px, transparent 1px)',
+                          'linear-gradient(to right, rgba(196,245,71,0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(196,245,71,0.1) 1px, transparent 1px)',
                         backgroundSize: '6px 6px',
                         maskImage: 'radial-gradient(ellipse 80% 80% at center, black 20%, transparent 70%)',
                         WebkitMaskImage: 'radial-gradient(ellipse 80% 80% at center, black 20%, transparent 70%)',
@@ -78,17 +78,17 @@ export function ConnectWalletButton() {
                   {/* Account button */}
                   <button
                     onClick={openAccountModal}
-                    className="group relative overflow-hidden flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 hover:shadow-[0_0_15px_rgba(168,85,247,0.2)]"
+                    className="group relative overflow-hidden flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 hover:shadow-[0_0_15px_rgba(196,245,71,0.2)]"
                     style={{
                       fontFamily: 'var(--font-mono), monospace',
-                      background: 'linear-gradient(#0a0a0f, #0a0a0f) padding-box, linear-gradient(135deg, rgba(168,85,247,0.4), transparent, rgba(168,85,247,0.4)) border-box',
-                      border: '1px solid rgba(168,85,247,0.3)',
+                      background: 'linear-gradient(#0a0a0f, #0a0a0f) padding-box, linear-gradient(135deg, rgba(196,245,71,0.4), transparent, rgba(196,245,71,0.4)) border-box',
+                      border: '1px solid rgba(196,245,71,0.3)',
                     }}
                   >
                     {/* Subtle pulse dot */}
                     <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#A855F7] opacity-40" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-[#A855F7]" />
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#c4f547] opacity-40" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-[#c4f547]" />
                     </span>
                     <span className="text-white tracking-wider">
                       {account.displayName}

@@ -43,11 +43,11 @@ function ReferralLeaderboard({
         <div
           className="w-10 h-10 rounded-lg flex items-center justify-center"
           style={{
-            background: 'rgba(168, 85, 247, 0.08)',
-            border: '1px solid rgba(168, 85, 247, 0.15)',
+            background: 'rgba(196, 245, 71, 0.08)',
+            border: '1px solid rgba(196, 245, 71, 0.15)',
           }}
         >
-          <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#A855F7]" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#c4f547]" fill="none" stroke="currentColor" strokeWidth="1.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 01-.982-3.172M9.497 14.25a7.454 7.454 0 00.981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 007.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M18.75 4.236c.982.143 1.954.317 2.916.52A6.003 6.003 0 0016.27 9.728M18.75 4.236V4.5c0 2.108-.966 3.99-2.48 5.228m0 0a6.023 6.023 0 01-3.52 1.272 6.023 6.023 0 01-3.52-1.272" />
           </svg>
         </div>
@@ -56,7 +56,7 @@ function ReferralLeaderboard({
             Top Referrers
           </h2>
           {userRank >= 0 && (
-            <span className="text-xs font-mono text-[#C084FC]">Your rank: #{userRank + 1}</span>
+            <span className="text-xs font-mono text-[#d5f972]">Your rank: #{userRank + 1}</span>
           )}
         </div>
       </div>
@@ -91,7 +91,7 @@ function ReferralLeaderboard({
                 return (
                   <tr
                     key={entry.address}
-                    className={`border-b border-white/5 last:border-0 ${isUser ? 'bg-[#A855F7]/5' : ''}`}
+                    className={`border-b border-white/5 last:border-0 ${isUser ? 'bg-[#c4f547]/5' : ''}`}
                   >
                     <td className="py-3 pr-4">
                       {i === 0 ? (
@@ -109,7 +109,7 @@ function ReferralLeaderboard({
                         href={`${explorerUrl}/address/${entry.address}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`hover:underline ${isUser ? 'text-[#C084FC]' : 'text-gray-300'}`}
+                        className={`hover:underline ${isUser ? 'text-[#d5f972]' : 'text-gray-300'}`}
                       >
                         {isUser ? 'You' : truncateAddress(entry.address, 6)}
                       </a>
@@ -292,8 +292,8 @@ export default function ReferralsPage() {
       {/* Header */}
       <div className="mb-10">
         <div className="flex items-center gap-3 mb-5">
-          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#A855F7] to-transparent" />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C084FC] font-mono">
+          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#c4f547] to-transparent" />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d5f972] font-mono">
             Referral Program
           </span>
         </div>
@@ -301,7 +301,7 @@ export default function ReferralsPage() {
           className="text-4xl md:text-5xl font-light mb-3 tracking-tight"
           style={{ fontFamily: 'var(--font-serif), serif' }}
         >
-          <span className="italic text-[#A855F7]">Invite</span>{' '}
+          <span className="italic text-[#c4f547]">Invite</span>{' '}
           <span className="text-white">& Earn</span>
         </h1>
         <p className="text-gray-500 max-w-lg text-sm leading-relaxed font-mono">
@@ -314,8 +314,8 @@ export default function ReferralsPage() {
       {!isConnected && (
         <div className="card text-center py-16">
           <div className="mb-6">
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-[#A855F7]/5 border border-[#A855F7]/10 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-7 h-7 text-[#A855F7]/40" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-[#c4f547]/5 border border-[#c4f547]/10 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-7 h-7 text-[#c4f547]/40" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
               </svg>
             </div>
@@ -375,7 +375,7 @@ export default function ReferralsPage() {
               <div className="text-xs text-gray-500 font-mono uppercase tracking-wider mb-2">
                 Points / Deposit
               </div>
-              <div className="text-3xl font-light text-[#A855F7] font-mono">
+              <div className="text-3xl font-light text-[#c4f547] font-mono">
                 1 : 1
               </div>
               <div className="text-xs text-gray-600 font-mono mt-1">
@@ -390,11 +390,11 @@ export default function ReferralsPage() {
               <div
                 className="w-10 h-10 rounded-lg flex items-center justify-center"
                 style={{
-                  background: 'rgba(168, 85, 247, 0.08)',
-                  border: '1px solid rgba(168, 85, 247, 0.15)',
+                  background: 'rgba(196, 245, 71, 0.08)',
+                  border: '1px solid rgba(196, 245, 71, 0.15)',
                 }}
               >
-                <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#A855F7]" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#c4f547]" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-3.122a4.5 4.5 0 00-1.242-7.244l4.5-4.5a4.5 4.5 0 016.364 6.364l-1.757 1.757" />
                 </svg>
               </div>
@@ -539,7 +539,7 @@ export default function ReferralsPage() {
                   href={`${explorerUrl}/address/${referredByAddr}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[#A855F7] text-sm font-mono hover:underline"
+                  className="text-[#c4f547] text-sm font-mono hover:underline"
                 >
                   {truncateAddress(referredByAddr as string, 6)}
                 </a>
@@ -553,11 +553,11 @@ export default function ReferralsPage() {
               <div
                 className="w-10 h-10 rounded-lg flex items-center justify-center"
                 style={{
-                  background: 'rgba(168, 85, 247, 0.08)',
-                  border: '1px solid rgba(168, 85, 247, 0.15)',
+                  background: 'rgba(196, 245, 71, 0.08)',
+                  border: '1px solid rgba(196, 245, 71, 0.15)',
                 }}
               >
-                <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#A855F7]" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#c4f547]" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
                 </svg>
               </div>
@@ -588,7 +588,7 @@ export default function ReferralsPage() {
                             href={`${explorerUrl}/address/${depositor}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-[#A855F7] hover:underline text-xs"
+                            className="text-[#c4f547] hover:underline text-xs"
                           >
                             View
                           </a>
@@ -614,11 +614,11 @@ export default function ReferralsPage() {
               <div
                 className="w-10 h-10 rounded-lg flex items-center justify-center"
                 style={{
-                  background: 'rgba(168, 85, 247, 0.08)',
-                  border: '1px solid rgba(168, 85, 247, 0.15)',
+                  background: 'rgba(196, 245, 71, 0.08)',
+                  border: '1px solid rgba(196, 245, 71, 0.15)',
                 }}
               >
-                <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#A855F7]" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#c4f547]" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
                 </svg>
               </div>
@@ -628,7 +628,7 @@ export default function ReferralsPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div className="text-center">
-                <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-[#A855F7]/10 border border-[#A855F7]/20 flex items-center justify-center text-[#A855F7] font-mono font-bold text-sm">
+                <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-[#c4f547]/10 border border-[#c4f547]/20 flex items-center justify-center text-[#c4f547] font-mono font-bold text-sm">
                   1
                 </div>
                 <h3 className="text-white text-sm font-medium mb-1">Register a Code</h3>
@@ -637,7 +637,7 @@ export default function ReferralsPage() {
                 </p>
               </div>
               <div className="text-center">
-                <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-[#A855F7]/10 border border-[#A855F7]/20 flex items-center justify-center text-[#A855F7] font-mono font-bold text-sm">
+                <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-[#c4f547]/10 border border-[#c4f547]/20 flex items-center justify-center text-[#c4f547] font-mono font-bold text-sm">
                   2
                 </div>
                 <h3 className="text-white text-sm font-medium mb-1">Share Your Link</h3>
@@ -646,7 +646,7 @@ export default function ReferralsPage() {
                 </p>
               </div>
               <div className="text-center">
-                <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-[#A855F7]/10 border border-[#A855F7]/20 flex items-center justify-center text-[#A855F7] font-mono font-bold text-sm">
+                <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-[#c4f547]/10 border border-[#c4f547]/20 flex items-center justify-center text-[#c4f547] font-mono font-bold text-sm">
                   3
                 </div>
                 <h3 className="text-white text-sm font-medium mb-1">Earn Points</h3>

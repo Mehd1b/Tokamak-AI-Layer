@@ -167,8 +167,8 @@ export default function AnimatedBackground() {
       if (mouseX < 0 || mouseY < 0) return;
 
       const gradient = ctx.createRadialGradient(mouseX, mouseY, 0, mouseX, mouseY, 200);
-      gradient.addColorStop(0, 'rgba(168, 85, 247, 0.08)');
-      gradient.addColorStop(0.5, 'rgba(168, 85, 247, 0.04)');
+      gradient.addColorStop(0, 'rgba(196, 245, 71, 0.08)');
+      gradient.addColorStop(0.5, 'rgba(196, 245, 71, 0.04)');
       gradient.addColorStop(1, 'transparent');
 
       ctx.fillStyle = gradient;
@@ -187,7 +187,7 @@ export default function AnimatedBackground() {
 
       const gradient1 = ctx.createLinearGradient(0, auroraY - 100, 0, auroraY + 100);
       gradient1.addColorStop(0, 'transparent');
-      gradient1.addColorStop(0.5, 'rgba(168, 85, 247, 0.03)');
+      gradient1.addColorStop(0.5, 'rgba(196, 245, 71, 0.03)');
       gradient1.addColorStop(1, 'transparent');
 
       ctx.fillStyle = gradient1;

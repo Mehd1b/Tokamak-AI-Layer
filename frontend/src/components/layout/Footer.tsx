@@ -1,145 +1,115 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { DiamondLogoGlow } from '@/components/icons/Logo';
-import { GitHubIcon, XIcon, TelegramIcon, YouTubeIcon } from '@/components/icons/Social';
+import { useBlockNumber } from 'wagmi';
+import { DiamondLogo } from '@/components/icons/Logo';
+import { useNetwork } from '@/lib/NetworkContext';
 
-const socialLinks = [
-  { name: 'GitHub', href: 'https://github.com/tokamak-network', icon: <GitHubIcon /> },
-  { name: 'X', href: 'https://x.com/tokagent', icon: <XIcon /> },
-  { name: 'Telegram', href: 'https://t.me/tokamak_network', icon: <TelegramIcon /> },
-  { name: 'YouTube', href: 'https://www.youtube.com/@tokagent', icon: <YouTubeIcon /> },
+type FooterLink = { label: string; href: string; external?: boolean };
+
+const PROTOCOL_LINKS: FooterLink[] = [
+  { label: 'Vaults', href: '/vaults' },
+  { label: 'Deploy', href: '/deploy' },
+  { label: 'Marketplace', href: '/marketplace' },
+  { label: 'Staking', href: '/staking' },
 ];
 
+const BUILD_LINKS: FooterLink[] = [
+  { label: 'Developers', href: '/developers' },
+  { label: 'SDK', href: 'https://docs.tokagent.network', external: true },
+  { label: 'Whitepaper', href: '/whitepaper' },
+  { label: 'GitHub', href: 'https://github.com/tokamak-network', external: true },
+];
+
+const PROGRAM_LINKS: FooterLink[] = [
+  { label: 'Points', href: '/points' },
+  { label: 'Referrals', href: '/referrals' },
+  { label: 'Leaderboard', href: '/leaderboard' },
+  { label: 'Institutional', href: '/institutional' },
+];
+
+const COMPANY_LINKS: FooterLink[] = [
+  { label: 'X', href: 'https://x.com/tokagent', external: true },
+  { label: 'LinkedIn', href: 'https://www.linkedin.com/company/tokamaknetwork/', external: true },
+  { label: 'YouTube', href: 'https://www.youtube.com/@tokagent', external: true },
+  { label: 'Press', href: 'mailto:press@tokamak.network', external: true },
+];
+
+function FooterColumn({ title, links }: { title: string; links: FooterLink[] }) {
+  return (
+    <div>
+      <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-[rgba(233,234,236,0.38)]">
+        {title}
+      </div>
+      <ul className="mt-4 space-y-2">
+        {links.map((l) => (
+          <li key={l.label}>
+            {l.external ? (
+              <a
+                href={l.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[13px] text-[rgba(233,234,236,0.58)] transition-colors hover:text-[#c4f547]"
+              >
+                {l.label}
+              </a>
+            ) : (
+              <Link
+                href={l.href}
+                className="text-[13px] text-[rgba(233,234,236,0.58)] transition-colors hover:text-[#c4f547]"
+              >
+                {l.label}
+              </Link>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function Footer() {
-  const footerRef = useRef<HTMLDivElement>(null);
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setIsVisible(true);
-          }
-        });
-      },
-      { threshold: 0.3 },
-    );
-
-    if (footerRef.current) {
-      observer.observe(footerRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, []);
+  const { selectedChainId } = useNetwork();
+  const { data: blockNumber } = useBlockNumber({ chainId: selectedChainId, watch: true });
+  const blockLabel = blockNumber
+    ? `Ethereum block ${blockNumber.toString()} · latency 1.2s`
+    : 'Ethereum block 22,408,112 · latency 1.2s';
 
   return (
-    <footer ref={footerRef} className="relative bg-[#0a0a0f]/50 backdrop-blur-xl">
-      {/* Top gradient line */}
-      <div className="h-[1px] bg-gradient-to-r from-transparent via-[#A855F7]/30 to-transparent" />
-
-      {/* Glow effect at top */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/3 h-[2px] bg-gradient-to-r from-transparent via-[#A855F7]/50 to-transparent blur-sm" />
-
-      <div className="relative py-16 px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col items-center space-y-10">
-            {/* Logo and tagline */}
-            <div className={`text-center transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-              <div className="flex items-center justify-center gap-3 mb-3">
-                <DiamondLogoGlow />
-                <span
-                  className="text-xl font-medium text-white tracking-wider"
-                  style={{ fontFamily: 'var(--font-mono), monospace' }}
-                >
-                  TOKAMAK AI LAYER
-                </span>
-              </div>
-              <p
-                className="text-gray-500 text-sm tracking-wide"
+    <footer
+      className="relative border-t bg-[#0b0d10]"
+      style={{ borderColor: 'rgba(255,255,255,0.07)' }}
+    >
+      <div className="mx-auto max-w-[1280px] px-10 py-16">
+        <div className="grid gap-10 md:grid-cols-[2fr_1fr_1fr_1fr_1fr]">
+          <div className="max-w-[260px]">
+            <div className="flex items-center gap-3">
+              <DiamondLogo className="h-7 w-7" />
+              <span
+                className="text-[15px] font-medium tracking-wide text-[#e9eaec]"
                 style={{ fontFamily: 'var(--font-mono), monospace' }}
               >
-                Verifiable Agent Execution with RISC Zero zkVM
-              </p>
-            </div>
-
-            {/* Social links */}
-            <div className={`flex items-center gap-3 transition-all duration-700 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-              {socialLinks.map((link, index) => (
-                <a
-                  key={link.name}
-                  href={link.href}
-                  className="social-glow"
-                  aria-label={link.name}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ transitionDelay: `${index * 50}ms` }}
-                >
-                  <div className="social-bg" />
-                  <div className="social-glow-effect" />
-                  <div className="social-icon">
-                    {link.icon}
-                  </div>
-                </a>
-              ))}
-            </div>
-
-            {/* Links row */}
-            <div className={`flex flex-wrap items-center justify-center gap-8 text-sm transition-all duration-700 delay-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-              <Link
-                href="/vaults"
-                className="text-gray-500 hover:text-[#A855F7] transition-colors duration-300 relative group"
-                style={{ fontFamily: 'var(--font-mono), monospace' }}
-              >
-                Vaults
-                <span className="absolute bottom-0 left-0 w-0 h-[1px] bg-[#A855F7] group-hover:w-full transition-all duration-300" />
-              </Link>
-              <Link
-                href="/whitepaper"
-                className="text-gray-500 hover:text-[#A855F7] transition-colors duration-300 relative group"
-                style={{ fontFamily: 'var(--font-mono), monospace' }}
-              >
-                Whitepaper
-                <span className="absolute bottom-0 left-0 w-0 h-[1px] bg-[#A855F7] group-hover:w-full transition-all duration-300" />
-              </Link>
-              <a
-                href="https://docs.tokagent.network"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-500 hover:text-[#A855F7] transition-colors duration-300 relative group"
-                style={{ fontFamily: 'var(--font-mono), monospace' }}
-              >
-                Docs
-                <span className="absolute bottom-0 left-0 w-0 h-[1px] bg-[#A855F7] group-hover:w-full transition-all duration-300" />
-              </a>
-              <a
-                href="https://github.com/tokamak-network"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-500 hover:text-[#A855F7] transition-colors duration-300 relative group"
-                style={{ fontFamily: 'var(--font-mono), monospace' }}
-              >
-                GitHub
-                <span className="absolute bottom-0 left-0 w-0 h-[1px] bg-[#A855F7] group-hover:w-full transition-all duration-300" />
-              </a>
-            </div>
-
-            {/* Divider line */}
-            <div className="w-full max-w-md h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-
-            {/* Copyright */}
-            <div className={`flex flex-col sm:flex-row items-center gap-2 text-gray-600 text-xs transition-all duration-700 delay-400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-              <span style={{ fontFamily: 'var(--font-mono), monospace' }}>
-                &copy; {new Date().getFullYear()} Tokagent
-              </span>
-              <span className="hidden sm:inline text-gray-700">|</span>
-              <span style={{ fontFamily: 'var(--font-mono), monospace' }}>
-                Tokamak Network
+                tokagent
               </span>
             </div>
+            <p className="mt-4 text-[13px] leading-[1.6] text-[rgba(233,234,236,0.58)]">
+              Autonomous AI vaults on Ethereum, with every action backed by a zero-knowledge proof.
+            </p>
           </div>
+          <FooterColumn title="Protocol" links={PROTOCOL_LINKS} />
+          <FooterColumn title="Build" links={BUILD_LINKS} />
+          <FooterColumn title="Program" links={PROGRAM_LINKS} />
+          <FooterColumn title="Company" links={COMPANY_LINKS} />
+        </div>
+
+        <div
+          className="mt-12 flex flex-col items-start justify-between gap-2 border-t pt-6 md:flex-row md:items-center"
+          style={{ borderColor: 'rgba(255,255,255,0.04)' }}
+        >
+          <span className="text-[12px] text-[rgba(233,234,236,0.38)]">
+            © {new Date().getFullYear()} Tokagent · Tokamak Network
+          </span>
+          <span className="font-mono text-[11px] text-[rgba(233,234,236,0.38)]">{blockLabel}</span>
         </div>
       </div>
     </footer>

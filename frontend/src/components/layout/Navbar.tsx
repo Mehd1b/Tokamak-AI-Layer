@@ -289,13 +289,13 @@ export function Navbar() {
     <>
       <nav className={clsx(
         "fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 sm:px-8 border-b border-white/5",
-        pathname === '/' ? 'bg-transparent' : 'bg-[#0a0a0f]'
+        "bg-[#0b0d10]"
       )}>
         {/* Logo - Interlocking Diamonds */}
         <Link href="/" className="group flex items-center gap-3">
           <DiamondLogo />
           <span
-            className="text-lg font-medium tracking-wider text-white group-hover:text-[#A855F7] transition-colors duration-300"
+            className="text-lg font-medium tracking-wider text-white group-hover:text-[#c4f547] transition-colors duration-300"
             style={{ fontFamily: 'var(--font-mono), monospace' }}
           >
             Tokagent
@@ -316,7 +316,7 @@ export function Navbar() {
               className={clsx(
                 'flex items-center gap-1 px-4 py-2 rounded-lg border border-dashed transition-all tracking-wider text-sm',
                 PROTOCOL_LINKS.some(l => pathname?.startsWith(l.href))
-                  ? 'border-[#A855F7]/60 text-[#A855F7]'
+                  ? 'border-[#c4f547]/60 text-[#c4f547]'
                   : 'border-white/30 text-white hover:border-white/60 hover:text-gray-300',
               )}
               aria-haspopup="true"
@@ -340,7 +340,7 @@ export function Navbar() {
               onPointerEnter={protocol.handlePanelPointerEnter}
               onPointerLeave={protocol.handlePanelPointerLeave}
               className={`absolute top-full mt-2 w-[280px] p-4 space-y-1
-                rounded-xl border border-[#A855F7]/30
+                rounded-xl border border-[#c4f547]/30
                 backdrop-blur-md bg-[#0a0a0f]/90
                 transition-all duration-200 origin-top-left z-50
                 ${protocol.isOpen
@@ -354,16 +354,16 @@ export function Navbar() {
                   href={link.href}
                   role="menuitem"
                   className={clsx(
-                    'flex items-center gap-3 p-2.5 -mx-1 rounded-lg hover:bg-[#A855F7]/10 transition-colors group',
-                    pathname?.startsWith(link.href) && 'bg-[#A855F7]/5',
+                    'flex items-center gap-3 p-2.5 -mx-1 rounded-lg hover:bg-[#c4f547]/10 transition-colors group',
+                    pathname?.startsWith(link.href) && 'bg-[#c4f547]/5',
                   )}
                   onClick={() => protocol.setIsOpen(false)}
                   onKeyDown={(e) => protocol.handleMenuItemKeyDown(e, index, PROTOCOL_LINKS.length)}
                 >
                   <div>
                     <div className={clsx(
-                      'text-sm font-medium group-hover:text-[#A855F7] transition-colors',
-                      pathname?.startsWith(link.href) ? 'text-[#A855F7]' : 'text-white',
+                      'text-sm font-medium group-hover:text-[#c4f547] transition-colors',
+                      pathname?.startsWith(link.href) ? 'text-[#c4f547]' : 'text-white',
                     )}>
                       {link.title}
                     </div>
@@ -406,7 +406,7 @@ export function Navbar() {
               onPointerEnter={socials.handlePanelPointerEnter}
               onPointerLeave={socials.handlePanelPointerLeave}
               className={`absolute top-full mt-2 w-[260px] p-4 space-y-1
-                rounded-xl border border-[#A855F7]/30
+                rounded-xl border border-[#c4f547]/30
                 backdrop-blur-md bg-[#0a0a0f]/90
                 transition-all duration-200 origin-top-left z-50
                 ${socials.isOpen
@@ -419,19 +419,19 @@ export function Navbar() {
                   key={link.href}
                   href={link.href}
                   role="menuitem"
-                  className="flex items-center gap-3 p-2.5 -mx-1 rounded-lg hover:bg-[#A855F7]/10 transition-colors group"
+                  className="flex items-center gap-3 p-2.5 -mx-1 rounded-lg hover:bg-[#c4f547]/10 transition-colors group"
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => socials.setIsOpen(false)}
                   onKeyDown={(e) => socials.handleMenuItemKeyDown(e, index, SOCIALS_LINKS.length)}
                 >
                   {link.icon && (
-                    <span className="text-gray-400 group-hover:text-[#A855F7] transition-colors">
+                    <span className="text-gray-400 group-hover:text-[#c4f547] transition-colors">
                       {link.icon}
                     </span>
                   )}
                   <div>
-                    <div className="text-sm font-medium text-white group-hover:text-[#A855F7] transition-colors">
+                    <div className="text-sm font-medium text-white group-hover:text-[#c4f547] transition-colors">
                       {link.title}
                     </div>
                     <div className="text-xs text-gray-400 mt-0.5">
@@ -454,7 +454,7 @@ export function Navbar() {
               className={clsx(
                 'relative flex items-center gap-1 px-4 py-2 rounded-lg border border-dashed transition-all tracking-wider text-sm',
                 (pathname === '/leaderboard' || pathname?.startsWith('/agents/') || pathname === '/portfolio')
-                  ? 'border-[#A855F7]/60 text-[#A855F7]'
+                  ? 'border-[#c4f547]/60 text-[#c4f547]'
                   : 'border-white/30 text-white hover:border-white/60 hover:text-gray-300',
               )}
               aria-haspopup="true"
@@ -462,7 +462,7 @@ export function Navbar() {
             >
               DASHBOARD
               {positionCount > 0 && walletConnected && (
-                <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-[#A855F7] text-white text-[10px] font-bold px-1">
+                <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-[#c4f547] text-white text-[10px] font-bold px-1">
                   {positionCount}
                 </span>
               )}
@@ -479,7 +479,7 @@ export function Navbar() {
               onPointerEnter={dashboard.handlePanelPointerEnter}
               onPointerLeave={dashboard.handlePanelPointerLeave}
               className={`absolute top-full mt-2 w-[280px] p-4 space-y-1
-                rounded-xl border border-[#A855F7]/30
+                rounded-xl border border-[#c4f547]/30
                 backdrop-blur-md bg-[#0a0a0f]/90
                 transition-all duration-200 origin-top-left z-50
                 ${dashboard.isOpen
@@ -495,16 +495,16 @@ export function Navbar() {
                     href={link.href}
                     role="menuitem"
                     className={clsx(
-                      'flex items-center gap-3 p-2.5 -mx-1 rounded-lg hover:bg-[#A855F7]/10 transition-colors group',
-                      pathname?.startsWith(link.href) && 'bg-[#A855F7]/5',
+                      'flex items-center gap-3 p-2.5 -mx-1 rounded-lg hover:bg-[#c4f547]/10 transition-colors group',
+                      pathname?.startsWith(link.href) && 'bg-[#c4f547]/5',
                     )}
                     onClick={() => dashboard.setIsOpen(false)}
                     onKeyDown={(e) => dashboard.handleMenuItemKeyDown(e, index, DASHBOARD_LINKS.length)}
                   >
                     <div>
                       <div className={clsx(
-                        'text-sm font-medium group-hover:text-[#A855F7] transition-colors',
-                        pathname?.startsWith(link.href) ? 'text-[#A855F7]' : 'text-white',
+                        'text-sm font-medium group-hover:text-[#c4f547] transition-colors',
+                        pathname?.startsWith(link.href) ? 'text-[#c4f547]' : 'text-white',
                       )}>
                         {link.title}
                       </div>
@@ -527,7 +527,7 @@ export function Navbar() {
               className={clsx(
                 'flex items-center gap-1 px-4 py-2 rounded-lg border border-dashed transition-all tracking-wider text-sm',
                 (pathname === '/whitepaper' || pathname === '/institutional')
-                  ? 'border-[#A855F7]/60 text-[#A855F7]'
+                  ? 'border-[#c4f547]/60 text-[#c4f547]'
                   : 'border-white/30 text-white hover:border-white/60 hover:text-gray-300',
               )}
               aria-haspopup="true"
@@ -547,7 +547,7 @@ export function Navbar() {
               onPointerEnter={resources.handlePanelPointerEnter}
               onPointerLeave={resources.handlePanelPointerLeave}
               className={`absolute top-full mt-2 w-[280px] p-4 space-y-1
-                rounded-xl border border-[#A855F7]/30
+                rounded-xl border border-[#c4f547]/30
                 backdrop-blur-md bg-[#0a0a0f]/90
                 transition-all duration-200 origin-top-left z-50
                 ${resources.isOpen
@@ -565,8 +565,8 @@ export function Navbar() {
                     href={link.href}
                     role="menuitem"
                     className={clsx(
-                      'flex items-center gap-3 p-2.5 -mx-1 rounded-lg hover:bg-[#A855F7]/10 transition-colors group',
-                      isInternal && pathname === link.href && 'bg-[#A855F7]/5',
+                      'flex items-center gap-3 p-2.5 -mx-1 rounded-lg hover:bg-[#c4f547]/10 transition-colors group',
+                      isInternal && pathname === link.href && 'bg-[#c4f547]/5',
                     )}
                     onClick={() => resources.setIsOpen(false)}
                     onKeyDown={(e) => resources.handleMenuItemKeyDown(e, index, RESOURCES_LINKS.length)}
@@ -574,8 +574,8 @@ export function Navbar() {
                   >
                     <div>
                       <div className={clsx(
-                        'text-sm font-medium group-hover:text-[#A855F7] transition-colors',
-                        isInternal && pathname === link.href ? 'text-[#A855F7]' : 'text-white',
+                        'text-sm font-medium group-hover:text-[#c4f547] transition-colors',
+                        isInternal && pathname === link.href ? 'text-[#c4f547]' : 'text-white',
                       )}>
                         {link.title}
                         {!isInternal && (
@@ -602,13 +602,13 @@ export function Navbar() {
           <ConnectButton />
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="relative group p-3 rounded-xl border border-gray-700/50 bg-gray-900/60 backdrop-blur-sm hover:border-[#A855F7]/50 transition-all duration-300"
+            className="relative group p-3 rounded-xl border border-gray-700/50 bg-gray-900/60 backdrop-blur-sm hover:border-[#c4f547]/50 transition-all duration-300"
             aria-label="Toggle menu"
           >
             <div className="w-6 h-6 flex flex-col justify-center items-center">
-              <span className={`block w-5 h-0.5 bg-current transform transition-all duration-300 ${isMenuOpen ? 'rotate-45 translate-y-1' : ''} group-hover:bg-[#A855F7]`} />
-              <span className={`block w-5 h-0.5 bg-current mt-1 transition-all duration-300 ${isMenuOpen ? 'opacity-0' : ''} group-hover:bg-[#A855F7]`} />
-              <span className={`block w-5 h-0.5 bg-current mt-1 transform transition-all duration-300 ${isMenuOpen ? '-rotate-45 -translate-y-1' : ''} group-hover:bg-[#A855F7]`} />
+              <span className={`block w-5 h-0.5 bg-current transform transition-all duration-300 ${isMenuOpen ? 'rotate-45 translate-y-1' : ''} group-hover:bg-[#c4f547]`} />
+              <span className={`block w-5 h-0.5 bg-current mt-1 transition-all duration-300 ${isMenuOpen ? 'opacity-0' : ''} group-hover:bg-[#c4f547]`} />
+              <span className={`block w-5 h-0.5 bg-current mt-1 transform transition-all duration-300 ${isMenuOpen ? '-rotate-45 -translate-y-1' : ''} group-hover:bg-[#c4f547]`} />
             </div>
           </button>
         </div>
@@ -628,7 +628,7 @@ export function Navbar() {
               </Link>
               <button
                 onClick={() => setIsMenuOpen(false)}
-                className="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center text-white hover:text-[#A855F7] transition-colors duration-300"
+                className="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center text-white hover:text-[#c4f547] transition-colors duration-300"
                 aria-label="Close menu"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -645,7 +645,7 @@ export function Navbar() {
                 <div className="text-center">
                   <button
                     onClick={() => setIsMobileProtocolOpen(prev => !prev)}
-                    className="inline-flex items-center gap-2 text-md font-light text-white hover:text-[#A855F7] transition-all duration-300 tracking-wider min-h-[44px]"
+                    className="inline-flex items-center gap-2 text-md font-light text-white hover:text-[#c4f547] transition-all duration-300 tracking-wider min-h-[44px]"
                     aria-expanded={isMobileProtocolOpen}
                   >
                     PROTOCOL
@@ -672,8 +672,8 @@ export function Navbar() {
                           className={clsx(
                             'block transition-colors py-2 min-h-[44px] flex items-center justify-center',
                             pathname?.startsWith(link.href)
-                              ? 'text-[#A855F7]'
-                              : 'text-gray-300 hover:text-[#A855F7]',
+                              ? 'text-[#c4f547]'
+                              : 'text-gray-300 hover:text-[#c4f547]',
                           )}
                           onClick={() => {
                             setIsMenuOpen(false);
@@ -691,7 +691,7 @@ export function Navbar() {
                 <div className="text-center">
                   <button
                     onClick={() => setIsMobileDashboardOpen(prev => !prev)}
-                    className="inline-flex items-center gap-2 text-md font-light text-white hover:text-[#A855F7] transition-all duration-300 tracking-wider min-h-[44px]"
+                    className="inline-flex items-center gap-2 text-md font-light text-white hover:text-[#c4f547] transition-all duration-300 tracking-wider min-h-[44px]"
                     aria-expanded={isMobileDashboardOpen}
                   >
                     DASHBOARD
@@ -712,7 +712,7 @@ export function Navbar() {
                             href={link.href}
                             className={clsx(
                               'block transition-colors py-2 min-h-[44px] flex items-center justify-center',
-                              pathname?.startsWith(link.href) ? 'text-[#A855F7]' : 'text-gray-300 hover:text-[#A855F7]',
+                              pathname?.startsWith(link.href) ? 'text-[#c4f547]' : 'text-gray-300 hover:text-[#c4f547]',
                             )}
                             onClick={() => { setIsMenuOpen(false); setIsMobileDashboardOpen(false); }}
                           >
@@ -728,7 +728,7 @@ export function Navbar() {
                 <div className="text-center">
                   <button
                     onClick={() => setIsMobileResourcesOpen(prev => !prev)}
-                    className="inline-flex items-center gap-2 text-md font-light text-white hover:text-[#A855F7] transition-all duration-300 tracking-wider min-h-[44px]"
+                    className="inline-flex items-center gap-2 text-md font-light text-white hover:text-[#c4f547] transition-all duration-300 tracking-wider min-h-[44px]"
                     aria-expanded={isMobileResourcesOpen}
                   >
                     RESOURCES
@@ -749,7 +749,7 @@ export function Navbar() {
                               href={link.href}
                               className={clsx(
                                 'block transition-colors py-2 min-h-[44px] flex items-center justify-center',
-                                pathname === link.href ? 'text-[#A855F7]' : 'text-gray-300 hover:text-[#A855F7]',
+                                pathname === link.href ? 'text-[#c4f547]' : 'text-gray-300 hover:text-[#c4f547]',
                               )}
                               onClick={() => { setIsMenuOpen(false); setIsMobileResourcesOpen(false); }}
                             >
@@ -763,7 +763,7 @@ export function Navbar() {
                             href={link.href}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="block transition-colors py-2 min-h-[44px] flex items-center justify-center text-gray-300 hover:text-[#A855F7]"
+                            className="block transition-colors py-2 min-h-[44px] flex items-center justify-center text-gray-300 hover:text-[#c4f547]"
                             onClick={() => { setIsMenuOpen(false); setIsMobileResourcesOpen(false); }}
                           >
                             {link.title}
@@ -788,7 +788,7 @@ export function Navbar() {
                   <a
                     key={link.href}
                     href={link.href}
-                    className="text-gray-400 hover:text-[#A855F7] transition-colors duration-300 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                    className="text-gray-400 hover:text-[#c4f547] transition-colors duration-300 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={link.title}

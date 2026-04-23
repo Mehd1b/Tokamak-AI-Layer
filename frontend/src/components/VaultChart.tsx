@@ -85,14 +85,14 @@ export function VaultChart({
       crosshair: {
         mode: CrosshairMode.Magnet,
         vertLine: {
-          color: 'rgba(168,85,247,0.3)',
+          color: 'rgba(196,245,71,0.3)',
           style: LineStyle.Dashed,
-          labelBackgroundColor: '#A855F7',
+          labelBackgroundColor: '#c4f547',
         },
         horzLine: {
-          color: 'rgba(168,85,247,0.3)',
+          color: 'rgba(196,245,71,0.3)',
           style: LineStyle.Dashed,
-          labelBackgroundColor: '#A855F7',
+          labelBackgroundColor: '#c4f547',
         },
       },
       rightPriceScale: {
@@ -110,15 +110,15 @@ export function VaultChart({
 
     if (type === 'area') {
       series = chart.addAreaSeries({
-        lineColor: '#A855F7',
+        lineColor: '#c4f547',
         lineWidth: 2,
-        topColor: 'rgba(168,85,247,0.4)',
-        bottomColor: 'rgba(168,85,247,0.0)',
+        topColor: 'rgba(196,245,71,0.4)',
+        bottomColor: 'rgba(196,245,71,0.0)',
         priceFormat: { type: 'price', precision, minMove: Math.pow(10, -precision) },
       });
     } else {
       series = chart.addLineSeries({
-        color: '#C084FC',
+        color: '#d5f972',
         lineWidth: 2,
         priceFormat: { type: 'price', precision, minMove: Math.pow(10, -precision) },
       });
@@ -259,7 +259,7 @@ export function VaultChart({
               onClick={() => setRange(label)}
               className={`px-2.5 py-1 rounded text-xs font-mono transition-colors border ${
                 range === label
-                  ? 'bg-[#A855F7]/20 text-[#C084FC] border-[#A855F7]/30'
+                  ? 'bg-[#c4f547]/20 text-[#d5f972] border-[#c4f547]/30'
                   : 'text-gray-500 border-transparent hover:text-gray-300 hover:bg-white/5'
               }`}
             >

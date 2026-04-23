@@ -31,7 +31,7 @@ export function StatCard({ title, description, children, featured = false }: {
         }}
       />
       {/* Hover border glow */}
-      <div className="absolute inset-0 rounded-[32px] border border-[#A855F7]/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-50 pointer-events-none" />
+      <div className="absolute inset-0 rounded-[32px] border border-[#c4f547]/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-50 pointer-events-none" />
       {/* Featured gradient overlay */}
       {featured && (
         <div className="absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-transparent pointer-events-none" />

@@ -89,7 +89,7 @@ function SortHeader({
     <button
       onClick={() => onSort(sortKey)}
       className={`flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider transition-colors ${
-        isActive ? 'text-[#C084FC]' : 'text-gray-600 hover:text-gray-400'
+        isActive ? 'text-[#d5f972]' : 'text-gray-600 hover:text-gray-400'
       } ${className}`}
     >
       {label}
@@ -173,9 +173,9 @@ export default function LeaderboardPage() {
       {/* Header */}
       <div className="mb-10">
         <div className="flex items-center gap-3 mb-5">
-          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#A855F7] to-transparent" />
+          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#c4f547] to-transparent" />
           <span
-            className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C084FC] font-mono"
+            className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d5f972] font-mono"
           >
             Leaderboard
           </span>
@@ -184,7 +184,7 @@ export default function LeaderboardPage() {
           className="text-4xl md:text-5xl font-light mb-3 tracking-tight"
           style={{ fontFamily: 'var(--font-serif), serif' }}
         >
-          <span className="italic text-[#A855F7]">Agent</span>{' '}
+          <span className="italic text-[#c4f547]">Agent</span>{' '}
           <span className="text-white">Rankings</span>
         </h1>
         <p className="text-gray-500 max-w-lg text-sm leading-relaxed font-mono">
@@ -201,7 +201,7 @@ export default function LeaderboardPage() {
               onClick={() => setTimePeriod(tp.key)}
               className={`px-3 py-1.5 min-h-[44px] sm:min-h-0 rounded-md text-[11px] font-mono font-medium transition-all duration-200 ${
                 timePeriod === tp.key
-                  ? 'bg-[#A855F7]/15 text-[#C084FC] shadow-sm'
+                  ? 'bg-[#c4f547]/15 text-[#d5f972] shadow-sm'
                   : 'text-gray-500 hover:text-gray-300'
               }`}
             >
@@ -258,8 +258,8 @@ export default function LeaderboardPage() {
       {!isLoading && sorted.length === 0 && (
         <div className="rounded-2xl border border-white/5 bg-[#12121a]/80 text-center py-20">
           <div className="mb-6">
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-[#A855F7]/5 border border-[#A855F7]/10 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-7 h-7 text-[#A855F7]/40" fill="none" stroke="currentColor" strokeWidth="1">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-[#c4f547]/5 border border-[#c4f547]/10 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-7 h-7 text-[#c4f547]/40" fill="none" stroke="currentColor" strokeWidth="1">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-4.5A3.375 3.375 0 0012.75 10.5h-1.5A3.375 3.375 0 007.5 14.25v4.5m9-9V6.375c0-.621-.504-1.125-1.125-1.125H8.625c-.621 0-1.125.504-1.125 1.125V9.75" />
               </svg>
             </div>
@@ -332,7 +332,7 @@ export default function LeaderboardPage() {
                     href={`/agents/${encodeURIComponent(entry.agentId)}`}
                   >
                     <div
-                      className="group flex items-center gap-4 px-5 py-3.5 rounded-xl border border-white/5 bg-[#12121a]/80 transition-all duration-300 ease-out hover:bg-[#1a1a28]/80 hover:border-[#A855F7]/20 vault-card-enter cursor-pointer"
+                      className="group flex items-center gap-4 px-5 py-3.5 rounded-xl border border-white/5 bg-[#12121a]/80 transition-all duration-300 ease-out hover:bg-[#1a1a28]/80 hover:border-[#c4f547]/20 vault-card-enter cursor-pointer"
                       style={{ animationDelay: `${i * 40}ms` }}
                     >
                       {/* Rank */}

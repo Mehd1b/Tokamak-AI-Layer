@@ -70,7 +70,7 @@ export function NetworkSelector() {
 
       {isOpen && (
         <div
-          className="absolute top-full mt-2 right-0 w-56 p-2 rounded-xl border border-[#A855F7]/30 backdrop-blur-md bg-[#0a0a0f]/90 z-50 max-h-[60vh] overflow-y-auto"
+          className="absolute top-full mt-2 right-0 w-56 p-2 rounded-xl border border-[#c4f547]/30 backdrop-blur-md bg-[#0a0a0f]/90 z-50 max-h-[60vh] overflow-y-auto"
         >
           {/* Mainnets section */}
           <div className="px-3 pt-1 pb-1.5">
@@ -86,7 +86,7 @@ export function NetworkSelector() {
               }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
                 network.chainId === selectedChainId
-                  ? 'bg-[#A855F7]/10 text-[#A855F7]'
+                  ? 'bg-[#c4f547]/10 text-[#c4f547]'
                   : 'text-gray-300 hover:bg-white/5 hover:text-white'
               }`}
               style={{ fontFamily: 'var(--font-mono), monospace' }}
@@ -114,7 +114,7 @@ export function NetworkSelector() {
               }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
                 network.chainId === selectedChainId
-                  ? 'bg-[#A855F7]/10 text-[#A855F7]'
+                  ? 'bg-[#c4f547]/10 text-[#c4f547]'
                   : 'text-gray-300 hover:bg-white/5 hover:text-white'
               }`}
               style={{ fontFamily: 'var(--font-mono), monospace' }}

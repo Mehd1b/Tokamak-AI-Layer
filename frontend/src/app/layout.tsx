@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, JetBrains_Mono, Playfair_Display } from 'next/font/google';
+import { Inter, JetBrains_Mono, Playfair_Display, Instrument_Serif } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 import { Navbar } from '@/components/layout/Navbar';
@@ -19,6 +19,12 @@ const playfair = Playfair_Display({
   subsets: ['latin'],
   style: ['normal', 'italic'],
   variable: '--font-serif',
+});
+const instrumentSerif = Instrument_Serif({
+  subsets: ['latin'],
+  weight: '400',
+  style: ['normal', 'italic'],
+  variable: '--font-display',
 });
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://tokamak.ai';
@@ -48,7 +54,7 @@ export const metadata: Metadata = {
   icons: {
     icon: '/icon.svg',
   },
-  themeColor: '#0a0a0f',
+  themeColor: '#0b0d10',
   alternates: {
     canonical: SITE_URL,
   },
@@ -60,7 +66,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} ${playfair.variable} dark`}>
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} ${playfair.variable} ${instrumentSerif.variable} dark`}>
       <head>
         <script
           type="application/ld+json"
@@ -98,7 +104,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="flex min-h-screen flex-col bg-[#0a0a0f]">
+      <body className="flex min-h-screen flex-col bg-[#0b0d10]">
         <Providers>
           <Navbar />
           <main className="relative z-10 flex-1 pt-20 pb-16 md:pb-0">{children}</main>

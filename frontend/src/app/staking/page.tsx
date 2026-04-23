@@ -180,7 +180,7 @@ export default function StakingPage() {
       <div
         className="pointer-events-none fixed left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] opacity-[0.06]"
         style={{
-          background: 'radial-gradient(circle, #A855F7 0%, #7C3AED 40%, transparent 70%)',
+          background: 'radial-gradient(circle, #c4f547 0%, #8ab81d 40%, transparent 70%)',
           animation: 'morph-blob 20s ease-in-out infinite',
           borderRadius: '60% 40% 30% 70% / 60% 30% 70% 40%',
         }}
@@ -191,7 +191,7 @@ export default function StakingPage() {
         <span
           className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-6"
         >
-          <span className="w-2 h-2 rounded-full bg-[#A855F7] animate-pulse mr-2" />
+          <span className="w-2 h-2 rounded-full bg-[#c4f547] animate-pulse mr-2" />
           Economic Security
         </span>
         <h1
@@ -206,7 +206,7 @@ export default function StakingPage() {
         </p>
       </div>
 
-      <div className="w-full h-px mb-8" style={{ background: 'linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.3), transparent)' }} />
+      <div className="w-full h-px mb-8" style={{ background: 'linear-gradient(90deg, transparent, rgba(196, 245, 71, 0.3), transparent)' }} />
 
       {/* Tab Toggle */}
       <div className="mb-8 flex items-center rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm p-1 w-fit animate-[slide-in-left_0.6s_ease-out_0.1s_both]">
@@ -216,7 +216,7 @@ export default function StakingPage() {
             onClick={() => setActiveTab(tab)}
             className={`rounded-lg px-5 py-2.5 text-sm font-medium transition-all duration-300 ${
               activeTab === tab
-                ? 'bg-[#A855F7]/15 text-[#C084FC] border border-[#A855F7]/30 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
+                ? 'bg-[#c4f547]/15 text-[#d5f972] border border-[#c4f547]/30 shadow-[0_0_15px_rgba(196,245,71,0.15)]'
                 : 'text-zinc-500 hover:text-zinc-300 border border-transparent'
             }`}
           >
@@ -226,8 +226,8 @@ export default function StakingPage() {
       </div>
 
       {!isConnected && (
-        <div className="card mb-6 border-[#A855F7]/20 bg-[#A855F7]/5">
-          <p className="text-sm text-[#C084FC]">
+        <div className="card mb-6 border-[#c4f547]/20 bg-[#c4f547]/5">
+          <p className="text-sm text-[#d5f972]">
             Please connect your wallet to view staking information and participate.
           </p>
         </div>
@@ -253,7 +253,7 @@ export default function StakingPage() {
               onClick={() => setStakingView('wizard')}
               className={`rounded-md px-4 py-2 text-xs font-medium transition-all duration-300 ${
                 stakingView === 'wizard'
-                  ? 'bg-[#A855F7]/15 text-[#C084FC] shadow-sm'
+                  ? 'bg-[#c4f547]/15 text-[#d5f972] shadow-sm'
                   : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
@@ -263,7 +263,7 @@ export default function StakingPage() {
               onClick={() => setStakingView('advanced')}
               className={`rounded-md px-4 py-2 text-xs font-medium transition-all duration-300 ${
                 stakingView === 'advanced'
-                  ? 'bg-[#A855F7]/15 text-[#C084FC] shadow-sm'
+                  ? 'bg-[#c4f547]/15 text-[#d5f972] shadow-sm'
                   : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
@@ -294,7 +294,7 @@ export default function StakingPage() {
                   available={`${formatWTON(wstonBalance)} WSTON`}
                 />
                 {withdrawAmount && parseFloat(withdrawAmount) > 0 && parseFloat(withdrawAmount) < 100 && (
-                  <div className="flex items-center gap-1 text-xs text-[#C084FC]"><AlertTriangle className="h-3 w-3" />Minimum withdrawal is 100 WSTON</div>
+                  <div className="flex items-center gap-1 text-xs text-[#d5f972]"><AlertTriangle className="h-3 w-3" />Minimum withdrawal is 100 WSTON</div>
                 )}
                 {isWithdrawalSuccess && <SuccessMsg text="Withdrawal requested! You can claim once processing completes." />}
                 {withdrawalError && <ErrorMsg text={withdrawalError.message} />}
@@ -340,7 +340,7 @@ export default function StakingPage() {
                 <div className="flex items-center rounded-lg border border-white/10 bg-white/5 p-0.5">
                   {(['WTON', 'TON'] as const).map((mode) => (
                     <button key={mode} onClick={() => { setTokenMode(mode); setDepositAmount(''); }}
-                      className={`rounded-md px-3 py-1 text-xs font-medium transition-all duration-300 ${tokenMode === mode ? 'bg-[#A855F7]/15 text-[#C084FC] shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                      className={`rounded-md px-3 py-1 text-xs font-medium transition-all duration-300 ${tokenMode === mode ? 'bg-[#c4f547]/15 text-[#d5f972] shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}>
                       {mode}
                     </button>
                   ))}
@@ -362,8 +362,8 @@ export default function StakingPage() {
                   available={isWTONMode ? `${formatWTON(wtonBalance)} WTON` : `${formatBalance(tonBalance)} TON`}
                 />
                 {rawAmount && estimatedWSTON > 0n && (
-                  <div className="rounded-lg bg-[#A855F7]/5 border border-[#A855F7]/10 p-3">
-                    <p className="text-xs text-white/40">Estimated WSTON received: <span className="font-semibold text-[#C084FC]">{formatWTON(estimatedWSTON)}</span></p>
+                  <div className="rounded-lg bg-[#c4f547]/5 border border-[#c4f547]/10 p-3">
+                    <p className="text-xs text-white/40">Estimated WSTON received: <span className="font-semibold text-[#d5f972]">{formatWTON(estimatedWSTON)}</span></p>
                   </div>
                 )}
                 {rawAmount && (
@@ -405,7 +405,7 @@ export default function StakingPage() {
                   available={`${formatWTON(wstonBalance)} WSTON`}
                 />
                 {withdrawAmount && parseFloat(withdrawAmount) > 0 && parseFloat(withdrawAmount) < 100 && (
-                  <div className="flex items-center gap-1 text-xs text-[#C084FC]"><AlertTriangle className="h-3 w-3" />Minimum withdrawal is 100 WSTON</div>
+                  <div className="flex items-center gap-1 text-xs text-[#d5f972]"><AlertTriangle className="h-3 w-3" />Minimum withdrawal is 100 WSTON</div>
                 )}
                 {isWithdrawalSuccess && <SuccessMsg text="Withdrawal requested! You can claim once processing completes." />}
                 {withdrawalError && <ErrorMsg text={withdrawalError.message} />}
@@ -445,7 +445,7 @@ export default function StakingPage() {
             title="WSTON APR"
             value="~4.5%"
             description="Estimated annual yield from Tokamak staking. Actual rate varies with network participation."
-            color="text-[#A855F7]"
+            color="text-[#c4f547]"
           />
 
           {/* Bond Requirements */}
@@ -453,7 +453,7 @@ export default function StakingPage() {
             title="Bond Requirement"
             value="100 TON"
             description="Each optimistic vault execution requires 100 TON worth of WSTON locked as bond collateral."
-            color="text-[#C084FC]"
+            color="text-[#d5f972]"
           />
 
           {/* Unbonding Period */}
@@ -461,14 +461,14 @@ export default function StakingPage() {
             title="Unbonding Period"
             value="~7 days"
             description="WSTON withdrawals have a processing delay. You can claim your WTON once the unbonding period completes."
-            color="text-[#D946EF]"
+            color="text-[#c4f547]"
           />
 
           {/* Why WSTON? */}
-          <div className="card group hover:border-[#A855F7]/30 hover:shadow-[0_0_20px_rgba(168,85,247,0.1)] cursor-default">
+          <div className="card group hover:border-[#c4f547]/30 hover:shadow-[0_0_20px_rgba(196,245,71,0.1)] cursor-default">
             <div className="flex items-start gap-2 mb-2">
-              <HelpCircle className="h-4 w-4 text-[#7C3AED] mt-0.5 flex-shrink-0" />
-              <h4 className="text-sm font-medium text-[#7C3AED]">Why WSTON?</h4>
+              <HelpCircle className="h-4 w-4 text-[#8ab81d] mt-0.5 flex-shrink-0" />
+              <h4 className="text-sm font-medium text-[#8ab81d]">Why WSTON?</h4>
             </div>
             <p className="text-xs text-white/40 leading-relaxed">
               WSTON is a liquid staking token that represents your staked TON position.
@@ -483,9 +483,9 @@ export default function StakingPage() {
       {/* ======================== BOND MANAGEMENT TAB ======================== */}
       {activeTab === 'bonds' && <>
         {/* Info banner */}
-        <div className="mb-8 card border-[#A855F7]/20 bg-[#A855F7]/5 animate-[slide-in-left_0.5s_ease-out]">
+        <div className="mb-8 card border-[#c4f547]/20 bg-[#c4f547]/5 animate-[slide-in-left_0.5s_ease-out]">
           <div className="flex items-start gap-3">
-            <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#C084FC]" />
+            <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#d5f972]" />
             <div>
               <h3 className="font-medium text-white">Cross-Chain Oracle-Attested Bonds</h3>
               <p className="mt-1 text-sm text-white/40">
@@ -493,8 +493,8 @@ export default function StakingPage() {
                 allowing the vault to execute actions immediately. Bonds are released when proof is submitted,
                 or slashed if the challenge window expires.
               </p>
-              <div className="mt-3 rounded-lg bg-[#7C3AED]/5 border border-[#7C3AED]/20 p-3">
-                <p className="text-sm text-[#C084FC] font-medium">Bond Requirement</p>
+              <div className="mt-3 rounded-lg bg-[#8ab81d]/5 border border-[#8ab81d]/20 p-3">
+                <p className="text-sm text-[#d5f972] font-medium">Bond Requirement</p>
                 <p className="mt-1 text-sm text-white/40">
                   Each optimistic execution requires a bond of <b className="text-white">100 TON</b> (in WSTON equivalent).
                   If a vault allows up to N concurrent pending executions, the operator must have at least
@@ -504,19 +504,19 @@ export default function StakingPage() {
               </div>
               <div className="mt-3 space-y-1.5 text-xs text-white/30">
                 <p className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#7C3AED] flex-shrink-0" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#8ab81d] flex-shrink-0" />
                   <b className="text-white/50">Lock:</b> Approve WSTON &rarr; lockBond(vault, nonce, amount) on L1
                 </p>
                 <p className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#C084FC] flex-shrink-0" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#d5f972] flex-shrink-0" />
                   <b className="text-white/50">Attest:</b> Oracle signs attestation after seeing L1 event
                 </p>
                 <p className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#A855F7] flex-shrink-0" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#c4f547] flex-shrink-0" />
                   <b className="text-white/50">Execute:</b> Submit attestation to HyperEVM vault for optimistic execution
                 </p>
                 <p className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#D946EF] flex-shrink-0" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#c4f547] flex-shrink-0" />
                   <b className="text-white/50">Resolve:</b> Bond released on proof, slashed if expired
                 </p>
               </div>
@@ -578,7 +578,7 @@ export default function StakingPage() {
 
               {/* Min bond warning */}
               {bondAmountBigInt > 0n && minBondFloor !== undefined && bondAmountBigInt < minBondFloor && (
-                <div className="flex items-center gap-1 text-xs text-[#C084FC]">
+                <div className="flex items-center gap-1 text-xs text-[#d5f972]">
                   <AlertTriangle className="h-3 w-3" />
                   Minimum bond is {formatWTON(minBondFloor)} WSTON
                 </div>
@@ -677,18 +677,18 @@ export default function StakingPage() {
         </div>
 
         {/* Slash Distribution Info */}
-        <div className="mt-8 card border-[#7C3AED]/20 bg-[#7C3AED]/5 animate-[slide-in-left_0.5s_ease-out_0.5s_both]">
+        <div className="mt-8 card border-[#8ab81d]/20 bg-[#8ab81d]/5 animate-[slide-in-left_0.5s_ease-out_0.5s_both]">
           <div className="flex items-start gap-3">
-            <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#C084FC]" />
+            <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#d5f972]" />
             <div>
               <h3 className="font-medium text-white">Slash Distribution</h3>
               <p className="mt-1 text-sm text-white/40">
                 When a bond is slashed (proof not submitted within challenge window), the WSTON is distributed:
               </p>
               <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-                <SlashCard label="Finder Fee" pct="10%" description="Reward for triggering the slash" color="text-[#A855F7]" />
-                <SlashCard label="Vault Depositors" pct="80%" description="Returned to vault as compensation" color="text-[#C084FC]" />
-                <SlashCard label="Treasury" pct="10%" description="Protocol treasury" color="text-[#D946EF]" />
+                <SlashCard label="Finder Fee" pct="10%" description="Reward for triggering the slash" color="text-[#c4f547]" />
+                <SlashCard label="Vault Depositors" pct="80%" description="Returned to vault as compensation" color="text-[#d5f972]" />
+                <SlashCard label="Treasury" pct="10%" description="Protocol treasury" color="text-[#c4f547]" />
               </div>
               <p className="mt-3 text-xs text-white/30">
                 Self-slashes (operator triggers their own slash): 0% finder, 90% depositors, 10% treasury.
@@ -708,15 +708,15 @@ function StepLine({ label, done, active }: { label: string; done: boolean; activ
     <div className="flex items-center gap-1.5 text-xs transition-all duration-200">
       {done ? (
         <svg className="h-3.5 w-3.5" viewBox="0 0 14 14" fill="none">
-          <circle cx="7" cy="7" r="6" stroke="#A855F7" strokeWidth="1.5" fill="#A855F7" fillOpacity="0.15" />
-          <path d="M4.5 7 L6.2 8.7 L9.5 5.3" stroke="#C084FC" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="7" cy="7" r="6" stroke="#c4f547" strokeWidth="1.5" fill="#c4f547" fillOpacity="0.15" />
+          <path d="M4.5 7 L6.2 8.7 L9.5 5.3" stroke="#d5f972" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       ) : active ? (
-        <div className="h-3.5 w-3.5 rounded-full border-2 border-[#A855F7] bg-[#A855F7]/20" />
+        <div className="h-3.5 w-3.5 rounded-full border-2 border-[#c4f547] bg-[#c4f547]/20" />
       ) : (
         <div className="h-3.5 w-3.5 rounded-full border border-white/20" />
       )}
-      <span className={done ? 'text-[#C084FC]' : active ? 'font-semibold text-[#C084FC]' : 'text-zinc-600'}>{label}</span>
+      <span className={done ? 'text-[#d5f972]' : active ? 'font-semibold text-[#d5f972]' : 'text-zinc-600'}>{label}</span>
     </div>
   );
 }
@@ -724,7 +724,7 @@ function StepLine({ label, done, active }: { label: string; done: boolean; activ
 function StatCard({ icon, value, label, delay = 0 }: { icon: React.ReactNode; value: string; label: string; delay?: number }) {
   return (
     <div
-      className="card text-center group hover:border-[#A855F7]/30 hover:shadow-[0_0_20px_rgba(168,85,247,0.1)] cursor-default"
+      className="card text-center group hover:border-[#c4f547]/30 hover:shadow-[0_0_20px_rgba(196,245,71,0.1)] cursor-default"
       style={{ animationDelay: `${delay * 100}ms`, animation: `slide-in-left 0.5s ease-out ${delay * 100}ms both` }}
     >
       <div className="transition-transform duration-300 group-hover:scale-110">{icon}</div>
@@ -747,7 +747,7 @@ function AmountInput({ value, onChange, disabled, suffix, onMax, available }: {
           className="input-dark flex-1"
                  />
         <button onClick={onMax} disabled={disabled}
-          className="rounded-lg border border-white/10 bg-white/5 px-3 text-xs font-medium text-zinc-300 hover:bg-[#A855F7]/10 hover:border-[#A855F7]/30 hover:text-[#C084FC] disabled:opacity-50 transition-all duration-300">
+          className="rounded-lg border border-white/10 bg-white/5 px-3 text-xs font-medium text-zinc-300 hover:bg-[#c4f547]/10 hover:border-[#c4f547]/30 hover:text-[#d5f972] disabled:opacity-50 transition-all duration-300">
           MAX
         </button>
         <span
@@ -763,11 +763,11 @@ function AmountInput({ value, onChange, disabled, suffix, onMax, available }: {
 
 function NetworkWarning({ message, onSwitch, label }: { message: string; onSwitch: () => void; label: string }) {
   return (
-    <div className="card mb-6 border-[#A855F7]/20 bg-[#A855F7]/5">
+    <div className="card mb-6 border-[#c4f547]/20 bg-[#c4f547]/5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-[#C084FC]" />
-          <p className="text-sm text-[#C084FC]">{message}</p>
+          <AlertTriangle className="h-4 w-4 text-[#d5f972]" />
+          <p className="text-sm text-[#d5f972]">{message}</p>
         </div>
         <button onClick={onSwitch} className="btn-primary text-xs">{label}</button>
       </div>
@@ -777,10 +777,10 @@ function NetworkWarning({ message, onSwitch, label }: { message: string; onSwitc
 
 function SuccessMsg({ text }: { text: string }) {
   return (
-    <div className="flex items-center gap-1.5 text-xs text-[#C084FC] animate-[slide-in-left_0.3s_ease-out]">
+    <div className="flex items-center gap-1.5 text-xs text-[#d5f972] animate-[slide-in-left_0.3s_ease-out]">
       <svg className="h-3.5 w-3.5" viewBox="0 0 14 14" fill="none">
-        <circle cx="7" cy="7" r="6" stroke="#A855F7" strokeWidth="1.5" fill="#A855F7" fillOpacity="0.15" />
-        <path d="M4.5 7 L6.2 8.7 L9.5 5.3" stroke="#C084FC" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="7" cy="7" r="6" stroke="#c4f547" strokeWidth="1.5" fill="#c4f547" fillOpacity="0.15" />
+        <path d="M4.5 7 L6.2 8.7 L9.5 5.3" stroke="#d5f972" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
       {text}
     </div>
@@ -809,7 +809,7 @@ function BondStatusBadge({ status }: { status: number }) {
 
 function SlashCard({ label, pct, description, color }: { label: string; pct: string; description: string; color: string }) {
   return (
-    <div className="rounded-lg bg-white/5 border border-white/10 p-3 transition-all duration-300 hover:border-[#A855F7]/20 hover:bg-[#A855F7]/5">
+    <div className="rounded-lg bg-white/5 border border-white/10 p-3 transition-all duration-300 hover:border-[#c4f547]/20 hover:bg-[#c4f547]/5">
       <p className={`text-xs font-medium ${color}`}>{label}</p>
       <p className="text-lg font-bold text-white">{pct}</p>
       <p className="text-xs text-white/30">{description}</p>
@@ -819,7 +819,7 @@ function SlashCard({ label, pct, description, color }: { label: string; pct: str
 
 function InfoCard({ title, value, description, color }: { title: string; value: string; description: string; color: string }) {
   return (
-    <div className="card group hover:border-[#A855F7]/30 hover:shadow-[0_0_20px_rgba(168,85,247,0.1)] cursor-default">
+    <div className="card group hover:border-[#c4f547]/30 hover:shadow-[0_0_20px_rgba(196,245,71,0.1)] cursor-default">
       <p className={`text-xs font-medium ${color} mb-1`}>{title}</p>
       <p className="text-lg font-bold text-white mb-2">{value}</p>
       <p className="text-xs text-white/40 leading-relaxed">{description}</p>

@@ -14,10 +14,10 @@ export default function ProofGenerationPipeline() {
       </div>
 
       {/* Main Diagram - Private Zone */}
-      <div className="bg-slate-800/30 rounded-xl border-2 border-dashed border-purple-500/30 p-3 md:p-4 relative">
+      <div className="bg-slate-800/30 rounded-xl border-2 border-dashed border-lime-500/30 p-3 md:p-4 relative">
         {/* Zone Label */}
         <div className="absolute -top-3 left-4 px-2 md:px-3 py-1 bg-gray-900 rounded-full">
-          <span className="text-purple-400 text-xs font-semibold flex items-center gap-1 md:gap-2">
+          <span className="text-lime-400 text-xs font-semibold flex items-center gap-1 md:gap-2">
             <svg className="w-3 h-3 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
@@ -70,48 +70,48 @@ export default function ProofGenerationPipeline() {
           </div>
 
           {/* Step 2: zkVM Execution */}
-          <div className="bg-gradient-to-r from-purple-900/40 to-purple-800/20 rounded-lg p-3 border border-purple-700/50">
+          <div className="bg-gradient-to-r from-lime-900/40 to-lime-800/20 rounded-lg p-3 border border-lime-700/50">
             <div className="flex items-start gap-2 md:gap-3">
               <div className="flex-shrink-0">
-                <div className="w-7 h-7 md:w-8 md:h-8 bg-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-xs md:text-sm">
+                <div className="w-7 h-7 md:w-8 md:h-8 bg-lime-600 rounded-lg flex items-center justify-center text-white font-bold text-xs md:text-sm">
                   2
                 </div>
               </div>
               <div className="flex-1 min-w-0">
                 <h6 className="text-white font-semibold text-sm mb-1">RISC Zero zkVM Execution</h6>
-                <p className="text-purple-300 text-xs mb-2">Deterministic RISC-V emulation with execution trace</p>
+                <p className="text-lime-300 text-xs mb-2">Deterministic RISC-V emulation with execution trace</p>
 
                 <div className="bg-slate-900/50 rounded-lg p-2 text-xs space-y-1.5 overflow-x-auto">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-slate-500 flex-shrink-0">1.</span>
-                    <code className="text-purple-300">env::read()</code>
+                    <code className="text-lime-300">env::read()</code>
                     <span className="text-slate-500 hidden sm:inline">→ Load input</span>
                   </div>
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-slate-500 flex-shrink-0">2.</span>
-                    <code className="text-purple-300">inference(x, W)</code>
+                    <code className="text-lime-300">inference(x, W)</code>
                     <span className="text-slate-500 hidden sm:inline">→ Forward pass</span>
                   </div>
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-slate-500 flex-shrink-0">3.</span>
-                    <code className="text-purple-300">validate()</code>
+                    <code className="text-lime-300">validate()</code>
                     <span className="text-slate-500 hidden sm:inline">→ Check bounds</span>
                   </div>
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-slate-500 flex-shrink-0">4.</span>
-                    <code className="text-purple-300">commit(action)</code>
+                    <code className="text-lime-300">commit(action)</code>
                     <span className="text-slate-500 hidden sm:inline">→ Journal</span>
                   </div>
                 </div>
 
                 <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-                  <div className="bg-purple-800/50 px-2 py-0.5 rounded text-purple-200">
+                  <div className="bg-lime-800/50 px-2 py-0.5 rounded text-lime-200">
                     ~10M cycles
                   </div>
-                  <div className="bg-purple-800/50 px-2 py-0.5 rounded text-purple-200">
+                  <div className="bg-lime-800/50 px-2 py-0.5 rounded text-lime-200">
                     RV32IM
                   </div>
-                  <div className="bg-purple-800/50 px-2 py-0.5 rounded text-purple-200">
+                  <div className="bg-lime-800/50 px-2 py-0.5 rounded text-lime-200">
                     BabyBear
                   </div>
                 </div>
@@ -122,8 +122,8 @@ export default function ProofGenerationPipeline() {
           {/* Arrow */}
           <div className="flex justify-center">
             <svg width="20" height="16" viewBox="0 0 20 16" fill="none">
-              <path d="M10 0 L10 10" stroke="#A855F7" strokeWidth="2"/>
-              <path d="M6 8 L10 14 L14 8" fill="#A855F7"/>
+              <path d="M10 0 L10 10" stroke="#c4f547" strokeWidth="2"/>
+              <path d="M6 8 L10 14 L14 8" fill="#c4f547"/>
             </svg>
           </div>
 
@@ -272,9 +272,9 @@ export default function ProofGenerationPipeline() {
                     <div className="text-xs text-amber-400 font-mono">32B</div>
                   </div>
                   <div className="bg-slate-900/50 rounded-lg p-1.5 md:p-2 text-center">
-                    <div className="text-purple-300 font-mono text-sm mb-0.5">J</div>
+                    <div className="text-lime-300 font-mono text-sm mb-0.5">J</div>
                     <div className="text-xs text-slate-400 hidden sm:block">Journal</div>
-                    <div className="text-xs text-purple-400 font-mono">var</div>
+                    <div className="text-xs text-lime-400 font-mono">var</div>
                   </div>
                 </div>
               </div>

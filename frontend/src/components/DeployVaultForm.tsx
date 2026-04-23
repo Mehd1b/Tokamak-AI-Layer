@@ -344,8 +344,8 @@ export function DeployVaultForm() {
     return (
       <div className="rounded-2xl border border-white/5 bg-[#12121a]/80 text-center py-16 px-6">
         <div className="mb-6">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-[#A855F7]/5 border border-[#A855F7]/10 flex items-center justify-center">
-            <svg viewBox="0 0 24 24" className="w-7 h-7 text-[#A855F7]/40" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-[#c4f547]/5 border border-[#c4f547]/10 flex items-center justify-center">
+            <svg viewBox="0 0 24 24" className="w-7 h-7 text-[#c4f547]/40" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3" />
             </svg>
           </div>
@@ -382,7 +382,7 @@ export function DeployVaultForm() {
               href={`${explorerUrl}/address/${deployedVaultAddress}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-gray-500 hover:text-[#A855F7] transition-colors shrink-0"
+              className="text-gray-500 hover:text-[#c4f547] transition-colors shrink-0"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -396,7 +396,7 @@ export function DeployVaultForm() {
                 href={`${explorerUrl}/tx/${deployHash}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-mono text-xs text-[#A855F7] hover:underline break-all"
+                className="font-mono text-xs text-[#c4f547] hover:underline break-all"
               >
                 {truncateAddress(deployHash, 12)}
               </a>
@@ -469,7 +469,7 @@ export function DeployVaultForm() {
               disabled={s.n > step}
               className={`flex items-center gap-1.5 sm:gap-2 text-xs font-mono transition-colors min-h-[44px] sm:min-h-0 ${
                 s.n === step
-                  ? 'text-[#C084FC]'
+                  ? 'text-[#d5f972]'
                   : s.n < step
                     ? 'text-emerald-400 cursor-pointer hover:text-emerald-300'
                     : 'text-gray-600 cursor-default'
@@ -478,7 +478,7 @@ export function DeployVaultForm() {
               <span
                 className={`w-6 h-6 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-colors shrink-0 ${
                   s.n === step
-                    ? 'border-[#A855F7]/50 bg-[#A855F7]/10 text-[#C084FC]'
+                    ? 'border-[#c4f547]/50 bg-[#c4f547]/10 text-[#d5f972]'
                     : s.n < step
                       ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400'
                       : 'border-white/10 bg-white/[0.02] text-gray-600'
@@ -517,7 +517,7 @@ export function DeployVaultForm() {
               onClick={() => setUseManualAgent(false)}
               className={`px-3 py-2 min-h-[44px] sm:min-h-0 sm:py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all border ${
                 !useManualAgent
-                  ? 'bg-[#A855F7]/15 text-[#C084FC] border-white/10'
+                  ? 'bg-[#c4f547]/15 text-[#d5f972] border-white/10'
                   : 'text-gray-500 hover:text-gray-300 border-transparent'
               }`}
             >
@@ -527,7 +527,7 @@ export function DeployVaultForm() {
               onClick={() => setUseManualAgent(true)}
               className={`px-3 py-2 min-h-[44px] sm:min-h-0 sm:py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all border ${
                 useManualAgent
-                  ? 'bg-[#A855F7]/15 text-[#C084FC] border-white/10'
+                  ? 'bg-[#c4f547]/15 text-[#d5f972] border-white/10'
                   : 'text-gray-500 hover:text-gray-300 border-transparent'
               }`}
             >
@@ -552,7 +552,7 @@ export function DeployVaultForm() {
                         onClick={() => setSelectedAgentId(agent.agentId)}
                         className={`w-full text-left p-4 rounded-xl border transition-all ${
                           isSelected
-                            ? 'border-[#A855F7]/40 bg-[#A855F7]/5'
+                            ? 'border-[#c4f547]/40 bg-[#c4f547]/5'
                             : 'border-white/5 bg-white/[0.02] hover:border-white/10 hover:bg-white/[0.03]'
                         }`}
                       >
@@ -580,7 +580,7 @@ export function DeployVaultForm() {
                           <div
                             className={`w-4 h-4 rounded-full border-2 shrink-0 mt-0.5 transition-colors ${
                               isSelected
-                                ? 'border-[#A855F7] bg-[#A855F7]'
+                                ? 'border-[#c4f547] bg-[#c4f547]'
                                 : 'border-gray-600'
                             }`}
                           >
@@ -655,7 +655,7 @@ export function DeployVaultForm() {
               onClick={() => setUseCustomAsset(false)}
               className={`px-3 py-2 min-h-[44px] sm:min-h-0 sm:py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all border ${
                 !useCustomAsset
-                  ? 'bg-[#A855F7]/15 text-[#C084FC] border-white/10'
+                  ? 'bg-[#c4f547]/15 text-[#d5f972] border-white/10'
                   : 'text-gray-500 hover:text-gray-300 border-transparent'
               }`}
             >
@@ -665,7 +665,7 @@ export function DeployVaultForm() {
               onClick={() => setUseCustomAsset(true)}
               className={`px-3 py-2 min-h-[44px] sm:min-h-0 sm:py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all border ${
                 useCustomAsset
-                  ? 'bg-[#A855F7]/15 text-[#C084FC] border-white/10'
+                  ? 'bg-[#c4f547]/15 text-[#d5f972] border-white/10'
                   : 'text-gray-500 hover:text-gray-300 border-transparent'
               }`}
             >
@@ -683,7 +683,7 @@ export function DeployVaultForm() {
                     onClick={() => setSelectedAsset(asset.address)}
                     className={`w-full text-left p-4 rounded-xl border transition-all ${
                       isSelected
-                        ? 'border-[#A855F7]/40 bg-[#A855F7]/5'
+                        ? 'border-[#c4f547]/40 bg-[#c4f547]/5'
                         : 'border-white/5 bg-white/[0.02] hover:border-white/10 hover:bg-white/[0.03]'
                     }`}
                   >
@@ -696,7 +696,7 @@ export function DeployVaultForm() {
                       </div>
                       <div
                         className={`w-4 h-4 rounded-full border-2 shrink-0 transition-colors ${
-                          isSelected ? 'border-[#A855F7] bg-[#A855F7]' : 'border-gray-600'
+                          isSelected ? 'border-[#c4f547] bg-[#c4f547]' : 'border-gray-600'
                         }`}
                       >
                         {isSelected && (

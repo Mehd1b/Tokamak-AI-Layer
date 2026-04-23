@@ -106,7 +106,7 @@ export function VaultWithdrawForm({
               <button
                 type="button"
                 onClick={handleMax}
-                className="text-xs text-[#A855F7] hover:text-[#C084FC] font-mono px-1.5 py-0.5 rounded bg-[#A855F7]/10 hover:bg-[#A855F7]/20 transition-colors"
+                className="text-xs text-[#c4f547] hover:text-[#d5f972] font-mono px-1.5 py-0.5 rounded bg-[#c4f547]/10 hover:bg-[#c4f547]/20 transition-colors"
               >
                 MAX
               </button>

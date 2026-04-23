@@ -89,13 +89,13 @@ export function BondStatusCard({
               />
               <div
                 className="h-full"
-                style={{ width: `${treasuryPct}%`, background: '#a855f7' }}
+                style={{ width: `${treasuryPct}%`, background: '#c4f547' }}
               />
             </div>
             <div className="flex justify-between mt-2">
               <span className="text-xs text-cyan-400">{finderPct}% Finder</span>
               <span className="text-xs text-green-400">{depositorPct}% Depositors</span>
-              <span className="text-xs text-purple-400">{treasuryPct}% Treasury</span>
+              <span className="text-xs text-lime-400">{treasuryPct}% Treasury</span>
             </div>
           </div>
         </div>
@@ -107,7 +107,7 @@ export function BondStatusCard({
               href={`${explorerUrl}/address/${trustedRelayer}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[#A855F7] text-sm hover:underline"
+              className="text-[#c4f547] text-sm hover:underline"
             >
               {truncateAddress(trustedRelayer, 6)}
             </a>

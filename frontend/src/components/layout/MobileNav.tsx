@@ -91,7 +91,7 @@ export function MobileNav() {
             className="fixed inset-0 bg-black/40 -z-10"
             onClick={() => setMoreOpen(false)}
           />
-          <div className="mx-3 mb-1 rounded-xl border border-white/10 bg-[#0a0a0f]/95 backdrop-blur-md p-2 shadow-2xl">
+          <div className="mx-3 mb-1 rounded-xl border border-white/10 bg-[#0b0d10]/95 backdrop-blur-md p-2 shadow-2xl">
             {MORE_LINKS.map((link) => {
               const isActive = !link.external && pathname?.startsWith(link.href);
               if (link.external) {
@@ -117,7 +117,7 @@ export function MobileNav() {
                   href={link.href}
                   className={`block px-4 py-3 min-h-[44px] rounded-lg text-sm font-mono transition-colors ${
                     isActive
-                      ? 'text-[#A855F7] bg-[#A855F7]/10'
+                      ? 'text-[#c4f547] bg-[#c4f547]/10'
                       : 'text-gray-300 hover:bg-white/5 hover:text-white'
                   }`}
                   onClick={() => setMoreOpen(false)}
@@ -132,7 +132,7 @@ export function MobileNav() {
 
       {/* Bottom navigation bar */}
       <nav
-        className="flex items-center justify-around border-t border-white/10 bg-[#0a0a0f] px-2"
+        className="flex items-center justify-around border-t border-white/10 bg-[#0b0d10] px-2"
         style={{ height: '64px', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         {TABS.map((tab) => {
@@ -147,7 +147,7 @@ export function MobileNav() {
               href={tab.href}
               className={`flex flex-col items-center justify-center gap-0.5 min-w-[56px] min-h-[44px] px-2 py-1 rounded-lg transition-colors ${
                 isActive
-                  ? 'text-[#A855F7]'
+                  ? 'text-[#c4f547]'
                   : 'text-gray-500 hover:text-gray-300'
               }`}
             >
@@ -163,7 +163,7 @@ export function MobileNav() {
             onClick={() => setMoreOpen((prev) => !prev)}
             className={`flex flex-col items-center justify-center gap-0.5 min-w-[56px] min-h-[44px] px-2 py-1 rounded-lg transition-colors ${
               moreOpen || isMoreActive
-                ? 'text-[#A855F7]'
+                ? 'text-[#c4f547]'
                 : 'text-gray-500 hover:text-gray-300'
             }`}
           >
