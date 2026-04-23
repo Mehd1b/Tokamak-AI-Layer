@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { softDeleteComment, getCommentById, pinComment, unpinComment } from '@/lib/db';
 import { getSession } from '@/lib/session';
 
+export const dynamic = 'force-dynamic';
+
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

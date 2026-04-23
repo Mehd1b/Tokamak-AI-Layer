@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createPublicClient, http, getAddress, isAddress, parseAbi, type Chain } from 'viem';
 import { hyperEvmMainnet } from '@/lib/chains';
 
+export const dynamic = 'force-dynamic';
+
 const SUPPORTED_CHAINS: Record<number, { rpcUrl: string; chain: Chain }> = {
   999: {
     rpcUrl: process.env.RPC_URL_HYPER_MAINNET || 'https://rpc.hyperliquid.xyz/evm',

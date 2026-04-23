@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCommentCountsByVaults } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     const vaultsParam = req.nextUrl.searchParams.get('vaults');
