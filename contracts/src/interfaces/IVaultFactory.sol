@@ -152,4 +152,57 @@ interface IVaultFactory {
     /// @notice Vault already exists at computed address
     error VaultAlreadyExists(address vault);
     error Create2DeploymentFailed();
+
+    // ============ Tokagent Vault additions (v4) ============
+
+    /// @notice (target, selector) allowlist entry.
+    struct TokagentEntry {
+        address target;
+        bytes4 selector;
+    }
+
+    /// @notice Initial ERC20 approval to seed into the vault at deploy time.
+    /// @dev The spender MUST appear in the initialAllowlist passed to deployTokagentVault.
+    struct TokagentApprovalSpec {
+        address token;
+        address spender;
+        uint256 amount;
+    }
+
+    /// @notice Emitted when a Tokagent (non-zkp) vault is deployed.
+    event TokagentVaultDeployed(
+        address indexed vault,
+        address indexed owner,
+        address indexed operator,
+        uint256 salt,
+        bytes32 kind
+    );
+
+    /// @notice Deploy a Tokagent (non-zkp) vault via CREATE2, seeding the allowlist and approvals atomically.
+    /// @param operator The operator address (the agent's hot wallet).
+    /// @param initialAllowlist Initial (target, selector) pairs to seed.
+    /// @param initialApprovals Initial ERC20 approvals; each `spender` must appear in `initialAllowlist`.
+    /// @param userSalt User-provided salt for CREATE2 address derivation.
+    function deployTokagentVault(
+        address operator,
+        TokagentEntry[] calldata initialAllowlist,
+        TokagentApprovalSpec[] calldata initialApprovals,
+        bytes32 userSalt
+    ) external returns (address vault);
+
+    /// @notice Compute the CREATE2 address for a Tokagent vault given the deploy parameters.
+    function computeTokagentVaultAddress(
+        address owner_,
+        address operator,
+        TokagentEntry[] calldata initialAllowlist,
+        TokagentApprovalSpec[] calldata initialApprovals,
+        bytes32 userSalt
+    ) external view returns (address vault, bytes32 salt);
+
+    /// @notice One-time setter for the TokagentVault creation code store.
+    /// @dev Revert if already set. Owner-only.
+    function setTokagentVaultCreationCodeStoreOnce(address store) external;
+
+    /// @notice Read the configured TokagentVault creation code store.
+    function tokagentVaultCreationCodeStore() external view returns (address);
 }

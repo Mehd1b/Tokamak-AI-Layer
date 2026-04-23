@@ -90,9 +90,13 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
     address public pendingOptimisticVaultCodeStore;
     uint256 public pendingOptimisticVaultCodeStoreActivatesAt;
 
-    /// @notice Storage gap for future upgrades. Reduced from 40 → 33 slots
-    ///         to accommodate the new state above.
-    uint256[33] private __gap;
+    /// @notice Contract whose runtime bytecode is TokagentVault creation code.
+    ///         One-time settable via setTokagentVaultCreationCodeStoreOnce.
+    address public _tokagentVaultCreationCodeStore;
+
+    /// @notice Storage gap for future upgrades. Reduced from 33 → 32 slots
+    ///         to accommodate the _tokagentVaultCreationCodeStore field.
+    uint256[32] private __gap;
 
     // ============ Errors ============
 
@@ -136,6 +140,9 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
 
     /// @notice Emitted when an ownership transfer is proposed.
     event OwnershipTransferProposed(address indexed currentOwner, address indexed proposedOwner);
+
+    /// @notice Emitted when the Tokagent vault creation code store is set.
+    event TokagentVaultCodeStoreSet(address indexed store);
 
     // ============ Modifiers ============
 
@@ -631,5 +638,104 @@ contract VaultFactory is IVaultFactory, Initializable, UUPSUpgradeable {
                 asset, _verifier, agentId, imageId, vaultOwner, bondChainId, challengeWindow
             )
         );
+    }
+
+    /// @notice Get the creation bytecode for TokagentVault with constructor arguments.
+    function _getTokagentCreationBytecode(
+        address owner_,
+        address operator,
+        IVaultFactory.TokagentEntry[] calldata initialAllowlist,
+        IVaultFactory.TokagentApprovalSpec[] calldata initialApprovals
+    ) internal view returns (bytes memory) {
+        require(_tokagentVaultCreationCodeStore != address(0), "tokagent code store not set");
+        return abi.encodePacked(
+            _tokagentVaultCreationCodeStore.code,
+            abi.encode(owner_, operator, initialAllowlist, initialApprovals)
+        );
+    }
+
+    /// @notice Compute CREATE2 salt specifically for Tokagent vaults.
+    /// @dev Distinct salt derivation from zkp vaults so the same (owner, userSalt)
+    ///      can coexist as a Tokagent vault and a KernelVault without address collision.
+    function _computeTokagentSalt(
+        address owner_,
+        address operator,
+        bytes32 userSalt
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked("TOKAGENT", owner_, operator, userSalt));
+    }
+
+    // ============ Tokagent vault stubs (filled by task B4) ============
+
+    /// @inheritdoc IVaultFactory
+    function deployTokagentVault(
+        address operator,
+        IVaultFactory.TokagentEntry[] calldata initialAllowlist,
+        IVaultFactory.TokagentApprovalSpec[] calldata initialApprovals,
+        bytes32 userSalt
+    ) external returns (address vault) {
+        require(operator != address(0), "zero operator");
+
+        bytes32 salt = _computeTokagentSalt(msg.sender, operator, userSalt);
+        bytes memory bytecode = _getTokagentCreationBytecode(
+            msg.sender, operator, initialAllowlist, initialApprovals
+        );
+
+        assembly {
+            vault := create2(0, add(bytecode, 0x20), mload(bytecode), salt)
+        }
+
+        if (vault == address(0)) {
+            revert Create2DeploymentFailed();
+        }
+
+        isDeployedVault[vault] = true;
+        _deployedVaults.push(vault);
+
+        emit TokagentVaultDeployed(
+            vault,
+            msg.sender,
+            operator,
+            uint256(userSalt),
+            keccak256("TokagentVault:v1")
+        );
+
+        return vault;
+    }
+
+    /// @inheritdoc IVaultFactory
+    function computeTokagentVaultAddress(
+        address owner_,
+        address operator,
+        IVaultFactory.TokagentEntry[] calldata initialAllowlist,
+        IVaultFactory.TokagentApprovalSpec[] calldata initialApprovals,
+        bytes32 userSalt
+    ) external view returns (address vault, bytes32 salt) {
+        salt = _computeTokagentSalt(owner_, operator, userSalt);
+        bytes memory bytecode = _getTokagentCreationBytecode(
+            owner_, operator, initialAllowlist, initialApprovals
+        );
+        bytes32 bytecodeHash = keccak256(bytecode);
+        vault = address(
+            uint160(
+                uint256(
+                    keccak256(abi.encodePacked(bytes1(0xff), address(this), salt, bytecodeHash))
+                )
+            )
+        );
+    }
+
+    /// @inheritdoc IVaultFactory
+    function setTokagentVaultCreationCodeStoreOnce(address store) external onlyOwner {
+        require(store != address(0), "zero store");
+        require(_tokagentVaultCreationCodeStore == address(0), "already set");
+        require(store.code.length > 0, "no code at store");
+        _tokagentVaultCreationCodeStore = store;
+        emit TokagentVaultCodeStoreSet(store);
+    }
+
+    /// @inheritdoc IVaultFactory
+    function tokagentVaultCreationCodeStore() external view returns (address) {
+        return _tokagentVaultCreationCodeStore;
     }
 }

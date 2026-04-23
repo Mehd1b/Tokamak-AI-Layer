@@ -17,8 +17,19 @@ mod monitor;
 mod onchain;
 mod sim;
 mod test_cmd;
+mod tokagent_packs;
 
 use clap::{Parser, Subcommand};
+
+#[derive(clap::ValueEnum, Debug, Clone, Copy)]
+pub enum VaultKind {
+    /// Standard zkp-verified vault (default)
+    Zkp,
+    /// OptimisticKernelVault with WSTON bond
+    Optimistic,
+    /// Non-zkp Tokagent vault with protocol allowlist
+    Tokagent,
+}
 
 #[derive(Parser)]
 #[command(
@@ -145,6 +156,22 @@ enum Commands {
         /// Minimum bond amount for optimistic execution (in wei, e.g. 1000000000000000000000000000 = 1e27 for 1 WSTON)
         #[arg(long)]
         min_bond: Option<String>,
+
+        /// What kind of vault to deploy: zkp (default, existing), optimistic, or tokagent.
+        #[arg(long, value_enum, default_value = "zkp")]
+        kind: VaultKind,
+
+        /// (tokagent only) Operator address — the agent's hot wallet.
+        #[arg(long, required_if_eq("kind", "tokagent"))]
+        operator: Option<String>,
+
+        /// (tokagent only) Protocol pack IDs to seed into the allowlist. Repeatable.
+        #[arg(long = "pack")]
+        packs: Vec<String>,
+
+        /// (tokagent only) User-provided CREATE2 salt (hex, 32 bytes).
+        #[arg(long, default_value = "0x0000000000000000000000000000000000000000000000000000000000000001")]
+        user_salt: String,
     },
 
     /// Fork an existing agent to create your own version
@@ -293,17 +320,28 @@ fn main() -> anyhow::Result<()> {
             polymarket,
             optimistic,
             min_bond,
-        } => deploy::run(
-            testnet,
-            step.as_deref(),
-            agent.as_deref(),
-            &cli.config,
-            cli.verbose,
-            hyperliquid,
-            polymarket,
-            optimistic,
-            min_bond.as_deref(),
-        ),
+            kind,
+            operator,
+            packs,
+            user_salt,
+        } => match kind {
+            VaultKind::Tokagent => {
+                let op = operator.as_deref()
+                    .ok_or_else(|| anyhow::anyhow!("--operator required for --kind tokagent"))?;
+                deploy::deploy_tokagent_vault(testnet, op, &packs, &user_salt, &cli.config)
+            }
+            VaultKind::Zkp | VaultKind::Optimistic => deploy::run(
+                testnet,
+                step.as_deref(),
+                agent.as_deref(),
+                &cli.config,
+                cli.verbose,
+                hyperliquid,
+                polymarket,
+                optimistic,
+                min_bond.as_deref(),
+            ),
+        },
 
         Commands::Fork {
             agent_id,

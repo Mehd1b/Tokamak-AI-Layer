@@ -6,6 +6,8 @@ export { AgentRegistryClient } from './clients/AgentRegistryClient';
 export { VaultFactoryClient } from './clients/VaultFactoryClient';
 export { KernelVaultClient } from './clients/KernelVaultClient';
 export { VerifierClient } from './clients/VerifierClient';
+export { TokagentVaultClient } from './clients/TokagentVaultClient';
+export type { TokagentEntry, TokagentCall } from './clients/TokagentVaultClient';
 
 // ABIs
 export { AgentRegistryABI } from './abi/AgentRegistry';
@@ -14,6 +16,7 @@ export { KernelVaultABI } from './abi/KernelVault';
 export { KernelExecutionVerifierABI } from './abi/KernelExecutionVerifier';
 export { ReferralManagerABI } from './abi/ReferralManager';
 export { PointsProgramABI } from './abi/PointsProgram';
+export { TokagentVaultABI } from './abi/TokagentVault';
 
 // Utilities
 export { fetchAgentMetadata, resolveMetadataURI } from './utils/metadata';

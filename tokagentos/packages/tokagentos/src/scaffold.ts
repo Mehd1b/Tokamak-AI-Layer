@@ -203,7 +203,7 @@ export function getPluginReplacementEntries(
     [`\${REPO_URL}`, values.repoUrl],
     ["__TOKAGENTOS_VERSION__", values.tokagentVersion],
     ["@tokagentos/rust-plugin-starter", `@tokagentos/${rustPluginName}`],
-    ["@tokagentos/plugin-starter", `@tokagentos/${values.pluginBaseName}`],
+    ["@elizaos/plugin-starter", `@tokagentos/${values.pluginBaseName}`],
     ["tokagentos_plugin_starter", `tokagentos_${values.pluginSnake}`],
     ["tokagentos-plugin-starter", `tokagentos-${values.pluginBaseName}`],
     ["rust_plugin_starter", `rust_${values.pluginSnake}`],
@@ -544,8 +544,36 @@ export function hydrateGitSubmoduleWorkspace(options: {
     return;
   }
 
+  // Upstream elizaos/eliza hardcodes `eliza/packages/...` paths in a
+  // few runtime scripts (e.g., dev-ui.mjs spawning the dev-server). Our
+  // template puts the submodule under `tokagent/` instead, so those
+  // hardcoded paths would 404 at runtime. Create an `eliza` symlink
+  // pointing at the submodule path so either name resolves.
+  if (options.upstream.path !== "eliza") {
+    const elizaAlias = path.join(options.projectRoot, "eliza");
+    if (!fs.existsSync(elizaAlias)) {
+      try {
+        fs.symlinkSync(options.upstream.path, elizaAlias, "dir");
+      } catch {
+        // Non-fatal — upstream scripts that rely on the alias will
+        // surface their own errors later if the symlink couldn't be
+        // created (e.g., on filesystems that don't support symlinks).
+      }
+    }
+  }
+
   const requiredSubmodules = options.upstream.requiredSubmodules ?? [];
   const localRepoRoot = resolveLocalRepoRoot(options.upstream.repo);
+
+  // Init ALL submodules recursively first so the upstream package's
+  // transitive workspace:* deps (plugins listed in upstream/package.json
+  // but not explicitly in requiredSubmodules) resolve. The per-path loop
+  // below then re-runs with optional --reference against a local fork.
+  execFileSync(
+    "git",
+    ["submodule", "update", "--init", "--recursive"],
+    { cwd: submoduleRoot, stdio: "inherit" },
+  );
 
   for (const submodulePath of requiredSubmodules) {
     const command = ["submodule", "update", "--init", "--recursive"];
@@ -581,6 +609,88 @@ export function hydrateGitSubmoduleWorkspace(options: {
     options.upstream.requiredWorkspaces ?? [],
   );
   ensureUpstreamCompatibilityFiles(submoduleRoot);
+
+  const patchResult = applyTokagentScaffoldPatches({
+    dryRun: options.dryRun,
+    submoduleRoot,
+  });
+
+  if (patchResult.missing.length > 0) {
+    throw new Error(
+      `scaffold-patches target paths missing — upstream reorganization? ` +
+        `Missing: ${patchResult.missing.join(", ")}`,
+    );
+  }
+}
+
+/**
+ * Overlay Tokagent-specific patches onto a freshly-hydrated upstream clone.
+ * Each file under `scaffold-patches/` is copied to the same relative path
+ * inside `<submoduleRoot>/` (i.e., the user's `<project>/tokagent/` directory).
+ *
+ * Returns a list of relative paths that were overlaid so the caller can log
+ * them. Conflicts (target path missing) throw with a clear error — upstream
+ * reorganizations must be reconciled in scaffold-patches before the next
+ * tokagentos release.
+ */
+export function applyTokagentScaffoldPatches(options: {
+  dryRun?: boolean;
+  submoduleRoot: string;
+}): { applied: string[]; missing: string[] } {
+  const applied: string[] = [];
+  const missing: string[] = [];
+
+  const patchesRoot = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "scaffold-patches",
+  );
+
+  if (!fs.existsSync(patchesRoot)) {
+    // No patches declared — nothing to do.
+    return { applied, missing };
+  }
+
+  const walk = (dir: string): string[] => {
+    const entries: string[] = [];
+    for (const name of fs.readdirSync(dir)) {
+      if (SKIP_NAMES.has(name)) continue;
+      const full = path.join(dir, name);
+      const stat = fs.statSync(full);
+      if (stat.isDirectory()) {
+        entries.push(...walk(full));
+      } else if (stat.isFile()) {
+        entries.push(full);
+      }
+    }
+    return entries;
+  };
+
+  const patchFiles = walk(patchesRoot);
+
+  for (const patchPath of patchFiles) {
+    const relativePath = path.relative(patchesRoot, patchPath);
+    // Exclude README.md from being overlaid — it's documentation.
+    if (relativePath === "README.md") continue;
+
+    const targetPath = path.join(options.submoduleRoot, relativePath);
+
+    if (!fs.existsSync(path.dirname(targetPath))) {
+      // Target parent dir missing — upstream layout may have changed.
+      missing.push(relativePath);
+      continue;
+    }
+
+    if (options.dryRun) {
+      applied.push(relativePath);
+      continue;
+    }
+
+    fs.copyFileSync(patchPath, targetPath);
+    applied.push(relativePath);
+  }
+
+  return { applied, missing };
 }
 
 export function initializeGitSubmodule(options: {

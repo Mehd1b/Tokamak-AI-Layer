@@ -11,7 +11,8 @@ use crate::onchain::{
     self, build_provider, get_chain_config, parse_bytes32, read_and_link_artifact, read_manifest,
     resolve_chain_id, resolve_env, resolve_private_key, send_tx, ChainConfig,
 };
-use alloy::primitives::{Address, FixedBytes, U256};
+use crate::tokagent_packs::{find_pack, ApprovalEntry, PackEntry, PACKS};
+use alloy::primitives::{address, Address, FixedBytes, U256};
 use alloy::providers::Provider;
 use alloy::sol;
 use alloy::sol_types::SolCall;
@@ -910,6 +911,384 @@ fn format_usdc(amount: U256) -> String {
     let raw: u128 = amount.try_into().unwrap_or(0);
     let dollars = raw as f64 / 1_000_000.0;
     format!("{:.2}", dollars)
+}
+
+// ===========================================================================
+// Tokagent Vault Deploy
+// ===========================================================================
+
+sol! {
+    #[sol(rpc)]
+    interface IVaultFactoryTokagent {
+        struct TokagentEntry {
+            address target;
+            bytes4 selector;
+        }
+
+        struct TokagentApprovalSpec {
+            address token;
+            address spender;
+            uint256 amount;
+        }
+
+        event TokagentVaultDeployed(
+            address indexed vault,
+            address indexed owner,
+            address indexed operator,
+            uint256 salt,
+            bytes32 kind
+        );
+
+        function deployTokagentVault(
+            address operator,
+            TokagentEntry[] calldata initialAllowlist,
+            TokagentApprovalSpec[] calldata initialApprovals,
+            bytes32 userSalt
+        ) external returns (address vault);
+    }
+}
+
+/// Entry point for `tal deploy --kind tokagent`.
+/// Assembles protocol pack data and sends a `deployTokagentVault` transaction.
+pub fn deploy_tokagent_vault(
+    testnet: bool,
+    operator_hex: &str,
+    pack_ids: &[String],
+    user_salt_hex: &str,
+    config_path: &str,
+) -> Result<()> {
+    let rt = tokio::runtime::Runtime::new()?;
+    rt.block_on(deploy_tokagent_vault_async(testnet, operator_hex, pack_ids, user_salt_hex, config_path))
+}
+
+async fn deploy_tokagent_vault_async(
+    testnet: bool,
+    operator_hex: &str,
+    pack_ids: &[String],
+    user_salt_hex: &str,
+    config_path: &str,
+) -> Result<()> {
+    use colored::Colorize;
+
+    println!(
+        "{} tal deploy --kind tokagent",
+        "●".cyan().bold()
+    );
+    println!();
+
+    // -----------------------------------------------------------------------
+    // Step 1: Resolve chain from packs (or testnet flag)
+    // -----------------------------------------------------------------------
+    let chain_id = if testnet {
+        998u64
+    } else {
+        resolve_chain_from_packs(pack_ids)?
+    };
+
+    // For Tokagent vaults we use a broader chain config (chain may not be in
+    // the existing onchain::get_chain_config table, e.g. Polygon 137).
+    // We only need the factory address and RPC; onchain::get_chain_config is
+    // only needed for HyperEVM chains. We handle both.
+    let factory_addr = resolve_factory_for_chain(chain_id)?;
+    println!("  Chain:   {} ({})", chain_id_name(chain_id), chain_id);
+    println!("  Factory: {}", factory_addr);
+
+    // -----------------------------------------------------------------------
+    // Step 2: Build allowlist + approvals from packs
+    // -----------------------------------------------------------------------
+    let mut entries: Vec<PackEntry> = Vec::new();
+    let mut approvals: Vec<ApprovalEntry> = Vec::new();
+    for pack_id in pack_ids {
+        let pack = find_pack(pack_id, chain_id)
+            .ok_or_else(|| anyhow::anyhow!("unknown pack '{}' for chain {}", pack_id, chain_id))?;
+        println!("  Pack:    {} ({})", pack.display_name, pack.id);
+        entries.extend_from_slice(pack.entries);
+        approvals.extend_from_slice(pack.approvals);
+    }
+    println!("  Entries: {} calls / {} approvals", entries.len(), approvals.len());
+    println!();
+
+    // -----------------------------------------------------------------------
+    // Step 3: Parse operator + salt
+    // -----------------------------------------------------------------------
+    let operator = parse_address(operator_hex)
+        .with_context(|| format!("--operator '{}' is not a valid address", operator_hex))?;
+    let user_salt = parse_bytes32_padded(user_salt_hex)
+        .with_context(|| format!("--user-salt '{}' is not a valid 32-byte hex value", user_salt_hex))?;
+
+    println!("  Operator: {}", operator);
+
+    // -----------------------------------------------------------------------
+    // Step 4: Connect provider/signer
+    // -----------------------------------------------------------------------
+    let rpc_url = resolve_env("RPC_URL")
+        .with_context(|| "RPC_URL not set. Add to .env or environment.")?;
+    let private_key = resolve_private_key("PRIVATE_KEY")?;
+    let provider = build_provider(&rpc_url, &private_key)?;
+
+    let deployer_addr = {
+        let pk_clean = private_key.strip_prefix("0x").unwrap_or(&private_key);
+        let signer: alloy::signers::local::PrivateKeySigner = pk_clean.parse()?;
+        signer.address()
+    };
+    let balance = provider.get_balance(deployer_addr).await?;
+    if balance.is_zero() {
+        bail!("Deployer {} has zero balance on chain {}. Fund with native token first.", deployer_addr, chain_id);
+    }
+    println!("  Deployer: {} ({:.4} native)", deployer_addr, balance.to::<u128>() as f64 / 1e18);
+    println!();
+
+    // -----------------------------------------------------------------------
+    // Step 5: ABI-encode deployTokagentVault calldata and send tx
+    // -----------------------------------------------------------------------
+    println!("  Deploying TokagentVault via factory...");
+
+    // Convert pack entries to sol! types
+    let allowlist: Vec<IVaultFactoryTokagent::TokagentEntry> = entries
+        .iter()
+        .map(|e| IVaultFactoryTokagent::TokagentEntry {
+            target: e.target,
+            selector: e.selector,
+        })
+        .collect();
+
+    let approval_specs: Vec<IVaultFactoryTokagent::TokagentApprovalSpec> = approvals
+        .iter()
+        .map(|a| IVaultFactoryTokagent::TokagentApprovalSpec {
+            token: a.token,
+            spender: a.spender,
+            amount: U256::MAX, // Max approval — operator controls token spending
+        })
+        .collect();
+
+    let calldata = IVaultFactoryTokagent::deployTokagentVaultCall {
+        operator,
+        initialAllowlist: allowlist,
+        initialApprovals: approval_specs,
+        userSalt: user_salt,
+    }
+    .abi_encode();
+
+    let result = send_tx(&provider, Some(factory_addr), calldata, U256::ZERO, Some(3_000_000))
+        .await
+        .context("deployTokagentVault transaction failed")?;
+
+    println!(
+        "  {} Transaction sent (tx: {:?}, gas: {})",
+        "✓".green(),
+        result.tx_hash,
+        result.gas_used
+    );
+
+    // -----------------------------------------------------------------------
+    // Step 6: Parse vault address from TokagentVaultDeployed event
+    // -----------------------------------------------------------------------
+    let vault_addr = result.contract_address.unwrap_or_else(|| {
+        // The factory emits TokagentVaultDeployed; try to extract from logs.
+        // alloy's send_tx returns the receipt; the vault address comes from the event,
+        // not the receipt.contract_address (factory is the tx target, not deployed contract).
+        // We will query the factory for the vault after deployment.
+        Address::ZERO
+    });
+
+    // If we didn't get the address from the receipt (expected — factory deploy, not contract creation),
+    // query the factory for the last deployed vault address via computeTokagentVaultAddress.
+    let final_vault_addr = if vault_addr == Address::ZERO {
+        // Query via factory
+        sol! {
+            #[sol(rpc)]
+            interface IVaultFactoryQuery {
+                struct TokagentEntry { address target; bytes4 selector; }
+                struct TokagentApprovalSpec { address token; address spender; uint256 amount; }
+                function computeTokagentVaultAddress(
+                    address owner_,
+                    address operator,
+                    TokagentEntry[] calldata initialAllowlist,
+                    TokagentApprovalSpec[] calldata initialApprovals,
+                    bytes32 userSalt
+                ) external view returns (address vault, bytes32 salt);
+            }
+        }
+
+        let factory = IVaultFactoryQuery::new(factory_addr, &provider);
+
+        let allowlist_q: Vec<IVaultFactoryQuery::TokagentEntry> = entries
+            .iter()
+            .map(|e| IVaultFactoryQuery::TokagentEntry {
+                target: e.target,
+                selector: e.selector,
+            })
+            .collect();
+        let approvals_q: Vec<IVaultFactoryQuery::TokagentApprovalSpec> = approvals
+            .iter()
+            .map(|a| IVaultFactoryQuery::TokagentApprovalSpec {
+                token: a.token,
+                spender: a.spender,
+                amount: U256::MAX,
+            })
+            .collect();
+
+        match factory
+            .computeTokagentVaultAddress(deployer_addr, operator, allowlist_q, approvals_q, user_salt)
+            .call()
+            .await
+        {
+            Ok(res) => res.vault,
+            Err(e) => {
+                println!("  {} Could not compute vault address post-deploy: {}", "⚠".yellow(), e);
+                println!("    Check factory events for the deployed vault address.");
+                Address::ZERO
+            }
+        }
+    } else {
+        vault_addr
+    };
+
+    // -----------------------------------------------------------------------
+    // Summary
+    // -----------------------------------------------------------------------
+    println!();
+    println!("{}", "Deployment Summary".bold());
+    println!("  {}", "─".repeat(55));
+    println!("  Chain:    {} ({})", chain_id_name(chain_id), chain_id);
+    println!("  Mode:     Tokagent (non-zkp)");
+    println!("  Operator: {}", operator);
+    if final_vault_addr != Address::ZERO {
+        println!("  Vault:    {}", final_vault_addr);
+    } else {
+        println!("  Vault:    (check factory TokagentVaultDeployed event)");
+    }
+    println!("  Tx:       {:?}", result.tx_hash);
+    println!("  {}", "─".repeat(55));
+
+    // Persist to .env
+    if final_vault_addr != Address::ZERO && std::path::Path::new(config_path).exists() {
+        update_env_file(config_path, "VAULT_ADDRESS", &format!("{}", final_vault_addr))?;
+        println!();
+        println!("  {} Updated {} with VAULT_ADDRESS", "✓".green(), config_path);
+    }
+
+    println!();
+    println!("  {} Tokagent vault deployed!", "✓".green().bold());
+    println!();
+    println!("  {} Next steps:", "→".yellow());
+    println!("    • Fund vault with tokens");
+    if final_vault_addr != Address::ZERO {
+        println!("    • Monitor: tal monitor --vault {}", final_vault_addr);
+    }
+    println!();
+
+    Ok(())
+}
+
+fn resolve_chain_from_packs(pack_ids: &[String]) -> Result<u64> {
+    let mut chain: Option<u64> = None;
+    for id in pack_ids {
+        let pack = PACKS.iter().find(|p| p.id == *id)
+            .ok_or_else(|| anyhow::anyhow!("unknown pack: '{}'", id))?;
+        match chain {
+            None => chain = Some(pack.chain_id),
+            Some(c) if c != pack.chain_id => {
+                bail!(
+                    "packs span multiple chains: '{}' is on chain {}, but earlier packs are on chain {}",
+                    id, pack.chain_id, c
+                );
+            }
+            _ => {}
+        }
+    }
+    chain.ok_or_else(|| anyhow::anyhow!("no packs specified — pass at least one --pack <id>"))
+}
+
+fn resolve_factory_for_chain(chain_id: u64) -> Result<Address> {
+    Ok(match chain_id {
+        1     => address!("47E6EfFf516E8b899092ebEEF92fddCE579e9d39"),
+        137   => address!("0eDa0bCFBFc51Ab245F078AEFa3ee42cB384c865"),
+        999   => address!("d27A7470a34903b7e215EA8d07d9cd2d21238F83"),
+        42161 => address!("7b0E7eDf494acF2E90fBc9Fc97b8C412606B0611"),
+        10    => address!("7b0E7eDf494acF2E90fBc9Fc97b8C412606B0611"),
+        11155111 => address!("580e55fDE87fFC1cF1B6a446d6DBf8068EB07b8C"),
+        998   => address!("4c36bCA87f21E16f5af8A6d7Df2D86a5aD13049F"),
+        _ => bail!("no factory address configured for chain {}. Add it to resolve_factory_for_chain().", chain_id),
+    })
+}
+
+fn chain_id_name(chain_id: u64) -> &'static str {
+    match chain_id {
+        1     => "Ethereum Mainnet",
+        137   => "Polygon",
+        999   => "HyperEVM Mainnet",
+        998   => "HyperEVM Testnet",
+        42161 => "Arbitrum One",
+        10    => "Optimism",
+        11155111 => "Sepolia",
+        _ => "Unknown",
+    }
+}
+
+fn parse_address(s: &str) -> Result<Address> {
+    s.parse::<Address>().map_err(|e| anyhow::anyhow!("bad address '{}': {}", s, e))
+}
+
+/// Like onchain::parse_bytes32 but left-pads short hex strings to 32 bytes.
+/// Used for --user-salt where the default "0x01" is valid shorthand.
+fn parse_bytes32_padded(s: &str) -> Result<FixedBytes<32>> {
+    let s = s.strip_prefix("0x").unwrap_or(s);
+    let padded = format!("{:0>64}", s);
+    let bytes = hex::decode(&padded).map_err(|e| anyhow::anyhow!("bad bytes32 hex: {}", e))?;
+    if bytes.len() != 32 {
+        bail!("expected 32 bytes, got {}", bytes.len());
+    }
+    Ok(FixedBytes::from_slice(&bytes))
+}
+
+// ===========================================================================
+// Tests
+// ===========================================================================
+
+#[cfg(test)]
+mod tokagent_tests {
+    use super::*;
+
+    #[test]
+    fn resolve_chain_from_packs_single_chain() {
+        let packs = vec!["aave-v3-polygon".to_string()];
+        assert_eq!(resolve_chain_from_packs(&packs).unwrap(), 137);
+    }
+
+    #[test]
+    fn resolve_chain_from_packs_empty() {
+        let err = resolve_chain_from_packs(&[]).unwrap_err();
+        assert!(err.to_string().contains("no packs"), "unexpected: {}", err);
+    }
+
+    #[test]
+    fn resolve_chain_from_packs_unknown() {
+        let packs = vec!["not-a-pack".to_string()];
+        let err = resolve_chain_from_packs(&packs).unwrap_err();
+        assert!(err.to_string().contains("unknown pack"), "unexpected: {}", err);
+    }
+
+    #[test]
+    fn parse_bytes32_ok() {
+        let h = "0x0000000000000000000000000000000000000000000000000000000000000001";
+        let out = parse_bytes32_padded(h).unwrap();
+        assert_eq!(out[31], 1);
+    }
+
+    #[test]
+    fn parse_bytes32_shorthand() {
+        // "0x01" should be padded to 32 bytes, last byte = 1
+        let h = "0x01";
+        let out = parse_bytes32_padded(h).unwrap();
+        assert_eq!(out[31], 1);
+    }
+
+    #[test]
+    fn parse_bytes32_invalid_hex() {
+        let h = "0xZZZZ"; // invalid hex
+        assert!(parse_bytes32_padded(h).is_err());
+    }
 }
 
 /// Update a KEY=VALUE line in a .env file. If the key exists, replace its value.
