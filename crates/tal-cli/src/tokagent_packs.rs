@@ -80,7 +80,9 @@ static POLYGON_AAVE_V3: ProtocolPack = ProtocolPack {
 //
 // Selectors verified against: cast sig "bridgeHype(uint256)" => 0xf4e0b185
 //                             cast sig "dispatchCoreWriter(bytes)" => 0xa62c829a
-const HYPERLIQUID_HELPER_HYPEREVM: Address = address!("0000000000000000000000000000000000000000");
+// Deployed TokagentHyperEvmHelper on HyperEVM mainnet (chain 999).
+// Stateless — any number of vaults can share this helper.
+const HYPERLIQUID_HELPER_HYPEREVM: Address = address!("8350777738059f29f639e493ea96e20d2f58171c");
 
 static HYPEREVM_HL_PERPS_ENTRIES: &[PackEntry] = &[
     PackEntry {
