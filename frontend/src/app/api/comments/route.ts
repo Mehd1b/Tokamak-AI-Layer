@@ -3,6 +3,8 @@ import { getCommentsByVault, createComment, countRecentComments, getCommentById 
 import { getSession } from '@/lib/session';
 import crypto from 'crypto';
 
+export const dynamic = 'force-dynamic';
+
 const MAX_CONTENT_LENGTH = 2000;
 const RATE_LIMIT_WINDOW = 60; // seconds
 const RATE_LIMIT_MAX = 10; // max comments per window

@@ -66,22 +66,22 @@ function PositionCard({ position }: { position: UserPosition }) {
           p-5 cursor-pointer group
           transition-all duration-500 ease-out
           hover:-translate-y-1
-          border-white/10 hover:border-[#A855F7]/30
-          group-hover:shadow-[0_0_30px_rgba(168,85,247,0.12)]
+          border-white/10 hover:border-[#c4f547]/30
+          group-hover:shadow-[0_0_30px_rgba(196,245,71,0.12)]
         `}
       >
         {/* Top-edge gradient on hover */}
         <div
           className="absolute top-0 left-0 right-0 h-px opacity-0 group-hover:opacity-100 transition-opacity duration-500"
           style={{
-            background: 'linear-gradient(90deg, transparent, #A855F7, transparent)',
+            background: 'linear-gradient(90deg, transparent, #c4f547, transparent)',
           }}
         />
 
         {/* Header: Agent name + Protocol badge */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-white group-hover:text-[#C084FC] transition-colors">
+            <span className="text-sm font-medium text-white group-hover:text-[#d5f972] transition-colors">
               <AgentName agentId={position.agentId} />
             </span>
           </div>
@@ -105,7 +105,7 @@ function PositionCard({ position }: { position: UserPosition }) {
             <span className="text-xl sm:text-2xl font-light tracking-tight text-white font-mono truncate">
               {formatClean(position.currentValue, position.assetDecimals)}
             </span>
-            <span className="text-xs font-mono font-medium text-[#C084FC]">
+            <span className="text-xs font-mono font-medium text-[#d5f972]">
               {position.assetSymbol}
             </span>
           </div>
@@ -157,8 +157,8 @@ function ConnectPrompt() {
       {/* Header */}
       <div className="mb-10">
         <div className="flex items-center gap-3 mb-5">
-          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#A855F7] to-transparent" />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C084FC] font-mono">
+          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#c4f547] to-transparent" />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d5f972] font-mono">
             Portfolio
           </span>
         </div>
@@ -166,7 +166,7 @@ function ConnectPrompt() {
           className="text-4xl md:text-5xl font-light mb-3 tracking-tight"
           style={{ fontFamily: 'var(--font-serif), serif' }}
         >
-          <span className="italic text-[#A855F7]">Your</span>{' '}
+          <span className="italic text-[#c4f547]">Your</span>{' '}
           <span className="text-white">Portfolio</span>
         </h1>
         <p className="text-gray-500 max-w-lg text-sm leading-relaxed font-mono">
@@ -177,10 +177,10 @@ function ConnectPrompt() {
       {/* Connect card */}
       <div className="rounded-2xl border border-white/5 bg-[#12121a]/80 text-center py-20">
         <div className="mb-6">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-[#A855F7]/5 border border-[#A855F7]/10 flex items-center justify-center">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-[#c4f547]/5 border border-[#c4f547]/10 flex items-center justify-center">
             <svg
               viewBox="0 0 24 24"
-              className="w-7 h-7 text-[#A855F7]/40"
+              className="w-7 h-7 text-[#c4f547]/40"
               fill="none"
               stroke="currentColor"
               strokeWidth="1"
@@ -229,8 +229,8 @@ export default function PortfolioPage() {
       {/* Header */}
       <div className="mb-8 sm:mb-10">
         <div className="flex items-center gap-3 mb-5">
-          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#A855F7] to-transparent" />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C084FC] font-mono">
+          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#c4f547] to-transparent" />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d5f972] font-mono">
             Portfolio
           </span>
         </div>
@@ -238,7 +238,7 @@ export default function PortfolioPage() {
           className="text-4xl md:text-5xl font-light mb-3 tracking-tight"
           style={{ fontFamily: 'var(--font-serif), serif' }}
         >
-          <span className="italic text-[#A855F7]">Your</span>{' '}
+          <span className="italic text-[#c4f547]">Your</span>{' '}
           <span className="text-white">Portfolio</span>
         </h1>
         <p className="text-gray-500 max-w-lg text-sm leading-relaxed font-mono">
@@ -367,10 +367,10 @@ export default function PortfolioPage() {
           {positions.length === 0 && (
             <div className="rounded-2xl border border-white/5 bg-[#12121a]/80 text-center py-20">
               <div className="mb-6">
-                <div className="w-16 h-16 mx-auto rounded-2xl bg-[#A855F7]/5 border border-[#A855F7]/10 flex items-center justify-center">
+                <div className="w-16 h-16 mx-auto rounded-2xl bg-[#c4f547]/5 border border-[#c4f547]/10 flex items-center justify-center">
                   <svg
                     viewBox="0 0 24 24"
-                    className="w-7 h-7 text-[#A855F7]/40"
+                    className="w-7 h-7 text-[#c4f547]/40"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="1"
@@ -416,9 +416,9 @@ export default function PortfolioPage() {
                   Deposit and withdrawal history for your positions.
                 </p>
                 <div className="rounded-xl border border-white/5 bg-white/[0.02] px-6 py-10 text-center">
-                  <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-[#A855F7]/5 border border-[#A855F7]/10 flex items-center justify-center">
+                  <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-[#c4f547]/5 border border-[#c4f547]/10 flex items-center justify-center">
                     <svg
-                      className="w-5 h-5 text-[#A855F7]/40"
+                      className="w-5 h-5 text-[#c4f547]/40"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"

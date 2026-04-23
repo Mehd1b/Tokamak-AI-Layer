@@ -25,7 +25,7 @@ export default function WhitepaperPage() {
             <h1 className="text-5xl md:text-6xl font-light mb-4">
               Verifiable ML Agent Marketplace for DeFi
             </h1>
-            <div className="w-32 h-1 bg-gradient-to-r from-purple-400 via-violet-500 to-fuchsia-400 mx-auto rounded-full"></div>
+            <div className="w-32 h-1 bg-gradient-to-r from-lime-400 via-violet-500 to-lime-400 mx-auto rounded-full"></div>
           </header>
 
           <section className="mb-12">
@@ -141,7 +141,7 @@ export default function WhitepaperPage() {
 
             <h4 className="text-xl font-semibold text-white mb-4">2.3.1 Private Zone Execution</h4>
             <p className="text-gray-300 leading-8 mb-6">
-              Agent execution occurs within a secure private zone where model weights are loaded directly into prover memory and never transmitted over networks. The RISC Zero zkVM executes deterministic RISC-V code with native f32 floating-point support, processing approximately 10 million CPU cycles for typical AI inference workloads. The execution follows a strict four-step process: (1) <span className="font-mono text-purple-400">env::read()</span> loads inputs and weights, (2) <span className="font-mono text-purple-400">inference(x, W)</span> performs the forward pass, (3) <span className="font-mono text-purple-400">constraints.validate()</span> checks bounds, and (4) <span className="font-mono text-purple-400">env::commit(action)</span> writes results to the cryptographically verifiable journal.
+              Agent execution occurs within a secure private zone where model weights are loaded directly into prover memory and never transmitted over networks. The RISC Zero zkVM executes deterministic RISC-V code with native f32 floating-point support, processing approximately 10 million CPU cycles for typical AI inference workloads. The execution follows a strict four-step process: (1) <span className="font-mono text-lime-400">env::read()</span> loads inputs and weights, (2) <span className="font-mono text-lime-400">inference(x, W)</span> performs the forward pass, (3) <span className="font-mono text-lime-400">constraints.validate()</span> checks bounds, and (4) <span className="font-mono text-lime-400">env::commit(action)</span> writes results to the cryptographically verifiable journal.
             </p>
 
             <h4 className="text-xl font-semibold text-white mb-4">2.3.2 Model Commitment Scheme</h4>

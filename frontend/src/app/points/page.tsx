@@ -72,8 +72,8 @@ export default function PointsPage() {
       {/* Header */}
       <div className="mb-10">
         <div className="flex items-center gap-3 mb-5">
-          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#A855F7] to-transparent" />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C084FC] font-mono">
+          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#c4f547] to-transparent" />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d5f972] font-mono">
             Points Program
           </span>
         </div>
@@ -81,7 +81,7 @@ export default function PointsPage() {
           className="text-4xl md:text-5xl font-light mb-3 tracking-tight"
           style={{ fontFamily: 'var(--font-serif), serif' }}
         >
-          <span className="italic text-[#A855F7]">Earn</span>{' '}
+          <span className="italic text-[#c4f547]">Earn</span>{' '}
           <span className="text-white">Points</span>
         </h1>
         <p className="text-gray-500 max-w-lg text-sm leading-relaxed font-mono">
@@ -95,8 +95,8 @@ export default function PointsPage() {
       {!isConnected && (
         <div className="card text-center py-16">
           <div className="mb-6">
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-[#A855F7]/5 border border-[#A855F7]/10 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-7 h-7 text-[#A855F7]/40" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-[#c4f547]/5 border border-[#c4f547]/10 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-7 h-7 text-[#c4f547]/40" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
               </svg>
             </div>
@@ -135,7 +135,7 @@ export default function PointsPage() {
           <div className="card relative overflow-hidden py-10 text-center">
             {/* Subtle gradient glow behind the number */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-64 h-64 rounded-full bg-[#A855F7]/5 blur-3xl" />
+              <div className="w-64 h-64 rounded-full bg-[#c4f547]/5 blur-3xl" />
             </div>
 
             <div className="relative z-10">
@@ -198,7 +198,7 @@ export default function PointsPage() {
               <div className="text-xs text-gray-500 font-mono uppercase tracking-wider mb-2">
                 Referral Bonus
               </div>
-              <div className="text-3xl font-light text-[#A855F7] font-mono">
+              <div className="text-3xl font-light text-[#c4f547] font-mono">
                 {isLoading ? (
                   <span className="text-gray-600 animate-pulse">--</span>
                 ) : (
@@ -215,11 +215,11 @@ export default function PointsPage() {
                 <div
                   className="w-10 h-10 rounded-lg flex items-center justify-center"
                   style={{
-                    background: 'rgba(168, 85, 247, 0.08)',
-                    border: '1px solid rgba(168, 85, 247, 0.15)',
+                    background: 'rgba(196, 245, 71, 0.08)',
+                    border: '1px solid rgba(196, 245, 71, 0.15)',
                   }}
                 >
-                  <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#A855F7]" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#c4f547]" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
@@ -244,11 +244,11 @@ export default function PointsPage() {
               <div
                 className="w-10 h-10 rounded-lg flex items-center justify-center"
                 style={{
-                  background: 'rgba(168, 85, 247, 0.08)',
-                  border: '1px solid rgba(168, 85, 247, 0.15)',
+                  background: 'rgba(196, 245, 71, 0.08)',
+                  border: '1px solid rgba(196, 245, 71, 0.15)',
                 }}
               >
-                <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#A855F7]" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#c4f547]" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
                 </svg>
               </div>
@@ -258,7 +258,7 @@ export default function PointsPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="text-center">
-                <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-[#A855F7]/10 border border-[#A855F7]/20 flex items-center justify-center text-[#A855F7] font-mono font-bold text-sm">
+                <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-[#c4f547]/10 border border-[#c4f547]/20 flex items-center justify-center text-[#c4f547] font-mono font-bold text-sm">
                   1
                 </div>
                 <h3 className="text-white text-sm font-medium mb-1">Deposit</h3>

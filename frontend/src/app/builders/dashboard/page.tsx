@@ -88,7 +88,7 @@ function TierProgressBar({ currentTvl, currentTier }: { currentTvl: bigint; curr
       </div>
       <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-[#A855F7] to-[#C084FC] transition-all duration-500"
+          className="h-full rounded-full bg-gradient-to-r from-[#c4f547] to-[#d5f972] transition-all duration-500"
           style={{ width: `${Math.max(progress, 2)}%` }}
         />
       </div>
@@ -130,11 +130,11 @@ function RegisterForm() {
         <div
           className="w-10 h-10 rounded-lg flex items-center justify-center"
           style={{
-            background: 'rgba(168, 85, 247, 0.08)',
-            border: '1px solid rgba(168, 85, 247, 0.15)',
+            background: 'rgba(196, 245, 71, 0.08)',
+            border: '1px solid rgba(196, 245, 71, 0.15)',
           }}
         >
-          <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#A855F7]" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#c4f547]" fill="none" stroke="currentColor" strokeWidth="1.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
           </svg>
         </div>
@@ -154,7 +154,7 @@ function RegisterForm() {
             onChange={(e) => setName(e.target.value)}
             placeholder="Your builder name"
             required
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#A855F7]/50 transition-colors font-mono"
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#c4f547]/50 transition-colors font-mono"
           />
         </div>
         <div>
@@ -166,7 +166,7 @@ function RegisterForm() {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://your-site.dev"
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#A855F7]/50 transition-colors font-mono"
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#c4f547]/50 transition-colors font-mono"
           />
         </div>
         {error && (
@@ -225,8 +225,8 @@ export default function BuilderDashboardPage() {
       {/* Header */}
       <div className="mb-10">
         <div className="flex items-center gap-3 mb-5">
-          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#A855F7] to-transparent" />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C084FC] font-mono">
+          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#c4f547] to-transparent" />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d5f972] font-mono">
             Builder Dashboard
           </span>
         </div>
@@ -234,7 +234,7 @@ export default function BuilderDashboardPage() {
           className="text-4xl md:text-5xl font-light mb-3 tracking-tight"
           style={{ fontFamily: 'var(--font-serif), serif' }}
         >
-          <span className="italic text-[#A855F7]">Your</span>{' '}
+          <span className="italic text-[#c4f547]">Your</span>{' '}
           <span className="text-white">Dashboard</span>
         </h1>
         <p className="text-gray-500 max-w-lg text-sm leading-relaxed font-mono">
@@ -246,8 +246,8 @@ export default function BuilderDashboardPage() {
       {!isConnected && (
         <div className="card text-center py-16">
           <div className="mb-6">
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-[#A855F7]/5 border border-[#A855F7]/10 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-7 h-7 text-[#A855F7]/40" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-[#c4f547]/5 border border-[#c4f547]/10 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-7 h-7 text-[#c4f547]/40" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3" />
               </svg>
             </div>
@@ -297,7 +297,7 @@ export default function BuilderDashboardPage() {
           {/* Tier Hero Card */}
           <div className="card relative overflow-hidden py-10 text-center">
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-64 h-64 rounded-full bg-[#A855F7]/5 blur-3xl" />
+              <div className="w-64 h-64 rounded-full bg-[#c4f547]/5 blur-3xl" />
             </div>
 
             <div className="relative z-10">
@@ -353,11 +353,11 @@ export default function BuilderDashboardPage() {
               <div
                 className="w-10 h-10 rounded-lg flex items-center justify-center"
                 style={{
-                  background: 'rgba(168, 85, 247, 0.08)',
-                  border: '1px solid rgba(168, 85, 247, 0.15)',
+                  background: 'rgba(196, 245, 71, 0.08)',
+                  border: '1px solid rgba(196, 245, 71, 0.15)',
                 }}
               >
-                <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#A855F7]" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#c4f547]" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
                 </svg>
               </div>
@@ -399,11 +399,11 @@ export default function BuilderDashboardPage() {
               <div
                 className="w-10 h-10 rounded-lg flex items-center justify-center"
                 style={{
-                  background: 'rgba(168, 85, 247, 0.08)',
-                  border: '1px solid rgba(168, 85, 247, 0.15)',
+                  background: 'rgba(196, 245, 71, 0.08)',
+                  border: '1px solid rgba(196, 245, 71, 0.15)',
                 }}
               >
-                <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#A855F7]" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#c4f547]" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                 </svg>
               </div>
@@ -500,11 +500,11 @@ export default function BuilderDashboardPage() {
               <div
                 className="w-10 h-10 rounded-lg flex items-center justify-center"
                 style={{
-                  background: 'rgba(168, 85, 247, 0.08)',
-                  border: '1px solid rgba(168, 85, 247, 0.15)',
+                  background: 'rgba(196, 245, 71, 0.08)',
+                  border: '1px solid rgba(196, 245, 71, 0.15)',
                 }}
               >
-                <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#A855F7]" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#c4f547]" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                 </svg>
               </div>
@@ -524,7 +524,7 @@ export default function BuilderDashboardPage() {
                     href={builder.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-[#A855F7] hover:underline"
+                    className="text-sm text-[#c4f547] hover:underline"
                   >
                     {builder.url.replace(/^https?:\/\//, '')}
                   </a>
@@ -551,11 +551,11 @@ export default function BuilderDashboardPage() {
               <div
                 className="w-10 h-10 rounded-lg flex items-center justify-center"
                 style={{
-                  background: 'rgba(168, 85, 247, 0.08)',
-                  border: '1px solid rgba(168, 85, 247, 0.15)',
+                  background: 'rgba(196, 245, 71, 0.08)',
+                  border: '1px solid rgba(196, 245, 71, 0.15)',
                 }}
               >
-                <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#A855F7]" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#c4f547]" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
                 </svg>
               </div>
@@ -591,7 +591,7 @@ export default function BuilderDashboardPage() {
                     return (
                       <tr
                         key={row.tier}
-                        className={`border-b border-white/5 ${isCurrentTier ? 'bg-[#A855F7]/5' : ''}`}
+                        className={`border-b border-white/5 ${isCurrentTier ? 'bg-[#c4f547]/5' : ''}`}
                       >
                         <td className="px-3 py-3">
                           <span

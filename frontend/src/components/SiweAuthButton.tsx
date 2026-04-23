@@ -26,7 +26,7 @@ export function SiweAuthButton() {
     return (
       <div className="flex items-center gap-3">
         <span className="text-gray-400 text-sm font-mono">
-          Signed in as <span className="text-[#C084FC]">{truncateAddress(session!, 4)}</span>
+          Signed in as <span className="text-[#d5f972]">{truncateAddress(session!, 4)}</span>
         </span>
         <button
           onClick={() => signOut()}

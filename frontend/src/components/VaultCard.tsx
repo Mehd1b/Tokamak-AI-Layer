@@ -66,11 +66,11 @@ function protocolAccent(type: number): { border: string; glow: string; text: str
       };
     default:
       return {
-        border: 'border-white/10 hover:border-[#A855F7]/30',
-        glow: 'group-hover:shadow-[0_0_30px_rgba(168,85,247,0.12)]',
-        text: 'text-[#C084FC]',
-        bg: 'bg-[#A855F7]/10',
-        dot: 'bg-[#A855F7]',
+        border: 'border-white/10 hover:border-[#c4f547]/30',
+        glow: 'group-hover:shadow-[0_0_30px_rgba(196,245,71,0.12)]',
+        text: 'text-[#d5f972]',
+        bg: 'bg-[#c4f547]/10',
+        dot: 'bg-[#c4f547]',
       };
   }
 }
@@ -214,7 +214,7 @@ export function VaultCard({
               ? 'linear-gradient(90deg, transparent, #10b981, transparent)'
               : protocolType === PROTOCOL_TYPE.POLYMARKET
                 ? 'linear-gradient(90deg, transparent, #3b82f6, transparent)'
-                : 'linear-gradient(90deg, transparent, #A855F7, transparent)',
+                : 'linear-gradient(90deg, transparent, #c4f547, transparent)',
           }}
         />
 

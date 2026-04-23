@@ -11,7 +11,7 @@ export default function OGImage() {
     (
       <div
         style={{
-          background: 'linear-gradient(135deg, #0a0a0f 0%, #1a0a2e 50%, #0a0a0f 100%)',
+          background: 'linear-gradient(135deg, #0b0d10 0%, #15191e 50%, #0b0d10 100%)',
           width: '100%',
           height: '100%',
           display: 'flex',
@@ -28,7 +28,7 @@ export default function OGImage() {
             position: 'absolute',
             inset: 0,
             backgroundImage:
-              'linear-gradient(to right, rgba(168, 85, 247, 0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(168, 85, 247, 0.05) 1px, transparent 1px)',
+              'linear-gradient(to right, rgba(196, 245, 71, 0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(196, 245, 71, 0.05) 1px, transparent 1px)',
             backgroundSize: '60px 60px',
           }}
         />
@@ -40,7 +40,7 @@ export default function OGImage() {
             width: 400,
             height: 400,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(168, 85, 247, 0.15) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(196, 245, 71, 0.15) 0%, transparent 70%)',
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
@@ -56,8 +56,8 @@ export default function OGImage() {
             width: 80,
             height: 80,
             borderRadius: 20,
-            border: '2px solid rgba(168, 85, 247, 0.4)',
-            background: 'rgba(168, 85, 247, 0.1)',
+            border: '2px solid rgba(196, 245, 71, 0.4)',
+            background: 'rgba(196, 245, 71, 0.1)',
             marginBottom: 32,
             fontSize: 40,
           }}
@@ -81,7 +81,7 @@ export default function OGImage() {
         <div
           style={{
             fontSize: 24,
-            color: 'rgba(168, 85, 247, 0.9)',
+            color: 'rgba(196, 245, 71, 0.9)',
             marginTop: 16,
             fontWeight: 500,
             letterSpacing: '2px',
@@ -112,7 +112,7 @@ export default function OGImage() {
             left: 0,
             right: 0,
             height: 4,
-            background: 'linear-gradient(to right, #A855F7, #D946EF, #A855F7)',
+            background: 'linear-gradient(to right, #c4f547, #c4f547, #c4f547)',
           }}
         />
       </div>

@@ -52,7 +52,7 @@ const ACTION_LABEL_STYLES: Record<string, string> = {
   'Deposit Balance': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
   'Withdraw to Vault': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
   'Fund HYPE Gas': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
-  'Register Vault': 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  'Register Vault': 'bg-lime-500/10 text-lime-400 border-lime-500/20',
   'Perp to Spot': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
   'Spot to EVM': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
   'ERC20 Transfer': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
@@ -62,7 +62,7 @@ const ACTION_LABEL_STYLES: Record<string, string> = {
 };
 
 function ActionBadge({ label }: { label: string }) {
-  const style = ACTION_LABEL_STYLES[label] ?? 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+  const style = ACTION_LABEL_STYLES[label] ?? 'bg-lime-500/10 text-lime-400 border-lime-500/20';
   return (
     <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap ${style}`}>
       {label}
@@ -97,7 +97,7 @@ function ActionsSummary({ actions, actionCount }: { actions: ActionInfo[]; actio
       {Array.from(counts.entries()).map(([label, count]) => (
         <span
           key={label}
-          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap ${ACTION_LABEL_STYLES[label] ?? 'bg-purple-500/10 text-purple-400 border-purple-500/20'}`}
+          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap ${ACTION_LABEL_STYLES[label] ?? 'bg-lime-500/10 text-lime-400 border-lime-500/20'}`}
         >
           {count}x {label}
         </span>
@@ -137,7 +137,7 @@ export function ExecutionHistoryTable({ executions }: { executions: ExecutionEve
           <tbody>
             {pageExecutions.map((exec, i) => (
               <tr key={exec.executionNonce + '-' + i} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                <td className="py-3 px-4 text-[#A855F7]">#{exec.executionNonce}</td>
+                <td className="py-3 px-4 text-[#c4f547]">#{exec.executionNonce}</td>
                 <td className="py-3 px-4">
                   <ActionsSummary actions={exec.actions} actionCount={exec.actionCount} />
                 </td>
@@ -158,7 +158,7 @@ export function ExecutionHistoryTable({ executions }: { executions: ExecutionEve
                       href={`${explorerUrl}/tx/${exec.transactionHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[#A855F7] hover:underline"
+                      className="text-[#c4f547] hover:underline"
                     >
                       {exec.transactionHash.slice(0, 10)}...
                     </a>

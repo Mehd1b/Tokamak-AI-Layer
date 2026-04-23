@@ -92,7 +92,7 @@ export function OptimisticStatusCard({
                 href={`${explorerUrl}/address/${bondManagerAddress}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[#A855F7] text-sm hover:underline"
+                className="text-[#c4f547] text-sm hover:underline"
               >
                 {truncateAddress(bondManagerAddress, 6)}
               </a>

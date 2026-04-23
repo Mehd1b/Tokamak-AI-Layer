@@ -62,7 +62,7 @@ export function VaultExplainer() {
             type="checkbox"
             checked={dontShowAgain}
             onChange={(e) => setDontShowAgain(e.target.checked)}
-            className="w-3.5 h-3.5 rounded border-white/20 bg-white/5 accent-purple-500"
+            className="w-3.5 h-3.5 rounded border-white/20 bg-white/5 accent-lime-500"
           />
           Don&apos;t show this again
         </label>

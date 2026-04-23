@@ -15,33 +15,33 @@ export default function ExecutionWorkflowDiagram() {
       <div className="space-y-4">
 
         {/* Row 1: Off-Chain Execution */}
-        <div className="bg-purple-900/20 rounded-xl p-4 border border-purple-700/50">
+        <div className="bg-lime-900/20 rounded-xl p-4 border border-lime-700/50">
           <div className="flex items-center gap-2 mb-3">
-            <span className="px-3 py-1 bg-purple-900/50 text-purple-300 text-xs font-semibold rounded-full border border-purple-700">
+            <span className="px-3 py-1 bg-lime-900/50 text-lime-300 text-xs font-semibold rounded-full border border-lime-700">
               OFF-CHAIN EXECUTION
             </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Stage 1 */}
-            <div className="bg-purple-900/40 rounded-lg p-4 border border-purple-600/50">
+            <div className="bg-lime-900/40 rounded-lg p-4 border border-lime-600/50">
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-7 h-7 bg-purple-500 text-white rounded-full flex items-center justify-center font-bold text-sm">
+                <div className="w-7 h-7 bg-lime-500 text-white rounded-full flex items-center justify-center font-bold text-sm">
                   1
                 </div>
                 <h3 className="text-white font-semibold text-sm">User Request</h3>
               </div>
               <div className="text-slate-300 text-xs space-y-1">
                 <div className="flex items-start gap-2">
-                  <span className="text-purple-400">•</span>
+                  <span className="text-lime-400">•</span>
                   <span>Agent ID (Image Hash)</span>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-purple-400">•</span>
+                  <span className="text-lime-400">•</span>
                   <span>Input Data (plaintext MVP; encrypted future)</span>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-purple-400">•</span>
+                  <span className="text-lime-400">•</span>
                   <span>Signed Authorization</span>
                 </div>
               </div>
@@ -77,8 +77,8 @@ export default function ExecutionWorkflowDiagram() {
           {/* Arrow down */}
           <div className="flex justify-center my-3">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path d="M12 4 L12 18" stroke="#A855F7" strokeWidth="2" strokeLinecap="round"/>
-              <path d="M6 14 L12 20 L18 14" stroke="#A855F7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M12 4 L12 18" stroke="#c4f547" strokeWidth="2" strokeLinecap="round"/>
+              <path d="M6 14 L12 20 L18 14" stroke="#c4f547" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
         </div>
@@ -131,7 +131,7 @@ export default function ExecutionWorkflowDiagram() {
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
               <defs>
                 <linearGradient id="arrowGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#A855F7" />
+                  <stop offset="0%" stopColor="#c4f547" />
                   <stop offset="100%" stopColor="#10B981" />
                 </linearGradient>
               </defs>
@@ -282,12 +282,12 @@ export default function ExecutionWorkflowDiagram() {
 
       {/* Separation of Concerns */}
       <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="bg-purple-900/20 rounded-lg p-3 border border-purple-800/50">
+        <div className="bg-lime-900/20 rounded-lg p-3 border border-lime-800/50">
           <div className="flex items-center gap-2 mb-2">
-            <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 text-lime-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
             </svg>
-            <span className="text-purple-300 font-semibold text-xs">Execution</span>
+            <span className="text-lime-300 font-semibold text-xs">Execution</span>
           </div>
           <p className="text-xs text-slate-400">
             Deterministic zkVM computation. Agent code + model weights committed via Image ID.

@@ -94,8 +94,8 @@ export default function DevelopersPage() {
     <div className="min-h-screen">
       {/* ── Hero ── */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-[#A855F7]/5 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-[#A855F7]/[0.03] rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#c4f547]/5 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-[#c4f547]/[0.03] rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-5xl mx-auto px-6 lg:px-12 pt-32 pb-20 relative">
           {/* Breadcrumbs */}
@@ -107,8 +107,8 @@ export default function DevelopersPage() {
 
           {/* Label */}
           <div className="flex items-center gap-3 mb-6">
-            <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#A855F7] to-transparent" />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C084FC] font-mono">
+            <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#c4f547] to-transparent" />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d5f972] font-mono">
               Build on Tokagent
             </span>
           </div>
@@ -118,7 +118,7 @@ export default function DevelopersPage() {
             className="text-4xl md:text-6xl font-light mb-6 tracking-tight max-w-3xl"
             style={{ fontFamily: 'var(--font-serif), serif' }}
           >
-            <span className="italic text-[#A855F7]">Build Verifiable</span>{' '}
+            <span className="italic text-[#c4f547]">Build Verifiable</span>{' '}
             <span className="text-white">DeFi Agents</span>
           </h1>
 
@@ -139,13 +139,13 @@ export default function DevelopersPage() {
               <code>
                 <span className="text-gray-500">{'# scaffold, test, deploy'}</span>
                 {'\n'}
-                <span className="text-[#C084FC]">$</span>
+                <span className="text-[#d5f972]">$</span>
                 <span className="text-gray-300">{' tal init my-agent --template yield'}</span>
                 {'\n'}
-                <span className="text-[#C084FC]">$</span>
+                <span className="text-[#d5f972]">$</span>
                 <span className="text-gray-300">{' tal test --local'}</span>
                 {'\n'}
-                <span className="text-[#C084FC]">$</span>
+                <span className="text-[#d5f972]">$</span>
                 <span className="text-gray-300">{' tal deploy --testnet'}</span>
               </code>
             </pre>
@@ -156,8 +156,8 @@ export default function DevelopersPage() {
       {/* ── Feature Cards ── */}
       <section className="max-w-5xl mx-auto px-6 lg:px-12 pb-24">
         <div className="flex items-center gap-3 mb-8">
-          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#A855F7] to-transparent" />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C084FC] font-mono">
+          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#c4f547] to-transparent" />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d5f972] font-mono">
             What You Get
           </span>
         </div>
@@ -166,16 +166,16 @@ export default function DevelopersPage() {
           {FEATURES.map((feature) => (
             <div
               key={feature.title}
-              className="card group hover:border-[#A855F7]/20 transition-all duration-300"
+              className="card group hover:border-[#c4f547]/20 transition-all duration-300"
             >
               <div
                 className="w-12 h-12 rounded-xl flex items-center justify-center mb-5 transition-colors duration-300"
                 style={{
-                  background: 'rgba(168, 85, 247, 0.08)',
-                  border: '1px solid rgba(168, 85, 247, 0.15)',
+                  background: 'rgba(196, 245, 71, 0.08)',
+                  border: '1px solid rgba(196, 245, 71, 0.15)',
                 }}
               >
-                <span className="text-[#A855F7]">{feature.icon}</span>
+                <span className="text-[#c4f547]">{feature.icon}</span>
               </div>
               <h3
                 className="text-lg font-light text-white mb-3"
@@ -195,8 +195,8 @@ export default function DevelopersPage() {
       <section className="border-t border-white/5">
         <div className="max-w-5xl mx-auto px-6 lg:px-12 py-20">
           <div className="flex items-center gap-3 mb-8">
-            <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#A855F7] to-transparent" />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C084FC] font-mono">
+            <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#c4f547] to-transparent" />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d5f972] font-mono">
               How It Works
             </span>
           </div>
@@ -211,7 +211,7 @@ export default function DevelopersPage() {
                 </div>
                 {i < FLOW_STEPS.length - 1 && (
                   <svg
-                    className="w-4 h-4 text-[#A855F7]/40 shrink-0 hidden md:block"
+                    className="w-4 h-4 text-[#c4f547]/40 shrink-0 hidden md:block"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -230,8 +230,8 @@ export default function DevelopersPage() {
       <section className="border-t border-white/5">
         <div className="max-w-5xl mx-auto px-6 lg:px-12 py-20">
           <div className="flex items-center gap-3 mb-8">
-            <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#A855F7] to-transparent" />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C084FC] font-mono">
+            <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#c4f547] to-transparent" />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d5f972] font-mono">
               Get Started
             </span>
           </div>
@@ -242,16 +242,16 @@ export default function DevelopersPage() {
               href="https://docs.tokagent.network/quickstart"
               target="_blank"
               rel="noopener noreferrer"
-              className="card group hover:border-[#A855F7]/20 transition-all duration-300 block"
+              className="card group hover:border-[#c4f547]/20 transition-all duration-300 block"
             >
               <div
                 className="w-12 h-12 rounded-xl flex items-center justify-center mb-5"
                 style={{
-                  background: 'rgba(168, 85, 247, 0.08)',
-                  border: '1px solid rgba(168, 85, 247, 0.15)',
+                  background: 'rgba(196, 245, 71, 0.08)',
+                  border: '1px solid rgba(196, 245, 71, 0.15)',
                 }}
               >
-                <span className="text-[#A855F7]">
+                <span className="text-[#c4f547]">
                   <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <path
                       strokeLinecap="round"
@@ -271,7 +271,7 @@ export default function DevelopersPage() {
                 Install the CLI, scaffold an agent from a template, test locally in 2 seconds,
                 and deploy to testnet. No proof generation required during development.
               </p>
-              <span className="text-[#C084FC] text-xs font-mono group-hover:text-[#A855F7] transition-colors inline-flex items-center gap-1">
+              <span className="text-[#d5f972] text-xs font-mono group-hover:text-[#c4f547] transition-colors inline-flex items-center gap-1">
                 Read the quickstart
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75" />
@@ -284,16 +284,16 @@ export default function DevelopersPage() {
               href="https://docs.tokagent.network/getting-started/build-a-rebalancer"
               target="_blank"
               rel="noopener noreferrer"
-              className="card group hover:border-[#A855F7]/20 transition-all duration-300 block"
+              className="card group hover:border-[#c4f547]/20 transition-all duration-300 block"
             >
               <div
                 className="w-12 h-12 rounded-xl flex items-center justify-center mb-5"
                 style={{
-                  background: 'rgba(168, 85, 247, 0.08)',
-                  border: '1px solid rgba(168, 85, 247, 0.15)',
+                  background: 'rgba(196, 245, 71, 0.08)',
+                  border: '1px solid rgba(196, 245, 71, 0.15)',
                 }}
               >
-                <span className="text-[#A855F7]">
+                <span className="text-[#c4f547]">
                   <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <path
                       strokeLinecap="round"
@@ -315,7 +315,7 @@ export default function DevelopersPage() {
                 <code className="text-gray-400 bg-white/5 px-1 rounded">CallBuilder</code>,
                 testing, and deployment.
               </p>
-              <span className="text-[#C084FC] text-xs font-mono group-hover:text-[#A855F7] transition-colors inline-flex items-center gap-1">
+              <span className="text-[#d5f972] text-xs font-mono group-hover:text-[#c4f547] transition-colors inline-flex items-center gap-1">
                 Start the tutorial
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75" />
@@ -330,7 +330,7 @@ export default function DevelopersPage() {
               href="https://docs.tokagent.network/sdk/overview"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-mono text-gray-500 hover:text-[#C084FC] transition-colors inline-flex items-center gap-1.5"
+              className="text-xs font-mono text-gray-500 hover:text-[#d5f972] transition-colors inline-flex items-center gap-1.5"
             >
               SDK Reference
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -341,7 +341,7 @@ export default function DevelopersPage() {
               href="https://docs.tokagent.network/architecture/overview"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-mono text-gray-500 hover:text-[#C084FC] transition-colors inline-flex items-center gap-1.5"
+              className="text-xs font-mono text-gray-500 hover:text-[#d5f972] transition-colors inline-flex items-center gap-1.5"
             >
               Architecture
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -352,7 +352,7 @@ export default function DevelopersPage() {
               href="https://github.com/tokamak-network/Tokamak-AI-Layer"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-mono text-gray-500 hover:text-[#C084FC] transition-colors inline-flex items-center gap-1.5"
+              className="text-xs font-mono text-gray-500 hover:text-[#d5f972] transition-colors inline-flex items-center gap-1.5"
             >
               GitHub
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">

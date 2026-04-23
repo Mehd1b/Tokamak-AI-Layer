@@ -145,7 +145,7 @@ export function VaultDepositForm({ vaultAddress, isEthVault = true, assetDecimal
               {assetSymbol} Amount
             </label>
             {balanceLabel && (
-              <button type="button" onClick={handleMax} className="text-xs text-[#A855F7] hover:underline font-mono">
+              <button type="button" onClick={handleMax} className="text-xs text-[#c4f547] hover:underline font-mono">
                 {balanceLabel}
               </button>
             )}
@@ -202,7 +202,7 @@ export function VaultDepositForm({ vaultAddress, isEthVault = true, assetDecimal
             {assetSymbol} Amount
           </label>
           {balanceLabel && (
-            <button type="button" onClick={handleMax} className="text-xs text-[#A855F7] hover:underline font-mono">
+            <button type="button" onClick={handleMax} className="text-xs text-[#c4f547] hover:underline font-mono">
               {balanceLabel}
             </button>
           )}

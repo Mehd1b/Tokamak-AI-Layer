@@ -135,9 +135,9 @@ export function PendingExecutionsTable({ vaultAddress, executions }: PendingExec
                 <td className="py-3 px-4">
                   <div className="flex items-center gap-2">
                     {isGrouped && (
-                      <div className="w-0.5 h-4 bg-[#A855F7]/40 rounded-full" />
+                      <div className="w-0.5 h-4 bg-[#c4f547]/40 rounded-full" />
                     )}
-                    <span className="text-[#A855F7]">#{nonceStr}</span>
+                    <span className="text-[#c4f547]">#{nonceStr}</span>
                   </div>
                 </td>
                 <td className="py-3 px-4 text-gray-300">{formatEther(exec.bondAmount, 27)} WSTON</td>
@@ -160,7 +160,7 @@ export function PendingExecutionsTable({ vaultAddress, executions }: PendingExec
                       href={`${explorerUrl}/tx/${exec.transactionHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[#A855F7] hover:underline"
+                      className="text-[#c4f547] hover:underline"
                     >
                       {exec.transactionHash.slice(0, 10)}...
                     </a>

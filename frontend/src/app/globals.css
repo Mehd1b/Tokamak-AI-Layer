@@ -6,12 +6,12 @@
   --background: #0a0a0f;
   --background-secondary: #111118;
   --foreground: #ffffff;
-  --primary: #A855F7;
-  --primary-rgb: 168, 85, 247;
-  --primary-glow: rgba(168, 85, 247, 0.3);
-  --primary-light: #C084FC;
-  --primary-dark: #7C3AED;
-  --accent: #D946EF;
+  --primary: #c4f547;
+  --primary-rgb: 196, 245, 71;
+  --primary-glow: rgba(196, 245, 71, 0.3);
+  --primary-light: #d5f972;
+  --primary-dark: #8ab81d;
+  --accent: #c4f547;
   --text-primary: #ffffff;
   --text-secondary: #9ca3af;
   --text-muted: #6b7280;
@@ -22,7 +22,7 @@
 
 @layer base {
   body {
-    @apply bg-[#0a0a0f] text-white antialiased;
+    @apply bg-[#0b0d10] text-white antialiased;
     font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
     overflow-x: hidden;
   }
@@ -34,7 +34,7 @@
   }
 
   .card-hover {
-    @apply card hover:border-[#A855F7]/30 hover:-translate-y-1;
+    @apply card hover:border-[#c4f547]/30 hover:-translate-y-1;
   }
 
   .glass {
@@ -42,11 +42,11 @@
   }
 
   .btn-primary {
-    @apply rounded-lg bg-[#A855F7] px-4 py-2 text-sm font-semibold text-white transition-all duration-200 shadow-glow hover:-translate-y-0.5 hover:shadow-glow-lg disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-glow;
+    @apply rounded-lg bg-[#c4f547] px-4 py-2 text-sm font-semibold text-white transition-all duration-200 shadow-glow hover:-translate-y-0.5 hover:shadow-glow-lg disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-glow;
   }
 
   .btn-secondary {
-    @apply rounded-lg border border-white/10 bg-transparent px-4 py-2 text-sm font-semibold text-white transition-all duration-200 hover:border-[#A855F7]/50 hover:bg-[#A855F7]/10 disabled:opacity-50;
+    @apply rounded-lg border border-white/10 bg-transparent px-4 py-2 text-sm font-semibold text-white transition-all duration-200 hover:border-[#c4f547]/50 hover:bg-[#c4f547]/10 disabled:opacity-50;
   }
 
   .badge {
@@ -66,18 +66,18 @@
   }
 
   .badge-info {
-    @apply badge bg-[#A855F7]/10 text-[#C084FC] border border-[#A855F7]/20;
+    @apply badge bg-[#c4f547]/10 text-[#d5f972] border border-[#c4f547]/20;
   }
 
   .gradient-text {
-    background: linear-gradient(90deg, #7C3AED, #A855F7, #D946EF);
+    background: linear-gradient(90deg, #8ab81d, #c4f547, #c4f547);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
   .input-dark {
-    @apply w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#A855F7] focus:outline-none focus:ring-1 focus:ring-[#A855F7]/50 disabled:opacity-50;
+    @apply w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-[#c4f547] focus:outline-none focus:ring-1 focus:ring-[#c4f547]/50 disabled:opacity-50;
   }
 
   .terminal {
@@ -85,7 +85,7 @@
   }
 
   .section-eyebrow {
-    @apply text-sm font-semibold uppercase tracking-widest text-[#C084FC] mb-3;
+    @apply text-sm font-semibold uppercase tracking-widest text-[#d5f972] mb-3;
   }
 }
 
@@ -99,7 +99,7 @@
 
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: rgba(168, 85, 247, 0.2) transparent;
+    scrollbar-color: rgba(196, 245, 71, 0.2) transparent;
   }
   .scrollbar-thin::-webkit-scrollbar {
     width: 4px;
@@ -108,11 +108,11 @@
     background: transparent;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: rgba(168, 85, 247, 0.2);
+    background: rgba(196, 245, 71, 0.2);
     border-radius: 2px;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: rgba(168, 85, 247, 0.4);
+    background: rgba(196, 245, 71, 0.4);
   }
 }
 
@@ -154,7 +154,7 @@
 }
 
 .aurora-bg {
-  background: linear-gradient(135deg, #7C3AED, #A855F7, #D946EF, #A855F7, #7C3AED);
+  background: linear-gradient(135deg, #8ab81d, #c4f547, #c4f547, #c4f547, #8ab81d);
   background-size: 400% 400%;
   animation: aurora-shift 20s ease-in-out infinite;
 }
@@ -203,11 +203,11 @@
 .shimmer-text {
   background: linear-gradient(
     90deg,
-    #C084FC 0%,
-    #D946EF 25%,
+    #d5f972 0%,
+    #c4f547 25%,
     #ffffff 50%,
-    #D946EF 75%,
-    #C084FC 100%
+    #c4f547 75%,
+    #d5f972 100%
   );
   background-size: 200% auto;
   -webkit-background-clip: text;
@@ -243,10 +243,10 @@
 /* Glow Pulse — Pulsing ring glow */
 @keyframes glow-pulse {
   0%, 100% {
-    box-shadow: 0 0 15px rgba(168, 85, 247, 0.2), 0 0 30px rgba(168, 85, 247, 0.1);
+    box-shadow: 0 0 15px rgba(196, 245, 71, 0.2), 0 0 30px rgba(196, 245, 71, 0.1);
   }
   50% {
-    box-shadow: 0 0 25px rgba(168, 85, 247, 0.4), 0 0 50px rgba(168, 85, 247, 0.2);
+    box-shadow: 0 0 25px rgba(196, 245, 71, 0.4), 0 0 50px rgba(196, 245, 71, 0.2);
   }
 }
 
@@ -278,7 +278,7 @@
   position: absolute;
   border-radius: 50%;
   border-style: solid;
-  border-color: rgba(168, 85, 247, 0.4);
+  border-color: rgba(196, 245, 71, 0.4);
   animation: ripple 2s ease-out infinite;
 }
 
@@ -312,7 +312,7 @@
 /* Shiny CTA Button — Purple redesign */
 .shiny-cta {
   --gradient-angle: 0deg;
-  --gradient-shine: #C084FC;
+  --gradient-shine: #d5f972;
 
   position: relative;
   overflow: hidden;
@@ -321,16 +321,16 @@
   font-size: 1rem;
   line-height: 1.2;
   font-weight: 500;
-  color: #C084FC;
+  color: #d5f972;
   background:
     linear-gradient(#0a0a0f, #0a0a0f) padding-box,
     conic-gradient(
       from var(--gradient-angle),
       transparent 0%,
-      #7C3AED 5%,
+      #8ab81d 5%,
       var(--gradient-shine) 15%,
-      #D946EF 25%,
-      #7C3AED 35%,
+      #c4f547 25%,
+      #8ab81d 35%,
       transparent 45%,
       transparent 100%
     ) border-box;
@@ -346,7 +346,7 @@
 }
 
 .shiny-cta:hover {
-  box-shadow: 0 0 30px rgba(168, 85, 247, 0.3);
+  box-shadow: 0 0 30px rgba(196, 245, 71, 0.3);
 }
 
 .shiny-cta:active {
@@ -360,8 +360,8 @@
   inset: 2px;
   z-index: 0;
   background-image:
-    linear-gradient(to right, rgba(168, 85, 247, 0.15) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(168, 85, 247, 0.15) 1px, transparent 1px);
+    linear-gradient(to right, rgba(196, 245, 71, 0.15) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(196, 245, 71, 0.15) 1px, transparent 1px);
   background-size: 8px 8px;
   border-radius: inherit;
   opacity: 0.6;
@@ -381,7 +381,7 @@
   z-index: 1;
   width: 100%;
   aspect-ratio: 1 / 1;
-  background: linear-gradient(-50deg, transparent, rgba(168, 85, 247, 0.4), transparent);
+  background: linear-gradient(-50deg, transparent, rgba(196, 245, 71, 0.4), transparent);
   mask-image: radial-gradient(circle at center bottom, transparent 40%, black);
   opacity: 0.6;
   animation: border-spin 4s linear infinite;
@@ -406,12 +406,12 @@
 }
 
 .social-glow:hover .social-bg {
-  @apply bg-[#A855F7]/10 border-[#A855F7]/30;
+  @apply bg-[#c4f547]/10 border-[#c4f547]/30;
 }
 
 .social-glow .social-glow-effect {
   @apply absolute inset-0 rounded-full opacity-0 transition-opacity duration-300;
-  background: rgba(168, 85, 247, 0.2);
+  background: rgba(196, 245, 71, 0.2);
   filter: blur(12px);
 }
 
@@ -424,7 +424,7 @@
 }
 
 .social-glow:hover .social-icon {
-  @apply text-[#C084FC] scale-110;
+  @apply text-[#d5f972] scale-110;
 }
 
 /* ===== REDUCED MOTION ===== */
@@ -492,7 +492,7 @@
 }
 
 .breadcrumb a {
-  @apply hover:text-[#A855F7] transition-colors;
+  @apply hover:text-[#c4f547] transition-colors;
 }
 
 .breadcrumb .separator {

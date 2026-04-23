@@ -91,7 +91,7 @@ export function DepositStepper({
         {steps.map((s, i) => (
           <div key={s.label} className="flex items-center gap-1">
             <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-              s.done ? 'bg-emerald-500/20 text-emerald-400' : i === currentStepIndex ? 'bg-purple-500/20 text-purple-400 animate-pulse' : 'bg-white/5 text-white/30'
+              s.done ? 'bg-emerald-500/20 text-emerald-400' : i === currentStepIndex ? 'bg-lime-500/20 text-lime-400 animate-pulse' : 'bg-white/5 text-white/30'
             }`}>
               {s.done ? '+' : i + 1}
             </span>
@@ -112,7 +112,7 @@ export function DepositStepper({
           className="input-dark w-full pr-24"
         />
         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
-          <button onClick={handleMax} disabled={isProcessing} className="text-xs text-purple-400 hover:text-purple-300">
+          <button onClick={handleMax} disabled={isProcessing} className="text-xs text-lime-400 hover:text-lime-300">
             MAX
           </button>
           <span className="text-xs text-white/40">{assetSymbol}</span>

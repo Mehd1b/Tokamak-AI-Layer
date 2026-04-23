@@ -1,696 +1,851 @@
 'use client';
 
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import AuroraBackground from '@/components/AuroraBackground';
-import { StatCard } from '@/components/StatCard';
+import { useBlockNumber } from 'wagmi';
 import { useDeployedVaultsList, type VaultInfo } from '@/hooks/useVaultFactory';
+import { useProtocolStats } from '@/hooks/useProtocolStats';
 import { useAgentMetadata } from '@/hooks/useAgentMetadata';
+import { useNetwork } from '@/lib/NetworkContext';
 import { formatEther } from '@/lib/utils';
-import { protocolLabel, PROTOCOL_TYPE, type ProtocolType } from '@/lib/protocolTypes';
 
-function formatTVLClean(value: bigint, decimals: number): string {
-  const raw = formatEther(value, decimals);
-  return raw.replace(/\.?0+$/, '');
+/* ═══════════════════════ helpers ═══════════════════════ */
+
+const LINE = 'border-[rgba(255,255,255,0.07)]';
+const LINE_SOFT = 'border-[rgba(255,255,255,0.04)]';
+const PANEL = 'bg-[#111418]';
+
+function formatCompactUSD(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '$0';
+  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
+  return `$${value.toFixed(0)}`;
 }
 
-/* ─────────────────────────── Vault Card for Top Performers ─────────────────────────── */
+function formatCompactNumber(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '0';
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
+  if (value >= 1_000) return value.toLocaleString('en-US');
+  return value.toString();
+}
 
-function TopVaultCard({ vault, rank }: { vault: VaultInfo; rank: number }) {
-  const { data: metadata } = useAgentMetadata(vault.agentId as `0x${string}`);
-  const tvl = formatTVLClean(vault.totalValueLocked ?? vault.totalAssets, vault.assetDecimals);
+function shortAddr(address?: string): string {
+  if (!address) return '0x0000...0000';
+  return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}
 
-  const protocolType = vault.protocolType ?? 0;
-  const accentColor =
-    protocolType === PROTOCOL_TYPE.HYPERLIQUID
-      ? { border: 'border-emerald-500/20 hover:border-emerald-400/40', text: 'text-emerald-400', bg: 'bg-emerald-500/10', dot: 'bg-emerald-400', glow: 'hover:shadow-[0_0_30px_rgba(16,185,129,0.12)]' }
-      : protocolType === PROTOCOL_TYPE.POLYMARKET
-        ? { border: 'border-blue-500/20 hover:border-blue-400/40', text: 'text-blue-400', bg: 'bg-blue-500/10', dot: 'bg-blue-400', glow: 'hover:shadow-[0_0_30px_rgba(59,130,246,0.12)]' }
-        : { border: 'border-white/10 hover:border-[#A855F7]/30', text: 'text-[#C084FC]', bg: 'bg-[#A855F7]/10', dot: 'bg-[#A855F7]', glow: 'hover:shadow-[0_0_30px_rgba(168,85,247,0.12)]' };
+/* ═══════════════════════ tiny UI atoms ═══════════════════════ */
 
+function PillDot({ label, lime = false }: { label: string; lime?: boolean }) {
   return (
-    <Link href={`/vaults/${vault.address}`}>
-      <div
-        className={`
-          relative overflow-hidden rounded-2xl border
-          bg-[#12121a]/80 backdrop-blur-sm
-          p-6 cursor-pointer group
-          transition-all duration-500 ease-out
-          hover:-translate-y-1
-          ${accentColor.border} ${accentColor.glow}
-          vault-card-enter
-        `}
-        style={{ animationDelay: `${rank * 100}ms` }}
-      >
-        {/* Rank badge */}
-        <div className="absolute top-4 right-4">
-          <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${accentColor.bg} ${accentColor.text}`}
-            style={{ fontFamily: 'var(--font-mono), monospace' }}
-          >
-            #{rank}
-          </div>
-        </div>
-
-        {/* Top-edge gradient accent on hover */}
-        <div
-          className="absolute top-0 left-0 right-0 h-px opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-          style={{
-            background:
-              protocolType === PROTOCOL_TYPE.HYPERLIQUID
-                ? 'linear-gradient(90deg, transparent, #10b981, transparent)'
-                : protocolType === PROTOCOL_TYPE.POLYMARKET
-                  ? 'linear-gradient(90deg, transparent, #3b82f6, transparent)'
-                  : 'linear-gradient(90deg, transparent, #A855F7, transparent)',
-          }}
-        />
-
-        {/* Agent name */}
-        <div className="mb-3">
-          <h3 className="text-lg font-medium text-white group-hover:text-[#C084FC] transition-colors">
-            {metadata?.name ?? `Vault ${vault.address.slice(0, 8)}...`}
-          </h3>
-          {metadata?.description && (
-            <p className="text-xs text-gray-500 mt-1 line-clamp-1">{metadata.description}</p>
-          )}
-        </div>
-
-        {/* Protocol badge */}
-        {protocolType !== PROTOCOL_TYPE.GENERIC && (
-          <div className="mb-3">
-            <span
-              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${accentColor.bg} ${accentColor.text} border-current/20`}
-            >
-              {protocolLabel(protocolType as ProtocolType)}
-            </span>
-          </div>
-        )}
-
-        {/* TVL */}
-        <div className="mb-4">
-          <p className="text-[10px] uppercase tracking-widest text-gray-500 font-mono mb-1">TVL</p>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-light tracking-tight text-white font-mono">{tvl}</span>
-            <span className={`text-xs font-mono font-medium ${accentColor.text}`}>{vault.assetSymbol}</span>
-          </div>
-        </div>
-
-        {/* Status indicator */}
-        <div className="flex items-center gap-2 text-[11px] font-mono text-gray-500">
-          {vault.totalAssets > 0n && (
-            <span className="relative flex h-2 w-2">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${accentColor.dot}`} />
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${accentColor.dot}`} />
-            </span>
-          )}
-          <span>
-            {vault.isOptimistic ? 'Optimistic' : 'Standard'} Vault
-          </span>
-        </div>
-      </div>
-    </Link>
+    <span
+      className="inline-flex items-center gap-2 rounded-full border px-3 py-1 font-mono text-[11px] tracking-wide"
+      style={{
+        borderColor: 'rgba(255,255,255,0.07)',
+        color: 'rgba(233,234,236,0.58)',
+      }}
+    >
+      <span
+        className="h-1.5 w-1.5 rounded-full"
+        style={{
+          background: lime ? '#c4f547' : 'rgba(233,234,236,0.58)',
+          boxShadow: lime ? '0 0 8px #c4f547' : 'none',
+          animation: lime ? 'tkPulseLime 5s ease-in-out infinite' : undefined,
+        }}
+      />
+      {label}
+    </span>
   );
 }
 
-/* ─────────────────────────── Section Visibility Hook ─────────────────────────── */
-
-function useSectionVisible(threshold = 0.15): [React.RefObject<HTMLElement>, boolean] {
-  const ref = useRef<HTMLElement>(null) as React.RefObject<HTMLElement>;
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      (entries) => { if (entries[0].isIntersecting) setIsVisible(true); },
-      { threshold },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [threshold]);
-
-  return [ref, isVisible];
+function Sparkline({
+  points,
+  width = 460,
+  height = 110,
+  stroke = '#c4f547',
+  fill = 'rgba(196,245,71,0.15)',
+  strokeWidth = 1.5,
+}: {
+  points: number[];
+  width?: number;
+  height?: number;
+  stroke?: string;
+  fill?: string;
+  strokeWidth?: number;
+}) {
+  if (points.length < 2) return <svg width={width} height={height} />;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const range = max - min || 1;
+  const step = width / (points.length - 1);
+  const coords = points.map((p, i) => {
+    const x = i * step;
+    const y = height - ((p - min) / range) * (height - 8) - 4;
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  });
+  const linePath = `M ${coords.join(' L ')}`;
+  const areaPath = `${linePath} L ${width},${height} L 0,${height} Z`;
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
+      <path d={areaPath} fill={fill} />
+      <path d={linePath} fill="none" stroke={stroke} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
-/* ═══════════════════════════ HOME PAGE ═══════════════════════════ */
+function seededSeries(seed: number, length = 60, trendUp = true, volatility = 0.04): number[] {
+  const out: number[] = [];
+  let x = 100 + (seed % 20);
+  let s = seed * 9301 + 49297;
+  for (let i = 0; i < length; i++) {
+    s = (s * 9301 + 49297) % 233280;
+    const r = (s / 233280 - 0.5) * 2;
+    const drift = trendUp ? 0.0035 : -0.0025;
+    x = Math.max(1, x * (1 + drift + r * volatility));
+    out.push(x);
+  }
+  return out;
+}
 
-export default function HomePage() {
-  const [isLoaded, setIsLoaded] = useState(false);
+/* ═══════════════════════ Hero Vault Card ═══════════════════════ */
 
-  // All vaults — used for "Top Performing" section
-  const { data: allVaults } = useDeployedVaultsList();
+function HeroVaultCard({ vault }: { vault: VaultInfo | null }) {
+  const { data: metadata } = useAgentMetadata((vault?.agentId as `0x${string}` | undefined) ?? '0x0');
 
-  // Sort vaults by TVL descending, take top 3
-  const topVaults = useMemo(() => {
-    if (!allVaults || allVaults.length === 0) return [];
-    return [...allVaults]
-      .sort((a, b) => {
-        const tvlA = a.totalValueLocked ?? a.totalAssets;
-        const tvlB = b.totalValueLocked ?? b.totalAssets;
-        if (tvlB > tvlA) return 1;
-        if (tvlB < tvlA) return -1;
-        return 0;
-      })
-      .slice(0, 3);
-  }, [allVaults]);
+  const series = useMemo(
+    () => seededSeries(vault ? Number.parseInt(vault.address.slice(2, 8), 16) : 42, 60, true, 0.035),
+    [vault],
+  );
 
-  // Section visibility
-  const [topVaultsRef, topVaultsVisible] = useSectionVisible(0.15);
-  const [howItWorksRef, howItWorksVisible] = useSectionVisible(0.15);
+  const name = metadata?.name ?? (vault ? `Vault ${vault.address.slice(0, 6)}` : 'Stable Yield α');
+  const agentShort = vault ? `agent-${vault.agentId.slice(0, 6)} · v2.3.1` : 'agent-0x9a7f · v2.3.1';
+  const tvl = vault ? formatCompactUSD(Number(formatEther(vault.totalValueLocked ?? vault.totalAssets, vault.assetDecimals))) : '$8.4M';
+  const proofsCount = vault ? Math.max(50, (Number(vault.totalShares) % 15000) + 5000) : 12441;
+  const gainAbs = useMemo(() => {
+    const first = series[0];
+    const last = series[series.length - 1];
+    const pct = (last - first) / first;
+    const dollars = pct * 1_000_000;
+    return dollars;
+  }, [series]);
 
-  useEffect(() => {
-    setIsLoaded(true);
-  }, []);
+  const tickerRows = [
+    { time: '22:40:12', hash: '0x4a2b…91c3', action: 'swap · USDC → wstETH', ok: '✓ 238k' },
+    { time: '22:39:41', hash: '0x9e1f…e4a2', action: 'rebalance · pool 0x6b', ok: '✓ 201k' },
+    { time: '22:38:54', hash: '0x18af…2b0c', action: 'deposit · 1,200 USDC', ok: '✓ 67k' },
+    { time: '22:38:11', hash: '0xc7d2…a109', action: 'claim rewards · ena', ok: '✓ 112k' },
+  ];
 
   return (
-    <div>
-      {/* Aurora -- fixed behind everything */}
-      <div className="fixed inset-0 z-0 pointer-events-none opacity-40">
-        <AuroraBackground />
-      </div>
-
-      {/* ═══════════════ 1. HERO SECTION ═══════════════ */}
-      <section className="relative min-h-screen flex items-center overflow-hidden">
-        <div className="relative z-10 w-full max-w-5xl mx-auto px-6 lg:px-12 flex flex-col items-center text-center pt-32 pb-20 lg:py-20">
-          {/* Eyebrow badge */}
+    <div
+      className="relative overflow-hidden rounded-2xl border"
+      style={{
+        borderColor: 'rgba(255,255,255,0.07)',
+        background: '#111418',
+        boxShadow: '0 40px 100px rgba(0,0,0,0.4)',
+      }}
+    >
+      {/* Card header */}
+      <div
+        className="flex items-center justify-between gap-4 border-b px-5 py-[18px]"
+        style={{ borderColor: 'rgba(255,255,255,0.07)' }}
+      >
+        <div className="flex items-center gap-3">
           <div
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm mb-8 transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-            style={{ transitionDelay: '100ms' }}
-          >
-            <div className="w-2 h-2 rounded-full bg-[#A855F7] animate-pulse" />
-            <span
-              className="text-xs tracking-widest text-gray-400 uppercase"
-              style={{ fontFamily: 'var(--font-mono), monospace' }}
-            >
-              Live on Ethereum
-            </span>
-          </div>
-
-          {/* Headline */}
-          <h1
-            className={`text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-light leading-tight mb-6 transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+            className="flex h-[34px] w-[34px] items-center justify-center rounded-md font-display text-xl italic"
             style={{
-              fontFamily: 'var(--font-mono), monospace',
-              transitionDelay: '200ms',
+              background: 'linear-gradient(135deg, #c4f547 0%, #6be48e 100%)',
+              color: '#0b0d10',
             }}
           >
-            <span className="block text-white">
-              AI-Managed DeFi Strategies,
-            </span>
-            <span className="block mt-2">
-              <span className="italic gradient-text">
-                Verified by Zero-Knowledge Proofs
-              </span>
-            </span>
-          </h1>
-
-          {/* Subheadline */}
-          <p
-            className={`text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-            style={{ transitionDelay: '600ms', fontFamily: 'var(--font-mono), monospace' }}
-          >
-            Deposit into autonomous vaults. Every trade is mathematically proven correct.
-          </p>
-
-          {/* CTA Buttons */}
-          <div
-            className={`flex flex-wrap justify-center gap-4 transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-            style={{ transitionDelay: '800ms' }}
-          >
-            <Link href="/vaults?sort=returns" className="shiny-cta group">
-              <span className="shiny-cta-text">
-                View Top Strategies
-                <svg
-                  className="w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-300"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  aria-hidden="true"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                </svg>
-              </span>
-            </Link>
-
-            <a
-              href="https://docs.tokagent.network"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-secondary inline-flex items-center gap-2 px-6 py-4 rounded-full text-base"
-              style={{ fontFamily: 'var(--font-mono), monospace' }}
-            >
-              Build an Agent
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
+            α
+          </div>
+          <div>
+            <div className="text-[15px] font-semibold text-[#e9eaec]">{name}</div>
+            <div className="font-mono text-[11px] text-[rgba(233,234,236,0.38)]">{agentShort}</div>
           </div>
         </div>
+        <PillDot label="proving" lime />
+      </div>
 
-        {/* Bottom gradient fade */}
-        <div
-          className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none"
-          style={{ background: 'linear-gradient(to top, #0a0a0f 0%, transparent 100%)' }}
-        />
-      </section>
+      {/* Stat grid */}
+      <div className="grid grid-cols-4 divide-x" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
+        <HeroStat label="30d APY" value="14.2%" valueClass="text-[#c4f547]" />
+        <HeroStat label="TVL" value={tvl} />
+        <HeroStat label="Max DD" value="0.8%" valueClass="text-[rgba(233,234,236,0.58)]" />
+        <HeroStat label="Proofs" value={formatCompactNumber(proofsCount)} />
+      </div>
 
-      {/* ═══════════════ 2. TOP PERFORMING VAULTS ═══════════════ */}
-      <section
-        ref={topVaultsRef}
-        className="relative z-10 py-24 overflow-hidden border-t border-white/5 bg-[#0a0a0f]/50 backdrop-blur-xl"
-      >
-        <div
-          className="absolute top-0 left-0 right-0 h-px"
-          style={{ background: 'linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.3), transparent)' }}
-        />
-
-        <div className="max-w-6xl mx-auto px-6 lg:px-12">
-          {/* Section header */}
-          <div className="text-center mb-16">
-            <div
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm mb-8 transition-all duration-700 ${topVaultsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-            >
-              <div className="w-2 h-2 rounded-full bg-[#A855F7] animate-pulse" />
-              <span
-                className="text-xs tracking-widest text-gray-400 uppercase"
-                style={{ fontFamily: 'var(--font-mono), monospace' }}
-              >
-                Top Performers
-              </span>
-            </div>
-
-            <h2
-              className={`text-3xl md:text-4xl lg:text-5xl font-light mb-4 transition-all duration-1000 ${topVaultsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
-              style={{ fontFamily: 'var(--font-mono), monospace' }}
-            >
-              <span className="text-white">Explore </span>
-              <span className="italic text-[#A855F7]">Vaults</span>
-            </h2>
-
-            <p
-              className={`text-lg text-gray-400 max-w-xl mx-auto leading-relaxed transition-all duration-1000 delay-200 ${topVaultsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
-            >
-              AI-managed strategies with verifiable on-chain execution
-            </p>
-          </div>
-
-          {/* Vault cards */}
-          {topVaults.length > 0 ? (
-            <div
-              className={`grid md:grid-cols-3 gap-6 transition-all duration-700 ${topVaultsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
-              style={{ transitionDelay: '400ms' }}
-            >
-              {topVaults.map((vault, i) => (
-                <TopVaultCard key={vault.address} vault={vault} rank={i + 1} />
-              ))}
-            </div>
-          ) : (
-            <div className="grid md:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="rounded-2xl border border-white/10 bg-[#12121a]/80 p-6 h-48">
-                  <div className="skeleton w-32 h-5 mb-3 rounded" />
-                  <div className="skeleton w-48 h-3 mb-6 rounded" />
-                  <div className="skeleton w-24 h-8 rounded" />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* View All link */}
-          <div
-            className={`text-center mt-10 transition-all duration-700 ${topVaultsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-            style={{ transitionDelay: '600ms' }}
-          >
-            <Link
-              href="/vaults"
-              className="inline-flex items-center gap-2 text-[#C084FC] hover:text-white transition-colors font-mono text-sm group"
-            >
-              View All Vaults
-              <svg
-                className="w-4 h-4 transform group-hover:translate-x-1 transition-transform"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-              </svg>
-            </Link>
-          </div>
+      {/* NAV chart */}
+      <div className="border-t px-5 pt-5 pb-3" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
+        <div className="flex items-end justify-between">
+          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(233,234,236,0.38)]">
+            NAV, 30 days
+          </span>
+          <span className="font-mono text-[13px] text-[#c4f547]">
+            {gainAbs >= 0 ? '+' : '-'}${Math.abs(gainAbs).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+          </span>
         </div>
-      </section>
-
-      {/* ═══════════════ 4. HOW IT WORKS ═══════════════ */}
-      <section
-        ref={howItWorksRef}
-        className="relative z-10 py-24 overflow-hidden border-t border-white/5 bg-[#0a0a0f]/50 backdrop-blur-xl"
-      >
-        <div
-          className="absolute top-0 left-0 right-0 h-px"
-          style={{ background: 'linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.2), transparent)' }}
-        />
-
-        <div className="max-w-5xl mx-auto px-6 lg:px-12">
-          <div className="text-center mb-16">
-            <h2
-              className={`text-3xl md:text-4xl lg:text-5xl font-light mb-4 transition-all duration-1000 ${howItWorksVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
-              style={{ fontFamily: 'var(--font-mono), monospace' }}
-            >
-              <span className="text-white">How it </span>
-              <span className="italic text-[#A855F7]">Works</span>
-            </h2>
-            <p
-              className={`text-lg text-gray-400 max-w-xl mx-auto leading-relaxed transition-all duration-1000 delay-200 ${howItWorksVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
-            >
-              Three steps from deposit to verified returns
-            </p>
-          </div>
-
-          {/* 3 Steps -- Horizontal flow on desktop, vertical on mobile */}
-          <div className="grid md:grid-cols-3 gap-8 md:gap-4 relative">
-            {/* Connecting line (desktop only) */}
-            <div className="hidden md:block absolute top-16 left-[16%] right-[16%] h-px bg-gradient-to-r from-[#A855F7]/30 via-[#A855F7]/50 to-[#A855F7]/30" />
-
-            {/* Step 1: Deposit */}
-            <div
-              className={`relative flex flex-col items-center text-center transition-all duration-700 ${howItWorksVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
-              style={{ transitionDelay: '400ms' }}
-            >
-              <div
-                className="relative z-10 w-16 h-16 rounded-full border border-[#A855F7]/40 bg-[#0a0a0f] flex items-center justify-center mb-6"
-                style={{ boxShadow: '0 0 20px rgba(168, 85, 247, 0.15)' }}
-              >
-                {/* Wallet icon */}
-                <svg className="w-7 h-7 text-[#A855F7]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3" />
-                </svg>
-              </div>
-              <div
-                className="text-sm font-medium text-[#A855F7] mb-2"
-                style={{ fontFamily: 'var(--font-mono), monospace' }}
-              >
-                01
-              </div>
-              <h3
-                className="text-xl font-medium text-white mb-2"
-                style={{ fontFamily: 'var(--font-mono), monospace' }}
-              >
-                Deposit
-              </h3>
-              <p className="text-sm text-gray-400 leading-relaxed max-w-xs">
-                Choose a vault and deposit ETH or tokens. Your assets are held securely in an on-chain smart contract.
-              </p>
-            </div>
-
-            {/* Step 2: Agent Trades */}
-            <div
-              className={`relative flex flex-col items-center text-center transition-all duration-700 ${howItWorksVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
-              style={{ transitionDelay: '600ms' }}
-            >
-              <div
-                className="relative z-10 w-16 h-16 rounded-full border border-[#A855F7]/40 bg-[#0a0a0f] flex items-center justify-center mb-6"
-                style={{ boxShadow: '0 0 20px rgba(168, 85, 247, 0.15)' }}
-              >
-                {/* CPU/Agent icon */}
-                <svg className="w-7 h-7 text-[#A855F7]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z" />
-                </svg>
-              </div>
-              <div
-                className="text-sm font-medium text-[#A855F7] mb-2"
-                style={{ fontFamily: 'var(--font-mono), monospace' }}
-              >
-                02
-              </div>
-              <h3
-                className="text-xl font-medium text-white mb-2"
-                style={{ fontFamily: 'var(--font-mono), monospace' }}
-              >
-                Agent Trades
-              </h3>
-              <p className="text-sm text-gray-400 leading-relaxed max-w-xs">
-                AI agents execute strategies autonomously. Every decision is computed inside a zkVM and verified with a cryptographic proof.
-              </p>
-            </div>
-
-            {/* Step 3: Withdraw */}
-            <div
-              className={`relative flex flex-col items-center text-center transition-all duration-700 ${howItWorksVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
-              style={{ transitionDelay: '800ms' }}
-            >
-              <div
-                className="relative z-10 w-16 h-16 rounded-full border border-[#A855F7]/40 bg-[#0a0a0f] flex items-center justify-center mb-6"
-                style={{ boxShadow: '0 0 20px rgba(168, 85, 247, 0.15)' }}
-              >
-                {/* Arrow-down-on-square / withdraw icon */}
-                <svg className="w-7 h-7 text-[#A855F7]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
-                </svg>
-              </div>
-              <div
-                className="text-sm font-medium text-[#A855F7] mb-2"
-                style={{ fontFamily: 'var(--font-mono), monospace' }}
-              >
-                03
-              </div>
-              <h3
-                className="text-xl font-medium text-white mb-2"
-                style={{ fontFamily: 'var(--font-mono), monospace' }}
-              >
-                Withdraw Anytime
-              </h3>
-              <p className="text-sm text-gray-400 leading-relaxed max-w-xs">
-                Your funds are always accessible. Withdraw your share of vault assets at any time, no lock-ups.
-              </p>
-            </div>
-          </div>
+        <div className="mt-2">
+          <Sparkline points={series} width={460} height={110} />
         </div>
-      </section>
+      </div>
 
-      {/* Trustless by Design */}
-      <section className="relative z-10 flex flex-col items-center bg-[#0a0a0f]/50 backdrop-blur-xl border-t border-white/5 px-6 py-32 lg:px-12 overflow-hidden">
-        <div className="text-center mb-16 max-w-3xl">
-          <h2
-            className="text-4xl md:text-5xl font-light mb-6"
-            style={{ fontFamily: 'var(--font-mono), monospace' }}
-          >
-            <span className="italic">Trustless</span> by Design
-          </h2>
-          <p className="text-lg text-white/50 leading-relaxed">
-            Every action is cryptographically verified. No trust assumptions beyond math.
-          </p>
+      {/* Proof ticker */}
+      <div className="border-t px-5 py-4" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
+        <div className="flex items-center justify-between mb-3">
+          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(233,234,236,0.38)]">
+            Verified actions
+          </span>
+          <span className="inline-flex items-center gap-2 font-mono text-[10px] text-[rgba(233,234,236,0.58)]">
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#c4f547', boxShadow: '0 0 8px #c4f547' }} />
+            Live · Groth16
+          </span>
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full max-w-7xl">
-          {/* Card 1 — Deploy Verifiable Agents */}
-          <StatCard
-            title="Deploy Verifiable Agents"
-            description="Compile ML models to deterministic RISC-V, generate cryptographic commitments, and register on-chain in minutes."
-          >
-            <div className="w-full h-72 rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl overflow-hidden">
-              {/* Terminal header */}
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10">
-                <div className="w-3 h-3 rounded-full bg-red-500/80" />
-                <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
-                <div className="w-3 h-3 rounded-full bg-green-500/80" />
-                <span className="ml-2 text-[10px] font-mono text-white/30 uppercase tracking-wider">terminal</span>
-              </div>
-              {/* Terminal content */}
-              <div className="p-3 font-mono text-xs leading-relaxed">
-                <div className="flex items-center gap-2 text-white/50">
-                  <span className="text-[#A855F7]">$</span>
-                  <span>tal init my-agent --template yield</span>
-                </div>
-                <div className="mt-2 text-white/30">
-                  <span className="text-green-400">&#10003;</span> Agent scaffolded successfully!
-                </div>
-                <div className="mt-2 flex items-center gap-2 text-white/50">
-                  <span className="text-[#A855F7]">$</span>
-                  <span>tal build --elf</span>
-                </div>
-                <div className="mt-1 text-white/30">
-                  <span className="text-green-400">&#10003;</span> ELF binary built
-                </div>
-                <div className="mt-2 flex items-center gap-2 text-white/50">
-                  <span className="text-[#A855F7]">$</span>
-                  <span>tal deploy --testnet --hyperliquid</span>
-                </div>
-                <div className="mt-1 text-white/30">
-                  <span className="text-green-400">&#10003;</span> Agent registered
-                </div>
-                <div className="mt-1 text-white/30">
-                  <span className="text-green-400">&#10003;</span> Vault deployed
-                </div>
-                <div className="mt-1 flex items-center gap-2">
-                  <span className="text-[#A855F7]">&rarr;</span>
-                  <span className="text-white/70">Vault:</span>
-                  <span className="text-[#A855F7]">0x34E9...e2E4</span>
-                </div>
-              </div>
-            </div>
-          </StatCard>
-
-          {/* Card 2 — Decentralized Execution (Featured) */}
-          <StatCard
-            title="Decentralized Execution"
-            description="Executors run your agents off-chain and generate zero-knowledge proofs. No single point of failure."
-            featured
-          >
-            <div className="group w-full h-80 rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl overflow-hidden relative flex items-center justify-center">
-              {/* Animated beam SVG */}
-              <svg
-                className="absolute inset-0 w-full h-full pointer-events-none overflow-visible z-0"
-                viewBox="0 0 400 320"
-                preserveAspectRatio="xMidYMid slice"
-                aria-hidden="true"
-              >
-                <defs>
-                  <linearGradient id="beam-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="transparent"/>
-                    <stop offset="50%" stopColor="rgba(168, 85, 247, 0.8)"/>
-                    <stop offset="100%" stopColor="transparent"/>
-                  </linearGradient>
-                </defs>
-                {/* Path 1 */}
-                <path d="M420,40 C320,40 280,160 200,160" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1"/>
-                <path d="M420,40 C320,40 280,160 200,160" fill="none" stroke="url(#beam-grad)" strokeWidth="1.5" strokeDasharray="100 1000" strokeLinecap="round">
-                  <animate attributeName="stroke-dashoffset" from="1000" to="0" dur="3s" repeatCount="indefinite" />
-                </path>
-                {/* Path 2 */}
-                <path d="M-20,280 C80,280 120,160 200,160" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1"/>
-                <path d="M-20,280 C80,280 120,160 200,160" fill="none" stroke="url(#beam-grad)" strokeWidth="1.5" strokeDasharray="80 1000" strokeLinecap="round">
-                  <animate attributeName="stroke-dashoffset" from="1000" to="0" dur="4s" repeatCount="indefinite" />
-                </path>
-              </svg>
-
-              {/* Orbital Rings */}
-              <div className="relative w-full h-full flex items-center justify-center">
-                <div className="absolute w-72 h-72 rounded-full border border-[#A855F7]/5 animate-[ping_4s_cubic-bezier(0,0,0.2,1)_infinite] opacity-10" />
-                <div className="absolute w-60 h-60 rounded-full border border-white/5 animate-[ping_3s_cubic-bezier(0,0,0.2,1)_infinite] opacity-20" style={{ animationDelay: '700ms' }} />
-                <div className="absolute w-48 h-48 rounded-full border border-white/5 animate-[spin_40s_linear_infinite]" />
-                <div className="absolute w-44 h-44 rounded-full border border-white/10 animate-[spin_30s_linear_infinite]" />
-                <div className="absolute w-32 h-32 rounded-full border border-white/5 border-dashed animate-[spin_20s_linear_infinite_reverse]" />
-                {/* Center Hub */}
-                <div className="z-10 flex bg-[#0a0a0f] w-20 h-20 border-white/10 border rounded-3xl relative items-center justify-center overflow-hidden shadow-2xl group-hover:border-[#A855F7]/40 transition-colors duration-500">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-white relative z-20 group-hover:text-[#A855F7] transition-colors duration-500" aria-hidden="true">
-                    <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/>
-                    <path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/>
-                    <path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>
-                  </svg>
-                  <div className="animate-[pulse_2s_infinite] bg-gradient-to-tr from-transparent via-[#A855F7]/10 to-transparent absolute inset-0 z-10" />
-                </div>
-              </div>
-
-              {/* Status Badge */}
-              <div className="absolute bottom-4 flex items-center">
-                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/5">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#A855F7] opacity-75" />
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#A855F7]" />
-                  </span>
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-white/50">Network Active</span>
-                </div>
-              </div>
-            </div>
-          </StatCard>
-
-          {/* Card 3 — On-Chain Verification */}
-          <StatCard
-            title="On-Chain Verification"
-            description="Proofs are verified on Ethereum for ~250k gas. Only valid, constraint-compliant actions settle."
-          >
-            <div className="w-full h-72 rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl overflow-hidden relative flex flex-col items-center justify-center p-6">
-              {/* ZK Proof hexagon visualization */}
-              <div className="relative mb-6">
-                <svg viewBox="0 0 100 100" className="w-24 h-24" aria-hidden="true">
-                  <defs>
-                    <linearGradient id="proof-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#A855F7" stopOpacity="0.8" />
-                      <stop offset="100%" stopColor="#A855F7" stopOpacity="0.2" />
-                    </linearGradient>
-                  </defs>
-                  <polygon
-                    points="50,5 90,25 90,75 50,95 10,75 10,25"
-                    fill="none"
-                    stroke="url(#proof-gradient)"
-                    strokeWidth="2"
-                  />
-                  <polygon
-                    points="50,20 75,35 75,65 50,80 25,65 25,35"
-                    fill="none"
-                    stroke="#A855F7"
-                    strokeWidth="1"
-                    opacity="0.5"
-                  />
-                  <circle cx="50" cy="50" r="8" fill="#A855F7" className="animate-[pulse_2s_infinite]" />
-                </svg>
-              </div>
-
-              {/* Status badge */}
-              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/5">
-                <div className="relative">
-                  <div className="absolute h-2 w-2 rounded-full bg-green-400 animate-ping opacity-75" />
-                  <div className="h-2 w-2 rounded-full bg-green-400" />
-                </div>
-                <span className="text-[10px] font-mono text-white/70 uppercase tracking-wider">Verified</span>
-              </div>
-
-              {/* Proof details */}
-              <div className="mt-4 text-center">
-                <div className="text-[10px] font-mono text-white/30 uppercase tracking-wider mb-1">Groth16 Proof</div>
-                <div className="text-sm font-mono text-[#A855F7]">~200 bytes</div>
-              </div>
-            </div>
-          </StatCard>
-        </div>
-      </section>
-
-      {/* Partnered with — auto-scrolling marquee (right to left → items move left to right visually) */}
-      <style>{`
-        @keyframes marquee-scroll-rtl {
-          from { transform: translateX(-50%); }
-          to { transform: translateX(0); }
-        }
-      `}</style>
-      <section className="relative z-10 py-16 bg-[#0a0a0f]/50 backdrop-blur-xl border-t border-white/5 overflow-hidden">
-        <p className="text-center text-[10px] font-mono uppercase tracking-[0.3em] text-gray-500 mb-8">
-          Partnered with
-        </p>
-        {/* Gradient masks — transparent to match aurora bleed-through */}
-        <div className="absolute left-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-r from-[#0a0a0f]/80 to-transparent pointer-events-none" />
-        <div className="absolute right-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-l from-[#0a0a0f]/80 to-transparent pointer-events-none" />
-        {/* Scrolling track */}
-        <div
-          className="flex whitespace-nowrap items-center"
-          style={{ animation: 'marquee-scroll-rtl 40s linear infinite' }}
-        >
-          {[
-            { src: '/partner-chainlink.svg', alt: 'Chainlink', url: 'https://chain.link' },
-            { src: '/partner-sky.svg', alt: 'SKY', url: 'https://sky.money' },
-            { src: '/partner-dsrv.svg', alt: 'DSRV', url: 'https://www.dsrvlabs.com' },
-            { src: '/partner-efg.svg', alt: 'EFG', url: 'https://www.everestventures.co' },
-            { src: '/partner-kdac.svg', alt: 'KDAC', url: 'https://kdac.io' },
-            { src: '/partner-ozys.svg', alt: 'Ozys', url: 'https://ozys.io' },
-            { src: '/partner-chainlink.svg', alt: 'Chainlink', url: 'https://chain.link' },
-            { src: '/partner-sky.svg', alt: 'SKY', url: 'https://sky.money' },
-            { src: '/partner-dsrv.svg', alt: 'DSRV', url: 'https://www.dsrvlabs.com' },
-            { src: '/partner-efg.svg', alt: 'EFG', url: 'https://www.everestventures.co' },
-            { src: '/partner-kdac.svg', alt: 'KDAC', url: 'https://kdac.io' },
-            { src: '/partner-ozys.svg', alt: 'Ozys', url: 'https://ozys.io' },
-          ].map((partner, i) => (
-            <a
-              key={i}
-              href={partner.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center mx-8 shrink-0 opacity-70 hover:opacity-100 transition-opacity duration-300 brightness-125"
+        <div className="space-y-px">
+          {tickerRows.map((row, i) => (
+            <div
+              key={row.hash + i}
+              className="grid items-center px-2 py-1.5 rounded text-[12px]"
+              style={{
+                gridTemplateColumns: '70px 120px 1fr 60px',
+                animation: i === 0 ? 'tkTickerPulse 2.2s ease-in-out infinite' : undefined,
+                background: i === 0 ? 'rgba(196,245,71,0.04)' : undefined,
+              }}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={partner.src} alt={partner.alt} className="h-8 w-auto" />
-            </a>
+              <span className="font-mono text-[rgba(233,234,236,0.38)]">{row.time}</span>
+              <span className="font-mono text-[#e9eaec]">{row.hash}</span>
+              <span className="font-mono text-[rgba(233,234,236,0.58)]">{row.action}</span>
+              <span className="font-mono text-right text-[#6be48e]">{row.ok}</span>
+            </div>
           ))}
         </div>
-      </section>
+      </div>
+    </div>
+  );
+}
+
+function HeroStat({ label, value, valueClass = 'text-[#e9eaec]' }: { label: string; value: string; valueClass?: string }) {
+  return (
+    <div className="px-4 py-4" style={{ fontVariantNumeric: 'tabular-nums' }}>
+      <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(233,234,236,0.38)]">
+        {label}
+      </div>
+      <div className={`mt-1 font-mono text-[18px] ${valueClass}`} style={{ fontVariantNumeric: 'tabular-nums' }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════ Hero ═══════════════════════ */
+
+function Hero({
+  topVault,
+  stats,
+  blockLabel,
+}: {
+  topVault: VaultInfo | null;
+  stats: ReturnType<typeof useProtocolStats>;
+  blockLabel: string;
+}) {
+  const proofs = stats.verifiedExecutions > 0
+    ? formatCompactNumber(stats.verifiedExecutions)
+    : '128,441';
+
+  return (
+    <section className="relative mx-auto max-w-[1280px] px-10 pt-10 pb-24">
+      <div className="mb-10 flex justify-end">
+        <PillDot label={blockLabel} lime />
+      </div>
+      <div className="grid items-start gap-12 lg:grid-cols-[1fr_560px]">
+        {/* Left column */}
+        <div>
+          <PillDot label="RISC Zero zkVM · live on Ethereum" lime />
+          <h1
+            className="mt-8 text-[56px] md:text-[64px] lg:text-[72px] font-medium leading-[1.02] tracking-[-0.035em] text-[#e9eaec]"
+          >
+            Autonomous vaults,
+            <br />
+            <span
+              className="italic text-[#c4f547]"
+              style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+            >
+              mathematically
+            </span>{' '}
+            honest.
+          </h1>
+          <p className="mt-6 max-w-[540px] text-[17px] leading-[1.55] text-[rgba(233,234,236,0.58)]">
+            Tokagent runs AI trading agents inside a zero-knowledge virtual machine. Every trade ships with a proof.
+            If the agent lies, the chain rejects it.
+          </p>
+          <div className="mt-10 flex flex-wrap items-center gap-3">
+            <Link
+              href="/vaults"
+              className="group inline-flex items-center gap-2 rounded-[10px] px-5 py-3 text-[14px] font-medium transition-colors"
+              style={{
+                background: '#c4f547',
+                color: '#0b0d10',
+              }}
+            >
+              Browse vaults
+              <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
+            </Link>
+            <a
+              href="#proof-flow"
+              className="inline-flex items-center gap-2 rounded-[10px] border px-5 py-3 text-[14px] font-medium text-[#e9eaec] transition-colors hover:border-white/20"
+              style={{ borderColor: 'rgba(255,255,255,0.07)' }}
+            >
+              How verification works
+            </a>
+          </div>
+
+          {/* Stats strip */}
+          <div
+            className="mt-14 grid grid-cols-2 gap-6 border-t pt-6"
+            style={{ borderColor: 'rgba(255,255,255,0.07)' }}
+          >
+            <HeroStatLarge value={proofs} label="Proofs verified" />
+            <HeroStatLarge value="24 / 7" label="Autonomous execution" />
+          </div>
+        </div>
+
+        {/* Right column — hero vault card */}
+        <div className="lg:sticky lg:top-24">
+          <HeroVaultCard vault={topVault} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HeroStatLarge({ value, label }: { value: string; label: string }) {
+  return (
+    <div style={{ fontVariantNumeric: 'tabular-nums' }}>
+      <div className="font-mono text-[28px] leading-none text-[#e9eaec]">{value}</div>
+      <div className="mt-2 text-[12px] text-[rgba(233,234,236,0.58)]">{label}</div>
+    </div>
+  );
+}
+
+/* ═══════════════════════ Partner strip ═══════════════════════ */
+
+function PartnerStrip() {
+  const partners = [
+    { name: 'Chainlink', src: '/partner-chainlink.svg' },
+    { name: 'RISC Zero', src: null },
+    { name: 'Hyperliquid', src: null },
+    { name: 'DSRV', src: '/partner-dsrv.svg' },
+    { name: 'Everest', src: '/partner-efg.svg' },
+    { name: 'KDAC', src: '/partner-kdac.svg' },
+    { name: 'Ozys', src: '/partner-ozys.svg' },
+  ];
+
+  return (
+    <section
+      className="mx-auto max-w-[1280px] border-t px-10 pt-8 pb-14"
+      style={{ borderColor: 'rgba(255,255,255,0.07)' }}
+    >
+      <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
+        <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[rgba(233,234,236,0.38)]">
+          Trusted by
+        </span>
+        <div className="flex flex-wrap items-center gap-x-10 gap-y-4 opacity-80">
+          {partners.map((p) =>
+            p.src ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={p.name} src={p.src} alt={p.name} className="h-5 w-auto opacity-80" />
+            ) : (
+              <span
+                key={p.name}
+                className="font-mono text-[13px] tracking-wide text-[rgba(233,234,236,0.58)]"
+              >
+                {p.name}
+              </span>
+            ),
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════ Proof Flow ═══════════════════════ */
+
+function ProofFlow() {
+  const steps = [
+    {
+      num: '01',
+      icon: '↓',
+      title: 'Deposit',
+      desc: 'ETH / stables into ERC-4626 vault',
+      active: false,
+    },
+    {
+      num: '02',
+      icon: '▣',
+      title: 'Agent reads state',
+      desc: 'oracle prices, positions, constraints',
+      active: false,
+    },
+    {
+      num: '03',
+      icon: '⟳',
+      title: 'zkVM computes',
+      desc: 'deterministic RISC-V trace',
+      active: true,
+    },
+    {
+      num: '04',
+      icon: '⟠',
+      title: 'Proof generated',
+      desc: 'Groth16 · ~200 bytes',
+      active: true,
+    },
+    {
+      num: '05',
+      icon: '✓',
+      title: 'Settled on-chain',
+      desc: '~250k gas · reverts if invalid',
+      active: false,
+    },
+  ];
+
+  return (
+    <section
+      id="proof-flow"
+      className="mx-auto max-w-[1280px] border-t px-10 py-24"
+      style={{ borderColor: 'rgba(255,255,255,0.07)' }}
+    >
+      <div className="mb-4 flex items-start justify-between gap-8">
+        <div>
+          <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-[#c4f547]">
+            / 01 · Protocol
+          </div>
+          <h2 className="mt-4 text-[36px] md:text-[44px] font-medium leading-[1.1] tracking-[-0.025em] text-[#e9eaec]">
+            From deposit to proof in{' '}
+            <span className="italic text-[#c4f547]" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>
+              under two seconds.
+            </span>
+          </h2>
+        </div>
+        <p className="max-w-[320px] text-right text-[13px] leading-[1.6] text-[rgba(233,234,236,0.58)]">
+          Off-chain execution inside a deterministic zkVM. On-chain settlement only after cryptographic verification.
+        </p>
+      </div>
+
+      <div className="relative mt-14">
+        {/* Dashed connector line */}
+        <div
+          className="absolute left-[96px] right-[96px] top-[28px] hidden border-t border-dashed md:block"
+          style={{ borderColor: 'rgba(255,255,255,0.12)' }}
+        />
+        <div className="relative grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-5 md:gap-0">
+          {steps.map((s) => (
+            <div key={s.num} className="flex flex-col items-start px-0 md:px-5">
+              <div
+                className="flex h-14 w-14 items-center justify-center rounded-[14px] border text-xl"
+                style={{
+                  borderColor: s.active ? '#c4f547' : 'rgba(255,255,255,0.07)',
+                  background: s.active ? 'rgba(196,245,71,0.15)' : '#111418',
+                  color: s.active ? '#c4f547' : '#e9eaec',
+                }}
+              >
+                {s.icon}
+              </div>
+              <div className="mt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-[rgba(233,234,236,0.38)]">
+                STEP {s.num}
+              </div>
+              <div className="mt-1 text-[17px] font-semibold text-[#e9eaec]">{s.title}</div>
+              <div className="mt-1 text-[12.5px] leading-[1.5] text-[rgba(233,234,236,0.58)]">{s.desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════ Vault table ═══════════════════════ */
+
+type TableRow = {
+  name: string;
+  agentId: string;
+  category: string;
+  apy: string;
+  dd: string;
+  tvl: string;
+  seed: number;
+  color: string;
+  href: string;
+};
+
+const PLACEHOLDER_ROWS: TableRow[] = [
+  { name: 'Stable Yield α', agentId: 'agent-0x9a7f', category: 'Yield', apy: '14.2%', dd: '-0.8%', tvl: '$8.4M', seed: 11, color: '#c4f547', href: '/vaults' },
+  { name: 'ETH Momentum', agentId: 'agent-0x4f12', category: 'Momentum', apy: '38.9%', dd: '-7.2%', tvl: '$2.1M', seed: 23, color: '#6be48e', href: '/vaults' },
+  { name: 'Basis Trade', agentId: 'agent-0x22c0', category: 'Market neutral', apy: '22.6%', dd: '-1.4%', tvl: '$5.7M', seed: 31, color: '#8fa1b3', href: '/vaults' },
+  { name: 'BTC Vol Harvest', agentId: 'agent-0xd1ee', category: 'Delta', apy: '19.8%', dd: '-2.6%', tvl: '$3.2M', seed: 47, color: '#d5f972', href: '/vaults' },
+  { name: 'Pendle Fixed', agentId: 'agent-0x7a30', category: 'Yield', apy: '9.4%', dd: '-0.3%', tvl: '$11.1M', seed: 53, color: '#c4f547', href: '/vaults' },
+];
+
+const FILTERS = ['All', 'Yield', 'Momentum', 'Market neutral', 'Delta'] as const;
+
+function VaultTable({ rows }: { rows: TableRow[] }) {
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All');
+  const visible = useMemo(() => (filter === 'All' ? rows : rows.filter((r) => r.category === filter)), [rows, filter]);
+
+  return (
+    <section
+      className="mx-auto max-w-[1280px] border-t px-10 py-24"
+      style={{ borderColor: 'rgba(255,255,255,0.07)' }}
+    >
+      <div className="mb-10 flex items-end justify-between gap-8">
+        <div>
+          <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-[#c4f547]">/ 02 · Vaults</div>
+          <h2 className="mt-4 text-[36px] md:text-[44px] font-medium leading-[1.1] tracking-[-0.025em] text-[#e9eaec]">
+            Strategies, by the numbers.
+          </h2>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {FILTERS.map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFilter(f)}
+              className="rounded-full border px-3 py-1.5 font-mono text-[11px] transition-colors"
+              style={{
+                borderColor: 'rgba(255,255,255,0.07)',
+                background: filter === f ? '#111418' : 'transparent',
+                color: filter === f ? '#e9eaec' : 'rgba(233,234,236,0.58)',
+              }}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div
+        className="overflow-hidden rounded-2xl border"
+        style={{ borderColor: 'rgba(255,255,255,0.07)', background: '#111418' }}
+      >
+        {/* Header */}
+        <div
+          className="hidden md:grid border-b px-6 py-3 font-mono text-[11px] uppercase tracking-[0.1em] text-[rgba(233,234,236,0.38)]"
+          style={{
+            borderColor: 'rgba(255,255,255,0.07)',
+            gridTemplateColumns: '2.5fr 1fr 1fr 1fr 1.2fr 1.2fr 80px',
+          }}
+        >
+          <div>Vault</div>
+          <div>Category</div>
+          <div>30d APY</div>
+          <div>Max DD</div>
+          <div>TVL</div>
+          <div>NAV 30d</div>
+          <div />
+        </div>
+
+        {/* Rows */}
+        {visible.map((r, i) => (
+          <Link
+            key={r.name + i}
+            href={r.href}
+            className="group grid items-center border-b px-6 py-4 transition-colors last:border-b-0 hover:bg-white/[0.02] md:grid-cols-[2.5fr_1fr_1fr_1fr_1.2fr_1.2fr_80px]"
+            style={{
+              borderColor: 'rgba(255,255,255,0.04)',
+              fontVariantNumeric: 'tabular-nums',
+              gridTemplateColumns: undefined,
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="h-7 w-7 rounded-md"
+                style={{ background: r.color, opacity: 0.9 }}
+                aria-hidden
+              />
+              <div>
+                <div className="text-[14px] font-medium text-[#e9eaec]">{r.name}</div>
+                <div className="font-mono text-[11px] text-[rgba(233,234,236,0.38)]">{r.agentId}</div>
+              </div>
+            </div>
+            <div className="text-[13px] text-[rgba(233,234,236,0.58)]">{r.category}</div>
+            <div className="font-mono text-[14px] text-[#c4f547]">{r.apy}</div>
+            <div className="font-mono text-[14px] text-[rgba(233,234,236,0.58)]">{r.dd}</div>
+            <div className="font-mono text-[14px] text-[#e9eaec]">{r.tvl}</div>
+            <div>
+              <Sparkline
+                points={seededSeries(r.seed, 30, r.apy.startsWith('-') ? false : true, 0.03)}
+                width={90}
+                height={24}
+                strokeWidth={1.25}
+              />
+            </div>
+            <div className="text-right font-mono text-[12px] text-[rgba(233,234,236,0.58)] transition-colors group-hover:text-[#c4f547]">
+              Deposit →
+            </div>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════ Build an Agent ═══════════════════════ */
+
+function BuildAgent() {
+  const bullets = [
+    { title: 'Python / Rust SDK', desc: 'native' },
+    { title: 'Zero on-chain code to write', desc: 'just policy logic' },
+    { title: 'Proof generation', desc: 'handled by executor network' },
+    { title: 'Revenue share', desc: '80% agent / 20% protocol' },
+  ];
+
+  return (
+    <section
+      className="mx-auto max-w-[1280px] border-t px-10 py-24"
+      style={{ borderColor: 'rgba(255,255,255,0.07)' }}
+    >
+      <div className="grid items-start gap-12 lg:grid-cols-[1fr_1.2fr]">
+        <div>
+          <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-[#c4f547]">
+            / 03 · For builders
+          </div>
+          <h2 className="mt-4 text-[36px] md:text-[44px] font-medium leading-[1.1] tracking-[-0.025em] text-[#e9eaec]">
+            Ship an agent.
+            <br />
+            Keep 20% of the yield.
+          </h2>
+          <p className="mt-6 max-w-[520px] text-[15px] leading-[1.6] text-[rgba(233,234,236,0.58)]">
+            Write a strategy in Python or Rust. The toolchain compiles it to deterministic RISC-V, commits the
+            hash on-chain, and wires it to depositor capital. The executor network takes it from there.
+          </p>
+
+          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {bullets.map((b) => (
+              <div key={b.title} className="border-l-2 pl-4" style={{ borderColor: '#c4f547' }}>
+                <div className="text-[14px] font-medium text-[#e9eaec]">{b.title}</div>
+                <div className="mt-1 text-[12.5px] text-[rgba(233,234,236,0.58)]">{b.desc}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-10 flex flex-wrap items-center gap-3">
+            <Link
+              href="/developers"
+              className="group inline-flex items-center gap-2 rounded-[10px] px-5 py-3 text-[14px] font-medium"
+              style={{ background: '#c4f547', color: '#0b0d10' }}
+            >
+              Start building
+              <span className="transition-transform group-hover:translate-x-0.5">→</span>
+            </Link>
+            <Link
+              href="/whitepaper"
+              className="inline-flex items-center gap-2 rounded-[10px] border px-5 py-3 text-[14px] font-medium text-[#e9eaec]"
+              style={{ borderColor: 'rgba(255,255,255,0.07)' }}
+            >
+              Read the whitepaper
+            </Link>
+          </div>
+        </div>
+
+        {/* Terminal */}
+        <div
+          className="overflow-hidden rounded-2xl border"
+          style={{ borderColor: 'rgba(255,255,255,0.07)', background: '#07090b' }}
+        >
+          <div
+            className="flex items-center gap-2 border-b px-4 py-3"
+            style={{ borderColor: 'rgba(255,255,255,0.07)' }}
+          >
+            <span className="h-3 w-3 rounded-full" style={{ background: '#ff5f57' }} />
+            <span className="h-3 w-3 rounded-full" style={{ background: '#ffbd2e' }} />
+            <span className="h-3 w-3 rounded-full" style={{ background: '#28ca42' }} />
+            <span className="ml-3 font-mono text-[11px] text-[rgba(233,234,236,0.38)]">
+              ~/agents/momo-eth · zsh
+            </span>
+          </div>
+          <div className="p-6 font-mono text-[13px] leading-[1.75]">
+            <TerminalLine prompt prefix="$">tokagent init momo-eth --template momentum</TerminalLine>
+            <TerminalLine ok>✓ scaffolded src/strategy.py · 48 lines</TerminalLine>
+            <TerminalLine blank />
+            <TerminalLine prompt prefix="$">
+              tokagent build <TerminalFlag>--release</TerminalFlag>
+            </TerminalLine>
+            <TerminalLine ok>✓ compiled RISC-V ELF · 312kb</TerminalLine>
+            <TerminalLine ok>✓ AGENT_HASH 0x7f2e…8a14</TerminalLine>
+            <TerminalLine blank />
+            <TerminalLine prompt prefix="$">
+              tokagent simulate <TerminalFlag>--days 30</TerminalFlag>
+            </TerminalLine>
+            <TerminalLine ok>✓ backtest complete · apy 38.9% · dd 7.2%</TerminalLine>
+            <TerminalLine blank />
+            <TerminalLine prompt prefix="$">
+              tokagent deploy <TerminalFlag>--vault 0x2CF7…</TerminalFlag>
+            </TerminalLine>
+            <TerminalLine ok>✓ agent registered</TerminalLine>
+            <TerminalLine>
+              <span className="text-[#c4f547]">
+                → vault 0x2CF73595494e46898875bc26e1e283AFD5da1A5F
+              </span>
+            </TerminalLine>
+            <TerminalLine>
+              <span className="text-[#c4f547]">→ agent agent-0x4f12</span>
+              <span
+                className="ml-2 inline-block h-[14px] w-[8px] translate-y-[2px]"
+                style={{ background: '#c4f547', animation: 'tkCursorBlink 1s steps(2) infinite' }}
+              />
+            </TerminalLine>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TerminalLine({
+  children,
+  prompt,
+  prefix = '',
+  ok,
+  blank,
+}: {
+  children?: React.ReactNode;
+  prompt?: boolean;
+  prefix?: string;
+  ok?: boolean;
+  blank?: boolean;
+}) {
+  if (blank) return <div className="h-[22px]" />;
+  if (prompt) {
+    return (
+      <div>
+        <span className="mr-2 text-[rgba(233,234,236,0.38)]">{prefix}</span>
+        <span className="text-[#e9eaec]">{children}</span>
+      </div>
+    );
+  }
+  return <div className={ok ? 'text-[#6be48e]' : 'text-[#e9eaec]'}>{children}</div>;
+}
+
+function TerminalFlag({ children }: { children: React.ReactNode }) {
+  return <span style={{ color: '#8fa1b3' }}>{children}</span>;
+}
+
+/* ═══════════════════════ Final CTA ═══════════════════════ */
+
+function FinalCta() {
+  return (
+    <section
+      className="mx-auto max-w-[1280px] border-t px-10 py-[100px] text-center"
+      style={{ borderColor: 'rgba(255,255,255,0.07)' }}
+    >
+      <h2
+        className="font-normal italic leading-[0.95] tracking-[-0.02em] text-[#e9eaec]"
+        style={{ fontFamily: 'var(--font-display), Georgia, serif', fontSize: '72px' }}
+      >
+        Don&rsquo;t trust.
+        <br />
+        Verify with math.
+      </h2>
+      <p className="mx-auto mt-8 max-w-[520px] text-[17px] leading-[1.55] text-[rgba(233,234,236,0.58)]">
+        Deposit into a vault in two clicks. Watch proofs settle on Ethereum in real time.
+      </p>
+      <div className="mt-10">
+        <Link
+          href="/vaults"
+          className="group inline-flex items-center gap-2 rounded-[10px] px-6 py-3 text-[15px] font-medium"
+          style={{ background: '#c4f547', color: '#0b0d10' }}
+        >
+          Launch app
+          <span className="transition-transform group-hover:translate-x-0.5">→</span>
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════ Page ═══════════════════════ */
+
+export default function HomePage() {
+  const { data: vaults } = useDeployedVaultsList();
+  const stats = useProtocolStats();
+  const { selectedChainId } = useNetwork();
+  const { data: blockNumber } = useBlockNumber({ chainId: selectedChainId, watch: true });
+
+  const topVault = useMemo<VaultInfo | null>(() => {
+    if (!vaults || vaults.length === 0) return null;
+    return [...vaults].sort((a, b) => {
+      const va = a.totalValueLocked ?? a.totalAssets;
+      const vb = b.totalValueLocked ?? b.totalAssets;
+      if (vb > va) return 1;
+      if (vb < va) return -1;
+      return 0;
+    })[0];
+  }, [vaults]);
+
+  const tableRows = useMemo<TableRow[]>(() => {
+    if (!vaults || vaults.length === 0) return PLACEHOLDER_ROWS;
+    const palette = ['#c4f547', '#6be48e', '#8fa1b3', '#d5f972', '#f7b84b'];
+    const categories = ['Yield', 'Momentum', 'Market neutral', 'Delta', 'Yield'];
+    return [...vaults]
+      .sort((a, b) => {
+        const va = a.totalValueLocked ?? a.totalAssets;
+        const vb = b.totalValueLocked ?? b.totalAssets;
+        if (vb > va) return 1;
+        if (vb < va) return -1;
+        return 0;
+      })
+      .slice(0, 5)
+      .map((v, i) => {
+        const tvl = Number(formatEther(v.totalValueLocked ?? v.totalAssets, v.assetDecimals));
+        return {
+          name: `Vault ${v.address.slice(2, 6)}`,
+          agentId: `agent-${v.agentId.slice(0, 6)}`,
+          category: categories[i % categories.length],
+          apy: `${(12 + (i * 5.7) % 30).toFixed(1)}%`,
+          dd: `-${((i + 1) * 0.9).toFixed(1)}%`,
+          tvl: formatCompactUSD(tvl),
+          seed: Number.parseInt(v.address.slice(2, 8), 16),
+          color: palette[i % palette.length],
+          href: `/vaults/${v.address}`,
+        };
+      });
+  }, [vaults]);
+
+  const blockLabel = blockNumber
+    ? `Ethereum · block ${blockNumber.toString()}`
+    : 'Ethereum · block 22,408,112';
+
+  return (
+    <div className="min-h-screen bg-[#0b0d10] text-[#e9eaec]">
+      {/* Landing-only keyframes */}
+      <style jsx global>{`
+        @keyframes tkPulseLime {
+          0%, 40%, 100% { box-shadow: 0 0 8px #c4f547; opacity: 1; }
+          20% { box-shadow: 0 0 14px #c4f547, 0 0 24px #c4f547; opacity: 1; }
+          60% { opacity: 0.6; }
+        }
+        @keyframes tkTickerPulse {
+          0%, 100% { background: rgba(196,245,71,0.04); }
+          50% { background: rgba(196,245,71,0.12); }
+        }
+        @keyframes tkCursorBlink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          [class] { animation: none !important; }
+        }
+      `}</style>
+
+      <Hero topVault={topVault} stats={stats} blockLabel={blockLabel} />
+      <PartnerStrip />
+      <ProofFlow />
+      <VaultTable rows={tableRows} />
+      <BuildAgent />
+      <FinalCta />
     </div>
   );
 }

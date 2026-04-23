@@ -41,7 +41,7 @@ function protocolAccent(type: number): { border: string; dot: string } {
     case PROTOCOL_TYPE.POLYMARKET:
       return { border: 'border-blue-500/20 hover:border-blue-400/40', dot: 'bg-blue-400' };
     default:
-      return { border: 'border-white/10 hover:border-[#A855F7]/30', dot: 'bg-[#A855F7]' };
+      return { border: 'border-white/10 hover:border-[#c4f547]/30', dot: 'bg-[#c4f547]' };
   }
 }
 
@@ -125,7 +125,7 @@ function AgentVaultCard({ vault, index }: { vault: VaultInfo; index: number }) {
             <span className="text-2xl font-light tracking-tight text-white font-mono">
               {tvl}
             </span>
-            <span className="text-xs font-mono font-medium text-[#C084FC]">
+            <span className="text-xs font-mono font-medium text-[#d5f972]">
               {vault.assetSymbol}
             </span>
           </div>
@@ -203,11 +203,11 @@ function ForkSection({ agentId, agentName }: { agentId: string; agentName: strin
   }, [command]);
 
   return (
-    <div className="rounded-2xl border border-[#A855F7]/20 bg-[#A855F7]/5 p-8 mb-10">
+    <div className="rounded-2xl border border-[#c4f547]/20 bg-[#c4f547]/5 p-8 mb-10">
       <div className="flex flex-col md:flex-row md:items-start gap-6">
         <div className="flex-1">
           <h3 className="text-lg font-light text-white mb-2" style={{ fontFamily: 'var(--font-serif), serif' }}>
-            <span className="italic text-[#A855F7]">Fork</span> this agent
+            <span className="italic text-[#c4f547]">Fork</span> this agent
           </h3>
           <p className="text-gray-400 text-sm font-mono leading-relaxed mb-4">
             Fork this agent to create your own version. Modify the strategy and deploy your own vault.
@@ -219,12 +219,12 @@ function ForkSection({ agentId, agentName }: { agentId: string; agentName: strin
               Run in your terminal
             </p>
             <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/30 p-4">
-              <code className="flex-1 text-sm font-mono text-[#C084FC] break-all">
+              <code className="flex-1 text-sm font-mono text-[#d5f972] break-all">
                 {command}
               </code>
               <button
                 onClick={handleCopy}
-                className="shrink-0 p-2 rounded-lg border border-white/10 hover:border-[#A855F7]/30 bg-white/[0.02] hover:bg-[#A855F7]/5 transition-all"
+                className="shrink-0 p-2 rounded-lg border border-white/10 hover:border-[#c4f547]/30 bg-white/[0.02] hover:bg-[#c4f547]/5 transition-all"
                 title="Copy command"
               >
                 {copied ? (
@@ -244,7 +244,7 @@ function ForkSection({ agentId, agentName }: { agentId: string; agentName: strin
             href="https://docs.tokagent.network"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-xs font-mono text-[#C084FC] hover:text-[#A855F7] transition-colors"
+            className="inline-flex items-center gap-2 text-xs font-mono text-[#d5f972] hover:text-[#c4f547] transition-colors"
           >
             Read the full guide
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -256,15 +256,15 @@ function ForkSection({ agentId, agentName }: { agentId: string; agentName: strin
         {/* Steps */}
         <div className="md:w-64 space-y-3">
           <div className="flex items-start gap-3">
-            <span className="shrink-0 w-5 h-5 rounded-full bg-[#A855F7]/10 border border-[#A855F7]/20 flex items-center justify-center text-[10px] font-mono text-[#C084FC]">1</span>
+            <span className="shrink-0 w-5 h-5 rounded-full bg-[#c4f547]/10 border border-[#c4f547]/20 flex items-center justify-center text-[10px] font-mono text-[#d5f972]">1</span>
             <p className="text-xs font-mono text-gray-400">Install the Tokagent CLI</p>
           </div>
           <div className="flex items-start gap-3">
-            <span className="shrink-0 w-5 h-5 rounded-full bg-[#A855F7]/10 border border-[#A855F7]/20 flex items-center justify-center text-[10px] font-mono text-[#C084FC]">2</span>
+            <span className="shrink-0 w-5 h-5 rounded-full bg-[#c4f547]/10 border border-[#c4f547]/20 flex items-center justify-center text-[10px] font-mono text-[#d5f972]">2</span>
             <p className="text-xs font-mono text-gray-400">Fork the agent&apos;s strategy code</p>
           </div>
           <div className="flex items-start gap-3">
-            <span className="shrink-0 w-5 h-5 rounded-full bg-[#A855F7]/10 border border-[#A855F7]/20 flex items-center justify-center text-[10px] font-mono text-[#C084FC]">3</span>
+            <span className="shrink-0 w-5 h-5 rounded-full bg-[#c4f547]/10 border border-[#c4f547]/20 flex items-center justify-center text-[10px] font-mono text-[#d5f972]">3</span>
             <p className="text-xs font-mono text-gray-400">Customize, register, and deploy</p>
           </div>
         </div>
@@ -300,8 +300,8 @@ function AuthorSection({
       <div className="rounded-xl border border-white/5 bg-[#12121a]/80 p-5">
         <div className="flex items-center gap-3 mb-3">
           {/* Author avatar placeholder */}
-          <div className="w-10 h-10 rounded-full bg-[#A855F7]/10 border border-[#A855F7]/20 flex items-center justify-center">
-            <svg className="w-5 h-5 text-[#A855F7]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+          <div className="w-10 h-10 rounded-full bg-[#c4f547]/10 border border-[#c4f547]/20 flex items-center justify-center">
+            <svg className="w-5 h-5 text-[#c4f547]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
             </svg>
           </div>
@@ -355,7 +355,7 @@ function AuthorOtherAgents({
           return (
             <Link key={otherId} href={`/agents/${encodeURIComponent(otherId)}`}>
               <div
-                className="rounded-xl border border-white/5 bg-[#12121a]/80 p-4 group hover:border-[#A855F7]/20 transition-all duration-300 cursor-pointer vault-card-enter"
+                className="rounded-xl border border-white/5 bg-[#12121a]/80 p-4 group hover:border-[#c4f547]/20 transition-all duration-300 cursor-pointer vault-card-enter"
                 style={{ animationDelay: `${i * 60}ms` }}
               >
                 <p className="text-sm font-mono text-gray-200 group-hover:text-white transition-colors truncate mb-1">
@@ -407,7 +407,7 @@ export default function AgentDetailPage() {
       {/* Back link */}
       <Link
         href="/leaderboard"
-        className="inline-flex items-center gap-1.5 text-xs font-mono text-gray-500 hover:text-[#C084FC] transition-colors mb-8"
+        className="inline-flex items-center gap-1.5 text-xs font-mono text-gray-500 hover:text-[#d5f972] transition-colors mb-8"
       >
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -449,8 +449,8 @@ export default function AgentDetailPage() {
           {/* Agent profile header */}
           <div className="mb-10">
             <div className="flex items-center gap-3 mb-5">
-              <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#A855F7] to-transparent" />
-              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C084FC] font-mono">
+              <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#c4f547] to-transparent" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d5f972] font-mono">
                 Agent Profile
               </span>
             </div>
@@ -461,7 +461,7 @@ export default function AgentDetailPage() {
             >
               {metadata?.name ? (
                 <>
-                  <span className="italic text-[#A855F7]">{metadata.name}</span>
+                  <span className="italic text-[#c4f547]">{metadata.name}</span>
                 </>
               ) : (
                 <span className="text-white font-mono text-2xl">{truncateBytes32(decodedAgentId, 8)}</span>
@@ -557,7 +557,7 @@ export default function AgentDetailPage() {
           </div>
 
           {/* CTA */}
-          <div className="rounded-2xl border border-[#A855F7]/20 bg-[#A855F7]/5 p-8 text-center">
+          <div className="rounded-2xl border border-[#c4f547]/20 bg-[#c4f547]/5 p-8 text-center">
             <h3 className="text-lg font-light text-white mb-2" style={{ fontFamily: 'var(--font-serif), serif' }}>
               Deploy a vault with this agent
             </h3>

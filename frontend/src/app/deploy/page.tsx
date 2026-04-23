@@ -9,9 +9,9 @@ export default function DeployPage() {
       {/* Header — editorial layout matching vaults page */}
       <div className="mb-8 sm:mb-10">
         <div className="flex items-center gap-3 mb-5">
-          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#A855F7] to-transparent" />
+          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#c4f547] to-transparent" />
           <span
-            className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C084FC] font-mono"
+            className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d5f972] font-mono"
           >
             Vault Factory
           </span>
@@ -20,7 +20,7 @@ export default function DeployPage() {
           className="text-3xl sm:text-4xl md:text-5xl font-light mb-3 tracking-tight"
           style={{ fontFamily: 'var(--font-serif), serif' }}
         >
-          <span className="italic text-[#A855F7]">Deploy</span>{' '}
+          <span className="italic text-[#c4f547]">Deploy</span>{' '}
           <span className="text-white">Vault</span>
         </h1>
         <p className="text-gray-500 max-w-lg text-sm leading-relaxed font-mono">

@@ -70,8 +70,8 @@ export default function BuildersPage() {
       {/* Header */}
       <div className="mb-10">
         <div className="flex items-center gap-3 mb-5">
-          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#A855F7] to-transparent" />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C084FC] font-mono">
+          <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#c4f547] to-transparent" />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d5f972] font-mono">
             Builder Program
           </span>
         </div>
@@ -79,7 +79,7 @@ export default function BuildersPage() {
           className="text-4xl md:text-5xl font-light mb-3 tracking-tight"
           style={{ fontFamily: 'var(--font-serif), serif' }}
         >
-          <span className="italic text-[#A855F7]">Builder</span>{' '}
+          <span className="italic text-[#c4f547]">Builder</span>{' '}
           <span className="text-white">Leaderboard</span>
         </h1>
         <p className="text-gray-500 max-w-lg text-sm leading-relaxed font-mono">
@@ -214,7 +214,7 @@ export default function BuildersPage() {
                                 href={builder.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-[#A855F7] text-xs font-mono hover:underline"
+                                className="text-[#c4f547] text-xs font-mono hover:underline"
                               >
                                 {builder.url.replace(/^https?:\/\//, '')}
                               </a>

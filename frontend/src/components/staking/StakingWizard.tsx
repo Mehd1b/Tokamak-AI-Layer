@@ -85,7 +85,7 @@ export function StakingWizard({ onComplete }: StakingWizardProps) {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-medium text-white flex items-center gap-2">
-            <Zap className="h-5 w-5 text-[#A855F7]" />
+            <Zap className="h-5 w-5 text-[#c4f547]" />
             Stake TON/WTON
           </h2>
 
@@ -95,7 +95,7 @@ export function StakingWizard({ onComplete }: StakingWizardProps) {
               onClick={() => setMode('quick')}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-300 ${
                 mode === 'quick'
-                  ? 'bg-[#A855F7]/15 text-[#C084FC] shadow-sm'
+                  ? 'bg-[#c4f547]/15 text-[#d5f972] shadow-sm'
                   : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
@@ -106,7 +106,7 @@ export function StakingWizard({ onComplete }: StakingWizardProps) {
               onClick={() => setMode('manual')}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-300 ${
                 mode === 'manual'
-                  ? 'bg-[#A855F7]/15 text-[#C084FC] shadow-sm'
+                  ? 'bg-[#c4f547]/15 text-[#d5f972] shadow-sm'
                   : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
@@ -126,11 +126,11 @@ export function StakingWizard({ onComplete }: StakingWizardProps) {
 
       {/* Network warning */}
       {isConnected && !isL1 && (
-        <div className="mb-4 rounded-lg border border-[#A855F7]/20 bg-[#A855F7]/5 p-3">
+        <div className="mb-4 rounded-lg border border-[#c4f547]/20 bg-[#c4f547]/5 p-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-[#C084FC]" />
-              <p className="text-sm text-[#C084FC]">Switch to Ethereum Mainnet to stake.</p>
+              <AlertTriangle className="h-4 w-4 text-[#d5f972]" />
+              <p className="text-sm text-[#d5f972]">Switch to Ethereum Mainnet to stake.</p>
             </div>
             <button onClick={switchToL1} className="btn-primary text-xs px-3 py-1">Switch</button>
           </div>
@@ -138,8 +138,8 @@ export function StakingWizard({ onComplete }: StakingWizardProps) {
       )}
 
       {!isConnected && (
-        <div className="mb-4 rounded-lg border border-[#A855F7]/20 bg-[#A855F7]/5 p-3">
-          <p className="text-sm text-[#C084FC]">Connect your wallet to stake.</p>
+        <div className="mb-4 rounded-lg border border-[#c4f547]/20 bg-[#c4f547]/5 p-3">
+          <p className="text-sm text-[#d5f972]">Connect your wallet to stake.</p>
         </div>
       )}
 
@@ -155,7 +155,7 @@ export function StakingWizard({ onComplete }: StakingWizardProps) {
                 disabled={!isIdle}
                 className={`rounded-md px-4 py-2 text-sm font-medium transition-all duration-300 ${
                   tokenSource === source
-                    ? 'bg-[#A855F7]/15 text-[#C084FC] shadow-sm'
+                    ? 'bg-[#c4f547]/15 text-[#d5f972] shadow-sm'
                     : 'text-zinc-500 hover:text-zinc-300'
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
@@ -217,7 +217,7 @@ export function StakingWizard({ onComplete }: StakingWizardProps) {
                 }
               }}
               disabled={!isConnected || !isL1 || isLoading}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 text-xs font-medium text-zinc-300 hover:bg-[#A855F7]/10 hover:border-[#A855F7]/30 hover:text-[#C084FC] disabled:opacity-50 transition-all duration-300"
+              className="rounded-lg border border-white/10 bg-white/5 px-3 text-xs font-medium text-zinc-300 hover:bg-[#c4f547]/10 hover:border-[#c4f547]/30 hover:text-[#d5f972] disabled:opacity-50 transition-all duration-300"
             >
               MAX
             </button>
@@ -233,10 +233,10 @@ export function StakingWizard({ onComplete }: StakingWizardProps) {
 
       {/* Estimated output */}
       {!isComplete && amount && parseFloat(amount) > 0 && (
-        <div className="mb-4 rounded-lg bg-[#A855F7]/5 border border-[#A855F7]/10 p-3">
+        <div className="mb-4 rounded-lg bg-[#c4f547]/5 border border-[#c4f547]/10 p-3">
           <p className="text-xs text-white/40">
             Estimated WSTON received:{' '}
-            <span className="font-semibold text-[#C084FC]">
+            <span className="font-semibold text-[#d5f972]">
               {parseFloat(estimatedWSTON).toLocaleString(undefined, { maximumFractionDigits: 4 })}
             </span>
           </p>
@@ -254,7 +254,7 @@ export function StakingWizard({ onComplete }: StakingWizardProps) {
                     isStepDone(i)
                       ? 'bg-emerald-500/20 text-emerald-400'
                       : isStepActive(i)
-                        ? 'bg-[#A855F7]/20 text-[#C084FC] animate-pulse'
+                        ? 'bg-[#c4f547]/20 text-[#d5f972] animate-pulse'
                         : 'bg-white/5 text-white/30'
                   }`}
                 >
@@ -267,7 +267,7 @@ export function StakingWizard({ onComplete }: StakingWizardProps) {
                   )}
                 </span>
                 <span className={`${
-                  isStepDone(i) ? 'text-emerald-400' : isStepActive(i) ? 'text-[#C084FC]' : 'text-white/30'
+                  isStepDone(i) ? 'text-emerald-400' : isStepActive(i) ? 'text-[#d5f972]' : 'text-white/30'
                 }`}>
                   {s.label}
                 </span>
@@ -306,7 +306,7 @@ export function StakingWizard({ onComplete }: StakingWizardProps) {
             <h3 className="text-lg font-medium text-white mb-1">Staking Complete!</h3>
             <p className="text-sm text-white/40 mb-4">
               You received approximately{' '}
-              <span className="font-semibold text-[#C084FC]">
+              <span className="font-semibold text-[#d5f972]">
                 {result?.wstonReceived
                   ? parseFloat(result.wstonReceived).toLocaleString(undefined, { maximumFractionDigits: 4 })
                   : '-'}{' '}
@@ -386,7 +386,7 @@ function TokenBadge({ label, active, done }: { label: string; active: boolean; d
         done
           ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
           : active
-            ? 'bg-[#A855F7]/15 border border-[#A855F7]/30 text-[#C084FC] shadow-[0_0_10px_rgba(168,85,247,0.15)]'
+            ? 'bg-[#c4f547]/15 border border-[#c4f547]/30 text-[#d5f972] shadow-[0_0_10px_rgba(196,245,71,0.15)]'
             : 'bg-white/5 border border-white/10 text-white/40'
       }`}
     >
@@ -396,7 +396,7 @@ function TokenBadge({ label, active, done }: { label: string; active: boolean; d
         </svg>
       )}
       {active && !done && (
-        <span className="w-1.5 h-1.5 rounded-full bg-[#A855F7] animate-pulse" />
+        <span className="w-1.5 h-1.5 rounded-full bg-[#c4f547] animate-pulse" />
       )}
       {label}
     </div>

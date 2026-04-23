@@ -81,8 +81,8 @@ export default function InstitutionalPage() {
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#A855F7]/5 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-[#A855F7]/[0.03] rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#c4f547]/5 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-[#c4f547]/[0.03] rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-5xl mx-auto px-6 lg:px-12 pt-32 pb-20 relative">
           {/* Breadcrumbs */}
@@ -94,8 +94,8 @@ export default function InstitutionalPage() {
 
           {/* Label */}
           <div className="flex items-center gap-3 mb-6">
-            <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#A855F7] to-transparent" />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C084FC] font-mono">
+            <div className="h-px flex-1 max-w-[40px] bg-gradient-to-r from-[#c4f547] to-transparent" />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d5f972] font-mono">
               For Institutions
             </span>
           </div>
@@ -105,7 +105,7 @@ export default function InstitutionalPage() {
             className="text-4xl md:text-6xl font-light mb-6 tracking-tight max-w-3xl"
             style={{ fontFamily: 'var(--font-serif), serif' }}
           >
-            <span className="italic text-[#A855F7]">Enterprise-Grade</span>{' '}
+            <span className="italic text-[#c4f547]">Enterprise-Grade</span>{' '}
             <span className="text-white">DeFi Infrastructure</span>
           </h1>
 
@@ -155,16 +155,16 @@ export default function InstitutionalPage() {
           {FEATURES.map((feature) => (
             <div
               key={feature.title}
-              className="card group hover:border-[#A855F7]/20 transition-all duration-300"
+              className="card group hover:border-[#c4f547]/20 transition-all duration-300"
             >
               <div
                 className="w-12 h-12 rounded-xl flex items-center justify-center mb-5 transition-colors duration-300"
                 style={{
-                  background: 'rgba(168, 85, 247, 0.08)',
-                  border: '1px solid rgba(168, 85, 247, 0.15)',
+                  background: 'rgba(196, 245, 71, 0.08)',
+                  border: '1px solid rgba(196, 245, 71, 0.15)',
                 }}
               >
-                <span className="text-[#A855F7]">{feature.icon}</span>
+                <span className="text-[#c4f547]">{feature.icon}</span>
               </div>
               <h3
                 className="text-lg font-light text-white mb-3"
