@@ -40,10 +40,16 @@ bytecode_hash = "none"
 [rpc_endpoints]
 mainnet = "${RPC_URL_MAINNET}"
 hyper_mainnet = "${RPC_URL_HYPER_MAINNET}"
+optimism = "${RPC_URL_OPTIMISM}"
+arbitrum = "${RPC_URL_ARBITRUM}"
+polygon = "${RPC_URL_POLYGON}"
 
 [etherscan]
 mainnet = { key = "${ETHERSCAN_API_KEY}", chain = 1, url = "https://api.etherscan.io/api" }
 hyperevm_mainnet = { key = "${ETHERSCAN_API_KEY}", chain = 999, url = "https://api.etherscan.io/v2/api?chainid=999" }
+optimism = { key = "${ETHERSCAN_API_KEY}", chain = 10, url = "https://api-optimistic.etherscan.io/api" }
+arbitrum = { key = "${ETHERSCAN_API_KEY}", chain = 42161, url = "https://api.arbiscan.io/api" }
+polygon = { key = "${ETHERSCAN_API_KEY}", chain = 137, url = "https://api.polygonscan.com/api" }
 
 [profile.test_medium]
 src = "src"
