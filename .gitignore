@@ -40,3 +40,11 @@ frontend/.next/
 frontend/node_modules/
 frontend/.env.local
 frontend/data/
+
+# superpowers planning artifacts (brainstorm/plan files, not product code)
+.superpowers/
+**/.superpowers/
+
+# tokagentos: native-plugins were intentionally removed in cleanup (Task #11).
+# Don't re-track if they reappear locally (e.g. via a stale checkout).
+tokagentos/packages/native-plugins/
