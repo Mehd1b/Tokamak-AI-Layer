@@ -17,6 +17,11 @@ node_modules/
 .env
 .env.local
 .env.*.local
+.env.prod
+.env.staging
+# tokagent-billing-server Fly secrets — only the .example template is tracked
+tokagentos/scripts/billing-server/.env.prod
+tokagentos/scripts/billing-server/.env.staging
 
 # Worktrees
 .worktrees/
