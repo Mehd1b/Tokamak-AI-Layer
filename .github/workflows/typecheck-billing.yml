@@ -1,0 +1,52 @@
+name: typecheck-billing
+
+# PR gate. Runs on every push to a branch that touches the billing surface
+# (packages/billing, plugin-tokagent-billing, or the deploy infra).
+# Independent from the main release CI to keep feedback fast on billing-only PRs.
+
+on:
+  pull_request:
+    paths:
+      - 'tokagentos/packages/billing/**'
+      - 'tokagentos/plugins/plugin-tokagent-billing/**'
+      - 'tokagentos/apps/billing-server/**'
+      - 'tokagentos/scripts/billing-server/**'
+      - '.github/workflows/typecheck-billing.yml'
+      - '.github/workflows/deploy-billing-server.yml'
+  push:
+    branches:
+      - master
+      - main
+      - alpha
+    paths:
+      - 'tokagentos/packages/billing/**'
+      - 'tokagentos/plugins/plugin-tokagent-billing/**'
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: '1.3'
+
+      - name: Install workspace deps
+        run: bun install --frozen-lockfile
+        working-directory: tokagentos
+
+      - name: Typecheck @tokagentos/billing
+        working-directory: tokagentos/packages/billing
+        run: ./node_modules/.bin/tsc --noEmit
+
+      - name: Typecheck @tokagent/plugin-tokagent-billing
+        working-directory: tokagentos/plugins/plugin-tokagent-billing
+        run: ./node_modules/.bin/tsc --noEmit
+
+      - name: Test @tokagent/plugin-tokagent-billing
+        working-directory: tokagentos/plugins/plugin-tokagent-billing
+        run: bun test
