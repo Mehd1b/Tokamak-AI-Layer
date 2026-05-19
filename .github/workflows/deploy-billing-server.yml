@@ -1,12 +1,12 @@
 name: deploy-billing-server
 
 # Deploys tokagent-billing-server to Fly.io on tag `billing-server-v*`.
-# Migrations run PRE-DEPLOY against the production Neon database; if the
+# Migrations run PRE-DEPLOY against the production Postgres database; if the
 # migration fails, the deploy aborts and prod stays on the previous revision.
 #
 # Required GitHub secrets (Settings → Secrets and variables → Actions):
 #   FLY_API_TOKEN          — flyctl tokens create deploy
-#   NEON_BILLING_URL       — same value as the BILLING_DATABASE_URL Fly secret
+#   BILLING_DATABASE_URL   — same value as the BILLING_DATABASE_URL Fly secret
 #                            (this workflow needs DB access to run migrations)
 
 on:
@@ -44,10 +44,10 @@ jobs:
           ./packages/billing/node_modules/.bin/tsc --noEmit -p packages/billing/tsconfig.json
           ./plugins/plugin-tokagent-billing/node_modules/.bin/tsc --noEmit -p plugins/plugin-tokagent-billing/tsconfig.json
 
-      - name: Run Drizzle migrations (production Neon, idempotent)
+      - name: Run Drizzle migrations (production Postgres, idempotent)
         working-directory: tokagentos/packages/billing
         env:
-          DATABASE_URL: ${{ secrets.NEON_BILLING_URL }}
+          DATABASE_URL: ${{ secrets.BILLING_DATABASE_URL }}
         run: bun run drizzle-kit migrate
 
       - name: Setup flyctl
@@ -68,7 +68,9 @@ jobs:
         run: sleep 20
 
       - name: Post-deploy readiness check
+        env:
+          BILLING_SERVER_URL: ${{ vars.BILLING_SERVER_URL }}
         run: |
           bun tokagentos/scripts/billing-server/check-readiness.ts \
-            https://gateway.tokagent.ai \
+            "${BILLING_SERVER_URL}" \
             --full
