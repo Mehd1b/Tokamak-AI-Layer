@@ -49,4 +49,7 @@ jobs:
 
       - name: Test @tokagent/plugin-tokagent-billing
         working-directory: tokagentos/plugins/plugin-tokagent-billing
-        run: bun test
+        # Plugin tests use vitest (vi.importActual / vi.stubEnv / etc.),
+        # which `bun test` does NOT implement. Invoke via the package
+        # script so it actually runs vitest.
+        run: bun run test
