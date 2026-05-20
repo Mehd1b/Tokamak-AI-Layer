@@ -21,6 +21,8 @@ on:
     paths:
       - 'tokagentos/packages/billing/**'
       - 'tokagentos/plugins/plugin-tokagent-billing/**'
+      - 'tokagentos/bun.lock'
+      - '.github/workflows/typecheck-billing.yml'
 
 jobs:
   typecheck:
