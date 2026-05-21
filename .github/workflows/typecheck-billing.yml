@@ -54,6 +54,17 @@ jobs:
         run: bun install
         working-directory: tokagentos
 
+      - name: Build workspace deps the billing plugin imports
+        # @tokagent/plugin-tokagent-billing imports @tokagentos/core
+        # (= packages/typescript) and @tokagentos/billing at runtime.
+        # Their dist/ output is gitignored and vitest can't run without
+        # it ("Failed to resolve entry for package @tokagentos/core").
+        # Use turbo to build only the transitive dep graph — full
+        # `bun run build` rebuilds the entire monorepo (slow + flaky on
+        # unrelated packages we don't typecheck here).
+        working-directory: tokagentos
+        run: bunx turbo run build --filter=@tokagentos/core --filter=@tokagentos/billing
+
       - name: Typecheck @tokagentos/billing
         working-directory: tokagentos/packages/billing
         run: ./node_modules/.bin/tsc --noEmit
